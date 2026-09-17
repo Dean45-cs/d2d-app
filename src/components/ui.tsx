@@ -113,6 +113,11 @@ export function EmptyState({
   );
 }
 
+/** "1 Straße" statt "1 Straßen". */
+export function plural(count: number, one: string, many: string): string {
+  return `${count} ${count === 1 ? one : many}`;
+}
+
 export function percent(part: number, total: number): string {
   if (!total) return "–";
   return `${Math.round((part / total) * 100)} %`;

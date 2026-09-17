@@ -1,6 +1,7 @@
 import { requireRole, requireUser } from "@/lib/auth";
 import { getDb } from "@/lib/db";
 import { getTerritory } from "@/lib/queries";
+import { parseArea } from "@/lib/geo/area";
 import { handle, optionalNumber, optionalText } from "@/lib/api";
 
 export const dynamic = "force-dynamic";
@@ -39,6 +40,10 @@ export async function PATCH(
       values.push(value);
     };
 
+    // Die Flaeche laesst sich jederzeit neu auf der Karte zeichnen; null loescht sie.
+    if (body.area !== undefined) {
+      set("area_json", body.area === null ? "" : JSON.stringify(parseArea(body.area)));
+    }
     if (body.name !== undefined) set("name", optionalText(body.name, 120));
     if (body.city !== undefined) set("city", optionalText(body.city, 120));
     if (body.postalCode !== undefined) set("postal_code", optionalText(body.postalCode, 10));

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { AuthError } from "./auth";
+import type { StreetInput } from "./queries";
 
 /** Einheitliche Fehlerbehandlung fuer alle API-Routen. */
 export async function handle<T>(fn: () => Promise<T>): Promise<NextResponse> {
@@ -32,4 +33,33 @@ export function optionalNumber(value: unknown): number | null {
   if (value === null || value === undefined || value === "") return null;
   const n = Number(value);
   return Number.isFinite(n) ? n : null;
+}
+
+/**
+ * Strassenliste aus der Kartenauswahl pruefen.
+ * Erwartet [{ name, houseNumbers, units, lat, lng }, ...].
+ */
+export function parseStreetList(value: unknown): StreetInput[] {
+  if (!Array.isArray(value)) return [];
+  return value
+    .slice(0, 500)
+    .map((entry) => {
+      const item = (entry ?? {}) as Record<string, unknown>;
+      const name = optionalText(item.name, 120);
+      if (!name) return null;
+      const units = Math.max(0, Math.min(9999, Math.round(optionalNumber(item.units) ?? 0)));
+      return {
+        name,
+        houseNumbers: optionalText(item.houseNumbers, 60),
+        units,
+        lat: coordinate(item.lat, 90),
+        lng: coordinate(item.lng, 180),
+      } satisfies StreetInput;
+    })
+    .filter((entry): entry is StreetInput => entry !== null);
+}
+
+function coordinate(value: unknown, limit: number): number | null {
+  const n = optionalNumber(value);
+  return n !== null && Math.abs(n) <= limit ? n : null;
 }

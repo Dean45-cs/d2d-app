@@ -5,6 +5,7 @@ import {
   CONSUMPTION_STROM_KWH,
   annualCost,
 } from "@/lib/energy/refresh";
+import { mapTileUrl } from "@/lib/map";
 import { EnergyMapClient, type MapPoint } from "./EnergyMapClient";
 
 export const dynamic = "force-dynamic";
@@ -35,10 +36,7 @@ export default async function EnergyMapPage() {
       refresh={refresh}
       isLeader={user.role === "LEADER"}
       consumption={{ strom: CONSUMPTION_STROM_KWH, gas: CONSUMPTION_GAS_KWH }}
-      tileUrl={
-        process.env.NEXT_PUBLIC_MAP_TILE_URL ??
-        "https://tile.openstreetmap.org/{z}/{x}/{y}.png"
-      }
+      tileUrl={mapTileUrl()}
     />
   );
 }

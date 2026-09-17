@@ -1,9 +1,18 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { requireUser } from "@/lib/auth";
-import { getTerritory, listMembers, listStreets, listVisits } from "@/lib/queries";
+import {
+  getTerritory,
+  listMembers,
+  listStreets,
+  listTerritories,
+  listVisits,
+} from "@/lib/queries";
+import { readArea } from "@/lib/geo/area";
+import { mapTileUrl } from "@/lib/map";
 import { PageHeader, ProgressBar, StatusBadge, percent } from "@/components/ui";
 import { TerritoryControls } from "./TerritoryControls";
+import { TerritoryAreaCard } from "./TerritoryAreaCard";
 import { StreetList } from "./StreetList";
 
 export const dynamic = "force-dynamic";
@@ -24,6 +33,35 @@ export default async function TerritoryDetailPage({
   const streets = listStreets(territory.id);
   const members = isLeader ? listMembers(user.team_id) : [];
   const visits = listVisits(user.team_id, { territoryId: territory.id, limit: 30 });
+
+  const area = readArea(territory.area_json);
+  // Beim Nachziehen der Flaeche sollen die Nachbargebiete sichtbar sein.
+  const otherAreas = isLeader
+    ? listTerritories(user.team_id).flatMap((t) => {
+        const other = t.id === territory.id ? null : readArea(t.area_json);
+        return other ? [{ id: t.id, name: t.name, area: other }] : [];
+      })
+    : [];
+
+  const pins = streets.flatMap((street) =>
+    street.lat !== null && street.lng !== null
+      ? [
+          {
+            name: street.name,
+            lat: street.lat,
+            lng: street.lng,
+            done: street.visit_count > 0,
+            hint: [
+              street.house_numbers && `Nr. ${street.house_numbers}`,
+              street.units > 0 && `${street.units} WE`,
+              `${street.visit_count} Türen erfasst`,
+            ]
+              .filter(Boolean)
+              .join(" · "),
+          },
+        ]
+      : [],
+  );
 
   return (
     <div className="mx-auto max-w-4xl">
@@ -66,6 +104,16 @@ export default async function TerritoryDetailPage({
           </p>
         )}
       </div>
+
+      <TerritoryAreaCard
+        territoryId={territory.id}
+        name={territory.name}
+        area={area}
+        pins={pins}
+        isLeader={isLeader}
+        tileUrl={mapTileUrl()}
+        otherAreas={otherAreas}
+      />
 
       <TerritoryControls
         territory={{

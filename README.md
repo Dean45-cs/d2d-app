@@ -2,7 +2,8 @@
 
 Eine Web-App für Door-to-Door-Teams im Energievertrieb:
 
-- **Gebiete zuteilen** – Straßenlisten anlegen und einzelnen Teammitgliedern zuweisen
+- **Gebiete auf der Karte abstecken** – Fläche einkreisen, die Straßen holt die App
+  selbst aus OpenStreetMap; danach einem Teammitglied zuweisen
 - **Türen tracken** – nicht angetroffen / angetroffen / Termin / Abschluss, mit einem Daumen bedienbar
 - **Ablehnungsgründe mit einem Tap** – konfigurierbare Kachel-Auswahl statt Freitext
 - **Abschluss-Button** – speichert den Verkauf und öffnet direkt die Auftragserfassung des Partners
@@ -53,7 +54,7 @@ angelegt – praktisch zum Ausprobieren, für den Echtbetrieb weglassen.
 
 | | Teamleitung | Vertrieb |
 |---|---|---|
-| Gebiete anlegen, Straßen pflegen, zuteilen | ✅ | – |
+| Gebiete auf der Karte abstecken, Straßen pflegen, zuteilen | ✅ | – |
 | Mitarbeiter anlegen, Passwörter setzen | ✅ | – |
 | Ablehnungsgründe konfigurieren | ✅ | – |
 | Türen erfassen | ✅ | ✅ |
@@ -89,8 +90,32 @@ frei änderbar: umbenennen, ausblenden, sortieren, eigene ergänzen.
 
 ## Gebiete und Straßen
 
-Beim Anlegen eines Gebiets wird die Straßenliste einfach eingefügt – eine Straße pro Zeile.
-Hausnummern und Wohneinheiten sind optional und werden automatisch erkannt:
+### Auf der Karte abstecken (der schnelle Weg)
+
+**Gebiete → Neues Gebiet → „Auf der Karte“:**
+
+1. Ort oder PLZ ins Suchfeld tippen – oder 📍 für den eigenen Standort
+2. **Umkreis:** einmal auf die Karte tippen, Größe über den Regler (150 m – 2 km).
+   **Fläche zeichnen:** die Ecken nacheinander antippen, Punkte lassen sich nachziehen.
+3. **„Straßen im Gebiet laden“** – die App holt alle Straßen samt Hausnummern aus
+   OpenStreetMap. Einzelne Straßen lassen sich abwählen.
+4. PLZ, Ort und ein Namensvorschlag sind schon ausgefüllt; nur noch zuteilen und speichern.
+
+Schon vergebene Gebiete liegen grau gestrichelt unter der Zeichnung – so entstehen keine
+Überschneidungen. Die Gebietsliste zeigt oben alle Flächen auf einer Karte (blau = in
+Arbeit, grün = fertig, orange = pausiert, grau = offen); ein Tipp auf eine Fläche öffnet
+das Gebiet.
+
+Auf der Gebietsseite lässt sich die Fläche jederzeit neu ziehen („Fläche ändern“) und die
+Straßenliste nachladen („Straßen nachladen“) – vorhandene Straßen bleiben unberührt.
+
+Ein Gebiet ist auf **25 km²** begrenzt; ein Tagesgebiet sind meist ein bis zwei
+Quadratkilometer.
+
+### Straßenliste einfügen (der klassische Weg)
+
+Unter **„Liste einfügen“** wird die Straßenliste wie bisher eingefügt – eine Straße pro
+Zeile. Hausnummern und Wohneinheiten sind optional und werden automatisch erkannt:
 
 ```
 Bahnhofstraße 1-45; 30 WE
@@ -100,6 +125,29 @@ Lindenweg
 
 Daraus wird: Name / Hausnummernbereich / Anzahl Wohneinheiten. Die Wohneinheiten dienen als
 Nenner für den Fortschrittsbalken („18 von 30 Türen bearbeitet“).
+
+### Woher die Straßen kommen
+
+Die Daten stammen aus **OpenStreetMap**: Overpass liefert die Straßen und Hausnummern in
+der Fläche, Nominatim die Ortssuche sowie PLZ und Ort. Beides ist kostenfrei und ohne
+Zugangsdaten nutzbar – die öffentlichen Server sind aber gedrosselt und für den
+Dauerbetrieb nicht gedacht:
+
+```bash
+OVERPASS_URL=https://overpass-api.de/api/interpreter
+NOMINATIM_URL=https://nominatim.openstreetmap.org
+GEO_USER_AGENT=d2d-app (kontakt@deinefirma.de)   # bitte eintragen, sonst drohen Sperren
+GEO_COUNTRY_CODES=de,at,ch                       # Länder der Ortssuche
+```
+
+Für ein Team, das täglich Gebiete schneidet, lohnt eine eigene Overpass-Instanz oder ein
+kommerzieller Anbieter – einfach die beiden Adressen umbiegen. Die Ortssuche wird von der
+App zwischengespeichert und auf einen Aufruf pro Sekunde gebremst.
+
+**Zu den Zahlen:** Die Wohneinheiten kommen aus den OSM-Angaben zum Gebäude; fehlen sie,
+zählt jede Adresse als eine Tür. OpenStreetMap ist nicht überall gleich vollständig –
+die Zahlen sind ein guter Startwert und lassen sich in der Straßenliste nachbessern.
+Findet die App keine Straßen, hilft der Weg über „Liste einfügen“.
 
 ---
 
@@ -256,6 +304,7 @@ entstehen zwei getrennte Datenbestände.
 | Styling | Tailwind CSS v4 mit eigenen Marken-Tokens |
 | Datenbank | SQLite über `better-sqlite3` – kein Datenbankserver nötig |
 | Karte | Leaflet mit OpenStreetMap-Kacheln |
+| Gebietszuschnitt | Overpass (Straßen in der Fläche), Nominatim (Ortssuche) |
 | Login | Signiertes Session-Cookie (HMAC), Passwörter als scrypt-Hash |
 | App auf dem Handy | PWA mit Manifest, Service Worker und lokaler Erfassungs-Warteschlange |
 
@@ -279,6 +328,7 @@ src/
     auth.ts           Login, Rollen, Passwörter
     queries.ts        alle Datenbankabfragen
     energy/           Städteliste, Datenquellen-Adapter, Tagesabruf
+    geo/              Flächenberechnung und OpenStreetMap-Abfragen
     offline-queue.ts  Puffer für Türeinträge ohne Netz
   components/         UI-Bausteine, Diagramme, Navigation
 public/
@@ -312,7 +362,10 @@ npm run energy:refresh  # Energiepreise abrufen
 - HTTPS verwenden: das Session-Cookie wird in Produktion nur über HTTPS gesetzt.
 - Kartenkacheln kommen standardmäßig von OpenStreetMap. Für dauerhaften Betrieb mit
   vielen Nutzern einen eigenen Kachel-Dienst über `NEXT_PUBLIC_MAP_TILE_URL` eintragen
-  und die Nutzungsbedingungen des Anbieters beachten.
+  und die Nutzungsbedingungen des Anbieters beachten. Dasselbe gilt für die Straßensuche
+  (`OVERPASS_URL`) und die Ortssuche (`NOMINATIM_URL`).
+- Der Server muss `OVERPASS_URL` und `NOMINATIM_URL` erreichen können. Ist das gesperrt,
+  funktioniert alles weiter – die Straßen werden dann von Hand eingetragen.
 - Bei Plattformen ohne dauerhaften Dateispeicher (z. B. Vercel) ist SQLite nicht die
   richtige Wahl – dort ein Volume einbinden (Fly.io, Railway, eigener Server) oder das
   Schema auf Postgres portieren. Alle Abfragen liegen gebündelt in `src/lib/queries.ts`.

@@ -152,6 +152,24 @@ function migrate(db: Database.Database) {
       value TEXT NOT NULL
     );
   `);
+
+  // Nachtraeglich ergaenzte Spalten: aeltere Datenbanken kennen sie noch nicht,
+  // CREATE TABLE IF NOT EXISTS aendert eine vorhandene Tabelle aber nicht mehr.
+  addColumn(db, "territories", "area_json", "TEXT NOT NULL DEFAULT ''");
+  addColumn(db, "streets", "lat", "REAL");
+  addColumn(db, "streets", "lng", "REAL");
+}
+
+/** Fuegt eine Spalte hinzu, falls sie noch fehlt. */
+function addColumn(
+  db: Database.Database,
+  table: string,
+  column: string,
+  definition: string,
+): void {
+  const columns = db.prepare(`PRAGMA table_info(${table})`).all() as Array<{ name: string }>;
+  if (columns.some((c) => c.name === column)) return;
+  db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);
 }
 
 export function getDb(): Database.Database {
