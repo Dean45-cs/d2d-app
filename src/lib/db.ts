@@ -1,0 +1,176 @@
+import Database from "better-sqlite3";
+import fs from "node:fs";
+import path from "node:path";
+
+/**
+ * Zentrale SQLite-Verbindung.
+ *
+ * SQLite laeuft ohne eigenen Datenbankserver und ist fuer ein Vertriebsteam
+ * (einige Dutzend Nutzer, ein paar hunderttausend Besuche) mehr als ausreichend.
+ * Der Pfad laesst sich ueber DATABASE_PATH umstellen.
+ */
+
+declare global {
+  // eslint-disable-next-line no-var
+  var __d2dDb: Database.Database | undefined;
+}
+
+function resolveDbPath(): string {
+  const configured = process.env.DATABASE_PATH ?? "./data/d2d.db";
+  // Der Pfad kommt bewusst aus der Konfiguration; der Hinweis unterbindet nur,
+  // dass der Bundler daraufhin das gesamte Projekt in die Ausgabe kopiert.
+  const abs = path.isAbsolute(configured)
+    ? configured
+    : path.join(/* turbopackIgnore: true */ process.cwd(), configured);
+  fs.mkdirSync(path.dirname(abs), { recursive: true });
+  return abs;
+}
+
+function createDb(): Database.Database {
+  const db = new Database(resolveDbPath());
+  db.pragma("journal_mode = WAL");
+  db.pragma("foreign_keys = ON");
+  migrate(db);
+  return db;
+}
+
+function migrate(db: Database.Database) {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS teams (
+      id          INTEGER PRIMARY KEY AUTOINCREMENT,
+      name        TEXT NOT NULL,
+      created_at  TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+    CREATE TABLE IF NOT EXISTS users (
+      id            INTEGER PRIMARY KEY AUTOINCREMENT,
+      team_id       INTEGER NOT NULL REFERENCES teams(id) ON DELETE CASCADE,
+      name          TEXT NOT NULL,
+      email         TEXT NOT NULL UNIQUE,
+      password_hash TEXT NOT NULL,
+      role          TEXT NOT NULL CHECK (role IN ('LEADER','MEMBER')),
+      phone         TEXT,
+      active        INTEGER NOT NULL DEFAULT 1,
+      created_at    TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+    CREATE TABLE IF NOT EXISTS territories (
+      id               INTEGER PRIMARY KEY AUTOINCREMENT,
+      team_id          INTEGER NOT NULL REFERENCES teams(id) ON DELETE CASCADE,
+      name             TEXT NOT NULL,
+      city             TEXT NOT NULL DEFAULT '',
+      postal_code      TEXT NOT NULL DEFAULT '',
+      assigned_user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+      status           TEXT NOT NULL DEFAULT 'OPEN'
+                       CHECK (status IN ('OPEN','ACTIVE','DONE','PAUSED')),
+      note             TEXT NOT NULL DEFAULT '',
+      due_date         TEXT,
+      created_at       TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+    CREATE TABLE IF NOT EXISTS streets (
+      id            INTEGER PRIMARY KEY AUTOINCREMENT,
+      territory_id  INTEGER NOT NULL REFERENCES territories(id) ON DELETE CASCADE,
+      name          TEXT NOT NULL,
+      house_numbers TEXT NOT NULL DEFAULT '',
+      units         INTEGER NOT NULL DEFAULT 0,
+      status        TEXT NOT NULL DEFAULT 'OPEN'
+                    CHECK (status IN ('OPEN','ACTIVE','DONE')),
+      sort_order    INTEGER NOT NULL DEFAULT 0,
+      created_at    TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+    CREATE TABLE IF NOT EXISTS rejection_reasons (
+      id         INTEGER PRIMARY KEY AUTOINCREMENT,
+      team_id    INTEGER NOT NULL REFERENCES teams(id) ON DELETE CASCADE,
+      code       TEXT NOT NULL,
+      label      TEXT NOT NULL,
+      emoji      TEXT NOT NULL DEFAULT '',
+      hint       TEXT NOT NULL DEFAULT '',
+      sort_order INTEGER NOT NULL DEFAULT 0,
+      active     INTEGER NOT NULL DEFAULT 1,
+      UNIQUE (team_id, code)
+    );
+
+    CREATE TABLE IF NOT EXISTS visits (
+      id           INTEGER PRIMARY KEY AUTOINCREMENT,
+      team_id      INTEGER NOT NULL REFERENCES teams(id) ON DELETE CASCADE,
+      user_id      INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      territory_id INTEGER REFERENCES territories(id) ON DELETE SET NULL,
+      street_id    INTEGER REFERENCES streets(id) ON DELETE SET NULL,
+      house_number TEXT NOT NULL DEFAULT '',
+      outcome      TEXT NOT NULL
+                   CHECK (outcome IN ('NOT_HOME','MET_NO_SALE','APPOINTMENT','SALE')),
+      reason_id    INTEGER REFERENCES rejection_reasons(id) ON DELETE SET NULL,
+      reason_note  TEXT NOT NULL DEFAULT '',
+      energy_type  TEXT NOT NULL DEFAULT ''
+                   CHECK (energy_type IN ('','STROM','GAS','BEIDES')),
+      follow_up_at TEXT,
+      lat          REAL,
+      lng          REAL,
+      created_at   TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_visits_team_created ON visits (team_id, created_at);
+    CREATE INDEX IF NOT EXISTS idx_visits_user_created ON visits (user_id, created_at);
+    CREATE INDEX IF NOT EXISTS idx_visits_street       ON visits (street_id);
+    CREATE INDEX IF NOT EXISTS idx_streets_territory   ON streets (territory_id);
+    CREATE INDEX IF NOT EXISTS idx_territories_team    ON territories (team_id);
+
+    CREATE TABLE IF NOT EXISTS energy_prices (
+      id                INTEGER PRIMARY KEY AUTOINCREMENT,
+      postal_code       TEXT NOT NULL,
+      city              TEXT NOT NULL,
+      state             TEXT NOT NULL DEFAULT '',
+      provider          TEXT NOT NULL DEFAULT '',
+      lat               REAL NOT NULL,
+      lng               REAL NOT NULL,
+      strom_ct_kwh      REAL,
+      strom_base_eur    REAL,
+      gas_ct_kwh        REAL,
+      gas_base_eur      REAL,
+      households        INTEGER NOT NULL DEFAULT 0,
+      source            TEXT NOT NULL DEFAULT '',
+      is_demo           INTEGER NOT NULL DEFAULT 0,
+      valid_from        TEXT,
+      updated_at        TEXT NOT NULL DEFAULT (datetime('now')),
+      UNIQUE (postal_code)
+    );
+
+    CREATE TABLE IF NOT EXISTS energy_refresh_log (
+      id          INTEGER PRIMARY KEY AUTOINCREMENT,
+      started_at  TEXT NOT NULL,
+      finished_at TEXT,
+      status      TEXT NOT NULL,
+      source      TEXT NOT NULL DEFAULT '',
+      row_count   INTEGER NOT NULL DEFAULT 0,
+      message     TEXT NOT NULL DEFAULT ''
+    );
+
+    CREATE TABLE IF NOT EXISTS settings (
+      key   TEXT PRIMARY KEY,
+      value TEXT NOT NULL
+    );
+  `);
+}
+
+export function getDb(): Database.Database {
+  if (!global.__d2dDb) global.__d2dDb = createDb();
+  return global.__d2dDb;
+}
+
+export function getSetting(key: string, fallback = ""): string {
+  const row = getDb()
+    .prepare("SELECT value FROM settings WHERE key = ?")
+    .get(key) as { value: string } | undefined;
+  return row?.value ?? fallback;
+}
+
+export function setSetting(key: string, value: string): void {
+  getDb()
+    .prepare(
+      `INSERT INTO settings (key, value) VALUES (?, ?)
+       ON CONFLICT(key) DO UPDATE SET value = excluded.value`,
+    )
+    .run(key, value);
+}

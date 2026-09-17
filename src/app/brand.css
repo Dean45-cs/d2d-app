@@ -1,0 +1,59 @@
+/* ==========================================================================
+   MARKEN-DATEI  ·  hier (und nur hier) die Farben von Energie Partner 24
+   eintragen. Alle Seiten, Buttons und Diagramme ziehen sich ihre Farben
+   aus diesen Variablen - eine Aenderung hier faerbt die ganze App um.
+   ========================================================================== */
+:root {
+  /* Primaerfarbe (Kopfzeile, Links, Hauptbuttons) */
+  --brand-50: #eef6fd;
+  --brand-100: #d7eafa;
+  --brand-200: #b2d5f4;
+  --brand-300: #7db8ec;
+  --brand-400: #4295e0;
+  --brand-500: #1a76d2;
+  --brand-600: #0f5cab;
+  --brand-700: #0e4a89;
+  --brand-800: #103e70;
+  --brand-900: #0c2f56;
+  --brand-950: #071d38;
+
+  /* Strom / Erfolg */
+  --energy-300: #6ee7ad;
+  --energy-400: #34d07f;
+  --energy-500: #12b76a;
+  --energy-600: #059450;
+  --energy-700: #047a43;
+
+  /* Gas */
+  --gas-400: #fbbf24;
+  --gas-500: #f59e0b;
+  --gas-600: #d97706;
+
+  /* Signal / Ablehnung */
+  --signal-400: #f87171;
+  --signal-500: #e5484d;
+  --signal-600: #c92a2f;
+
+  /* Firmenname in der Kopfzeile */
+  --brand-name: "Energie Partner 24";
+
+  /* Diagrammfarben - gegen Farbfehlsichtigkeit geprueft (OKLab-Abstand > 20) */
+  --chart-doors: #1a76d2;
+  --chart-sales: #12b76a;
+  --chart-grid: #e2e8f0;
+}
+
+/* Im Dunkelmodus eigene, gegen den dunklen Hintergrund gepruefte Stufen */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --chart-doors: #4295e0;
+    --chart-sales: #1fae6c;
+    --chart-grid: #1e3252;
+  }
+}
+
+:root[data-theme="dark"] {
+  --chart-doors: #4295e0;
+  --chart-sales: #1fae6c;
+  --chart-grid: #1e3252;
+}

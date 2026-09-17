@@ -1,0 +1,213 @@
+@import "tailwindcss";
+@import "./brand.css";
+
+@theme inline {
+  --color-brand-50: var(--brand-50);
+  --color-brand-100: var(--brand-100);
+  --color-brand-200: var(--brand-200);
+  --color-brand-300: var(--brand-300);
+  --color-brand-400: var(--brand-400);
+  --color-brand-500: var(--brand-500);
+  --color-brand-600: var(--brand-600);
+  --color-brand-700: var(--brand-700);
+  --color-brand-800: var(--brand-800);
+  --color-brand-900: var(--brand-900);
+  --color-brand-950: var(--brand-950);
+
+  --color-energy-300: var(--energy-300);
+  --color-energy-400: var(--energy-400);
+  --color-energy-500: var(--energy-500);
+  --color-energy-600: var(--energy-600);
+  --color-energy-700: var(--energy-700);
+
+  --color-gas-400: var(--gas-400);
+  --color-gas-500: var(--gas-500);
+  --color-gas-600: var(--gas-600);
+
+  --color-signal-400: var(--signal-400);
+  --color-signal-500: var(--signal-500);
+  --color-signal-600: var(--signal-600);
+
+  --font-sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue",
+    Arial, sans-serif;
+}
+
+:root {
+  --surface: #f4f7fb;
+  --card: #ffffff;
+  --ink: #0f172a;
+  --ink-muted: #5b6b82;
+  --line: #e2e8f0;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --surface: #0a1526;
+    --card: #101f36;
+    --ink: #eaf1fb;
+    --ink-muted: #97aac4;
+    --line: #1e3252;
+  }
+}
+
+:root[data-theme="dark"] {
+  --surface: #0a1526;
+  --card: #101f36;
+  --ink: #eaf1fb;
+  --ink-muted: #97aac4;
+  --line: #1e3252;
+}
+
+html,
+body {
+  background: var(--surface);
+  color: var(--ink);
+}
+
+body {
+  font-family: var(--font-sans);
+  -webkit-tap-highlight-color: transparent;
+  overscroll-behavior-y: none;
+}
+
+/* ------------------------------ Bausteine ------------------------------- */
+
+@layer components {
+  .card {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 1rem;
+    box-shadow: 0 1px 2px rgb(15 23 42 / 0.04),
+      0 8px 24px -16px rgb(15 23 42 / 0.25);
+  }
+
+  .muted {
+    color: var(--ink-muted);
+  }
+
+  .hairline {
+    border-color: var(--line);
+  }
+
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    border-radius: 0.75rem;
+    padding: 0.625rem 1.125rem;
+    font-weight: 600;
+    font-size: 0.9375rem;
+    line-height: 1.25rem;
+    transition: filter 0.15s ease, transform 0.08s ease;
+    cursor: pointer;
+    border: 1px solid transparent;
+  }
+  .btn:active:not(:disabled) {
+    transform: translateY(1px);
+  }
+  .btn:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+  }
+  .btn-primary {
+    background: var(--brand-600);
+    color: #fff;
+  }
+  .btn-primary:hover:not(:disabled) {
+    filter: brightness(1.08);
+  }
+  .btn-success {
+    background: var(--energy-600);
+    color: #fff;
+  }
+  .btn-success:hover:not(:disabled) {
+    filter: brightness(1.08);
+  }
+  .btn-ghost {
+    background: transparent;
+    color: var(--ink);
+    border-color: var(--line);
+  }
+  .btn-ghost:hover:not(:disabled) {
+    background: color-mix(in srgb, var(--brand-500) 8%, transparent);
+  }
+  .btn-danger {
+    background: var(--signal-500);
+    color: #fff;
+  }
+
+  .input,
+  .select,
+  .textarea {
+    width: 100%;
+    background: var(--card);
+    color: var(--ink);
+    border: 1px solid var(--line);
+    border-radius: 0.75rem;
+    padding: 0.625rem 0.875rem;
+    font-size: 1rem;
+    outline: none;
+  }
+  .input:focus,
+  .select:focus,
+  .textarea:focus {
+    border-color: var(--brand-400);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--brand-400) 25%, transparent);
+  }
+
+  .label {
+    display: block;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: var(--ink-muted);
+    margin-bottom: 0.375rem;
+  }
+
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    border-radius: 999px;
+    padding: 0.1875rem 0.625rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+
+  /* Grosse Aktionsflaechen fuer die Bedienung mit einer Hand an der Tuer */
+  .tap-tile {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.375rem;
+    min-height: 5.5rem;
+    padding: 0.875rem 0.5rem;
+    border-radius: 1rem;
+    border: 1px solid var(--line);
+    background: var(--card);
+    font-weight: 600;
+    font-size: 0.875rem;
+    text-align: center;
+    line-height: 1.2;
+    cursor: pointer;
+    transition: transform 0.08s ease, border-color 0.15s ease;
+  }
+  .tap-tile:active {
+    transform: scale(0.97);
+  }
+  .tap-tile-emoji {
+    font-size: 1.625rem;
+    line-height: 1;
+  }
+}
+
+/* Leaflet-Grundstile (lokal eingebunden, kein externes CSS noetig) */
+.leaflet-container {
+  height: 100%;
+  width: 100%;
+  background: #dfe6ee;
+  font-family: var(--font-sans);
+  z-index: 0;
+}
