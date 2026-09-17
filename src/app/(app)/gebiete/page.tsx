@@ -1,8 +1,11 @@
 import Link from "next/link";
 import { requireUser } from "@/lib/auth";
 import { listMembers, listTerritories } from "@/lib/queries";
+import { readArea } from "@/lib/geo/area";
+import { mapTileUrl } from "@/lib/map";
 import { EmptyState, PageHeader, ProgressBar, StatusBadge, percent } from "@/components/ui";
 import { NewTerritoryButton } from "./NewTerritory";
+import { TerritoryOverviewMap, type OverviewTerritory } from "./TerritoryOverviewMap";
 
 export const dynamic = "force-dynamic";
 
@@ -14,6 +17,24 @@ export default async function TerritoriesPage() {
     userId: isLeader ? undefined : user.id,
   });
   const members = isLeader ? listMembers(user.team_id) : [];
+  const tileUrl = mapTileUrl();
+
+  // Nur Gebiete mit gezeichneter Flaeche kommen auf die Uebersichtskarte.
+  const mapped: OverviewTerritory[] = territories.flatMap((t) => {
+    const area = readArea(t.area_json);
+    return area
+      ? [
+          {
+            id: t.id,
+            name: t.name,
+            area,
+            status: t.status,
+            assignee: t.assignee_name,
+            streets: t.street_count,
+          },
+        ]
+      : [];
+  });
 
   return (
     <div className="mx-auto max-w-5xl">
@@ -21,18 +42,28 @@ export default async function TerritoriesPage() {
         title={isLeader ? "Gebiete" : "Meine Gebiete"}
         subtitle={
           isLeader
-            ? "Straßen anlegen und dem Team zuteilen"
+            ? "Gebiet auf der Karte abstecken, Straßen automatisch laden und zuteilen"
             : "Deine zugeteilten Straßen und dein Fortschritt"
         }
-        action={isLeader ? <NewTerritoryButton members={members} /> : undefined}
+        action={
+          isLeader ? (
+            <NewTerritoryButton
+              members={members}
+              tileUrl={tileUrl}
+              existingAreas={mapped.map((t) => ({ id: t.id, name: t.name, area: t.area }))}
+            />
+          ) : undefined
+        }
       />
+
+      <TerritoryOverviewMap tileUrl={tileUrl} territories={mapped} />
 
       {territories.length === 0 ? (
         <EmptyState
           title={isLeader ? "Noch keine Gebiete" : "Dir ist noch kein Gebiet zugeteilt"}
           text={
             isLeader
-              ? "Lege ein Gebiet an, füge die Straßen ein und weise es einem Teammitglied zu."
+              ? "Neues Gebiet anlegen, auf der Karte einkreisen – die Straßen holt die App aus OpenStreetMap."
               : "Sobald deine Teamleitung dir ein Gebiet zuweist, erscheint es hier."
           }
         />

@@ -25,6 +25,8 @@ export interface Territory {
   status: TerritoryStatus;
   note: string;
   due_date: string | null;
+  /** Auf der Karte gezeichnete Flaeche als JSON ([[lat, lng], ...]), sonst "". */
+  area_json: string;
   created_at: string;
 }
 
@@ -36,6 +38,9 @@ export interface Street {
   units: number;
   status: "OPEN" | "ACTIVE" | "DONE";
   sort_order: number;
+  /** Mittelpunkt der Strasse, sofern sie aus der Karte uebernommen wurde. */
+  lat: number | null;
+  lng: number | null;
   created_at: string;
 }
 

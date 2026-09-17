@@ -94,6 +94,7 @@ export function EnergyMapClient({
 
   useEffect(() => {
     let cancelled = false;
+    let sizeTimer: ReturnType<typeof setTimeout> | undefined;
 
     (async () => {
       const L = await import("leaflet");
@@ -111,11 +112,14 @@ export function EnergyMapClient({
       }).addTo(map);
       mapRef.current = map;
       // Nach dem Einblenden neu vermessen, sonst bleiben Kacheln grau.
-      setTimeout(() => map.invalidateSize(), 150);
+      sizeTimer = setTimeout(() => map.invalidateSize(), 150);
     })();
 
     return () => {
       cancelled = true;
+      clearTimeout(sizeTimer);
+      // Laufende Flug-/Zoom-Animation zuerst stoppen.
+      mapRef.current?.stop();
       mapRef.current?.remove();
       mapRef.current = null;
     };

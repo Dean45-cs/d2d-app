@@ -109,11 +109,14 @@ export function createTerritory(input: {
   assignedUserId: number | null;
   note: string;
   dueDate: string | null;
+  /** Auf der Karte gezeichnete Flaeche als JSON, sonst leer. */
+  areaJson?: string;
 }): number {
   const result = getDb()
     .prepare(
-      `INSERT INTO territories (team_id, name, city, postal_code, assigned_user_id, note, due_date, status)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO territories
+         (team_id, name, city, postal_code, assigned_user_id, note, due_date, status, area_json)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .run(
       input.teamId,
@@ -124,8 +127,68 @@ export function createTerritory(input: {
       input.note,
       input.dueDate,
       input.assignedUserId ? "ACTIVE" : "OPEN",
+      input.areaJson ?? "",
     );
   return result.lastInsertRowid as number;
+}
+
+/** Gezeichnete Flaeche eines bestehenden Gebiets ersetzen. */
+export function setTerritoryArea(territoryId: number, areaJson: string): void {
+  getDb().prepare("UPDATE territories SET area_json = ? WHERE id = ?").run(areaJson, territoryId);
+}
+
+export interface StreetInput {
+  name: string;
+  houseNumbers: string;
+  units: number;
+  lat: number | null;
+  lng: number | null;
+}
+
+/**
+ * Strassen aus der Kartenauswahl uebernehmen - inklusive Koordinate, damit sie
+ * spaeter auf der Gebietskarte zu sehen sind. Bereits vorhandene Strassen des
+ * Gebiets werden uebersprungen, doppelte Eintraege gibt es also nicht.
+ */
+export function addStreetEntries(territoryId: number, entries: StreetInput[]): number {
+  const db = getDb();
+  const existingRows = db
+    .prepare("SELECT name FROM streets WHERE territory_id = ?")
+    .all(territoryId) as Array<{ name: string }>;
+  const known = new Set(existingRows.map((r) => r.name.toLocaleLowerCase("de-DE")));
+  const maxOrder = db
+    .prepare("SELECT COALESCE(MAX(sort_order), 0) AS m FROM streets WHERE territory_id = ?")
+    .get(territoryId) as { m: number };
+
+  const insert = db.prepare(
+    `INSERT INTO streets (territory_id, name, house_numbers, units, sort_order, lat, lng)
+     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+  );
+
+  let order = maxOrder.m;
+  let added = 0;
+  const run = db.transaction(() => {
+    for (const entry of entries) {
+      const name = entry.name.trim();
+      if (!name) continue;
+      const key = name.toLocaleLowerCase("de-DE");
+      if (known.has(key)) continue;
+      known.add(key);
+      order += 1;
+      added += 1;
+      insert.run(
+        territoryId,
+        name,
+        entry.houseNumbers,
+        entry.units,
+        order,
+        entry.lat,
+        entry.lng,
+      );
+    }
+  });
+  run();
+  return added;
 }
 
 /**
