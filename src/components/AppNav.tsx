@@ -97,7 +97,7 @@ export function MobileTopBar({ userName }: { userName: string }) {
     router.refresh();
   }
   return (
-    <header className="sticky top-0 z-20 flex items-center justify-between bg-brand-900 px-4 py-3 text-white md:hidden">
+    <header className="sticky top-0 z-20 flex items-center justify-between bg-brand-900 px-4 py-3 pt-[max(0.75rem,env(safe-area-inset-top))] text-white md:hidden">
       <Logo size={30} />
       <button
         onClick={logout}
@@ -114,7 +114,7 @@ export function MobileTabBar({ items }: { items: NavItem[] }) {
   const pathname = usePathname();
   return (
     <nav
-      className="fixed inset-x-0 bottom-0 z-20 grid border-t bg-[var(--card)] pb-[env(safe-area-inset-bottom)] md:hidden"
+      className="fixed inset-x-0 bottom-0 z-20 grid border-t bg-[var(--card)] pb-[max(0.25rem,env(safe-area-inset-bottom))] md:hidden"
       style={{
         gridTemplateColumns: `repeat(${items.length}, minmax(0, 1fr))`,
         borderColor: "var(--line)",

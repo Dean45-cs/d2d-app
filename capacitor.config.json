@@ -1,0 +1,19 @@
+{
+  "_hinweis": [
+    "Konfiguration fuer den spaeteren App-Store-Weg (Capacitor).",
+    "Fuer die Installation ueber den Home-Bildschirm wird diese Datei NICHT gebraucht.",
+    "Anleitung: docs/IPHONE-IPAD.md",
+    "Vor dem Bauen unter server.url die eigene HTTPS-Adresse eintragen."
+  ],
+  "appId": "de.energiepartner24.vertrieb",
+  "appName": "EP24 Vertrieb",
+  "webDir": "public",
+  "server": {
+    "url": "https://d2d-app.fly.dev",
+    "cleartext": false
+  },
+  "ios": {
+    "contentInset": "always",
+    "backgroundColor": "#0c2f56"
+  }
+}

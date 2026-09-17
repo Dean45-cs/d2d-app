@@ -8,9 +8,14 @@ Eine Web-App für Door-to-Door-Teams im Energievertrieb:
 - **Abschluss-Button** – speichert den Verkauf und öffnet direkt die Auftragserfassung des Partners
 - **Energiekarte** – zeigt täglich aktualisiert, wo der Grundversorger besonders teuer ist
 - **Auswertung** – Antreff- und Abschlussquoten je Mitarbeiter, Gebiet und Zeitraum
+- **Installierbar auf iPhone und iPad** – eigenes Symbol, Vollbild ohne Browserleiste,
+  Erfassung funktioniert auch ohne Empfang
 
 Die Oberfläche ist mobil-first (der Außendienst arbeitet am Handy), das Leitungs-Dashboard
 funktioniert zusätzlich am Desktop.
+
+**Installation auf dem Handy und Weg in den App Store:
+[docs/IPHONE-IPAD.md](docs/IPHONE-IPAD.md)**
 
 ---
 
@@ -190,6 +195,51 @@ beim Austauschen bitte den Kontrast im Blick behalten.
 
 ---
 
+## Auf dem Handy installieren
+
+Die App ist eine installierbare Web-App (PWA). Auf dem iPhone in **Safari** öffnen,
+Teilen-Symbol → „Zum Home-Bildschirm“ → „Hinzufügen“. Danach startet sie mit eigenem
+Symbol im Vollbild. Die Anleitung dazu zeigt die App beim ersten Öffnen selbst an.
+
+Voraussetzung ist eine erreichbare **HTTPS**-Adresse – ohne HTTPS gibt es weder
+Installation noch Service Worker.
+
+**Erfassung ohne Empfang:** Tippt jemand im Treppenhaus ohne Netz ein Ergebnis, landet der
+Eintrag im Speicher des Geräts. Ein Banner zeigt, wie viele Einträge warten; sobald wieder
+Verbindung besteht, werden sie automatisch nachgesendet (bei erneutem Öffnen der App, beim
+Wechsel auf „online“ und alle 30 Sekunden). Einträge, die der Server dauerhaft ablehnt –
+etwa weil das Gebiet gelöscht wurde – werden verworfen, damit die Schlange nicht blockiert.
+
+Der Service Worker speichert bewusst **nur** JavaScript, CSS und Icons zwischen, niemals
+HTML mit Teamdaten. So kann auf einem geteilten Gerät nach dem Abmelden keine gecachte
+Seite mehr auftauchen.
+
+Alles Weitere – Livegang in 15 Minuten, App-Store-Weg, Stolpersteine – steht in
+[docs/IPHONE-IPAD.md](docs/IPHONE-IPAD.md).
+
+---
+
+## Livegang
+
+Es liegt ein `Dockerfile` (Next.js im Standalone-Modus) und eine Beispiel-`fly.toml` bei:
+
+```bash
+fly apps create d2d-app
+fly volumes create d2d_data --region fra --size 1
+fly secrets set SESSION_SECRET="$(node -e "console.log(require('crypto').randomBytes(32).toString('hex'))")"
+fly deploy
+fly ssh console -C "npx tsx scripts/seed.ts"
+```
+
+Geht genauso bei Railway, Render, Hetzner oder einem eigenen Server – Hauptsache, es gibt
+**dauerhaften Dateispeicher** für die SQLite-Datei. **Vercel und Netlify funktionieren
+nicht**, weil dort das Dateisystem nach jedem Aufruf verworfen wird.
+
+Mit Volume darf immer nur **eine** Maschine laufen (`min_machines_running = 1`), sonst
+entstehen zwei getrennte Datenbestände.
+
+---
+
 ## Technik
 
 | | |
@@ -199,6 +249,7 @@ beim Austauschen bitte den Kontrast im Blick behalten.
 | Datenbank | SQLite über `better-sqlite3` – kein Datenbankserver nötig |
 | Karte | Leaflet mit OpenStreetMap-Kacheln |
 | Login | Signiertes Session-Cookie (HMAC), Passwörter als scrypt-Hash |
+| App auf dem Handy | PWA mit Manifest, Service Worker und lokaler Erfassungs-Warteschlange |
 
 ### Struktur
 
@@ -220,7 +271,12 @@ src/
     auth.ts           Login, Rollen, Passwörter
     queries.ts        alle Datenbankabfragen
     energy/           Städteliste, Datenquellen-Adapter, Tagesabruf
+    offline-queue.ts  Puffer für Türeinträge ohne Netz
   components/         UI-Bausteine, Diagramme, Navigation
+public/
+  manifest.webmanifest, sw.js, offline.html, App-Icons
+docs/
+  IPHONE-IPAD.md      Installation auf dem Handy und App-Store-Weg
 scripts/
   seed.ts             Ersteinrichtung
   refresh-energy.ts   Tagesabruf für Cron

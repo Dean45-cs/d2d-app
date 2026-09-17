@@ -1,12 +1,21 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
-import type { StreetWithStats } from "@/lib/queries";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import type { StreetWithStats, Totals, VisitRow } from "@/lib/queries";
 import type { RejectionReason, VisitOutcome } from "@/lib/types";
-import type { Totals, VisitRow } from "@/lib/queries";
+import { OUTCOME_LABEL } from "@/lib/types";
 import { IconArrowRight, IconCheck } from "@/components/icons";
 import { StatTile } from "@/components/ui";
+import {
+  enqueue,
+  flush,
+  getQueue,
+  remove as removeQueued,
+  startAutoFlush,
+  subscribe,
+  type QueuedVisit,
+} from "@/lib/offline-queue";
 
 type TerritoryLite = {
   id: number;
@@ -16,6 +25,11 @@ type TerritoryLite = {
 };
 
 type EnergyType = "STROM" | "GAS" | "BEIDES";
+
+type SaveResult =
+  | { status: "saved"; id: number }
+  | { status: "queued" }
+  | { status: "error" };
 
 interface Props {
   territories: TerritoryLite[];
@@ -48,20 +62,30 @@ export function TourClient({
   const [streetId, setStreetId] = useState<number | null>(null);
   const [houseNumber, setHouseNumber] = useState("");
   const [product, setProduct] = useState<EnergyType>("BEIDES");
-  const [sheet, setSheet] = useState<null | "reason" | "sale">(null);
+  const [sheet, setSheet] = useState<null | "reason">(null);
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const [lastVisitId, setLastVisitId] = useState<number | null>(null);
   const [position, setPosition] = useState<{ lat: number; lng: number } | null>(null);
+  const [pending, setPending] = useState<QueuedVisit[]>([]);
+  const [online, setOnline] = useState(true);
 
-  // Zuletzt gewähltes Produkt merken, damit an der Tür kein Extra-Tap nötig ist.
+  /* --------------------------- Gerät & Umgebung --------------------------- */
+
+  // Zuletzt gewähltes Produkt und Straße merken – spart Taps an der Tür.
   useEffect(() => {
-    const stored = window.localStorage.getItem("d2d_product");
-    if (stored === "STROM" || stored === "GAS" || stored === "BEIDES") {
-      setProduct(stored);
+    const storedProduct = window.localStorage.getItem("d2d_product");
+    if (storedProduct === "STROM" || storedProduct === "GAS" || storedProduct === "BEIDES") {
+      setProduct(storedProduct);
     }
-  }, []);
+    const storedStreet = Number(window.localStorage.getItem("d2d_street"));
+    if (storedStreet && streets.some((s) => s.id === storedStreet)) {
+      setStreetId(storedStreet);
+      const street = streets.find((s) => s.id === storedStreet);
+      if (street) setTerritoryId(street.territory_id);
+    }
+  }, [streets]);
 
   useEffect(() => {
     if (!navigator.geolocation) return;
@@ -78,6 +102,40 @@ export function TourClient({
     return () => clearTimeout(timer);
   }, [toast]);
 
+  // Warteschlange beobachten und automatisch nachsenden
+  useEffect(() => {
+    setPending(getQueue());
+    setOnline(navigator.onLine);
+
+    const unsubscribe = subscribe(setPending);
+    const stopAutoFlush = startAutoFlush((result) => {
+      if (result.sent > 0) {
+        setToast(
+          result.sent === 1
+            ? "1 gepufferter Eintrag wurde gesendet"
+            : `${result.sent} gepufferte Einträge wurden gesendet`,
+        );
+        router.refresh();
+      }
+      if (result.rejected > 0) {
+        setToast(`${result.rejected} Eintrag/Einträge konnten nicht gespeichert werden`);
+      }
+    });
+
+    const update = () => setOnline(navigator.onLine);
+    window.addEventListener("online", update);
+    window.addEventListener("offline", update);
+
+    return () => {
+      unsubscribe();
+      stopAutoFlush();
+      window.removeEventListener("online", update);
+      window.removeEventListener("offline", update);
+    };
+  }, [router]);
+
+  /* -------------------------------- Auswahl ------------------------------- */
+
   const streetsOfTerritory = useMemo(
     () => streets.filter((s) => s.territory_id === territoryId),
     [streets, territoryId],
@@ -88,42 +146,71 @@ export function TourClient({
   );
   const territory = territories.find((t) => t.id === territoryId) ?? null;
 
+  const chooseStreet = useCallback((value: number | null) => {
+    setStreetId(value);
+    if (value) window.localStorage.setItem("d2d_street", String(value));
+    else window.localStorage.removeItem("d2d_street");
+  }, []);
+
+  /* ------------------------------- Speichern ------------------------------ */
+
   async function save(
     outcome: VisitOutcome,
     extra: { reasonId?: number | null; reasonNote?: string } = {},
-  ): Promise<number | null> {
+  ): Promise<SaveResult> {
+    const payload = {
+      territoryId,
+      streetId,
+      houseNumber,
+      outcome,
+      reasonId: extra.reasonId ?? null,
+      reasonNote: extra.reasonNote ?? "",
+      energyType: outcome === "SALE" ? product : "",
+      lat: position?.lat ?? null,
+      lng: position?.lng ?? null,
+    };
+
     setBusy(true);
     try {
       const response = await fetch("/api/visits", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          territoryId,
-          streetId,
-          houseNumber,
-          outcome,
-          reasonId: extra.reasonId ?? null,
-          reasonNote: extra.reasonNote ?? "",
-          energyType: outcome === "SALE" ? product : "",
-          lat: position?.lat ?? null,
-          lng: position?.lng ?? null,
-        }),
+        body: JSON.stringify(payload),
       });
       const data = await response.json();
       if (!response.ok) {
         setToast(data.error ?? "Speichern fehlgeschlagen");
-        return null;
+        return { status: "error" };
       }
       setLastVisitId(data.id);
       setHouseNumber("");
       setNote("");
       router.refresh();
-      return data.id as number;
+      return { status: "saved", id: data.id as number };
     } catch {
-      setToast("Keine Verbindung – bitte nochmal tippen");
-      return null;
+      // Kein Netz: Eintrag lokal puffern, damit nichts verloren geht.
+      const label = [
+        street?.name ?? "",
+        houseNumber,
+        "·",
+        OUTCOME_LABEL[outcome],
+      ]
+        .filter(Boolean)
+        .join(" ");
+      enqueue(label, payload);
+      setLastVisitId(null);
+      setHouseNumber("");
+      setNote("");
+      return { status: "queued" };
     } finally {
       setBusy(false);
+    }
+  }
+
+  function report(result: SaveResult, savedText: string) {
+    if (result.status === "saved") setToast(savedText);
+    else if (result.status === "queued") {
+      setToast("Kein Netz – gespeichert, wird automatisch nachgesendet");
     }
   }
 
@@ -132,12 +219,11 @@ export function TourClient({
       setSheet("reason");
       return;
     }
-    const id = await save(outcome);
-    if (id) {
-      setToast(
-        outcome === "NOT_HOME" ? "Nicht angetroffen gespeichert" : "Termin gespeichert",
-      );
-    }
+    const result = await save(outcome);
+    report(
+      result,
+      outcome === "NOT_HOME" ? "Nicht angetroffen gespeichert" : "Termin gespeichert",
+    );
   }
 
   /**
@@ -146,38 +232,55 @@ export function TourClient({
    */
   async function handleSale() {
     const win = window.open(tarifrechnerUrl, "_blank", "noopener,noreferrer");
-    const id = await save("SALE");
-    if (id) setToast("Abschluss gespeichert – viel Erfolg bei der Erfassung!");
+    const result = await save("SALE");
+    report(result, "Abschluss gespeichert – viel Erfolg bei der Erfassung!");
     if (!win) window.location.href = tarifrechnerUrl;
   }
 
   async function handleReason(reason: RejectionReason) {
-    const needsNote = reason.code === "SONSTIGES";
-    if (needsNote && !note.trim()) {
+    if (reason.code === "SONSTIGES" && !note.trim()) {
       setToast("Bitte kurz eintragen, woran es lag");
       return;
     }
-    const id = await save("MET_NO_SALE", { reasonId: reason.id, reasonNote: note.trim() });
-    if (id) {
+    const result = await save("MET_NO_SALE", {
+      reasonId: reason.id,
+      reasonNote: note.trim(),
+    });
+    if (result.status !== "error") {
       setSheet(null);
-      setToast(`Gespeichert: ${reason.label}`);
+      report(result, `Gespeichert: ${reason.label}`);
     }
   }
 
   async function undo() {
     if (!lastVisitId) return;
-    const response = await fetch(`/api/visits/${lastVisitId}`, { method: "DELETE" });
-    const data = await response.json();
-    setToast(response.ok ? "Letzter Eintrag entfernt" : (data.error ?? "Nicht möglich"));
-    if (response.ok) {
-      setLastVisitId(null);
-      router.refresh();
+    try {
+      const response = await fetch(`/api/visits/${lastVisitId}`, { method: "DELETE" });
+      const data = await response.json();
+      setToast(response.ok ? "Letzter Eintrag entfernt" : (data.error ?? "Nicht möglich"));
+      if (response.ok) {
+        setLastVisitId(null);
+        router.refresh();
+      }
+    } catch {
+      setToast("Ohne Verbindung nicht möglich");
     }
   }
 
   function chooseProduct(value: EnergyType) {
     setProduct(value);
     window.localStorage.setItem("d2d_product", value);
+  }
+
+  async function sendPendingNow() {
+    setToast("Sende …");
+    const result = await flush();
+    if (result.sent > 0) {
+      setToast(`${result.sent} Eintrag/Einträge gesendet`);
+      router.refresh();
+    } else if (result.remaining > 0) {
+      setToast("Immer noch keine Verbindung");
+    }
   }
 
   /* ----------------------------- leeres Gebiet ---------------------------- */
@@ -198,6 +301,31 @@ export function TourClient({
 
   return (
     <div className="mx-auto max-w-2xl">
+      {(!online || pending.length > 0) && (
+        <div
+          className="mb-3 flex items-center gap-3 rounded-xl px-4 py-2.5 text-sm"
+          style={{
+            background: "color-mix(in srgb, var(--gas-500) 16%, transparent)",
+            color: "var(--gas-600)",
+          }}
+        >
+          <span className="text-lg leading-none">{online ? "⏳" : "📴"}</span>
+          <span className="min-w-0 flex-1 font-medium">
+            {pending.length > 0
+              ? `${pending.length} ${pending.length === 1 ? "Eintrag wartet" : "Einträge warten"} auf Verbindung`
+              : "Kein Netz – Einträge werden gepuffert"}
+          </span>
+          {pending.length > 0 && online && (
+            <button
+              onClick={sendPendingNow}
+              className="shrink-0 font-semibold underline"
+            >
+              Jetzt senden
+            </button>
+          )}
+        </div>
+      )}
+
       <div className="mb-4 grid grid-cols-3 gap-2">
         <StatTile label="Türen heute" value={todayTotals.doors ?? 0} />
         <StatTile
@@ -224,7 +352,7 @@ export function TourClient({
           value={territoryId ?? ""}
           onChange={(e) => {
             setTerritoryId(Number(e.target.value));
-            setStreetId(null);
+            chooseStreet(null);
           }}
         >
           {territories.map((t) => (
@@ -247,7 +375,7 @@ export function TourClient({
             id="street"
             className="select"
             value={streetId ?? ""}
-            onChange={(e) => setStreetId(e.target.value ? Number(e.target.value) : null)}
+            onChange={(e) => chooseStreet(e.target.value ? Number(e.target.value) : null)}
           >
             <option value="">– Straße wählen –</option>
             {streetsOfTerritory.map((s) => (
@@ -384,19 +512,31 @@ export function TourClient({
         )}
       </div>
 
-      {/* Letzte Einträge */}
-      {recent.length > 0 && (
+      {/* Letzte Einträge – wartende zuerst */}
+      {(pending.length > 0 || recent.length > 0) && (
         <div className="card mt-4 p-4">
           <p className="mb-2 text-sm font-semibold">Zuletzt erfasst</p>
           <ul className="space-y-1.5">
+            {pending.map((item) => (
+              <li key={item.localId} className="flex items-center gap-2 text-sm">
+                <span className="w-6 text-center">⏳</span>
+                <span className="min-w-0 flex-1 truncate">{item.label}</span>
+                <button
+                  onClick={() => removeQueued(item.localId)}
+                  className="muted shrink-0 px-1 text-xs underline"
+                >
+                  verwerfen
+                </button>
+              </li>
+            ))}
             {recent.map((v) => (
               <li key={v.id} className="flex items-center gap-2 text-sm">
-                <span className="w-6 text-center">{outcomeEmoji(v.outcome, v.reason_emoji)}</span>
+                <span className="w-6 text-center">
+                  {outcomeEmoji(v.outcome, v.reason_emoji)}
+                </span>
                 <span className="min-w-0 flex-1 truncate">
                   {v.street_name ?? "–"} {v.house_number}
-                  {v.reason_label && (
-                    <span className="muted"> · {v.reason_label}</span>
-                  )}
+                  {v.reason_label && <span className="muted"> · {v.reason_label}</span>}
                 </span>
                 <span className="muted shrink-0 text-xs tabular-nums">
                   {formatTime(v.created_at)}
@@ -414,7 +554,7 @@ export function TourClient({
           onClick={() => setSheet(null)}
         >
           <div
-            className="max-h-[88dvh] w-full overflow-y-auto rounded-t-3xl bg-[var(--card)] p-5 pb-8 md:max-w-lg md:rounded-3xl"
+            className="max-h-[88dvh] w-full overflow-y-auto rounded-t-3xl bg-[var(--card)] p-5 pb-[max(2rem,env(safe-area-inset-bottom))] md:max-w-lg md:rounded-3xl"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="mb-4">
@@ -464,7 +604,7 @@ export function TourClient({
       )}
 
       {toast && (
-        <div className="fixed inset-x-0 bottom-20 z-40 mx-auto w-fit max-w-[92vw] rounded-full bg-brand-900 px-4 py-2 text-sm font-semibold text-white shadow-lg md:bottom-8">
+        <div className="fixed inset-x-0 bottom-[calc(5.5rem+env(safe-area-inset-bottom))] z-40 mx-auto w-fit max-w-[92vw] rounded-full bg-brand-900 px-4 py-2 text-center text-sm font-semibold text-white shadow-lg md:bottom-8">
           {toast}
         </div>
       )}

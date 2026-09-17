@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="de">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>Keine Verbindung · EP24 Vertrieb</title>
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <style>
+      :root { color-scheme: light dark; }
+      body {
+        margin: 0;
+        min-height: 100dvh;
+        display: grid;
+        place-items: center;
+        padding: 2rem 1.5rem;
+        background: #0c2f56;
+        color: #fff;
+        font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+        text-align: center;
+      }
+      .box { max-width: 22rem; }
+      h1 { font-size: 1.35rem; margin: 1.25rem 0 0.5rem; }
+      p { line-height: 1.55; color: rgba(255, 255, 255, 0.72); margin: 0 0 1.5rem; }
+      button {
+        background: #12b76a;
+        color: #fff;
+        border: 0;
+        border-radius: 0.75rem;
+        padding: 0.85rem 1.5rem;
+        font-size: 1rem;
+        font-weight: 600;
+        font-family: inherit;
+      }
+      img { width: 72px; height: 72px; border-radius: 18px; }
+    </style>
+  </head>
+  <body>
+    <div class="box">
+      <img src="/icon-192.png" alt="" />
+      <h1>Gerade keine Verbindung</h1>
+      <p>
+        Erfasste Türen gehen nicht verloren – sie werden auf dem Gerät gespeichert
+        und automatisch nachgesendet, sobald du wieder Empfang hast.
+      </p>
+      <button onclick="location.reload()">Erneut versuchen</button>
+    </div>
+  </body>
+</html>

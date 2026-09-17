@@ -13,3 +13,7 @@ next-env.d.ts
 data/*.db
 data/*.db-shm
 data/*.db-wal
+
+# Von Capacitor erzeugte Projekte (nur auf dem Mac gebraucht, siehe docs/IPHONE-IPAD.md)
+ios/
+android/

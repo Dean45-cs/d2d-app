@@ -67,7 +67,27 @@ body {
 body {
   font-family: var(--font-sans);
   -webkit-tap-highlight-color: transparent;
+  /* Kein Gummiband-Effekt, wenn die App vom Home-Bildschirm läuft */
   overscroll-behavior-y: none;
+}
+
+/* Buttons und Kacheln sollen sich wie in einer App anfühlen: kein Zoom beim
+   Doppeltippen, keine Textmarkierung beim langen Drücken. */
+button,
+.tap-tile,
+.btn,
+a[role="button"] {
+  touch-action: manipulation;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+/* Im Standalone-Modus (vom Home-Bildschirm gestartet) gibt es keine
+   Safari-Leisten – der Inhalt reicht bis an die Gerätekanten. */
+@media (display-mode: standalone) {
+  body {
+    -webkit-touch-callout: none;
+  }
 }
 
 /* ------------------------------ Bausteine ------------------------------- */

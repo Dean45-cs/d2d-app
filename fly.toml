@@ -1,0 +1,38 @@
+# Beispielkonfiguration für Fly.io – "app" auf den eigenen Namen ändern.
+# Wichtig: SQLite verträgt nur EINE Maschine gleichzeitig. Deshalb bleibt
+# min_machines_running bei 1 und es wird nicht hochskaliert.
+
+app = "d2d-app"
+primary_region = "fra"
+
+[build]
+
+[env]
+  NODE_ENV = "production"
+  DATABASE_PATH = "/data/d2d.db"
+  NEXT_PUBLIC_TARIFRECHNER_URL = "https://portal-ep24.de/menues/tarifrechner/"
+  ENERGY_FEED_MODE = "seed"
+
+[[mounts]]
+  source = "d2d_data"
+  destination = "/data"
+
+[http_service]
+  internal_port = 3000
+  force_https = true
+  auto_stop_machines = "suspend"
+  auto_start_machines = true
+  min_machines_running = 1
+  processes = ["app"]
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "512mb"
+
+# Täglicher Abruf der Grundversorger-Preise um 05:00 UTC
+[[http_service.checks]]
+  grace_period = "10s"
+  interval = "30s"
+  method = "GET"
+  timeout = "5s"
+  path = "/login"
