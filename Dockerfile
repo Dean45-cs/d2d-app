@@ -32,13 +32,11 @@ RUN groupadd --system --gid 1001 nodejs \
 COPY --from=builder /app/public ./public
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
-# Skripte für Ersteinrichtung und Preisabruf per "fly ssh console" o. Ä.
-COPY --from=builder --chown=nextjs:nodejs /app/scripts ./scripts
-COPY --from=builder --chown=nextjs:nodejs /app/src ./src
-COPY --from=builder --chown=nextjs:nodejs /app/tsconfig.json ./tsconfig.json
+COPY --chmod=755 docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 
-USER nextjs
 EXPOSE 3000
 VOLUME ["/data"]
 
-CMD ["node", "server.js"]
+# Startet als root, übereignet das Laufwerk und wechselt dann auf den
+# Nutzer "nextjs" (UID 1001) - siehe docker-entrypoint.sh.
+ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]

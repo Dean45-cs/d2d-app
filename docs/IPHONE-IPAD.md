@@ -31,29 +31,41 @@ Beispiel mit [Fly.io](https://fly.io) (Kreditkarte nötig, kleine App kostet
 ein paar Euro im Monat):
 
 ```bash
-# einmalig: Fly-Kommandozeile installieren und anmelden
+# 1) Fly-Kommandozeile installieren und Konto anlegen
 curl -L https://fly.io/install.sh | sh
-fly auth signup      # oder: fly auth login
+fly auth signup            # bestehendes Konto: fly auth login
 
 cd d2d-app
 
-# App anlegen – "d2d-app" durch einen freien Namen ersetzen
-# und denselben Namen oben in fly.toml eintragen
+# 2) App anlegen - "d2d-app" durch einen freien Namen ersetzen
+#    und denselben Namen oben in fly.toml eintragen
 fly apps create d2d-app
 
-# Dauerhaften Speicher für die Datenbank anlegen (1 GB reicht weit)
-fly volumes create d2d_data --region fra --size 1
+# 3) Dauerhaften Speicher fuer die Datenbank (1 GB reicht fuer Jahre)
+fly volumes create d2d_data --region fra --size 1 --yes
 
-# Geheimnisse setzen
-fly secrets set SESSION_SECRET="$(node -e "console.log(require('crypto').randomBytes(32).toString('hex'))")"
-fly secrets set ENERGY_REFRESH_TOKEN="$(node -e "console.log(require('crypto').randomBytes(16).toString('hex'))")"
+# 4) Geheimnisse setzen - daraus wird beim ersten Start die Teamleitung angelegt
+fly secrets set \
+  SESSION_SECRET="$(node -e "console.log(require('crypto').randomBytes(32).toString('hex'))")" \
+  SEED_LEADER_EMAIL="chef@deinefirma.de" \
+  SEED_LEADER_PASSWORD="EinLangesPasswort123"
 
-# Starten
+# 5) Starten
 fly deploy
-
-# Datenbank einrichten (legt die erste Teamleitung an)
-fly ssh console -C "npx tsx scripts/seed.ts"
 ```
+
+Beim ersten Start legt die App Team, Teamleitung und Ablehnungsgruende selbst an
+und befuellt die Energiekarte - ein Einrichtungsschritt ueber die Kommandozeile
+ist nicht noetig. Im Protokoll (`fly logs`) steht dann:
+
+```
+[Start] Team „Door2Door Team“ und Teamleitung chef@deinefirma.de angelegt.
+[Start] Energiekarte: 88 Postleitzahlen aktualisiert
+```
+
+Ein spaeterer Neustart aendert daran nichts mehr: Sobald ein Nutzer existiert,
+laesst die App die Zugangsdaten unberuehrt. Das Passwort wird danach nur noch
+in der App selbst geaendert.
 
 Danach läuft die App unter `https://d2d-app.fly.dev`.
 

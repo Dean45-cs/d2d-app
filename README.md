@@ -28,7 +28,9 @@ npm run db:seed                   # Datenbank + erste Teamleitung anlegen
 npm run dev                       # http://localhost:3000
 ```
 
-Nach dem Seed steht der Login in der Konsole, standardmäßig:
+Beim Serverstart legt die App Team und Teamleitung automatisch an, sobald
+`SEED_LEADER_EMAIL` und `SEED_LEADER_PASSWORD` gesetzt sind – lokal genügt
+`npm run db:seed`. Danach lautet der Login standardmäßig:
 
 | Rolle       | E-Mail                | Passwort    |
 |-------------|-----------------------|-------------|
@@ -225,11 +227,17 @@ Es liegt ein `Dockerfile` (Next.js im Standalone-Modus) und eine Beispiel-`fly.t
 
 ```bash
 fly apps create d2d-app
-fly volumes create d2d_data --region fra --size 1
-fly secrets set SESSION_SECRET="$(node -e "console.log(require('crypto').randomBytes(32).toString('hex'))")"
+fly volumes create d2d_data --region fra --size 1 --yes
+fly secrets set \
+  SESSION_SECRET="$(node -e "console.log(require('crypto').randomBytes(32).toString('hex'))")" \
+  SEED_LEADER_EMAIL="chef@deinefirma.de" \
+  SEED_LEADER_PASSWORD="EinLangesPasswort123"
 fly deploy
-fly ssh console -C "npx tsx scripts/seed.ts"
 ```
+
+Team, Teamleitung und Ablehnungsgründe legt die App beim ersten Start selbst an
+(`src/lib/bootstrap.ts`), ebenso wird die Energiekarte einmal befüllt und danach
+täglich aktualisiert. Ein Einrichtungsschritt über die Kommandozeile entfällt.
 
 Geht genauso bei Railway, Render, Hetzner oder einem eigenen Server – Hauptsache, es gibt
 **dauerhaften Dateispeicher** für die SQLite-Datei. **Vercel und Netlify funktionieren
