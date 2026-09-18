@@ -1,23 +1,16 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { IconPlus } from "@/components/icons";
-import { plural } from "@/components/ui";
+import { plotColor } from "@/components/map-colors";
 import type { User } from "@/lib/types";
 import { centerOf, type LatLng } from "@/lib/geo/area";
-import { AreaPicker, type ExistingArea } from "./AreaPicker";
+import { outlineOf, splitStreets } from "@/lib/geo/split";
+import { AreaPicker, type ExistingArea, type OverlayPlot, type OverlayStreet } from "./AreaPicker";
+import { StreetResult, doorsOf, type FoundStreet, type Plot } from "./StreetResult";
 
-interface FoundStreet {
-  name: string;
-  houseNumbers: string;
-  units: number;
-  addresses: number;
-  lat: number | null;
-  lng: number | null;
-}
-
-interface StreetResult {
+interface StreetResponse {
   streets: FoundStreet[];
   addressCount: number;
   areaSqKm: number;
@@ -44,8 +37,11 @@ export function NewTerritoryButton({
   // Kartenauswahl
   const [area, setArea] = useState<LatLng[] | null>(null);
   const [loadingStreets, setLoadingStreets] = useState(false);
-  const [result, setResult] = useState<StreetResult | null>(null);
+  const [result, setResult] = useState<StreetResponse | null>(null);
   const [chosen, setChosen] = useState<Set<string>>(new Set());
+  const [focus, setFocus] = useState<string | null>(null);
+  const [plotCount, setPlotCount] = useState(1);
+  const [assignees, setAssignees] = useState<string[]>([]);
 
   const [form, setForm] = useState({
     name: "",
@@ -61,19 +57,19 @@ export function NewTerritoryButton({
     setForm((prev) => ({ ...prev, [key]: value }));
   }
 
-  function close() {
-    setOpen(false);
-  }
-
   function resetAll() {
     setForm({ name: "", city: "", postalCode: "", assignedUserId: "", streets: "", note: "", dueDate: "" });
     setArea(null);
     setResult(null);
     setChosen(new Set());
+    setFocus(null);
+    setPlotCount(1);
+    setAssignees([]);
     setError(null);
   }
 
-  /** Straßen aus OpenStreetMap zur gezeichneten Fläche holen. */
+  /* --------------------------- Straßen laden ---------------------------- */
+
   async function loadStreets() {
     if (!area) return;
     setLoadingStreets(true);
@@ -89,7 +85,7 @@ export function NewTerritoryButton({
         setError(data.error ?? "Die Straßen konnten nicht geladen werden.");
         return;
       }
-      const found = data as StreetResult;
+      const found = data as StreetResponse;
       setResult(found);
       setChosen(new Set(found.streets.map((s) => s.name)));
 
@@ -107,20 +103,62 @@ export function NewTerritoryButton({
     }
   }
 
-  function toggleStreet(name: string) {
-    setChosen((prev) => {
-      const next = new Set(prev);
-      if (next.has(name)) next.delete(name);
-      else next.add(name);
-      return next;
-    });
-  }
+  /* ---------------------------- Aufteilung ------------------------------ */
 
-  // Die Karte startet beim zuletzt angelegten Gebiet - Teams arbeiten in einer Region.
-  const start = existingAreas.length > 0 ? centerOf(existingAreas[0].area) : null;
+  const selectedStreets = useMemo(
+    () => result?.streets.filter((s) => chosen.has(s.name)) ?? [],
+    [result, chosen],
+  );
 
-  const selectedStreets = result?.streets.filter((s) => chosen.has(s.name)) ?? [];
-  const selectedUnits = selectedStreets.reduce((sum, s) => sum + s.units, 0);
+  const plots: Plot[] = useMemo(() => {
+    if (plotCount < 2 || selectedStreets.length === 0) return [];
+    const groups = splitStreets(
+      selectedStreets.map((s) => ({ ...s, weight: doorsOf(s) || 1 })),
+      plotCount,
+    // Liegen die Strassen so, dass ein Paket leer bliebe, entstehen lieber
+    // weniger Gebiete als eines ohne Strassen.
+    ).filter((group) => group.length > 0);
+    return groups.map((group, index) => ({
+      label: String(index + 1),
+      color: plotColor(index),
+      streets: group,
+      doors: group.reduce((sum, s) => sum + doorsOf(s), 0),
+    }));
+  }, [selectedStreets, plotCount]);
+
+  /** Strassenname -> Nummer des Teilgebiets. */
+  const plotOf = useMemo(() => {
+    const map = new Map<string, number>();
+    plots.forEach((plot, index) => plot.streets.forEach((s) => map.set(s.name, index)));
+    return map;
+  }, [plots]);
+
+  /* -------------------------- Karten-Vorschau ---------------------------- */
+
+  const overlay: OverlayStreet[] = useMemo(
+    () =>
+      (result?.streets ?? []).map((street) => ({
+        name: street.name,
+        points: street.points,
+        center: street.lat !== null && street.lng !== null ? [street.lat, street.lng] : null,
+        color: chosen.has(street.name) ? plotColor(plotOf.get(street.name) ?? 0) : null,
+      })),
+    [result, chosen, plotOf],
+  );
+
+  const overlayPlots: OverlayPlot[] = useMemo(
+    () =>
+      plots
+        .map((plot) => ({
+          label: plot.label,
+          color: plot.color,
+          area: outlineOf(plot.streets.flatMap((s) => s.points)),
+        }))
+        .filter((plot) => plot.area.length >= 3),
+    [plots],
+  );
+
+  /* ------------------------------ Speichern ------------------------------ */
 
   async function submit(event: React.FormEvent) {
     event.preventDefault();
@@ -130,24 +168,47 @@ export function NewTerritoryButton({
       setError("Bitte zuerst ein Gebiet auf der Karte markieren.");
       return;
     }
+    if (tab === "map" && plotCount > 1 && plots.length < 2) {
+      setError("Für die Aufteilung werden mindestens zwei Straßen gebraucht.");
+      return;
+    }
 
     setBusy(true);
     try {
-      const response = await fetch("/api/territories", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          name: form.name,
-          city: form.city,
-          postalCode: form.postalCode,
-          note: form.note,
-          dueDate: form.dueDate,
-          assignedUserId: form.assignedUserId ? Number(form.assignedUserId) : null,
-          area: tab === "map" ? area : null,
-          streetList: tab === "map" ? selectedStreets : [],
-          streets: tab === "list" ? form.streets : "",
-        }),
-      });
+      const response =
+        tab === "map" && plotCount > 1
+          ? await fetch("/api/territories/split", {
+              method: "POST",
+              headers: { "content-type": "application/json" },
+              body: JSON.stringify({
+                city: form.city,
+                postalCode: form.postalCode,
+                note: form.note,
+                dueDate: form.dueDate,
+                groups: plots.map((plot, index) => ({
+                  name: `${form.name} (${plot.label}/${plots.length})`,
+                  assignedUserId: assignees[index] ? Number(assignees[index]) : null,
+                  area: overlayPlots[index]?.area ?? area,
+                  streetList: plot.streets,
+                })),
+              }),
+            })
+          : await fetch("/api/territories", {
+              method: "POST",
+              headers: { "content-type": "application/json" },
+              body: JSON.stringify({
+                name: form.name,
+                city: form.city,
+                postalCode: form.postalCode,
+                note: form.note,
+                dueDate: form.dueDate,
+                assignedUserId: form.assignedUserId ? Number(form.assignedUserId) : null,
+                area: tab === "map" ? area : null,
+                streetList: tab === "map" ? selectedStreets : [],
+                streets: tab === "list" ? form.streets : "",
+              }),
+            });
+
       const data = await response.json();
       if (!response.ok) {
         setError(data.error ?? "Gebiet konnte nicht angelegt werden.");
@@ -155,12 +216,17 @@ export function NewTerritoryButton({
       }
       setOpen(false);
       resetAll();
-      router.push(`/gebiete/${data.id}`);
+      // Beim Aufteilen entstehen mehrere Gebiete - dann in die Übersicht.
+      router.push(data.id ? `/gebiete/${data.id}` : "/gebiete");
       router.refresh();
     } finally {
       setBusy(false);
     }
   }
+
+  // Die Karte startet beim zuletzt angelegten Gebiet - Teams arbeiten in einer Region.
+  const start = existingAreas.length > 0 ? centerOf(existingAreas[0].area) : null;
+  const splitting = tab === "map" && plotCount > 1;
 
   return (
     <>
@@ -178,7 +244,7 @@ export function NewTerritoryButton({
       {open && (
         <div
           className="fixed inset-0 z-30 flex items-end bg-black/45 md:items-center md:justify-center"
-          onClick={close}
+          onClick={() => setOpen(false)}
         >
           <form
             onSubmit={submit}
@@ -198,6 +264,7 @@ export function NewTerritoryButton({
                   key={option.value}
                   type="button"
                   onClick={() => setTab(option.value)}
+                  aria-pressed={tab === option.value}
                   className={`flex-1 px-4 py-2 text-sm font-semibold ${
                     tab === option.value ? "bg-brand-600 text-white" : ""
                   }`}
@@ -214,92 +281,80 @@ export function NewTerritoryButton({
                   onAreaChange={(next) => {
                     setArea(next);
                     // Nach dem Verschieben passt die alte Straßenliste nicht mehr.
-                    if (result) setResult(null);
+                    if (result) {
+                      setResult(null);
+                      setPlotCount(1);
+                    }
                   }}
                   existing={existingAreas}
+                  overlay={overlay}
+                  plots={overlayPlots}
+                  focus={focus}
                   start={start ? { lat: start[0], lng: start[1], zoom: 14 } : undefined}
                 />
 
-                <button
-                  type="button"
-                  className="btn btn-ghost w-full"
-                  onClick={loadStreets}
-                  disabled={!area || loadingStreets}
-                >
-                  {loadingStreets ? "Straßen werden gesucht …" : "Straßen im Gebiet laden"}
-                </button>
+                {!result && (
+                  <button
+                    type="button"
+                    className="btn btn-ghost w-full"
+                    onClick={loadStreets}
+                    disabled={!area || loadingStreets}
+                  >
+                    {loadingStreets ? "Straßen werden gesucht …" : "Straßen im Gebiet laden"}
+                  </button>
+                )}
 
                 {result && (
-                  <div className="rounded-xl border hairline">
-                    <div className="flex flex-wrap items-center justify-between gap-2 border-b px-3 py-2 hairline">
-                      <p className="text-sm font-semibold">
-                        {plural(result.streets.length, "Straße", "Straßen")} ·{" "}
-                        {plural(result.addressCount, "Adresse", "Adressen")}
-                      </p>
-                      <div className="flex gap-2">
-                        <button
-                          type="button"
-                          className="muted text-xs font-semibold underline"
-                          onClick={() => setChosen(new Set(result.streets.map((s) => s.name)))}
-                        >
-                          alle
-                        </button>
-                        <button
-                          type="button"
-                          className="muted text-xs font-semibold underline"
-                          onClick={() => setChosen(new Set())}
-                        >
-                          keine
-                        </button>
-                      </div>
-                    </div>
-
-                    {result.streets.length === 0 ? (
-                      <p className="muted px-3 py-4 text-sm">
-                        In dieser Fläche sind keine Straßen hinterlegt. Zeichne etwas größer
-                        oder trage die Straßen über „Liste einfügen“ von Hand ein.
-                      </p>
-                    ) : (
-                      <ul className="max-h-56 divide-y overflow-y-auto hairline">
-                        {result.streets.map((street) => (
-                          <li key={street.name}>
-                            <label className="flex cursor-pointer items-center gap-3 px-3 py-2">
-                              <input
-                                type="checkbox"
-                                className="h-5 w-5 shrink-0 accent-[var(--brand-600)]"
-                                checked={chosen.has(street.name)}
-                                onChange={() => toggleStreet(street.name)}
-                              />
-                              <span className="min-w-0 flex-1">
-                                <span className="block truncate text-sm font-medium">
-                                  {street.name}
-                                </span>
-                                <span className="muted block text-xs">
-                                  {street.houseNumbers
-                                    ? `Nr. ${street.houseNumbers}`
-                                    : "keine Hausnummern hinterlegt"}
-                                  {street.units > 0 && ` · ${street.units} Wohneinheiten`}
-                                </span>
-                              </span>
-                            </label>
-                          </li>
-                        ))}
-                      </ul>
-                    )}
-
-                    <p className="muted border-t px-3 py-2 text-xs hairline">
-                      Ausgewählt: {plural(selectedStreets.length, "Straße", "Straßen")},{" "}
-                      {plural(selectedUnits, "Wohneinheit", "Wohneinheiten")}.
-                      Die Zahlen stammen aus OpenStreetMap und lassen sich später anpassen.
-                    </p>
-                  </div>
+                  <>
+                    <StreetResult
+                      streets={result.streets}
+                      addressCount={result.addressCount}
+                      chosen={chosen}
+                      onToggle={(name) =>
+                        setChosen((prev) => {
+                          const next = new Set(prev);
+                          if (next.has(name)) next.delete(name);
+                          else next.add(name);
+                          return next;
+                        })
+                      }
+                      onChooseAll={(all) =>
+                        setChosen(all ? new Set(result.streets.map((s) => s.name)) : new Set())
+                      }
+                      focus={focus}
+                      onFocus={setFocus}
+                      plotCount={plotCount}
+                      onPlotCount={setPlotCount}
+                      plots={plots}
+                      plotOf={plotOf}
+                      members={members}
+                      assignees={assignees}
+                      onAssignee={(index, value) =>
+                        setAssignees((prev) => {
+                          const next = [...prev];
+                          next[index] = value;
+                          return next;
+                        })
+                      }
+                    />
+                    <button
+                      type="button"
+                      className="muted text-xs font-semibold underline"
+                      onClick={loadStreets}
+                      disabled={loadingStreets}
+                    >
+                      {loadingStreets ? "Wird geladen …" : "Straßen neu laden"}
+                    </button>
+                  </>
                 )}
               </div>
             )}
 
             <div className="space-y-3">
               <div>
-                <label className="label" htmlFor="t-name">Gebietsname</label>
+                <label className="label" htmlFor="t-name">
+                  {splitting ? "Name der Teilgebiete" : "Gebietsname"}
+                </label>
                 <input
                   id="t-name"
                   className="input"
@@ -308,6 +363,12 @@ export function NewTerritoryButton({
                   onChange={(e) => update("name", e.target.value)}
                   required
                 />
+                {splitting && form.name && (
+                  <p className="muted mt-1 text-xs">
+                    Ergibt: {form.name} (1/{plots.length}) … {form.name} ({plots.length}/
+                    {plots.length})
+                  </p>
+                )}
               </div>
 
               <div className="grid grid-cols-3 gap-3">
@@ -333,25 +394,27 @@ export function NewTerritoryButton({
               </div>
 
               <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="label" htmlFor="t-user">Zuteilen an</label>
-                  <select
-                    id="t-user"
-                    className="select"
-                    value={form.assignedUserId}
-                    onChange={(e) => update("assignedUserId", e.target.value)}
-                  >
-                    <option value="">– später zuteilen –</option>
-                    {members
-                      .filter((m) => m.active)
-                      .map((m) => (
-                        <option key={m.id} value={m.id}>
-                          {m.name}
-                        </option>
-                      ))}
-                  </select>
-                </div>
-                <div>
+                {!splitting && (
+                  <div>
+                    <label className="label" htmlFor="t-user">Zuteilen an</label>
+                    <select
+                      id="t-user"
+                      className="select"
+                      value={form.assignedUserId}
+                      onChange={(e) => update("assignedUserId", e.target.value)}
+                    >
+                      <option value="">– später zuteilen –</option>
+                      {members
+                        .filter((m) => m.active)
+                        .map((m) => (
+                          <option key={m.id} value={m.id}>
+                            {m.name}
+                          </option>
+                        ))}
+                    </select>
+                  </div>
+                )}
+                <div className={splitting ? "col-span-2" : undefined}>
                   <label className="label" htmlFor="t-due">Bis wann</label>
                   <input
                     id="t-due"
@@ -402,11 +465,15 @@ export function NewTerritoryButton({
             )}
 
             <div className="mt-5 flex gap-2">
-              <button type="button" className="btn btn-ghost flex-1" onClick={close}>
+              <button type="button" className="btn btn-ghost flex-1" onClick={() => setOpen(false)}>
                 Abbrechen
               </button>
               <button className="btn btn-primary flex-1" disabled={busy}>
-                {busy ? "Anlegen …" : "Gebiet anlegen"}
+                {busy
+                  ? "Anlegen …"
+                  : splitting
+                    ? `${plots.length} Gebiete anlegen`
+                    : "Gebiet anlegen"}
               </button>
             </div>
           </form>

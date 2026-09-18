@@ -7,6 +7,7 @@ import {
   listStreets,
   listTerritories,
   listVisits,
+  type StreetWithStats,
 } from "@/lib/queries";
 import { readArea } from "@/lib/geo/area";
 import { mapTileUrl } from "@/lib/map";
@@ -43,6 +44,7 @@ export default async function TerritoryDetailPage({
       })
     : [];
 
+  // Jede Strasse wird auf der Karte nach ihrem Stand eingefaerbt.
   const pins = streets.flatMap((street) =>
     street.lat !== null && street.lng !== null
       ? [
@@ -50,11 +52,13 @@ export default async function TerritoryDetailPage({
             name: street.name,
             lat: street.lat,
             lng: street.lng,
-            done: street.visit_count > 0,
+            state: streetState(street),
             hint: [
               street.house_numbers && `Nr. ${street.house_numbers}`,
-              street.units > 0 && `${street.units} WE`,
-              `${street.visit_count} Türen erfasst`,
+              street.units > 0
+                ? `${street.visit_count} von ${street.units} Türen`
+                : `${street.visit_count} Türen erfasst`,
+              street.sale_count > 0 && `${street.sale_count} Abschlüsse`,
             ]
               .filter(Boolean)
               .join(" · "),
@@ -185,6 +189,13 @@ function Metric({
       </p>
     </div>
   );
+}
+
+/** Fertig, sobald die Strasse abgehakt oder rechnerisch durchgearbeitet ist. */
+function streetState(street: StreetWithStats): "open" | "active" | "done" {
+  if (street.status === "DONE") return "done";
+  if (street.units > 0 && street.visit_count >= street.units) return "done";
+  return street.visit_count > 0 ? "active" : "open";
 }
 
 function formatDateTime(value: string): string {

@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { routeUrl } from "@/lib/map";
 import type { StreetWithStats, Totals, VisitRow } from "@/lib/queries";
 import type { RejectionReason, VisitOutcome } from "@/lib/types";
 import { OUTCOME_LABEL } from "@/lib/types";
@@ -395,6 +396,19 @@ export function TourClient({
           <div className="min-w-0">
             <p className="truncate text-sm font-semibold">
               {street ? street.name : "Keine Straße gewählt"}
+              {/* Kommt die Strasse aus der Kartenauswahl, fuehrt der Pfeil direkt hin. */}
+              {street?.lat != null && street?.lng != null && (
+                <a
+                  href={routeUrl(street.lat, street.lng)}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="muted ml-2 inline-block align-middle text-base leading-none hover:text-brand-600"
+                  title={`Route zur ${street.name}`}
+                  aria-label={`Route zur ${street.name}`}
+                >
+                  ➤
+                </a>
+              )}
             </p>
             <p className="muted truncate text-xs">
               {territory?.postal_code} {territory?.city}

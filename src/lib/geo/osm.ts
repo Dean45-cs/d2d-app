@@ -30,6 +30,9 @@ const USER_AGENT = process.env.GEO_USER_AGENT ?? "d2d-app (Gebietsplanung; https
 const STREET_TYPES = "residential|living_street|pedestrian|unclassified|tertiary|secondary|primary|road";
 
 const MAX_STREETS = 400;
+/** Punkte je Strasse und insgesamt - die Vorschau soll leicht bleiben. */
+const MAX_POINTS_PER_STREET = 160;
+const MAX_POINTS_TOTAL = 4000;
 
 export interface FoundStreet {
   name: string;
@@ -38,6 +41,8 @@ export interface FoundStreet {
   addresses: number;
   lat: number | null;
   lng: number | null;
+  /** Lage der gefundenen Hausnummern - die Vorschau zeigt damit die echten Tueren. */
+  points: LatLng[];
 }
 
 export interface AreaStreets {
@@ -64,8 +69,22 @@ interface OverpassElement {
   tags?: Record<string, string>;
 }
 
+/* Overpass ist langsam und gedrosselt. Wer eine Flaeche zuschneidet, laedt sie
+   mehrfach - ein kurzer Zwischenspeicher spart dem Dienst die Arbeit. */
+const STREET_CACHE_TTL_MS = 5 * 60 * 1000;
+const STREET_CACHE_MAX = 20;
+const streetCache = new Map<string, { at: number; value: AreaStreets }>();
+
+function areaKey(area: LatLng[]): string {
+  return area.map(([lat, lng]) => `${lat.toFixed(5)},${lng.toFixed(5)}`).join(";");
+}
+
 /** Alle Strassen samt Hausnummern innerhalb der gezeichneten Flaeche. */
 export async function streetsInArea(area: LatLng[]): Promise<AreaStreets> {
+  const key = areaKey(area);
+  const cached = streetCache.get(key);
+  if (cached && Date.now() - cached.at < STREET_CACHE_TTL_MS) return cached.value;
+
   const size = areaSqKm(area);
   if (size > MAX_AREA_SQKM) {
     throw new Error(
@@ -85,7 +104,10 @@ export async function streetsInArea(area: LatLng[]): Promise<AreaStreets> {
   const addressCount = streets.reduce((sum, s) => sum + s.addresses, 0);
   const place = await describePlace(centerOf(area));
 
-  return { streets, addressCount, place, areaSqKm: size };
+  const result: AreaStreets = { streets, addressCount, place, areaSqKm: size };
+  if (streetCache.size >= STREET_CACHE_MAX) streetCache.clear();
+  streetCache.set(key, { at: Date.now(), value: result });
+  return result;
 }
 
 async function overpass(query: string): Promise<OverpassElement[]> {
@@ -133,7 +155,8 @@ function groupStreets(elements: OverpassElement[], area: LatLng[]): FoundStreet[
     addresses: number;
     latSum: number;
     lngSum: number;
-    points: number;
+    /** Koordinaten der Hausnummern, fuer die Vorschau auf der Karte. */
+    points: LatLng[];
     roadLat: number | null;
     roadLng: number | null;
   }
@@ -150,7 +173,7 @@ function groupStreets(elements: OverpassElement[], area: LatLng[]): FoundStreet[
         addresses: 0,
         latSum: 0,
         lngSum: 0,
-        points: 0,
+        points: [],
         roadLat: null,
         roadLng: null,
       };
@@ -180,7 +203,9 @@ function groupStreets(elements: OverpassElement[], area: LatLng[]): FoundStreet[
       if (lat !== null && lng !== null) {
         draft.latSum += lat;
         draft.lngSum += lng;
-        draft.points += 1;
+        if (draft.points.length < MAX_POINTS_PER_STREET) {
+          draft.points.push([round6(lat), round6(lng)]);
+        }
       }
       continue;
     }
@@ -196,20 +221,39 @@ function groupStreets(elements: OverpassElement[], area: LatLng[]): FoundStreet[
 
   const streets: FoundStreet[] = [];
   for (const draft of drafts.values()) {
+    const located = draft.points.length;
     streets.push({
       name: draft.name,
       houseNumbers: formatRange(draft.numbers),
       units: draft.units,
       addresses: draft.addresses,
-      lat: draft.points > 0 ? round6(draft.latSum / draft.points) : draft.roadLat,
-      lng: draft.points > 0 ? round6(draft.lngSum / draft.points) : draft.roadLng,
+      lat: located > 0 ? round6(draft.latSum / located) : draft.roadLat,
+      lng: located > 0 ? round6(draft.lngSum / located) : draft.roadLng,
+      points: draft.points,
     });
   }
 
-  return streets
+  const ranked = streets
     .sort((a, b) => b.addresses - a.addresses || a.name.localeCompare(b.name, "de-DE"))
     .slice(0, MAX_STREETS)
     .sort((a, b) => a.name.localeCompare(b.name, "de-DE"));
+
+  return thinPoints(ranked);
+}
+
+/**
+ * Deckelt die Zahl der Vorschaupunkte. In dichten Innenstaedten kommen sonst
+ * Zehntausende Adressen zusammen - sichtbar waere davon nichts, die Karte
+ * wuerde aber ruckeln.
+ */
+function thinPoints(streets: FoundStreet[]): FoundStreet[] {
+  const total = streets.reduce((sum, s) => sum + s.points.length, 0);
+  if (total <= MAX_POINTS_TOTAL) return streets;
+  const keepEvery = Math.ceil(total / MAX_POINTS_TOTAL);
+  return streets.map((street) => ({
+    ...street,
+    points: street.points.filter((_, index) => index % keepEvery === 0),
+  }));
 }
 
 /** Wohneinheiten aus den OSM-Tags, sonst zaehlt die Adresse als eine Tuer. */

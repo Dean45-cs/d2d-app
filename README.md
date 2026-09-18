@@ -3,7 +3,7 @@
 Eine Web-App für Door-to-Door-Teams im Energievertrieb:
 
 - **Gebiete auf der Karte abstecken** – Fläche einkreisen, die Straßen holt die App
-  selbst aus OpenStreetMap; danach einem Teammitglied zuweisen
+  selbst aus OpenStreetMap; auf Wunsch gleich ausgewogen auf mehrere Leute aufgeteilt
 - **Türen tracken** – nicht angetroffen / angetroffen / Termin / Abschluss, mit einem Daumen bedienbar
 - **Ablehnungsgründe mit einem Tap** – konfigurierbare Kachel-Auswahl statt Freitext
 - **Abschluss-Button** – speichert den Verkauf und öffnet direkt die Auftragserfassung des Partners
@@ -54,7 +54,7 @@ angelegt – praktisch zum Ausprobieren, für den Echtbetrieb weglassen.
 
 | | Teamleitung | Vertrieb |
 |---|---|---|
-| Gebiete auf der Karte abstecken, Straßen pflegen, zuteilen | ✅ | – |
+| Gebiete abstecken, aufteilen, Straßen pflegen, zuteilen | ✅ | – |
 | Mitarbeiter anlegen, Passwörter setzen | ✅ | – |
 | Ablehnungsgründe konfigurieren | ✅ | – |
 | Türen erfassen | ✅ | ✅ |
@@ -98,19 +98,49 @@ frei änderbar: umbenennen, ausblenden, sortieren, eigene ergänzen.
 2. **Umkreis:** einmal auf die Karte tippen, Größe über den Regler (150 m – 2 km).
    **Fläche zeichnen:** die Ecken nacheinander antippen, Punkte lassen sich nachziehen.
 3. **„Straßen im Gebiet laden“** – die App holt alle Straßen samt Hausnummern aus
-   OpenStreetMap. Einzelne Straßen lassen sich abwählen.
+   OpenStreetMap. Jede gefundene Hausnummer erscheint als Punkt auf der Karte: man
+   sieht vor dem Speichern, wie viel Substanz das Gebiet hat. Ein Tipp auf eine Zeile
+   in der Liste springt zur Straße, abgewählte Straßen werden blass.
 4. PLZ, Ort und ein Namensvorschlag sind schon ausgefüllt; nur noch zuteilen und speichern.
 
 Schon vergebene Gebiete liegen grau gestrichelt unter der Zeichnung – so entstehen keine
-Überschneidungen. Die Gebietsliste zeigt oben alle Flächen auf einer Karte (blau = in
-Arbeit, grün = fertig, orange = pausiert, grau = offen); ein Tipp auf eine Fläche öffnet
-das Gebiet.
+Überschneidungen. Ein Gebiet ist auf **25 km²** begrenzt; ein Tagesgebiet sind meist ein
+bis zwei Quadratkilometer.
 
-Auf der Gebietsseite lässt sich die Fläche jederzeit neu ziehen („Fläche ändern“) und die
-Straßenliste nachladen („Straßen nachladen“) – vorhandene Straßen bleiben unberührt.
+### Ein Gebiet auf mehrere Leute aufteilen
 
-Ein Gebiet ist auf **25 km²** begrenzt; ein Tagesgebiet sind meist ein bis zwei
-Quadratkilometer.
+Unter **„Aufteilen auf“** wird aus einer Zeichnung mit einem Tipp ein Gebiet je
+Mitarbeiter – **bis zu vier**:
+
+- Die App gruppiert die Straßen **räumlich** (niemand läuft quer durchs Viertel) und
+  gleicht sie danach **nach Türen** aus. Wohneinheiten aus OpenStreetMap zählen, sonst
+  jede Adresse als eine Tür.
+- Jedes Paket bekommt Farbe und Nummer auf der Karte, eine eigene Fläche und ein
+  eigenes Zuteilungsfeld.
+- Gespeichert wird in einem Zug: `Innenstadt-Nord – KW 38 (1/3)` bis `(3/3)`.
+  Entweder entstehen alle Teilgebiete oder keines.
+
+Ganz gleich groß werden die Pakete nicht immer – eine Straße mit 50 Wohneinheiten
+lässt sich nicht halbieren. Angestrebt sind höchstens 12 % Unterschied.
+
+> **Warum höchstens vier?** Mehr Farben nebeneinander lassen sich auf einer Karte nicht
+> mehr sicher unterscheiden, vor allem bei Rot-Grün-Schwäche. Die vier Farben in
+> `brand.css` (`--plot-1` bis `--plot-4`) sind dafür geprüft – hell und dunkel, jedes
+> Paar gegen jedes. Die Zahl im Kreis ist die eigentliche Kennzeichnung, die Farbe nur
+> die Unterstützung.
+
+### Den Überblick behalten
+
+- Die **Gebietsliste** zeigt oben alle Flächen auf einer Karte: Farbe = Status (blau in
+  Arbeit, grün fertig, orange pausiert, grau offen), das Kürzel im Kreis = wer dran ist.
+  Über das Auswahlfeld lässt sich die Karte auf eine Person oder auf „nicht zugeteilt“
+  filtern; ein Tipp auf eine Fläche öffnet das Gebiet.
+- Die **Gebietsseite** zeigt die Fläche und jede Straße als Punkt, eingefärbt nach
+  Bearbeitungsstand (offen / in Arbeit / fertig). Die Fläche lässt sich neu ziehen
+  („Fläche ändern“), die Straßenliste nachladen („Straßen nachladen“) – vorhandene
+  Straßen bleiben unberührt.
+- Der Pfeil **➤** neben einer Straße öffnet die Navigation – in der Gebietsliste und
+  an der Tür in der Türerfassung.
 
 ### Straßenliste einfügen (der klassische Weg)
 
@@ -141,8 +171,10 @@ GEO_COUNTRY_CODES=de,at,ch                       # Länder der Ortssuche
 ```
 
 Für ein Team, das täglich Gebiete schneidet, lohnt eine eigene Overpass-Instanz oder ein
-kommerzieller Anbieter – einfach die beiden Adressen umbiegen. Die Ortssuche wird von der
-App zwischengespeichert und auf einen Aufruf pro Sekunde gebremst.
+kommerzieller Anbieter – einfach die beiden Adressen umbiegen. Die App geht sparsam mit
+den Diensten um: Die Ortssuche ist auf einen Aufruf pro Sekunde gebremst, Ergebnisse
+werden zwischengespeichert, und dieselbe Fläche wird innerhalb von fünf Minuten nicht
+zweimal abgefragt – Zuschneiden und noch einmal Laden kostet also nichts.
 
 **Zu den Zahlen:** Die Wohneinheiten kommen aus den OSM-Angaben zum Gebäude; fehlen sie,
 zählt jede Adresse als eine Tür. OpenStreetMap ist nicht überall gleich vollständig –
@@ -240,8 +272,10 @@ automatisch, inklusive Dunkelmodus.
 Eigenes Logo: Datei als `public/logo.svg` ablegen und in `src/components/Logo.tsx`
 einbinden (der Platzhalter ist dort kommentiert).
 
-Die Diagrammfarben (`--chart-doors`, `--chart-sales`) sind auf Farbfehlsichtigkeit geprüft;
-beim Austauschen bitte den Kontrast im Blick behalten.
+Die Diagrammfarben (`--chart-doors`, `--chart-sales`) und die Farben der Teilgebiete
+(`--plot-1` bis `--plot-4`) sind auf Farbfehlsichtigkeit geprüft – jedes Paar gegen jedes,
+hell und dunkel. Wer sie austauscht, sollte den Abstand der Farben zueinander prüfen;
+sonst sind auf der Karte zwei Teilgebiete nicht mehr auseinanderzuhalten.
 
 ---
 
@@ -305,6 +339,7 @@ entstehen zwei getrennte Datenbestände.
 | Datenbank | SQLite über `better-sqlite3` – kein Datenbankserver nötig |
 | Karte | Leaflet mit OpenStreetMap-Kacheln |
 | Gebietszuschnitt | Overpass (Straßen in der Fläche), Nominatim (Ortssuche) |
+| Aufteilung | k-Means auf den Straßenmitten, danach Ausgleich nach Türen |
 | Login | Signiertes Session-Cookie (HMAC), Passwörter als scrypt-Hash |
 | App auf dem Handy | PWA mit Manifest, Service Worker und lokaler Erfassungs-Warteschlange |
 
@@ -328,7 +363,7 @@ src/
     auth.ts           Login, Rollen, Passwörter
     queries.ts        alle Datenbankabfragen
     energy/           Städteliste, Datenquellen-Adapter, Tagesabruf
-    geo/              Flächenberechnung und OpenStreetMap-Abfragen
+    geo/              Flächenberechnung, Aufteilung, OpenStreetMap-Abfragen
     offline-queue.ts  Puffer für Türeinträge ohne Netz
   components/         UI-Bausteine, Diagramme, Navigation
 public/

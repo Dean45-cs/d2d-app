@@ -4,7 +4,8 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import type { StreetWithStats } from "@/lib/queries";
 import { IconPlus } from "@/components/icons";
-import { StatusBadge } from "@/components/ui";
+import { ProgressBar } from "@/components/ui";
+import { routeUrl } from "@/lib/map";
 
 export function StreetList({
   territoryId,
@@ -104,7 +105,7 @@ export function StreetList({
       ) : (
         <ul className="divide-y" style={{ borderColor: "var(--line)" }}>
           {streets.map((s) => (
-            <li key={s.id} className="flex items-center gap-3 py-2.5">
+            <li key={s.id} className="flex items-center gap-2 py-2.5">
               <div className="min-w-0 flex-1">
                 <p className="truncate text-sm font-medium">
                   {s.name}{" "}
@@ -113,15 +114,40 @@ export function StreetList({
                   )}
                 </p>
                 <p className="muted text-xs tabular-nums">
-                  {s.visit_count} Türen · {s.met_count} angetroffen · {s.sale_count} Abschlüsse
-                  {s.units > 0 && ` · ${s.units} WE`}
+                  {/* Kurz halten: der Fortschritt ist die wichtigste Zahl. */}
+                  {s.units > 0
+                    ? `${s.visit_count} von ${s.units} Türen`
+                    : `${s.visit_count} Türen`}
+                  {s.sale_count > 0 && ` · ${s.sale_count} Abschlüsse`}
                 </p>
+                {s.units > 0 && (
+                  <div className="mt-1 max-w-40">
+                    <ProgressBar
+                      value={s.visit_count}
+                      max={s.units}
+                      tone={s.status === "DONE" ? "success" : "brand"}
+                    />
+                  </div>
+                )}
               </div>
 
-              <StatusBadge status={s.status} />
+              {s.lat !== null && s.lng !== null && (
+                <a
+                  href={routeUrl(s.lat, s.lng)}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="muted shrink-0 px-1 text-base leading-none hover:text-brand-600"
+                  title={`Route zur ${s.name}`}
+                  aria-label={`Route zur ${s.name}`}
+                >
+                  ➤
+                </a>
+              )}
 
+              {/* Das Auswahlfeld zeigt den Status schon an - eine zusaetzliche
+                  Plakette daneben waere doppelt und kostet auf dem Handy Platz. */}
               <select
-                className="select w-auto px-2 py-1 text-xs"
+                className="select w-auto shrink-0 px-2 py-1 text-xs"
                 value={s.status}
                 onChange={(e) => setStatus(s.id, e.target.value)}
                 aria-label={`Status von ${s.name}`}
@@ -134,7 +160,7 @@ export function StreetList({
               {isLeader && (
                 <button
                   onClick={() => remove(s.id)}
-                  className="muted px-1 text-lg leading-none hover:text-signal-600"
+                  className="muted shrink-0 px-1 text-lg leading-none hover:text-signal-600"
                   aria-label={`${s.name} entfernen`}
                 >
                   ×

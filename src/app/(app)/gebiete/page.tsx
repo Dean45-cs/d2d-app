@@ -31,6 +31,8 @@ export default async function TerritoriesPage() {
             status: t.status,
             assignee: t.assignee_name,
             streets: t.street_count,
+            doors: t.visit_count,
+            units: t.unit_count,
           },
         ]
       : [];

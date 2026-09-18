@@ -191,6 +191,36 @@ export function addStreetEntries(territoryId: number, entries: StreetInput[]): n
   return added;
 }
 
+export interface TerritoryDraft {
+  name: string;
+  city: string;
+  postalCode: string;
+  assignedUserId: number | null;
+  note: string;
+  dueDate: string | null;
+  areaJson: string;
+  streets: StreetInput[];
+}
+
+/**
+ * Legt mehrere Gebiete auf einmal an - fuer ein Gebiet, das beim Anlegen auf
+ * mehrere Leute aufgeteilt wird. Entweder entstehen alle oder keines: ein
+ * halb aufgeteiltes Viertel waere schlimmer als gar keines.
+ */
+export function createTerritories(teamId: number, drafts: TerritoryDraft[]): number[] {
+  const db = getDb();
+  const run = db.transaction(() => {
+    const ids: number[] = [];
+    for (const draft of drafts) {
+      const id = createTerritory({ teamId, ...draft });
+      addStreetEntries(id, draft.streets);
+      ids.push(id);
+    }
+    return ids;
+  });
+  return run();
+}
+
 /**
  * Nimmt eine eingefuegte Strassenliste entgegen. Jede Zeile ist eine Strasse,
  * optional mit Hausnummern und Wohneinheiten:
