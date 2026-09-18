@@ -4,6 +4,13 @@ import type { User } from "@/lib/types";
 import { plural } from "@/components/ui";
 import { MAX_PLOTS } from "@/lib/geo/split";
 
+export interface FoundAddress {
+  number: string;
+  units: number;
+  lat: number | null;
+  lng: number | null;
+}
+
 export interface FoundStreet {
   name: string;
   houseNumbers: string;
@@ -11,7 +18,8 @@ export interface FoundStreet {
   addresses: number;
   lat: number | null;
   lng: number | null;
-  points: [number, number][];
+  /** Jede gefundene Hausnummer einzeln. */
+  numbers: FoundAddress[];
 }
 
 export interface Plot {
@@ -202,11 +210,16 @@ export function StreetResult({
                   <span className={`block truncate text-sm ${isChosen ? "font-medium" : "muted"}`}>
                     {street.name}
                   </span>
-                  <span className="muted block text-xs">
-                    {street.houseNumbers ? `Nr. ${street.houseNumbers}` : "keine Hausnummern"}
-                    {street.units > 0 && ` · ${street.units} WE`}
-                    {street.units === 0 && street.addresses > 0 && ` · ${street.addresses} Adressen`}
+                  <span className="muted block truncate text-xs">
+                    {street.numbers.length > 0
+                      ? `${plural(street.numbers.length, "Hausnummer", "Hausnummern")}: ${preview(street)}`
+                      : "keine Hausnummern hinterlegt"}
                   </span>
+                  {street.units > street.numbers.length && (
+                    <span className="muted block text-xs">
+                      {plural(street.units, "Wohneinheit", "Wohneinheiten")}
+                    </span>
+                  )}
                 </button>
               </div>
             </li>
@@ -223,7 +236,20 @@ export function StreetResult({
   );
 }
 
-/** Aufwand einer Strasse: Wohneinheiten, sonst Adressen. */
+/** Aufwand einer Strasse: Wohneinheiten, sonst Zahl der Haeuser. */
 export function doorsOf(street: FoundStreet): number {
-  return street.units > 0 ? street.units : street.addresses;
+  return street.units > 0 ? street.units : street.numbers.length || street.addresses;
+}
+
+/** Koordinaten der Haeuser - fuer Karte und Umriss. */
+export function pointsOf(street: FoundStreet): [number, number][] {
+  return street.numbers.flatMap((house) =>
+    house.lat !== null && house.lng !== null ? [[house.lat, house.lng] as [number, number]] : [],
+  );
+}
+
+/** Die ersten Nummern als Kostprobe: "1, 3, 5, 7 …" */
+function preview(street: FoundStreet): string {
+  const first = street.numbers.slice(0, 6).map((h) => h.number).join(", ");
+  return street.numbers.length > 6 ? `${first} …` : first;
 }

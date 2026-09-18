@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import type { StreetWithStats } from "@/lib/queries";
+import type { HouseNumberWithStats, StreetWithStats } from "@/lib/queries";
 import { IconPlus } from "@/components/icons";
 import { ProgressBar } from "@/components/ui";
 import { routeUrl } from "@/lib/map";
@@ -10,14 +10,18 @@ import { routeUrl } from "@/lib/map";
 export function StreetList({
   territoryId,
   streets,
+  numbers,
   isLeader,
 }: {
   territoryId: number;
   streets: StreetWithStats[];
+  /** Hausnummern je Strassen-ID, aus der Kartenauswahl uebernommen. */
+  numbers: Record<number, HouseNumberWithStats[]>;
   isLeader: boolean;
 }) {
   const router = useRouter();
   const [adding, setAdding] = useState(false);
+  const [openStreet, setOpenStreet] = useState<number | null>(null);
   const [raw, setRaw] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -104,72 +108,134 @@ export function StreetList({
         </p>
       ) : (
         <ul className="divide-y" style={{ borderColor: "var(--line)" }}>
-          {streets.map((s) => (
-            <li key={s.id} className="flex items-center gap-2 py-2.5">
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-medium">
-                  {s.name}{" "}
-                  {s.house_numbers && (
-                    <span className="muted font-normal">{s.house_numbers}</span>
+          {streets.map((s) => {
+            const houses = numbers[s.id] ?? [];
+            const doneHouses = houses.filter((h) => h.visit_count > 0).length;
+            const expanded = openStreet === s.id;
+            return (
+              <li key={s.id} className="py-2.5">
+                <div className="flex items-center gap-2">
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-medium">
+                      {s.name}{" "}
+                      {s.house_numbers && (
+                        <span className="muted font-normal">{s.house_numbers}</span>
+                      )}
+                    </p>
+                    <p className="muted text-xs tabular-nums">
+                      {/* Kurz halten: der Fortschritt ist die wichtigste Zahl. */}
+                      {s.units > 0
+                        ? `${s.visit_count} von ${s.units} Türen`
+                        : `${s.visit_count} Türen`}
+                      {s.sale_count > 0 && ` · ${s.sale_count} Abschlüsse`}
+                    </p>
+                    {s.units > 0 && (
+                      <div className="mt-1 max-w-40">
+                        <ProgressBar
+                          value={s.visit_count}
+                          max={s.units}
+                          tone={s.status === "DONE" ? "success" : "brand"}
+                        />
+                      </div>
+                    )}
+                  </div>
+
+                  {houses.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => setOpenStreet(expanded ? null : s.id)}
+                      className="muted shrink-0 rounded-lg px-2 py-1 text-xs font-semibold hover:bg-brand-500/8"
+                      aria-expanded={expanded}
+                    >
+                      {houses.length} Nr.
+                      <span aria-hidden className="ml-1">{expanded ? "▾" : "▸"}</span>
+                    </button>
                   )}
-                </p>
-                <p className="muted text-xs tabular-nums">
-                  {/* Kurz halten: der Fortschritt ist die wichtigste Zahl. */}
-                  {s.units > 0
-                    ? `${s.visit_count} von ${s.units} Türen`
-                    : `${s.visit_count} Türen`}
-                  {s.sale_count > 0 && ` · ${s.sale_count} Abschlüsse`}
-                </p>
-                {s.units > 0 && (
-                  <div className="mt-1 max-w-40">
-                    <ProgressBar
-                      value={s.visit_count}
-                      max={s.units}
-                      tone={s.status === "DONE" ? "success" : "brand"}
-                    />
+
+                  {s.lat !== null && s.lng !== null && (
+                    <a
+                      href={routeUrl(s.lat, s.lng)}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="muted shrink-0 px-1 text-base leading-none hover:text-brand-600"
+                      title={`Route zur ${s.name}`}
+                      aria-label={`Route zur ${s.name}`}
+                    >
+                      ➤
+                    </a>
+                  )}
+
+                  {/* Das Auswahlfeld zeigt den Status schon an - eine zusaetzliche
+                      Plakette daneben waere doppelt und kostet auf dem Handy Platz. */}
+                  <select
+                    className="select w-auto shrink-0 px-2 py-1 text-xs"
+                    value={s.status}
+                    onChange={(e) => setStatus(s.id, e.target.value)}
+                    aria-label={`Status von ${s.name}`}
+                  >
+                    <option value="OPEN">Offen</option>
+                    <option value="ACTIVE">In Arbeit</option>
+                    <option value="DONE">Fertig</option>
+                  </select>
+
+                  {isLeader && (
+                    <button
+                      onClick={() => remove(s.id)}
+                      className="muted shrink-0 px-1 text-lg leading-none hover:text-signal-600"
+                      aria-label={`${s.name} entfernen`}
+                    >
+                      ×
+                    </button>
+                  )}
+                </div>
+
+                {expanded && (
+                  <div className="mt-2">
+                    <p className="muted mb-1.5 text-xs">
+                      {doneHouses} von {houses.length} Häusern erfasst · grün = Abschluss
+                    </p>
+                    <ul className="flex flex-wrap gap-1">
+                      {houses.map((house) => (
+                        <li key={house.id}>
+                          <HouseChip house={house} />
+                        </li>
+                      ))}
+                    </ul>
                   </div>
                 )}
-              </div>
-
-              {s.lat !== null && s.lng !== null && (
-                <a
-                  href={routeUrl(s.lat, s.lng)}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="muted shrink-0 px-1 text-base leading-none hover:text-brand-600"
-                  title={`Route zur ${s.name}`}
-                  aria-label={`Route zur ${s.name}`}
-                >
-                  ➤
-                </a>
-              )}
-
-              {/* Das Auswahlfeld zeigt den Status schon an - eine zusaetzliche
-                  Plakette daneben waere doppelt und kostet auf dem Handy Platz. */}
-              <select
-                className="select w-auto shrink-0 px-2 py-1 text-xs"
-                value={s.status}
-                onChange={(e) => setStatus(s.id, e.target.value)}
-                aria-label={`Status von ${s.name}`}
-              >
-                <option value="OPEN">Offen</option>
-                <option value="ACTIVE">In Arbeit</option>
-                <option value="DONE">Fertig</option>
-              </select>
-
-              {isLeader && (
-                <button
-                  onClick={() => remove(s.id)}
-                  className="muted shrink-0 px-1 text-lg leading-none hover:text-signal-600"
-                  aria-label={`${s.name} entfernen`}
-                >
-                  ×
-                </button>
-              )}
-            </li>
-          ))}
+              </li>
+            );
+          })}
         </ul>
       )}
     </div>
+  );
+}
+
+/** Eine Hausnummer als Plakette: grau = offen, blau = erfasst, grün = Abschluss. */
+function HouseChip({ house }: { house: HouseNumberWithStats }) {
+  const done = house.visit_count > 0;
+  const sale = house.sale_count > 0;
+  return (
+    <span
+      className="inline-flex items-center rounded-lg px-1.5 py-0.5 text-xs font-semibold tabular-nums"
+      style={{
+        background: sale
+          ? "color-mix(in srgb, var(--energy-500) 20%, transparent)"
+          : done
+            ? "color-mix(in srgb, var(--brand-500) 16%, transparent)"
+            : "color-mix(in srgb, var(--ink) 7%, transparent)",
+        color: sale ? "var(--energy-700)" : done ? "var(--brand-600)" : "var(--ink-muted)",
+      }}
+      title={[
+        `Hausnummer ${house.number}`,
+        house.units > 1 ? `${house.units} Wohneinheiten` : null,
+        sale ? "Abschluss" : done ? "erfasst" : "offen",
+      ]
+        .filter(Boolean)
+        .join(" · ")}
+    >
+      {house.number}
+    </span>
   );
 }

@@ -5,6 +5,7 @@ import {
   getTerritory,
   listMembers,
   listStreets,
+  listHouseNumbers,
   listTerritories,
   listVisits,
   type StreetWithStats,
@@ -34,6 +35,13 @@ export default async function TerritoryDetailPage({
   const streets = listStreets(territory.id);
   const members = isLeader ? listMembers(user.team_id) : [];
   const visits = listVisits(user.team_id, { territoryId: territory.id, limit: 30 });
+
+  // Hausnummern je Strasse - aus der Kartenauswahl uebernommen.
+  const houseNumbers = listHouseNumbers(streets.map((s) => s.id));
+  const numbersByStreet: Record<number, typeof houseNumbers> = {};
+  for (const house of houseNumbers) {
+    (numbersByStreet[house.street_id] ??= []).push(house);
+  }
 
   const area = readArea(territory.area_json);
   // Beim Nachziehen der Flaeche sollen die Nachbargebiete sichtbar sein.
@@ -134,6 +142,7 @@ export default async function TerritoryDetailPage({
       <StreetList
         territoryId={territory.id}
         streets={streets}
+        numbers={numbersByStreet}
         isLeader={isLeader}
       />
 

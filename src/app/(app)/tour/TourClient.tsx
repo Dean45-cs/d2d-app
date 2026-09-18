@@ -3,7 +3,12 @@
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { routeUrl } from "@/lib/map";
-import type { StreetWithStats, Totals, VisitRow } from "@/lib/queries";
+import type {
+  HouseNumberWithStats,
+  StreetWithStats,
+  Totals,
+  VisitRow,
+} from "@/lib/queries";
 import type { RejectionReason, VisitOutcome } from "@/lib/types";
 import { OUTCOME_LABEL } from "@/lib/types";
 import { IconArrowRight, IconCheck } from "@/components/icons";
@@ -35,6 +40,7 @@ type SaveResult =
 interface Props {
   territories: TerritoryLite[];
   streets: StreetWithStats[];
+  houseNumbers: HouseNumberWithStats[];
   reasons: RejectionReason[];
   todayTotals: Totals;
   recent: VisitRow[];
@@ -50,6 +56,7 @@ const PRODUCTS: Array<{ value: EnergyType; label: string }> = [
 export function TourClient({
   territories,
   streets,
+  houseNumbers,
   reasons,
   todayTotals,
   recent,
@@ -145,6 +152,35 @@ export function TourClient({
     () => streets.find((s) => s.id === streetId) ?? null,
     [streets, streetId],
   );
+
+  /** Die Hausnummern der gewaehlten Strasse, in Reihenfolge. */
+  const houses = useMemo(
+    () => (streetId ? houseNumbers.filter((h) => h.street_id === streetId) : []),
+    [houseNumbers, streetId],
+  );
+
+  /**
+   * In dieser Sitzung erfasste Nummern. Der Server weiss es erst nach dem
+   * Neuladen, und ohne Netz gar nicht - deshalb wird es hier mitgezaehlt,
+   * damit die Plakette sofort umspringt.
+   */
+  const [justDone, setJustDone] = useState<Set<string>>(new Set());
+  const doneKey = (id: number, number: string) => `${id}:${number.toLowerCase()}`;
+  const isDone = useCallback(
+    (house: HouseNumberWithStats) =>
+      house.visit_count > 0 || justDone.has(doneKey(house.street_id, house.number)),
+    [justDone],
+  );
+
+  /** Naechste noch offene Hausnummer - der Weg die Strasse hinauf. */
+  function nextHouse(): string | null {
+    if (houses.length === 0) return null;
+    const current = houses.findIndex(
+      (h) => h.number.toLowerCase() === houseNumber.trim().toLowerCase(),
+    );
+    const rest = current >= 0 ? houses.slice(current + 1) : houses;
+    return (rest.find((h) => !isDone(h)) ?? rest[0] ?? null)?.number ?? null;
+  }
   const territory = territories.find((t) => t.id === territoryId) ?? null;
 
   const chooseStreet = useCallback((value: number | null) => {
@@ -171,6 +207,13 @@ export function TourClient({
       lng: position?.lng ?? null,
     };
 
+    // Die gerade erfasste Nummer gilt sofort als erledigt.
+    const markDone = () => {
+      if (!streetId || !houseNumber.trim()) return;
+      const key = doneKey(streetId, houseNumber.trim());
+      setJustDone((prev) => new Set(prev).add(key));
+    };
+
     setBusy(true);
     try {
       const response = await fetch("/api/visits", {
@@ -184,6 +227,7 @@ export function TourClient({
         return { status: "error" };
       }
       setLastVisitId(data.id);
+      markDone();
       setHouseNumber("");
       setNote("");
       router.refresh();
@@ -200,6 +244,7 @@ export function TourClient({
         .join(" ");
       enqueue(label, payload);
       setLastVisitId(null);
+      markDone();
       setHouseNumber("");
       setNote("");
       return { status: "queued" };
@@ -437,15 +482,66 @@ export function TourClient({
           <button
             type="button"
             className="btn btn-ghost px-4 text-lg"
-            aria-label="Hausnummer um 1 erhöhen"
+            aria-label={
+              houses.length > 0 ? "Zur nächsten offenen Hausnummer" : "Hausnummer um 1 erhöhen"
+            }
             onClick={() => {
+              // Kennt die App die Hausnummern der Straße, springt sie zur
+              // nächsten offenen - sonst bleibt es beim schlichten Hochzählen.
+              const next = nextHouse();
+              if (next) {
+                setHouseNumber(next);
+                return;
+              }
               const match = houseNumber.match(/^(\d+)(.*)$/);
               setHouseNumber(match ? `${Number(match[1]) + 1}${match[2]}` : "1");
             }}
           >
-            +1
+            {houses.length > 0 ? "weiter" : "+1"}
           </button>
         </div>
+
+        {houses.length > 0 && (
+          <div className="mb-4">
+            <p className="muted mb-1.5 text-xs">
+              {houses.filter((h) => !isDone(h)).length} von {houses.length} Häusern offen –
+              antippen statt tippen
+            </p>
+            <ul className="flex max-h-28 flex-wrap gap-1.5 overflow-y-auto">
+              {houses.map((house) => {
+                const done = isDone(house);
+                const active = house.number.toLowerCase() === houseNumber.trim().toLowerCase();
+                return (
+                  <li key={house.id}>
+                    <button
+                      type="button"
+                      onClick={() => setHouseNumber(house.number)}
+                      className="rounded-lg border px-2.5 py-1.5 text-sm font-semibold tabular-nums transition"
+                      style={{
+                        borderColor: active ? "var(--brand-600)" : "var(--line)",
+                        background: active
+                          ? "color-mix(in srgb, var(--brand-500) 16%, transparent)"
+                          : done
+                            ? "color-mix(in srgb, var(--ink) 7%, transparent)"
+                            : "var(--card)",
+                        color: done && !active ? "var(--ink-muted)" : "var(--ink)",
+                        textDecoration: done ? "line-through" : undefined,
+                      }}
+                      title={
+                        house.units > 1 ? `${house.units} Wohneinheiten` : undefined
+                      }
+                      aria-label={`Hausnummer ${house.number}${
+                        house.units > 1 ? `, ${house.units} Wohneinheiten` : ""
+                      }${done ? ", schon erfasst" : ""}`}
+                    >
+                      {house.number}
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        )}
 
         {/* Produktwahl – gilt für den nächsten Abschluss */}
         <div className="mb-4">

@@ -8,7 +8,13 @@ import type { User } from "@/lib/types";
 import { centerOf, type LatLng } from "@/lib/geo/area";
 import { outlineOf, splitStreets } from "@/lib/geo/split";
 import { AreaPicker, type ExistingArea, type OverlayPlot, type OverlayStreet } from "./AreaPicker";
-import { StreetResult, doorsOf, type FoundStreet, type Plot } from "./StreetResult";
+import {
+  StreetResult,
+  doorsOf,
+  pointsOf,
+  type FoundStreet,
+  type Plot,
+} from "./StreetResult";
 
 interface StreetResponse {
   streets: FoundStreet[];
@@ -139,7 +145,7 @@ export function NewTerritoryButton({
     () =>
       (result?.streets ?? []).map((street) => ({
         name: street.name,
-        points: street.points,
+        points: pointsOf(street),
         center: street.lat !== null && street.lng !== null ? [street.lat, street.lng] : null,
         color: chosen.has(street.name) ? plotColor(plotOf.get(street.name) ?? 0) : null,
       })),
@@ -152,7 +158,7 @@ export function NewTerritoryButton({
         .map((plot) => ({
           label: plot.label,
           color: plot.color,
-          area: outlineOf(plot.streets.flatMap((s) => s.points)),
+          area: outlineOf(plot.streets.flatMap(pointsOf)),
         }))
         .filter((plot) => plot.area.length >= 3),
     [plots],

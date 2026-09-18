@@ -30,19 +30,29 @@ const USER_AGENT = process.env.GEO_USER_AGENT ?? "d2d-app (Gebietsplanung; https
 const STREET_TYPES = "residential|living_street|pedestrian|unclassified|tertiary|secondary|primary|road";
 
 const MAX_STREETS = 400;
-/** Punkte je Strasse und insgesamt - die Vorschau soll leicht bleiben. */
-const MAX_POINTS_PER_STREET = 160;
-const MAX_POINTS_TOTAL = 4000;
+/** Hausnummern je Strasse und insgesamt - eine Grenze gegen Ausreisser. */
+const MAX_NUMBERS_PER_STREET = 500;
+const MAX_NUMBERS_TOTAL = 8000;
+
+/** Ein einzelnes Haus: Nummer, Wohneinheiten und Lage. */
+export interface FoundAddress {
+  number: string;
+  /** Wohneinheiten laut OSM, 0 = unbekannt. */
+  units: number;
+  lat: number | null;
+  lng: number | null;
+}
 
 export interface FoundStreet {
   name: string;
+  /** Spanne fuer die Anzeige, z. B. "1-45". */
   houseNumbers: string;
   units: number;
   addresses: number;
   lat: number | null;
   lng: number | null;
-  /** Lage der gefundenen Hausnummern - die Vorschau zeigt damit die echten Tueren. */
-  points: LatLng[];
+  /** Jede gefundene Hausnummer einzeln - daraus wird die Liste an der Tür. */
+  numbers: FoundAddress[];
 }
 
 export interface AreaStreets {
@@ -146,17 +156,16 @@ async function overpass(query: string): Promise<OverpassElement[]> {
   }
 }
 
-/** Macht aus Overpass-Elementen je Strasse eine Zeile mit Hausnummern und Einheiten. */
+/** Macht aus Overpass-Elementen je Strasse eine Zeile mit allen Hausnummern. */
 function groupStreets(elements: OverpassElement[], area: LatLng[]): FoundStreet[] {
   interface Draft {
     name: string;
-    numbers: Array<{ value: number; suffix: string; raw: string }>;
-    units: number;
+    /** Hausnummer (normalisiert) -> Haus. Doppelte Treffer fallen so weg. */
+    houses: Map<string, FoundAddress>;
     addresses: number;
     latSum: number;
     lngSum: number;
-    /** Koordinaten der Hausnummern, fuer die Vorschau auf der Karte. */
-    points: LatLng[];
+    located: number;
     roadLat: number | null;
     roadLng: number | null;
   }
@@ -168,12 +177,11 @@ function groupStreets(elements: OverpassElement[], area: LatLng[]): FoundStreet[
     if (!draft) {
       draft = {
         name,
-        numbers: [],
-        units: 0,
+        houses: new Map(),
         addresses: 0,
         latSum: 0,
         lngSum: 0,
-        points: [],
+        located: 0,
         roadLat: null,
         roadLng: null,
       };
@@ -196,16 +204,32 @@ function groupStreets(elements: OverpassElement[], area: LatLng[]): FoundStreet[
 
       const draft = draftFor(streetName);
       draft.addresses += 1;
-      draft.units += flatsOf(tags);
-      for (const number of splitHouseNumbers(tags["addr:housenumber"])) {
-        draft.numbers.push(number);
-      }
       if (lat !== null && lng !== null) {
         draft.latSum += lat;
         draft.lngSum += lng;
-        if (draft.points.length < MAX_POINTS_PER_STREET) {
-          draft.points.push([round6(lat), round6(lng)]);
+        draft.located += 1;
+      }
+
+      // "12", "12a", aber auch "12;14" oder "12-14" an einem Gebaeude.
+      const flats = flatsOf(tags);
+      for (const number of splitHouseNumbers(tags["addr:housenumber"])) {
+        if (draft.houses.size >= MAX_NUMBERS_PER_STREET && !draft.houses.has(number.key)) continue;
+        const existing = draft.houses.get(number.key);
+        if (existing) {
+          // Dieselbe Nummer zweimal (Knoten und Gebaeude): bessere Angabe behalten.
+          if (existing.units === 0) existing.units = flats;
+          if (existing.lat === null && lat !== null) {
+            existing.lat = round6(lat);
+            existing.lng = lng === null ? null : round6(lng);
+          }
+          continue;
         }
+        draft.houses.set(number.key, {
+          number: number.label,
+          units: flats,
+          lat: lat === null ? null : round6(lat),
+          lng: lng === null ? null : round6(lng),
+        });
       }
       continue;
     }
@@ -221,15 +245,16 @@ function groupStreets(elements: OverpassElement[], area: LatLng[]): FoundStreet[
 
   const streets: FoundStreet[] = [];
   for (const draft of drafts.values()) {
-    const located = draft.points.length;
+    const numbers = [...draft.houses.values()].sort(byHouseNumber);
     streets.push({
       name: draft.name,
-      houseNumbers: formatRange(draft.numbers),
-      units: draft.units,
+      houseNumbers: formatRange(numbers),
+      // Wohneinheiten aus den Haeusern; ohne Angabe zaehlt jedes Haus als eines.
+      units: numbers.reduce((sum, house) => sum + (house.units || 1), 0),
       addresses: draft.addresses,
-      lat: located > 0 ? round6(draft.latSum / located) : draft.roadLat,
-      lng: located > 0 ? round6(draft.lngSum / located) : draft.roadLng,
-      points: draft.points,
+      lat: draft.located > 0 ? round6(draft.latSum / draft.located) : draft.roadLat,
+      lng: draft.located > 0 ? round6(draft.lngSum / draft.located) : draft.roadLng,
+      numbers,
     });
   }
 
@@ -238,53 +263,81 @@ function groupStreets(elements: OverpassElement[], area: LatLng[]): FoundStreet[
     .slice(0, MAX_STREETS)
     .sort((a, b) => a.name.localeCompare(b.name, "de-DE"));
 
-  return thinPoints(ranked);
+  return capNumbers(ranked);
 }
 
 /**
- * Deckelt die Zahl der Vorschaupunkte. In dichten Innenstaedten kommen sonst
- * Zehntausende Adressen zusammen - sichtbar waere davon nichts, die Karte
- * wuerde aber ruckeln.
+ * Notbremse fuer Ausreisser: mehr als achttausend Hausnummern auf einmal
+ * braucht kein Tagesgebiet. Die Zaehlung bleibt richtig, nur die Einzelliste
+ * wird ab da nicht weitergefuehrt.
  */
-function thinPoints(streets: FoundStreet[]): FoundStreet[] {
-  const total = streets.reduce((sum, s) => sum + s.points.length, 0);
-  if (total <= MAX_POINTS_TOTAL) return streets;
-  const keepEvery = Math.ceil(total / MAX_POINTS_TOTAL);
-  return streets.map((street) => ({
-    ...street,
-    points: street.points.filter((_, index) => index % keepEvery === 0),
-  }));
+function capNumbers(streets: FoundStreet[]): FoundStreet[] {
+  let budget = MAX_NUMBERS_TOTAL;
+  return streets.map((street) => {
+    if (budget <= 0) return { ...street, numbers: [] };
+    if (street.numbers.length <= budget) {
+      budget -= street.numbers.length;
+      return street;
+    }
+    const numbers = street.numbers.slice(0, budget);
+    budget = 0;
+    return { ...street, numbers };
+  });
 }
 
-/** Wohneinheiten aus den OSM-Tags, sonst zaehlt die Adresse als eine Tuer. */
+/** Sortiert wie im Briefkasten: 2 vor 10, 12 vor 12a. */
+function byHouseNumber(a: FoundAddress, b: FoundAddress): number {
+  const parse = (value: string) => {
+    const match = value.match(/^(\d+)\s*(.*)$/);
+    return match ? { value: Number(match[1]), suffix: match[2] } : { value: 0, suffix: value };
+  };
+  const left = parse(a.number);
+  const right = parse(b.number);
+  return left.value - right.value || left.suffix.localeCompare(right.suffix, "de-DE");
+}
+
+/** Wohneinheiten aus den OSM-Tags/** Wohneinheiten aus den OSM-Tags, sonst zaehlt die Adresse als eine Tuer. */
 function flatsOf(tags: Record<string, string>): number {
   const flats = Number(tags["building:flats"] ?? tags["addr:flats"] ?? "");
   return Number.isFinite(flats) && flats > 0 ? Math.min(flats, 500) : 1;
 }
 
 /** "12a", "12-14", "12;14" -> einzelne Hausnummern. */
-function splitHouseNumbers(raw: string): Array<{ value: number; suffix: string; raw: string }> {
-  return raw
+function splitHouseNumbers(raw: string): Array<{ key: string; label: string }> {
+  const parts = raw
     .split(/[;,]/)
     .map((part) => part.trim())
     .filter(Boolean)
-    .slice(0, 12)
-    .map((part) => {
-      const match = part.match(/^(\d{1,4})\s*([a-zA-Z]?)/);
-      if (!match) return null;
-      return { value: Number(match[1]), suffix: match[2] ?? "", raw: part };
-    })
-    .filter((n): n is { value: number; suffix: string; raw: string } => n !== null);
+    .slice(0, 12);
+
+  const out: Array<{ key: string; label: string }> = [];
+  for (const part of parts) {
+    // "12-16" an einem Gebaeude: die Nummern dazwischen gehoeren dazu, aber
+    // nur in vernuenftigem Abstand und in derselben Schrittweite (gerade/ungerade).
+    const span = part.match(/^(\d{1,4})\s*[-–]\s*(\d{1,4})$/);
+    if (span) {
+      const from = Number(span[1]);
+      const to = Number(span[2]);
+      if (to > from && to - from <= 20) {
+        const step = (to - from) % 2 === 0 ? 2 : 1;
+        for (let n = from; n <= to; n += step) out.push({ key: String(n), label: String(n) });
+        continue;
+      }
+    }
+    const match = part.match(/^(\d{1,4})\s*([a-zA-Z]?)/);
+    if (!match) continue;
+    const label = `${match[1]}${(match[2] ?? "").toLowerCase()}`;
+    out.push({ key: label, label });
+  }
+  return out;
 }
 
 /** Aus allen Hausnummern wird die Spanne, die im Gebiet abzuarbeiten ist. */
-function formatRange(numbers: Array<{ value: number; suffix: string; raw: string }>): string {
+function formatRange(numbers: FoundAddress[]): string {
   if (numbers.length === 0) return "";
-  const sorted = [...numbers].sort((a, b) => a.value - b.value || a.suffix.localeCompare(b.suffix));
-  const first = sorted[0];
-  const last = sorted[sorted.length - 1];
-  if (first.value === last.value && first.suffix === last.suffix) return `${first.value}${first.suffix}`;
-  return `${first.value}${first.suffix}-${last.value}${last.suffix}`;
+  const first = numbers[0].number;
+  const last = numbers[numbers.length - 1].number;
+  return first === last ? first : `${first}-${last}`;
 }
 
 function round6(value: number): number {

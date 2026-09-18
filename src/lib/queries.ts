@@ -137,58 +137,21 @@ export function setTerritoryArea(territoryId: number, areaJson: string): void {
   getDb().prepare("UPDATE territories SET area_json = ? WHERE id = ?").run(areaJson, territoryId);
 }
 
+export interface HouseNumberInput {
+  number: string;
+  units: number;
+  lat: number | null;
+  lng: number | null;
+}
+
 export interface StreetInput {
   name: string;
   houseNumbers: string;
   units: number;
   lat: number | null;
   lng: number | null;
-}
-
-/**
- * Strassen aus der Kartenauswahl uebernehmen - inklusive Koordinate, damit sie
- * spaeter auf der Gebietskarte zu sehen sind. Bereits vorhandene Strassen des
- * Gebiets werden uebersprungen, doppelte Eintraege gibt es also nicht.
- */
-export function addStreetEntries(territoryId: number, entries: StreetInput[]): number {
-  const db = getDb();
-  const existingRows = db
-    .prepare("SELECT name FROM streets WHERE territory_id = ?")
-    .all(territoryId) as Array<{ name: string }>;
-  const known = new Set(existingRows.map((r) => r.name.toLocaleLowerCase("de-DE")));
-  const maxOrder = db
-    .prepare("SELECT COALESCE(MAX(sort_order), 0) AS m FROM streets WHERE territory_id = ?")
-    .get(territoryId) as { m: number };
-
-  const insert = db.prepare(
-    `INSERT INTO streets (territory_id, name, house_numbers, units, sort_order, lat, lng)
-     VALUES (?, ?, ?, ?, ?, ?, ?)`,
-  );
-
-  let order = maxOrder.m;
-  let added = 0;
-  const run = db.transaction(() => {
-    for (const entry of entries) {
-      const name = entry.name.trim();
-      if (!name) continue;
-      const key = name.toLocaleLowerCase("de-DE");
-      if (known.has(key)) continue;
-      known.add(key);
-      order += 1;
-      added += 1;
-      insert.run(
-        territoryId,
-        name,
-        entry.houseNumbers,
-        entry.units,
-        order,
-        entry.lat,
-        entry.lng,
-      );
-    }
-  });
-  run();
-  return added;
+  /** Einzelne Hausnummern aus der Kartenauswahl. */
+  numbers?: HouseNumberInput[];
 }
 
 export interface TerritoryDraft {
@@ -219,6 +182,142 @@ export function createTerritories(teamId: number, drafts: TerritoryDraft[]): num
     return ids;
   });
   return run();
+}
+
+/**
+ * Strassen aus der Kartenauswahl uebernehmen - inklusive Koordinate und der
+ * einzelnen Hausnummern, damit an der Tuer klar ist, welche Haeuser es gibt.
+ *
+ * Eine Strasse, die es im Gebiet schon gibt, wird nicht doppelt angelegt;
+ * fehlen ihr aber die Hausnummern, werden sie nachgetragen. So bringt
+ * "Straßen nachladen" auch alten Gebieten etwas.
+ */
+export function addStreetEntries(territoryId: number, entries: StreetInput[]): number {
+  const db = getDb();
+  const existingRows = db
+    .prepare("SELECT id, name, house_numbers, units FROM streets WHERE territory_id = ?")
+    .all(territoryId) as Array<{ id: number; name: string; house_numbers: string; units: number }>;
+  const known = new Map(existingRows.map((r) => [r.name.toLocaleLowerCase("de-DE"), r]));
+  const maxOrder = db
+    .prepare("SELECT COALESCE(MAX(sort_order), 0) AS m FROM streets WHERE territory_id = ?")
+    .get(territoryId) as { m: number };
+
+  const insertStreet = db.prepare(
+    `INSERT INTO streets (territory_id, name, house_numbers, units, sort_order, lat, lng)
+     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+  );
+  const insertNumber = db.prepare(
+    `INSERT INTO house_numbers (street_id, number, units, lat, lng, sort_order)
+     VALUES (?, ?, ?, ?, ?, ?)
+     ON CONFLICT(street_id, number) DO NOTHING`,
+  );
+  const countNumbers = db.prepare(
+    "SELECT COUNT(*) AS c FROM house_numbers WHERE street_id = ?",
+  );
+  const updateStreet = db.prepare(
+    "UPDATE streets SET house_numbers = ?, units = ? WHERE id = ?",
+  );
+
+  const saveNumbers = (streetId: number, numbers: HouseNumberInput[]) => {
+    for (const house of numbers) {
+      // Sortiert wird nach der Zahl im Namen: so liegt eine spaeter
+      // nachgetragene 9 zwischen 7 und 11 und nicht am Ende.
+      const numeric = Number.parseInt(house.number, 10);
+      insertNumber.run(
+        streetId,
+        house.number,
+        house.units,
+        house.lat,
+        house.lng,
+        Number.isFinite(numeric) ? numeric : 0,
+      );
+    }
+  };
+
+  let order = maxOrder.m;
+  let added = 0;
+  const run = db.transaction(() => {
+    for (const entry of entries) {
+      const name = entry.name.trim();
+      if (!name) continue;
+      const numbers = entry.numbers ?? [];
+      const existing = known.get(name.toLocaleLowerCase("de-DE"));
+
+      if (existing) {
+        // Schon da: nur ergaenzen, was fehlt - nie ueberschreiben. Neue
+        // Hausnummern kommen dazu, vorhandene bleiben samt Reihenfolge stehen.
+        if (numbers.length > 0) {
+          const { c } = countNumbers.get(existing.id) as { c: number };
+          saveNumbers(existing.id, numbers);
+          if (c === 0) {
+            updateStreet.run(
+              existing.house_numbers || entry.houseNumbers,
+              existing.units > 0 ? existing.units : entry.units,
+              existing.id,
+            );
+          }
+        }
+        continue;
+      }
+
+      order += 1;
+      added += 1;
+      const result = insertStreet.run(
+        territoryId,
+        name,
+        entry.houseNumbers,
+        entry.units,
+        order,
+        entry.lat,
+        entry.lng,
+      );
+      known.set(name.toLocaleLowerCase("de-DE"), {
+        id: result.lastInsertRowid as number,
+        name,
+        house_numbers: entry.houseNumbers,
+        units: entry.units,
+      });
+      saveNumbers(result.lastInsertRowid as number, numbers);
+    }
+  });
+  run();
+  return added;
+}
+
+export interface HouseNumberWithStats {
+  id: number;
+  street_id: number;
+  number: string;
+  units: number;
+  lat: number | null;
+  lng: number | null;
+  sort_order: number;
+  /** Erfasste Tueren an dieser Hausnummer. */
+  visit_count: number;
+  sale_count: number;
+}
+
+/**
+ * Hausnummern samt Bearbeitungsstand. Abgeglichen wird ueber den Text der
+ * erfassten Hausnummer - Gross-/Kleinschreibung und Leerzeichen egal.
+ */
+export function listHouseNumbers(streetIds: number[]): HouseNumberWithStats[] {
+  if (streetIds.length === 0) return [];
+  const placeholders = streetIds.map(() => "?").join(",");
+  return getDb()
+    .prepare(
+      `SELECT h.*,
+              (SELECT COUNT(*) FROM visits v
+                WHERE v.street_id = h.street_id
+                  AND lower(replace(v.house_number, ' ', '')) = lower(h.number)) AS visit_count,
+              (SELECT COUNT(*) FROM visits v
+                WHERE v.street_id = h.street_id AND v.outcome = 'SALE'
+                  AND lower(replace(v.house_number, ' ', '')) = lower(h.number)) AS sale_count
+         FROM house_numbers h
+        WHERE h.street_id IN (${placeholders})
+        ORDER BY h.street_id, h.sort_order, h.number`,
+    )
+    .all(...streetIds) as HouseNumberWithStats[];
 }
 
 /**
