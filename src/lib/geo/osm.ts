@@ -21,7 +21,23 @@ import {
   type LatLng,
 } from "./area";
 
-const OVERPASS_URL = process.env.OVERPASS_URL ?? "https://overpass-api.de/api/interpreter";
+/**
+ * Overpass-Server der Reihe nach. Der offizielle Server ist oft ausgelastet -
+ * vor allem, wenn die App bei einem Hoster laeuft, dessen Ausgangs-IP sich
+ * viele teilen. Dann wird der naechste Spiegel genommen.
+ * Eigene Adressen (auch mehrere, mit Komma getrennt) ueber OVERPASS_URL.
+ */
+const OVERPASS_URLS = (
+  process.env.OVERPASS_URL ??
+  [
+    "https://overpass-api.de/api/interpreter",
+    "https://overpass.kumi.systems/api/interpreter",
+    "https://overpass.private.coffee/api/interpreter",
+  ].join(",")
+)
+  .split(",")
+  .map((url) => url.trim())
+  .filter(Boolean);
 const NOMINATIM_URL = (process.env.NOMINATIM_URL ?? "https://nominatim.openstreetmap.org").replace(/\/$/, "");
 const COUNTRY_CODES = process.env.GEO_COUNTRY_CODES ?? "de,at,ch";
 const USER_AGENT = process.env.GEO_USER_AGENT ?? "d2d-app (Gebietsplanung; https://github.com/)";
@@ -105,7 +121,7 @@ export async function streetsInArea(area: LatLng[]): Promise<AreaStreets> {
 
   const poly = toOverpassPoly(area);
   const query =
-    `[out:json][timeout:60];` +
+    `[out:json][timeout:40];` +
     `way["highway"~"^(${STREET_TYPES})$"]["name"](poly:"${poly}");out tags center;` +
     `(node["addr:housenumber"](poly:"${poly}");way["addr:housenumber"](poly:"${poly}"););out tags center;`;
 
@@ -120,40 +136,66 @@ export async function streetsInArea(area: LatLng[]): Promise<AreaStreets> {
   return result;
 }
 
+/** Zeit je Versuch. Eine uebliche Antwort kommt in wenigen Sekunden. */
+const OVERPASS_TIMEOUT_MS = 35_000;
+
+/** Der Server, der zuletzt geantwortet hat - beim naechsten Mal zuerst gefragt. */
+let preferredServer = 0;
+
+/**
+ * Fragt die Overpass-Server der Reihe nach, bis einer antwortet.
+ * Ueberlastung (429) und Zeitueberschreitungen sind kein Grund aufzugeben,
+ * ein fehlerhafter Abfragetext dagegen schon.
+ */
 async function overpass(query: string): Promise<OverpassElement[]> {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 75_000);
-  try {
-    const response = await fetch(OVERPASS_URL, {
-      method: "POST",
-      headers: {
-        "content-type": "application/x-www-form-urlencoded",
-        "user-agent": USER_AGENT,
-      },
-      body: new URLSearchParams({ data: query }).toString(),
-      signal: controller.signal,
-      cache: "no-store",
-    });
-    if (!response.ok) {
-      throw new Error(
-        response.status === 429 || response.status === 504
-          ? "Der Straßen-Dienst ist gerade überlastet. Bitte in einer Minute noch einmal versuchen."
-          : `Straßen konnten nicht geladen werden (Fehler ${response.status}).`,
-      );
+  let lastProblem = "";
+
+  for (let attempt = 0; attempt < OVERPASS_URLS.length; attempt += 1) {
+    const index = (preferredServer + attempt) % OVERPASS_URLS.length;
+    const url = OVERPASS_URLS[index];
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), OVERPASS_TIMEOUT_MS);
+
+    try {
+      const response = await fetch(url, {
+        method: "POST",
+        headers: {
+          "content-type": "application/x-www-form-urlencoded",
+          "user-agent": USER_AGENT,
+        },
+        body: new URLSearchParams({ data: query }).toString(),
+        signal: controller.signal,
+        cache: "no-store",
+      });
+
+      if (response.ok) {
+        const data = (await response.json()) as { elements?: OverpassElement[] };
+        preferredServer = index;
+        return data.elements ?? [];
+      }
+
+      // 400 heisst: die Abfrage selbst taugt nichts - da hilft kein anderer Server.
+      if (response.status === 400) {
+        throw new Error("Die Straßenabfrage wurde abgelehnt. Bitte das Gebiet neu zeichnen.");
+      }
+      lastProblem = `Fehler ${response.status}`;
+      console.warn(`[overpass] ${url}: ${lastProblem}`);
+    } catch (error) {
+      if (error instanceof Error && error.message.startsWith("Die Straßenabfrage")) throw error;
+      lastProblem =
+        error instanceof Error && error.name === "AbortError"
+          ? "keine Antwort"
+          : "nicht erreichbar";
+      console.warn(`[overpass] ${url}: ${lastProblem}`);
+    } finally {
+      clearTimeout(timer);
     }
-    const data = (await response.json()) as { elements?: OverpassElement[] };
-    return data.elements ?? [];
-  } catch (error) {
-    if (error instanceof Error && error.name === "AbortError") {
-      throw new Error("Der Straßen-Dienst antwortet nicht. Bitte noch einmal versuchen.");
-    }
-    if (error instanceof Error && error.message.includes("Straßen")) throw error;
-    throw new Error(
-      "OpenStreetMap ist nicht erreichbar. Die Straßen lassen sich solange von Hand eintragen.",
-    );
-  } finally {
-    clearTimeout(timer);
   }
+
+  throw new Error(
+    `Die Straßen-Server sind gerade alle ausgelastet (zuletzt: ${lastProblem}). ` +
+      "In einer Minute noch einmal versuchen – oder die Straßen über „Liste einfügen“ eintragen.",
+  );
 }
 
 /** Macht aus Overpass-Elementen je Strasse eine Zeile mit allen Hausnummern. */
@@ -486,8 +528,8 @@ async function nominatim<T>(url: string, cacheKey: string): Promise<T | null> {
 }
 
 /** Nur fuer die Anzeige in den Einstellungen. */
-export function geoSources(): { overpass: string; nominatim: string } {
-  return { overpass: OVERPASS_URL, nominatim: NOMINATIM_URL };
+export function geoSources(): { overpass: string[]; nominatim: string } {
+  return { overpass: OVERPASS_URLS, nominatim: NOMINATIM_URL };
 }
 
 /** Kartenausschnitt einer Flaeche - fuer das Zoomen nach dem Laden. */

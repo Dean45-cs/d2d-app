@@ -186,11 +186,20 @@ Zugangsdaten nutzbar – die öffentlichen Server sind aber gedrosselt und für 
 Dauerbetrieb nicht gedacht:
 
 ```bash
-OVERPASS_URL=https://overpass-api.de/api/interpreter
+# Mehrere Server mit Komma trennen – ist einer ausgelastet, nimmt die App den nächsten
+OVERPASS_URL=https://overpass-api.de/api/interpreter,https://overpass.kumi.systems/api/interpreter
 NOMINATIM_URL=https://nominatim.openstreetmap.org
 GEO_USER_AGENT=d2d-app (kontakt@deinefirma.de)   # bitte eintragen, sonst drohen Sperren
 GEO_COUNTRY_CODES=de,at,ch                       # Länder der Ortssuche
 ```
+
+**„Die Straßen-Server sind gerade alle ausgelastet"?** Der offizielle Overpass-Server
+begrenzt die Abfragen pro IP-Adresse. Bei einem Hoster, dessen Ausgangs-IP sich viele
+Kunden teilen (Fly.io, Railway & Co.), ist dieses Kontingent oft schon von anderen
+verbraucht. Die App probiert deshalb von sich aus mehrere Spiegelserver durch und merkt
+sich den, der geantwortet hat. Bleibt es hartnäckig, hilft eine eigene Overpass-Instanz –
+`OVERPASS_URL` darauf zeigen lassen, fertig. Welcher Server gerade genommen wurde, steht
+im Serverprotokoll (`[overpass] …`).
 
 Für ein Team, das täglich Gebiete schneidet, lohnt eine eigene Overpass-Instanz oder ein
 kommerzieller Anbieter – einfach die beiden Adressen umbiegen. Die App geht sparsam mit
