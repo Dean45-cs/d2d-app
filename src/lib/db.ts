@@ -80,6 +80,20 @@ function migrate(db: Database.Database) {
       created_at    TEXT NOT NULL DEFAULT (datetime('now'))
     );
 
+    /* Einzelne Hausnummern einer Strasse - aus OpenStreetMap uebernommen.
+       Damit weiss die App an der Tuer, welche Haeuser es ueberhaupt gibt,
+       und kann abhaken statt raten. */
+    CREATE TABLE IF NOT EXISTS house_numbers (
+      id         INTEGER PRIMARY KEY AUTOINCREMENT,
+      street_id  INTEGER NOT NULL REFERENCES streets(id) ON DELETE CASCADE,
+      number     TEXT NOT NULL,
+      units      INTEGER NOT NULL DEFAULT 0,
+      lat        REAL,
+      lng        REAL,
+      sort_order INTEGER NOT NULL DEFAULT 0,
+      UNIQUE (street_id, number)
+    );
+
     CREATE TABLE IF NOT EXISTS rejection_reasons (
       id         INTEGER PRIMARY KEY AUTOINCREMENT,
       team_id    INTEGER NOT NULL REFERENCES teams(id) ON DELETE CASCADE,
@@ -115,6 +129,7 @@ function migrate(db: Database.Database) {
     CREATE INDEX IF NOT EXISTS idx_visits_user_created ON visits (user_id, created_at);
     CREATE INDEX IF NOT EXISTS idx_visits_street       ON visits (street_id);
     CREATE INDEX IF NOT EXISTS idx_streets_territory   ON streets (territory_id);
+    CREATE INDEX IF NOT EXISTS idx_numbers_street      ON house_numbers (street_id, sort_order);
     CREATE INDEX IF NOT EXISTS idx_territories_team    ON territories (team_id);
 
     CREATE TABLE IF NOT EXISTS energy_prices (

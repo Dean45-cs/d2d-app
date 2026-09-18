@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { AreaMap } from "@/components/AreaMap";
+import { progressColor } from "@/components/map-colors";
 import { plural } from "@/components/ui";
 import { AreaPicker } from "../AreaPicker";
 import { centerOf, type LatLng } from "@/lib/geo/area";
@@ -11,7 +12,7 @@ interface StreetPin {
   name: string;
   lat: number;
   lng: number;
-  done: boolean;
+  state: "open" | "active" | "done";
   hint: string;
 }
 
@@ -187,15 +188,19 @@ export function TerritoryAreaCard({
               lng: p.lng,
               label: p.name,
               hint: p.hint,
-              done: p.done,
+              state: p.state,
             }))}
+            legend={
+              pins.length > 0
+                ? [
+                    { color: progressColor("open"), label: "offen" },
+                    { color: progressColor("active"), label: "in Arbeit" },
+                    { color: progressColor("done"), label: "fertig" },
+                  ]
+                : undefined
+            }
             className="h-[40vh] min-h-[240px] w-full"
           />
-          {pins.length > 0 && (
-            <p className="muted mt-2 text-xs">
-              Punkte sind die Straßen des Gebiets – grün, sobald dort Türen erfasst wurden.
-            </p>
-          )}
         </>
       ) : (
         <p className="muted text-sm">

@@ -13,12 +13,34 @@ export interface ExistingArea {
   area: LatLng[];
 }
 
+/** Eine gefundene Strasse, wie sie in der Vorschau erscheint. */
+export interface OverlayStreet {
+  name: string;
+  points: LatLng[];
+  center: LatLng | null;
+  /** Farbe des Pakets; null = nicht ausgewaehlt und deshalb blass. */
+  color: string | null;
+}
+
+/** Umriss eines Teilgebiets mit seiner Nummer. */
+export interface OverlayPlot {
+  label: string;
+  area: LatLng[];
+  color: string;
+}
+
 interface Props {
   tileUrl: string;
   /** Meldet die gezeichnete Flaeche nach oben, null solange nichts markiert ist. */
   onAreaChange: (area: LatLng[] | null) => void;
   /** Schon vergebene Gebiete - damit sich nichts ueberschneidet. */
   existing?: ExistingArea[];
+  /** Gefundene Strassen samt Hausnummern als Vorschau. */
+  overlay?: OverlayStreet[];
+  /** Umrisse der Teilgebiete beim Aufteilen. */
+  plots?: OverlayPlot[];
+  /** Strasse, auf die die Karte springt (Name aus overlay). */
+  focus?: string | null;
   /** Startausschnitt der Karte. */
   start?: { lat: number; lng: number; zoom: number };
 }
@@ -34,12 +56,24 @@ const RADIUS_STEPS = [150, 250, 400, 600, 800, 1200, 1600, 2000];
  * Zwei Wege, beide mit dem Daumen bedienbar:
  *  - Umkreis: einmal auf die Karte tippen, Groesse ueber den Regler
  *  - Fläche: Ecke fuer Ecke antippen, Punkte lassen sich nachziehen
+ *
+ * Sind die Strassen geladen, liegen die gefundenen Hausnummern als Punkte auf
+ * der Karte - man sieht also vor dem Speichern, wie viel Substanz das Gebiet hat.
  */
-export function AreaPicker({ tileUrl, onAreaChange, existing = [], start }: Props) {
+export function AreaPicker({
+  tileUrl,
+  onAreaChange,
+  existing = [],
+  overlay = [],
+  plots = [],
+  focus = null,
+  start,
+}: Props) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<LeafletMap | null>(null);
   const drawLayerRef = useRef<LayerGroup | null>(null);
   const existingLayerRef = useRef<LayerGroup | null>(null);
+  const overlayLayerRef = useRef<LayerGroup | null>(null);
   const leafletRef = useRef<typeof import("leaflet") | null>(null);
 
   const [mode, setMode] = useState<Mode>("circle");
@@ -74,6 +108,8 @@ export function AreaPicker({ tileUrl, onAreaChange, existing = [], start }: Prop
         zoom: start?.zoom ?? DEFAULT_START.zoom,
         zoomControl: true,
         scrollWheelZoom: true,
+        // Tausende Adresspunkte zeichnet die Leinwand deutlich fluessiger als SVG.
+        preferCanvas: true,
       });
       L.tileLayer(tileUrl, {
         maxZoom: 19,
@@ -81,6 +117,7 @@ export function AreaPicker({ tileUrl, onAreaChange, existing = [], start }: Prop
       }).addTo(map);
 
       existingLayerRef.current = L.layerGroup().addTo(map);
+      overlayLayerRef.current = L.layerGroup().addTo(map);
       drawLayerRef.current = L.layerGroup().addTo(map);
 
       map.on("click", (event: { latlng: { lat: number; lng: number } }) => {
@@ -109,6 +146,7 @@ export function AreaPicker({ tileUrl, onAreaChange, existing = [], start }: Prop
       mapRef.current = null;
       drawLayerRef.current = null;
       existingLayerRef.current = null;
+      overlayLayerRef.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tileUrl]);
@@ -162,6 +200,67 @@ export function AreaPicker({ tileUrl, onAreaChange, existing = [], start }: Prop
     }
   }, [ready, existing]);
 
+  // Gefundene Hausnummern und Teilgebiete
+  useEffect(() => {
+    const L = leafletRef.current;
+    const layer = overlayLayerRef.current;
+    if (!ready || !L || !layer) return;
+    layer.clearLayers();
+
+    const muted = cssColor("--ink-muted", "#5b6b82");
+
+    // Der Umriss ist nur eine Andeutung - welche Strassen zu welchem Paket
+    // gehoeren, sagen die farbigen Punkte. Deshalb bleibt er zurueckhaltend.
+    for (const plot of plots) {
+      if (plot.area.length < 3) continue;
+      L.polygon(plot.area, {
+        color: plot.color,
+        weight: 1.5,
+        dashArray: "6 5",
+        fillOpacity: 0.05,
+        bubblingMouseEvents: true,
+      }).addTo(layer);
+    }
+
+    for (const street of overlay) {
+      const chosen = street.color !== null;
+      for (const point of street.points) {
+        L.circleMarker(point, {
+          radius: chosen ? 3.5 : 2.5,
+          stroke: false,
+          fillColor: chosen ? street.color! : muted,
+          fillOpacity: chosen ? 0.9 : 0.3,
+          bubblingMouseEvents: true,
+        }).addTo(layer);
+      }
+    }
+
+    // Die Zahl im Kreis ist die eigentliche Kennzeichnung - Farbe allein
+    // reicht nicht, wenn jemand Farben schlecht unterscheidet.
+    for (const plot of plots) {
+      if (plot.area.length < 3) continue;
+      const middle = plot.area.reduce(
+        (acc, [lat, lng]) => [acc[0] + lat / plot.area.length, acc[1] + lng / plot.area.length],
+        [0, 0],
+      ) as LatLng;
+      L.marker(middle, {
+        icon: badgeIcon(L, plot.color, plot.label),
+        interactive: false,
+        keyboard: false,
+      }).addTo(layer);
+    }
+  }, [ready, overlay, plots]);
+
+  // Auf eine Strasse springen, wenn sie in der Liste angetippt wird
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!ready || !map || !focus) return;
+    const street = overlay.find((s) => s.name === focus);
+    const target = street?.center ?? street?.points[0] ?? null;
+    if (!target) return;
+    map.flyTo(target, Math.max(map.getZoom(), 16), { duration: 0.6 });
+  }, [ready, focus, overlay]);
+
   // Aktuelle Auswahl samt Eckpunkten
   useEffect(() => {
     const L = leafletRef.current;
@@ -175,7 +274,7 @@ export function AreaPicker({ tileUrl, onAreaChange, existing = [], start }: Prop
       L.polygon(circleToArea(center, radius, 48), {
         color: brand,
         weight: 2,
-        fillOpacity: 0.16,
+        fillOpacity: 0.12,
         bubblingMouseEvents: true,
       }).addTo(layer);
       L.marker(center, { icon: dotIcon(L, brand, 14), draggable: true, keyboard: false })
@@ -192,7 +291,7 @@ export function AreaPicker({ tileUrl, onAreaChange, existing = [], start }: Prop
         L.polygon(points, {
           color: brand,
           weight: 2,
-          fillOpacity: 0.16,
+          fillOpacity: 0.12,
           bubblingMouseEvents: true,
         }).addTo(layer);
       } else {
@@ -215,9 +314,11 @@ export function AreaPicker({ tileUrl, onAreaChange, existing = [], start }: Prop
     mapRef.current?.flyTo([lat, lng], zoom, { duration: 0.8 });
   }, []);
 
-  async function search(event: React.FormEvent) {
-    event.preventDefault();
-    if (query.trim().length < 3) return;
+  async function search() {
+    if (query.trim().length < 3) {
+      setHint("Bitte mindestens drei Zeichen eingeben.");
+      return;
+    }
     setSearching(true);
     setHint(null);
     setHits([]);
@@ -273,21 +374,40 @@ export function AreaPicker({ tileUrl, onAreaChange, existing = [], start }: Prop
 
   return (
     <div className="space-y-2">
-      <form onSubmit={search} className="flex gap-2">
+      <div className="flex gap-2">
         <input
           className="input"
           placeholder="Ort oder PLZ suchen"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
+          onKeyDown={(e) => {
+            // Enter sucht - und darf auf keinen Fall das Gebiet anlegen.
+            if (e.key === "Enter") {
+              e.preventDefault();
+              void search();
+            }
+          }}
           enterKeyHint="search"
+          aria-label="Ort oder PLZ suchen"
         />
-        <button type="submit" className="btn btn-ghost shrink-0" disabled={searching}>
+        <button
+          type="button"
+          className="btn btn-ghost shrink-0"
+          onClick={() => void search()}
+          disabled={searching}
+        >
           {searching ? "…" : "Suchen"}
         </button>
-        <button type="button" className="btn btn-ghost shrink-0" onClick={locate} title="Mein Standort">
+        <button
+          type="button"
+          className="btn btn-ghost shrink-0"
+          onClick={locate}
+          title="Mein Standort"
+          aria-label="Karte auf meinen Standort setzen"
+        >
           📍
         </button>
-      </form>
+      </div>
 
       {hits.length > 1 && (
         <ul className="max-h-32 overflow-y-auto rounded-xl border text-sm hairline">
@@ -324,6 +444,7 @@ export function AreaPicker({ tileUrl, onAreaChange, existing = [], start }: Prop
                 setMode(option.value);
                 setHint(null);
               }}
+              aria-pressed={mode === option.value}
               className={`px-3 py-1.5 text-sm font-semibold ${
                 mode === option.value ? "bg-brand-600 text-white" : ""
               }`}
@@ -370,8 +491,13 @@ export function AreaPicker({ tileUrl, onAreaChange, existing = [], start }: Prop
         </div>
       )}
 
-      <div className="overflow-hidden rounded-xl border hairline">
+      <div className="relative overflow-hidden rounded-xl border hairline">
         <div ref={containerRef} className="h-[44vh] min-h-[260px] w-full" />
+        {!ready && (
+          <div className="absolute inset-0 grid place-items-center bg-[var(--card)]">
+            <p className="muted animate-pulse text-sm">Karte wird geladen …</p>
+          </div>
+        )}
       </div>
 
       <p className="muted text-xs">
@@ -396,5 +522,18 @@ function dotIcon(L: typeof import("leaflet"), color: string, size: number) {
     iconSize: [size, size],
     iconAnchor: [size / 2, size / 2],
     html: `<span style="display:block;width:${size}px;height:${size}px;border-radius:999px;background:${color};border:2px solid #fff;box-shadow:0 1px 4px rgb(15 23 42 / .45)"></span>`,
+  });
+}
+
+/** Nummernschild eines Teilgebiets. */
+function badgeIcon(L: typeof import("leaflet"), color: string, label: string) {
+  return L.divIcon({
+    className: "",
+    iconSize: [26, 26],
+    iconAnchor: [13, 13],
+    html:
+      `<span style="display:grid;place-items:center;width:26px;height:26px;border-radius:999px;` +
+      `background:${color};color:#fff;border:2px solid #fff;font:700 13px/1 system-ui;` +
+      `box-shadow:0 1px 5px rgb(15 23 42 / .5)">${label}</span>`,
   });
 }

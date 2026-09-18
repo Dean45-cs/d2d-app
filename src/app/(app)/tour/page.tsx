@@ -1,6 +1,12 @@
 import { requireUser } from "@/lib/auth";
 import { getDb } from "@/lib/db";
-import { listReasons, listTerritories, listVisits, totals } from "@/lib/queries";
+import {
+  listHouseNumbers,
+  listReasons,
+  listTerritories,
+  listVisits,
+  totals,
+} from "@/lib/queries";
 import { TourClient } from "./TourClient";
 import type { StreetWithStats } from "@/lib/queries";
 
@@ -31,6 +37,9 @@ export default async function TourPage() {
         .all(...territories.map((t) => t.id)) as StreetWithStats[])
     : [];
 
+  // Hausnummern der eigenen Strassen: an der Tuer wird abgehakt statt getippt.
+  const houseNumbers = listHouseNumbers(streets.map((s) => s.id));
+
   const today = new Date().toISOString().slice(0, 10);
   const todayTotals = totals(user.team_id, { userId: user.id, since: today });
   const recent = listVisits(user.team_id, { userId: user.id, limit: 8 });
@@ -44,6 +53,7 @@ export default async function TourPage() {
         postal_code: t.postal_code,
       }))}
       streets={streets}
+      houseNumbers={houseNumbers}
       reasons={listReasons(user.team_id)}
       todayTotals={todayTotals}
       recent={recent}

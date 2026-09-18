@@ -231,3 +231,37 @@ a[role="button"] {
   font-family: var(--font-sans);
   z-index: 0;
 }
+
+/* Im Dunkelmodus blenden die hellen Kartenkacheln - sie werden gedaempft,
+   damit die farbigen Gebiete darauf bestehen bleiben. Die Beschriftung der
+   Karte bleibt lesbar, deshalb kein Invertieren. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .leaflet-tile-pane {
+    filter: brightness(0.78) contrast(1.08) saturate(0.85);
+  }
+  :root:not([data-theme="light"]) .leaflet-container {
+    background: #0d1b2f;
+  }
+}
+
+:root[data-theme="dark"] .leaflet-tile-pane {
+  filter: brightness(0.78) contrast(1.08) saturate(0.85);
+}
+:root[data-theme="dark"] .leaflet-container {
+  background: #0d1b2f;
+}
+
+/* Sprechblasen der Karte in den App-Farben */
+.leaflet-tooltip {
+  background: var(--card);
+  color: var(--ink);
+  border: 1px solid var(--line);
+  border-radius: 0.625rem;
+  box-shadow: 0 2px 10px rgb(15 23 42 / 0.18);
+  font-size: 0.75rem;
+  line-height: 1.35;
+  padding: 0.375rem 0.5rem;
+}
+.leaflet-tooltip-top::before {
+  border-top-color: var(--line);
+}

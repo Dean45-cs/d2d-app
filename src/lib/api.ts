@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { AuthError } from "./auth";
-import type { StreetInput } from "./queries";
+import type { HouseNumberInput, StreetInput } from "./queries";
 
 /** Einheitliche Fehlerbehandlung fuer alle API-Routen. */
 export async function handle<T>(fn: () => Promise<T>): Promise<NextResponse> {
@@ -43,7 +43,7 @@ export function parseStreetList(value: unknown): StreetInput[] {
   if (!Array.isArray(value)) return [];
   return value
     .slice(0, 500)
-    .map((entry) => {
+    .map((entry): StreetInput | null => {
       const item = (entry ?? {}) as Record<string, unknown>;
       const name = optionalText(item.name, 120);
       if (!name) return null;
@@ -54,7 +54,8 @@ export function parseStreetList(value: unknown): StreetInput[] {
         units,
         lat: coordinate(item.lat, 90),
         lng: coordinate(item.lng, 180),
-      } satisfies StreetInput;
+        numbers: parseHouseNumbers(item.numbers),
+      };
     })
     .filter((entry): entry is StreetInput => entry !== null);
 }
@@ -62,4 +63,24 @@ export function parseStreetList(value: unknown): StreetInput[] {
 function coordinate(value: unknown, limit: number): number | null {
   const n = optionalNumber(value);
   return n !== null && Math.abs(n) <= limit ? n : null;
+}
+
+/** Einzelne Hausnummern einer Strasse pruefen. */
+function parseHouseNumbers(value: unknown): HouseNumberInput[] {
+  if (!Array.isArray(value)) return [];
+  const seen = new Set<string>();
+  const out: HouseNumberInput[] = [];
+  for (const entry of value.slice(0, 1000)) {
+    const item = (entry ?? {}) as Record<string, unknown>;
+    const number = optionalText(item.number, 12);
+    if (!number || seen.has(number)) continue;
+    seen.add(number);
+    out.push({
+      number,
+      units: Math.max(0, Math.min(999, Math.round(optionalNumber(item.units) ?? 0))),
+      lat: coordinate(item.lat, 90),
+      lng: coordinate(item.lng, 180),
+    });
+  }
+  return out;
 }

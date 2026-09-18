@@ -44,6 +44,18 @@ export interface Street {
   created_at: string;
 }
 
+/** Eine Hausnummer einer Strasse, so wie sie in OpenStreetMap steht. */
+export interface HouseNumber {
+  id: number;
+  street_id: number;
+  number: string;
+  /** Wohneinheiten im Haus, 0 = unbekannt. */
+  units: number;
+  lat: number | null;
+  lng: number | null;
+  sort_order: number;
+}
+
 export interface RejectionReason {
   id: number;
   team_id: number;

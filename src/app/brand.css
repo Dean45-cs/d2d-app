@@ -41,6 +41,15 @@
   --chart-doors: #1a76d2;
   --chart-sales: #12b76a;
   --chart-grid: #e2e8f0;
+
+  /* Teilgebiete auf der Karte. Vier Farben, als Kartenpalette geprueft:
+     jedes Paar bleibt auch bei Rot-Gruen-Schwaeche unterscheidbar. Mehr als
+     vier waeren es nicht mehr - deshalb teilt die App hoechstens in vier
+     Pakete. Die Zahl im Kreis bleibt die eigentliche Kennzeichnung. */
+  --plot-1: #2a78d6;
+  --plot-2: #eda100;
+  --plot-3: #e87ba4;
+  --plot-4: #008300;
 }
 
 /* Im Dunkelmodus eigene, gegen den dunklen Hintergrund gepruefte Stufen */
@@ -49,6 +58,12 @@
     --chart-doors: #4295e0;
     --chart-sales: #1fae6c;
     --chart-grid: #1e3252;
+
+    /* Eigene Stufen fuer die dunkle Karte, als Satz geprueft */
+    --plot-1: #3987e5;
+    --plot-2: #c98500;
+    --plot-3: #d55181;
+    --plot-4: #008300;
   }
 }
 
@@ -56,4 +71,9 @@
   --chart-doors: #4295e0;
   --chart-sales: #1fae6c;
   --chart-grid: #1e3252;
+
+  --plot-1: #3987e5;
+  --plot-2: #c98500;
+  --plot-3: #d55181;
+  --plot-4: #008300;
 }
