@@ -214,7 +214,12 @@ export function StreetList({
 
 /** Eine Hausnummer als Plakette: grau = offen, blau = erfasst, grün = Abschluss. */
 function HouseChip({ house }: { house: HouseNumberWithStats }) {
-  const done = house.visit_count > 0;
+  // Ein Mehrfamilienhaus ist erst durch, wenn jede Klingel dran war - sonst
+  // saehe die Gebietsuebersicht nach dem ersten Eintrag schon fertig aus.
+  const mfh = house.building_type === "MFH";
+  const done = mfh
+    ? house.bell_count > 0 && house.bell_done_count >= house.bell_count
+    : house.visit_count > 0;
   const sale = house.sale_count > 0;
   return (
     <span
@@ -229,6 +234,10 @@ function HouseChip({ house }: { house: HouseNumberWithStats }) {
       }}
       title={[
         `Hausnummer ${house.number}`,
+        mfh ? "Mehrfamilienhaus" : house.building_type === "EFH" ? "Einfamilienhaus" : null,
+        mfh && house.bell_count > 0
+          ? `${house.bell_done_count} von ${house.bell_count} Klingeln`
+          : null,
         house.units > 1 ? `${house.units} Wohneinheiten` : null,
         sale ? "Abschluss" : done ? "erfasst" : "offen",
       ]
@@ -236,6 +245,11 @@ function HouseChip({ house }: { house: HouseNumberWithStats }) {
         .join(" · ")}
     >
       {house.number}
+      {mfh && (
+        <span className="ml-1 text-[10px] font-medium opacity-70">
+          {house.bell_count > 0 ? `${house.bell_done_count}/${house.bell_count}` : "🔔"}
+        </span>
+      )}
     </span>
   );
 }

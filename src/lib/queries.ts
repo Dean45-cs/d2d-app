@@ -1,5 +1,9 @@
 import { getDb } from "./db";
+import { bellKey, MAX_BELLS_PER_HOUSE, normalizeFloor, normalizeLabel } from "./doorbells";
+import type { DoorbellInput } from "./doorbells";
 import type {
+  BuildingType,
+  Doorbell,
   EnergyPrice,
   RejectionReason,
   Street,
@@ -292,9 +296,14 @@ export interface HouseNumberWithStats {
   lat: number | null;
   lng: number | null;
   sort_order: number;
+  building_type: BuildingType;
   /** Erfasste Tueren an dieser Hausnummer. */
   visit_count: number;
   sale_count: number;
+  /** Angelegte Klingelschilder - nur im Mehrfamilienhaus ueber 0. */
+  bell_count: number;
+  /** Davon schon abgeklingelt. */
+  bell_done_count: number;
 }
 
 /**
@@ -312,7 +321,12 @@ export function listHouseNumbers(streetIds: number[]): HouseNumberWithStats[] {
                   AND lower(replace(v.house_number, ' ', '')) = lower(h.number)) AS visit_count,
               (SELECT COUNT(*) FROM visits v
                 WHERE v.street_id = h.street_id AND v.outcome = 'SALE'
-                  AND lower(replace(v.house_number, ' ', '')) = lower(h.number)) AS sale_count
+                  AND lower(replace(v.house_number, ' ', '')) = lower(h.number)) AS sale_count,
+              (SELECT COUNT(*) FROM doorbells d
+                WHERE d.house_number_id = h.id)                                  AS bell_count,
+              (SELECT COUNT(*) FROM doorbells d
+                WHERE d.house_number_id = h.id
+                  AND EXISTS (SELECT 1 FROM visits v WHERE v.doorbell_id = d.id)) AS bell_done_count
          FROM house_numbers h
         WHERE h.street_id IN (${placeholders})
         ORDER BY h.street_id, h.sort_order, h.number`,
@@ -380,6 +394,203 @@ export function parseStreetLine(line: string): {
   return { name: rest.replace(/[;,]$/, "").trim(), houseNumbers: "", units };
 }
 
+/* =========================== Klingelschilder ============================ */
+
+export interface DoorbellWithStats extends Doorbell {
+  /** Erfasste Tueren an dieser Klingel. */
+  visit_count: number;
+  sale_count: number;
+  /** Ergebnis des letzten Eintrags - fuer das Symbol in der Liste. */
+  last_outcome: VisitOutcome | null;
+  last_reason_emoji: string | null;
+}
+
+/** Klingelschilder mehrerer Haeuser auf einmal, in Reihenfolge des Klingelbretts. */
+export function listDoorbells(houseNumberIds: number[]): DoorbellWithStats[] {
+  if (houseNumberIds.length === 0) return [];
+  const placeholders = houseNumberIds.map(() => "?").join(",");
+  return getDb()
+    .prepare(
+      `SELECT d.*,
+              (SELECT COUNT(*) FROM visits v WHERE v.doorbell_id = d.id) AS visit_count,
+              (SELECT COUNT(*) FROM visits v
+                WHERE v.doorbell_id = d.id AND v.outcome = 'SALE')        AS sale_count,
+              (SELECT v.outcome FROM visits v WHERE v.doorbell_id = d.id
+                ORDER BY v.created_at DESC, v.id DESC LIMIT 1)            AS last_outcome,
+              (SELECT r.emoji FROM visits v
+                 LEFT JOIN rejection_reasons r ON r.id = v.reason_id
+                WHERE v.doorbell_id = d.id
+                ORDER BY v.created_at DESC, v.id DESC LIMIT 1)            AS last_reason_emoji
+         FROM doorbells d
+        WHERE d.house_number_id IN (${placeholders})
+        ORDER BY d.house_number_id, d.sort_order, d.id`,
+    )
+    .all(...houseNumberIds) as DoorbellWithStats[];
+}
+
+/**
+ * Die Hausnummer einer Strasse holen und notfalls anlegen.
+ *
+ * Gebraucht fuer von Hand getippte Nummern, die OpenStreetMap nicht kennt.
+ * Gesucht wird so unscharf wie an anderer Stelle verglichen wird, damit
+ * "12 A" nicht neben der vorhandenen "12a" landet.
+ */
+export function ensureHouseNumber(streetId: number, number: string): number {
+  const db = getDb();
+  const found = db
+    .prepare(
+      `SELECT id FROM house_numbers
+        WHERE street_id = ?
+          AND lower(replace(number, ' ', '')) = lower(replace(?, ' ', ''))`,
+    )
+    .get(streetId, number) as { id: number } | undefined;
+  if (found) return found.id;
+
+  const numeric = Number.parseInt(number, 10);
+  db.prepare(
+    `INSERT INTO house_numbers (street_id, number, units, sort_order)
+     VALUES (?, ?, 0, ?)
+     ON CONFLICT(street_id, number) DO NOTHING`,
+  ).run(streetId, number, Number.isFinite(numeric) ? numeric : 0);
+
+  const row = db
+    .prepare("SELECT id FROM house_numbers WHERE street_id = ? AND number = ?")
+    .get(streetId, number) as { id: number } | undefined;
+  if (!row) throw new Error("Hausnummer konnte nicht angelegt werden.");
+  return row.id;
+}
+
+export function setBuildingType(houseNumberId: number, type: BuildingType): void {
+  getDb()
+    .prepare("UPDATE house_numbers SET building_type = ? WHERE id = ?")
+    .run(type, houseNumberId);
+}
+
+/**
+ * Klingelschilder anlegen, was noch fehlt.
+ *
+ * Verglichen wird ueber den Namen - derselbe Massstab wie in der Oberflaeche.
+ * Ein Schild, das offline und online gleichzeitig entsteht, bleibt damit eins.
+ */
+export function addDoorbells(houseNumberId: number, entries: DoorbellInput[]): number {
+  if (entries.length === 0) return 0;
+  const db = getDb();
+  const existing = db
+    .prepare("SELECT label FROM doorbells WHERE house_number_id = ?")
+    .all(houseNumberId) as Array<{ label: string }>;
+  const taken = new Set(existing.map((row) => bellKey(row.label)));
+
+  const insert = db.prepare(
+    `INSERT INTO doorbells (house_number_id, label, floor, sort_order)
+     VALUES (?, ?, ?, ?)
+     ON CONFLICT(house_number_id, label) DO NOTHING`,
+  );
+  const maxOrder = db
+    .prepare("SELECT COALESCE(MAX(sort_order), 0) AS m FROM doorbells WHERE house_number_id = ?")
+    .get(houseNumberId) as { m: number };
+
+  let order = maxOrder.m;
+  let total = existing.length;
+  let added = 0;
+  const run = db.transaction(() => {
+    for (const entry of entries) {
+      const label = normalizeLabel(entry.label);
+      if (!label) continue;
+      const key = bellKey(label);
+      if (taken.has(key)) continue;
+      if (total >= MAX_BELLS_PER_HOUSE) break;
+      taken.add(key);
+      order += 1;
+      total += 1;
+      added += 1;
+      insert.run(houseNumberId, label, normalizeFloor(entry.floor), order);
+    }
+  });
+  run();
+  return added;
+}
+
+/** Eine einzelne Klingel holen und notfalls anlegen - fuer nachgesendete Eintraege. */
+export function ensureDoorbell(houseNumberId: number, label: string, floor = ""): number {
+  const clean = normalizeLabel(label);
+  if (!clean) throw new Error("Klingelschild ohne Namen.");
+  const db = getDb();
+  const rows = db
+    .prepare("SELECT id, label FROM doorbells WHERE house_number_id = ?")
+    .all(houseNumberId) as Array<{ id: number; label: string }>;
+  const hit = rows.find((row) => bellKey(row.label) === bellKey(clean));
+  if (hit) return hit.id;
+
+  addDoorbells(houseNumberId, [{ label: clean, floor: normalizeFloor(floor) }]);
+  const row = db
+    .prepare("SELECT id FROM doorbells WHERE house_number_id = ? AND label = ?")
+    .get(houseNumberId, clean) as { id: number } | undefined;
+  if (!row) throw new Error("Klingelschild konnte nicht angelegt werden.");
+  return row.id;
+}
+
+/** Prueft, dass die Klingel ueber Haus, Strasse und Gebiet zum Team gehoert. */
+export function requireTeamDoorbell(
+  doorbellId: number,
+  teamId: number,
+): Doorbell & { visit_count: number } {
+  const row = getDb()
+    .prepare(
+      `SELECT d.*,
+              (SELECT COUNT(*) FROM visits v WHERE v.doorbell_id = d.id) AS visit_count
+         FROM doorbells d
+         JOIN house_numbers h ON h.id = d.house_number_id
+         JOIN streets s       ON s.id = h.street_id
+         JOIN territories t   ON t.id = s.territory_id
+        WHERE d.id = ? AND t.team_id = ?`,
+    )
+    .get(doorbellId, teamId) as (Doorbell & { visit_count: number }) | undefined;
+  if (!row) throw new Error("Klingelschild nicht gefunden.");
+  return row;
+}
+
+export function updateDoorbell(
+  doorbellId: number,
+  input: { label?: string; floor?: string },
+): void {
+  const fields: string[] = [];
+  const values: string[] = [];
+  if (input.label !== undefined) {
+    const label = normalizeLabel(input.label);
+    if (!label) throw new Error("Das Klingelschild braucht einen Namen.");
+    fields.push("label = ?");
+    values.push(label);
+  }
+  if (input.floor !== undefined) {
+    fields.push("floor = ?");
+    values.push(normalizeFloor(input.floor));
+  }
+  if (fields.length === 0) return;
+  getDb()
+    .prepare(`UPDATE doorbells SET ${fields.join(", ")} WHERE id = ?`)
+    .run(...values, doorbellId);
+}
+
+export function deleteDoorbell(doorbellId: number): void {
+  getDb().prepare("DELETE FROM doorbells WHERE id = ?").run(doorbellId);
+}
+
+/** Prueft, dass die Strasse ueber ihr Gebiet zum Team gehoert. */
+export function requireTeamStreet(
+  streetId: number,
+  teamId: number,
+): { id: number; territory_id: number } {
+  const row = getDb()
+    .prepare(
+      `SELECT s.id, s.territory_id FROM streets s
+         JOIN territories t ON t.id = s.territory_id
+        WHERE s.id = ? AND t.team_id = ?`,
+    )
+    .get(streetId, teamId) as { id: number; territory_id: number } | undefined;
+  if (!row) throw new Error("Straße nicht gefunden.");
+  return row;
+}
+
 /* ========================== Ablehnungsgruende =========================== */
 
 export const DEFAULT_REASONS: Array<Omit<RejectionReason, "id" | "team_id">> = [
@@ -435,6 +646,7 @@ export function createVisit(input: {
   territoryId: number | null;
   streetId: number | null;
   houseNumber: string;
+  doorbellId: number | null;
   outcome: VisitOutcome;
   reasonId: number | null;
   reasonNote: string;
@@ -447,9 +659,9 @@ export function createVisit(input: {
   const result = db
     .prepare(
       `INSERT INTO visits
-         (team_id, user_id, territory_id, street_id, house_number, outcome,
+         (team_id, user_id, territory_id, street_id, house_number, doorbell_id, outcome,
           reason_id, reason_note, energy_type, follow_up_at, lat, lng)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .run(
       input.teamId,
@@ -457,6 +669,7 @@ export function createVisit(input: {
       input.territoryId,
       input.streetId,
       input.houseNumber,
+      input.doorbellId,
       input.outcome,
       input.reasonId,
       input.reasonNote,

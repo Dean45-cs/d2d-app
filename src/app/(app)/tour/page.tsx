@@ -1,6 +1,7 @@
 import { requireUser } from "@/lib/auth";
 import { getDb } from "@/lib/db";
 import {
+  listDoorbells,
   listHouseNumbers,
   listReasons,
   listTerritories,
@@ -40,6 +41,10 @@ export default async function TourPage() {
   // Hausnummern der eigenen Strassen: an der Tuer wird abgehakt statt getippt.
   const houseNumbers = listHouseNumbers(streets.map((s) => s.id));
 
+  // Alle Klingelschilder gleich mitschicken statt bei Bedarf nachzuladen:
+  // im Treppenhaus ist meist kein Netz, und genau dort werden sie gebraucht.
+  const doorbells = listDoorbells(houseNumbers.map((h) => h.id));
+
   const today = new Date().toISOString().slice(0, 10);
   const todayTotals = totals(user.team_id, { userId: user.id, since: today });
   const recent = listVisits(user.team_id, { userId: user.id, limit: 8 });
@@ -54,6 +59,7 @@ export default async function TourPage() {
       }))}
       streets={streets}
       houseNumbers={houseNumbers}
+      doorbells={doorbells}
       reasons={listReasons(user.team_id)}
       todayTotals={todayTotals}
       recent={recent}

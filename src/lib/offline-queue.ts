@@ -1,41 +1,52 @@
 /**
- * Warteschlange für Türeinträge ohne Netz.
+ * Warteschlange für Schreibvorgänge ohne Netz.
  *
  * Im Treppenhaus oder Keller ist regelmäßig kein Empfang. Statt eine
  * Fehlermeldung zu zeigen, landet der Eintrag im lokalen Speicher des Geräts
  * und wird automatisch nachgesendet, sobald wieder Verbindung besteht.
  *
+ * Gepuffert werden Türeinträge und beschriebene Häuser (Haustyp und
+ * Klingelschilder). Beide Endpunkte sind so gebaut, dass ein doppelt
+ * gesendeter Aufruf nichts kaputt macht.
+ *
  * Läuft ausschließlich im Browser.
  */
 
+// Bewusst unverändert, damit wartende Einträge einen Deploy überleben.
 const STORAGE_KEY = "d2d_pending_visits";
 
-export interface QueuedVisit {
+const DEFAULT_URL = "/api/visits";
+
+export interface QueuedWrite {
   /** Nur lokal, um den Eintrag in der Liste wiederzufinden. */
   localId: string;
   createdAt: string;
   /** Anzeigetext für die Liste "wartet auf Verbindung" */
   label: string;
   payload: Record<string, unknown>;
+  /** Zielroute. Altbestand ohne Angabe ging immer an /api/visits. */
+  url?: string;
+  /** Nur fürs Symbol in der Warteliste. */
+  kind?: "visit" | "house";
 }
 
-type Listener = (queue: QueuedVisit[]) => void;
+type Listener = (queue: QueuedWrite[]) => void;
 
 const listeners = new Set<Listener>();
 
-function read(): QueuedVisit[] {
+function read(): QueuedWrite[] {
   try {
     const raw = window.localStorage.getItem(STORAGE_KEY);
     if (!raw) return [];
     const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? (parsed as QueuedVisit[]) : [];
+    return Array.isArray(parsed) ? (parsed as QueuedWrite[]) : [];
   } catch {
     // Privater Modus oder gesperrter Speicher: dann eben ohne Warteschlange.
     return [];
   }
 }
 
-function write(queue: QueuedVisit[]): void {
+function write(queue: QueuedWrite[]): void {
   try {
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(queue));
   } catch {
@@ -45,7 +56,7 @@ function write(queue: QueuedVisit[]): void {
   listeners.forEach((listener) => listener(queue));
 }
 
-export function getQueue(): QueuedVisit[] {
+export function getQueue(): QueuedWrite[] {
   if (typeof window === "undefined") return [];
   return read();
 }
@@ -55,12 +66,18 @@ export function subscribe(listener: Listener): () => void {
   return () => listeners.delete(listener);
 }
 
-export function enqueue(label: string, payload: Record<string, unknown>): QueuedVisit {
-  const entry: QueuedVisit = {
+export function enqueue(
+  label: string,
+  payload: Record<string, unknown>,
+  target: { url?: string; kind?: QueuedWrite["kind"] } = {},
+): QueuedWrite {
+  const entry: QueuedWrite = {
     localId: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
     createdAt: new Date().toISOString(),
     label,
     payload,
+    url: target.url ?? DEFAULT_URL,
+    kind: target.kind ?? "visit",
   };
   write([...read(), entry]);
   return entry;
@@ -98,7 +115,7 @@ export async function flush(): Promise<FlushResult> {
   try {
     for (const entry of read()) {
       try {
-        const response = await fetch("/api/visits", {
+        const response = await fetch(entry.url ?? DEFAULT_URL, {
           method: "POST",
           headers: { "content-type": "application/json" },
           body: JSON.stringify(entry.payload),
