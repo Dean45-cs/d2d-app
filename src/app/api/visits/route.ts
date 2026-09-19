@@ -1,6 +1,12 @@
 import { requireUser } from "@/lib/auth";
 import { getDb } from "@/lib/db";
-import { createVisit, listVisits } from "@/lib/queries";
+import {
+  createVisit,
+  ensureDoorbell,
+  ensureHouseNumber,
+  listVisits,
+  requireTeamStreet,
+} from "@/lib/queries";
 import { handle, optionalNumber, optionalText } from "@/lib/api";
 import type { VisitOutcome } from "@/lib/types";
 
@@ -21,15 +27,7 @@ export async function POST(request: Request) {
     const streetId = optionalNumber(body.streetId);
     let territoryId = optionalNumber(body.territoryId);
     if (streetId !== null) {
-      const street = db
-        .prepare(
-          `SELECT s.id, s.territory_id FROM streets s
-             JOIN territories t ON t.id = s.territory_id
-            WHERE s.id = ? AND t.team_id = ?`,
-        )
-        .get(streetId, user.team_id) as { id: number; territory_id: number } | undefined;
-      if (!street) throw new Error("Straße nicht gefunden.");
-      territoryId = street.territory_id;
+      territoryId = requireTeamStreet(streetId, user.team_id).territory_id;
     } else if (territoryId !== null) {
       const territory = db
         .prepare("SELECT id FROM territories WHERE id = ? AND team_id = ?")
@@ -48,13 +46,31 @@ export async function POST(request: Request) {
     if (outcome !== "MET_NO_SALE") reasonId = null;
 
     const energyType = optionalText(body.energyType, 10).toUpperCase();
+    const houseNumber = optionalText(body.houseNumber, 20);
+
+    /*
+     * Die Klingel kommt als Name, nie als ID: ein Eintrag, der ohne Netz im
+     * Treppenhaus entstanden ist, kennt keine ID vom Server. Fehlt das Schild
+     * noch, wird es hier angelegt - der Weg ist online wie offline derselbe.
+     */
+    let doorbellId: number | null = null;
+    const doorbellLabel = optionalText(body.doorbellLabel, 60);
+    if (doorbellLabel && streetId !== null && houseNumber) {
+      const houseNumberId = ensureHouseNumber(streetId, houseNumber);
+      doorbellId = ensureDoorbell(
+        houseNumberId,
+        doorbellLabel,
+        optionalText(body.doorbellFloor, 20),
+      );
+    }
 
     const id = createVisit({
       teamId: user.team_id,
       userId: user.id,
       territoryId,
       streetId,
-      houseNumber: optionalText(body.houseNumber, 20),
+      houseNumber,
+      doorbellId,
       outcome,
       reasonId,
       reasonNote: optionalText(body.reasonNote, 500),

@@ -1,5 +1,11 @@
 import { NextResponse } from "next/server";
 import { AuthError } from "./auth";
+import {
+  MAX_BELLS_PER_HOUSE,
+  normalizeFloor,
+  normalizeLabel,
+  type DoorbellInput,
+} from "./doorbells";
 import type { HouseNumberInput, StreetInput } from "./queries";
 
 /** Einheitliche Fehlerbehandlung fuer alle API-Routen. */
@@ -63,6 +69,26 @@ export function parseStreetList(value: unknown): StreetInput[] {
 function coordinate(value: unknown, limit: number): number | null {
   const n = optionalNumber(value);
   return n !== null && Math.abs(n) <= limit ? n : null;
+}
+
+/**
+ * Klingelschilder eines Hauses pruefen.
+ * Erwartet [{ label, floor }, ...]; doppelte Namen fallen weg.
+ */
+export function parseDoorbellList(value: unknown): DoorbellInput[] {
+  if (!Array.isArray(value)) return [];
+  const seen = new Set<string>();
+  const out: DoorbellInput[] = [];
+  for (const entry of value.slice(0, MAX_BELLS_PER_HOUSE)) {
+    const item = (entry ?? {}) as Record<string, unknown>;
+    const label = normalizeLabel(item.label);
+    if (!label) continue;
+    const key = label.toLocaleLowerCase("de-DE");
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push({ label, floor: normalizeFloor(item.floor) });
+  }
+  return out;
 }
 
 /** Einzelne Hausnummern einer Strasse pruefen. */
