@@ -553,11 +553,24 @@ export function updateDoorbell(
   doorbellId: number,
   input: { label?: string; floor?: string },
 ): void {
+  const db = getDb();
   const fields: string[] = [];
   const values: string[] = [];
   if (input.label !== undefined) {
     const label = normalizeLabel(input.label);
     if (!label) throw new Error("Das Klingelschild braucht einen Namen.");
+    // Ohne diese Pruefung schluege die Eindeutigkeit der Tabelle zu und der
+    // Vertriebler bekaeme an der Tuer eine SQL-Meldung zu lesen.
+    const siblings = db
+      .prepare(
+        `SELECT id, label FROM doorbells
+          WHERE house_number_id = (SELECT house_number_id FROM doorbells WHERE id = ?)`,
+      )
+      .all(doorbellId) as Array<{ id: number; label: string }>;
+    const taken = siblings.some(
+      (row) => row.id !== doorbellId && bellKey(row.label) === bellKey(label),
+    );
+    if (taken) throw new Error(`„${label}“ steht schon an diesem Klingelbrett.`);
     fields.push("label = ?");
     values.push(label);
   }
@@ -566,9 +579,7 @@ export function updateDoorbell(
     values.push(normalizeFloor(input.floor));
   }
   if (fields.length === 0) return;
-  getDb()
-    .prepare(`UPDATE doorbells SET ${fields.join(", ")} WHERE id = ?`)
-    .run(...values, doorbellId);
+  db.prepare(`UPDATE doorbells SET ${fields.join(", ")} WHERE id = ?`).run(...values, doorbellId);
 }
 
 export function deleteDoorbell(doorbellId: number): void {

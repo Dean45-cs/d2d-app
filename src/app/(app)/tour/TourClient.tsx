@@ -20,6 +20,7 @@ import {
 } from "@/lib/doorbells";
 import { IconArrowRight, IconCheck } from "@/components/icons";
 import { StatTile } from "@/components/ui";
+import { readDraft, writeDraft } from "@/lib/tour-draft";
 import {
   enqueue,
   flush,
@@ -102,11 +103,17 @@ export function TourClient({
     { id: number; original: string; label: string; floor: string } | null
   >(null);
   const [busy, setBusy] = useState(false);
-  const [toast, setToast] = useState<string | null>(null);
+  const [toast, setToastState] = useState<{ text: string; undo: boolean } | null>(null);
+  /** Kurze Rueckmeldung. Die Aufrufe bleiben schlicht: setToast("..."). */
+  const setToast = useCallback(
+    (text: string) => setToastState({ text, undo: false }),
+    [],
+  );
   const [lastVisitId, setLastVisitId] = useState<number | null>(null);
   const [position, setPosition] = useState<{ lat: number; lng: number } | null>(null);
   const [pending, setPending] = useState<QueuedWrite[]>([]);
   const [online, setOnline] = useState(true);
+  const [draftLoaded, setDraftLoaded] = useState(false);
 
   /* --------------------------- Gerät & Umgebung --------------------------- */
 
@@ -135,7 +142,9 @@ export function TourClient({
 
   useEffect(() => {
     if (!toast) return;
-    const timer = setTimeout(() => setToast(null), 2600);
+    // Mit Rueckgaengig-Knopf laenger stehen lassen - ein Fehltipp faellt
+    // erst auf, wenn man den Namen nochmal liest.
+    const timer = setTimeout(() => setToastState(null), toast.undo ? 5200 : 2600);
     return () => clearTimeout(timer);
   }, [toast]);
 
@@ -195,7 +204,9 @@ export function TourClient({
    */
   const [justDone, setJustDone] = useState<Set<string>>(new Set());
   const [justDoneBells, setJustDoneBells] = useState<Set<string>>(new Set());
-  const [lastDone, setLastDone] = useState<{ key: string; bell: boolean } | null>(null);
+  const [lastDone, setLastDone] = useState<
+    { key: string; bell: boolean; houseNumber: string; label: string } | null
+  >(null);
 
   /**
    * Haustyp und Klingelschilder, die gerade erst entstanden sind. Steckt der
@@ -204,6 +215,32 @@ export function TourClient({
    */
   const [localTypes, setLocalTypes] = useState<Map<string, BuildingType>>(new Map());
   const [localBells, setLocalBells] = useState<Map<string, DoorbellInput[]>>(new Map());
+
+  /*
+   * Zwischenstand aus dem Geraet holen und danach bei jeder Aenderung
+   * sichern. Erst nach dem Lesen schreiben, sonst wuerde der leere
+   * Anfangszustand den gespeicherten Stand ueberbuegeln.
+   */
+  useEffect(() => {
+    const draft = readDraft();
+    if (draft) {
+      setLocalTypes(new Map(draft.types));
+      setLocalBells(new Map(draft.bells));
+      setJustDone(new Set(draft.doneHouses));
+      setJustDoneBells(new Set(draft.doneBells));
+    }
+    setDraftLoaded(true);
+  }, []);
+
+  useEffect(() => {
+    if (!draftLoaded) return;
+    writeDraft({
+      types: [...localTypes],
+      bells: [...localBells],
+      doneHouses: [...justDone],
+      doneBells: [...justDoneBells],
+    });
+  }, [draftLoaded, localTypes, localBells, justDone, justDoneBells]);
 
   /** Klingeln je Hausnummer, einmal vorsortiert statt je Plakette gesucht. */
   const serverBells = useMemo(() => {
@@ -298,6 +335,9 @@ export function TourClient({
     currentBells.find((bell) => bellKey(bell.label) === bellKey(bellLabel)) ?? null;
   /** Kennt die Karte mehrere Wohneinheiten, ist Mehrfamilienhaus das Naheliegende. */
   const suggestMfh = (currentHouse?.units ?? 0) > 1;
+  /** Die Klingel, bei der es weitergeht - im Sheet hervorgehoben. */
+  const nextOpenBell =
+    currentBells.find((bell) => !isBellDone(currentKey, bell)) ?? null;
 
   /** Naechste noch offene Hausnummer - der Weg die Strasse hinauf. */
   function nextHouse(): string | null {
@@ -326,6 +366,7 @@ export function TourClient({
   async function describeHouse(
     patch: { buildingType?: BuildingType; doorbells?: DoorbellInput[] },
     label: string,
+    rollback?: () => void,
   ): Promise<void> {
     if (!streetId || !currentNumber) return;
     const payload = { streetId, houseNumber: currentNumber, ...patch };
@@ -337,6 +378,9 @@ export function TourClient({
       });
       const data = await response.json();
       if (!response.ok) {
+        // Der Server hat abgelehnt - dann darf auch lokal nichts stehen
+        // bleiben, sonst zeigt die Liste Schilder, die es nirgends gibt.
+        rollback?.();
         setToast(data.error ?? "Speichern fehlgeschlagen");
         return;
       }
@@ -350,12 +394,21 @@ export function TourClient({
   /** Beim ersten Antippen: Ein- oder Mehrfamilienhaus. */
   async function chooseBuildingType(type: "EFH" | "MFH") {
     if (!currentKey) return;
-    setLocalTypes((prev) => new Map(prev).set(currentKey, type));
+    const key = currentKey;
+    const before = localTypes.get(key);
+    setLocalTypes((prev) => new Map(prev).set(key, type));
     setBellLabel("");
     setSheet(type === "MFH" ? "bells" : null);
     await describeHouse(
       { buildingType: type },
       `${street?.name ?? ""} ${currentNumber} · ${BUILDING_TYPE_LABEL[type]}`,
+      () =>
+        setLocalTypes((prev) => {
+          const next = new Map(prev);
+          if (before === undefined) next.delete(key);
+          else next.set(key, before);
+          return next;
+        }),
     );
   }
 
@@ -381,9 +434,21 @@ export function TourClient({
     });
     // Der Haustyp faehrt mit: dann steht er auch dann richtig, wenn der
     // Aufruf von vorhin die Verbindung nicht mehr erwischt hat.
+    const key = currentKey;
     await describeHouse(
       { buildingType: "MFH", doorbells: fresh },
       `${street?.name ?? ""} ${currentNumber} · ${fresh.length} Klingelschilder`,
+      () => {
+        const rejected = new Set(fresh.map((entry) => bellKey(entry.label)));
+        setLocalBells((prev) => {
+          const next = new Map(prev);
+          next.set(
+            key,
+            (next.get(key) ?? []).filter((entry) => !rejected.has(bellKey(entry.label))),
+          );
+          return next;
+        });
+      },
     );
   }
 
@@ -514,10 +579,10 @@ export function TourClient({
       if (bell) {
         const key = `${currentKey}:${bellKey(bell.label)}`;
         setJustDoneBells((prev) => new Set(prev).add(key));
-        setLastDone({ key, bell: true });
+        setLastDone({ key, bell: true, houseNumber: currentNumber, label: bell.label });
       } else {
         setJustDone((prev) => new Set(prev).add(currentKey));
-        setLastDone({ key: currentKey, bell: false });
+        setLastDone({ key: currentKey, bell: false, houseNumber: currentNumber, label: "" });
       }
     };
 
@@ -588,10 +653,30 @@ export function TourClient({
       result.status === "saved"
         ? savedText
         : "Kein Netz – gespeichert, wird automatisch nachgesendet";
-    setToast(result.nextBell ? `${base} · weiter mit ${result.nextBell}` : base);
+    const text = result.nextBell ? `${base} · weiter mit ${result.nextBell}` : base;
+    // Rueckgaengig nur, wenn der Server den Eintrag bestaetigt hat - ohne ID
+    // gibt es nichts zu loeschen.
+    setToastState({ text, undo: result.status === "saved" });
+  }
+
+  /**
+   * Im Mehrfamilienhaus gehoert jeder Eintrag an eine Klingel. Ohne sie waere
+   * die Tuer nirgends zugeordnet und das Klingelbrett kaeme nicht voran -
+   * deshalb fuehrt der Tipp dann zur Liste statt ins Leere.
+   */
+  function bellMissing(): boolean {
+    if (currentType !== "MFH" || activeBell) return false;
+    setSheet("bells");
+    setToast(
+      currentBells.length === 0
+        ? "Erst die Klingelschilder anlegen"
+        : "An welcher Klingel warst du?",
+    );
+    return true;
   }
 
   async function handleOutcome(outcome: VisitOutcome) {
+    if (bellMissing()) return;
     if (outcome === "MET_NO_SALE") {
       setSheet("reason");
       return;
@@ -608,6 +693,9 @@ export function TourClient({
    * der Browser das Fenster), gespeichert wird parallel im Hintergrund.
    */
   async function handleSale() {
+    // Vor dem Fenster pruefen: ein geoeffneter Tarifrechner ohne Eintrag
+    // waere das Schlimmste, was hier passieren kann.
+    if (bellMissing()) return;
     const win = window.open(tarifrechnerUrl, "_blank", "noopener,noreferrer");
     const result = await save("SALE");
     report(result, "Abschluss gespeichert – viel Erfolg bei der Erfassung!");
@@ -647,6 +735,10 @@ export function TourClient({
           };
           if (lastDone.bell) setJustDoneBells(drop);
           else setJustDone(drop);
+          // Zurueck an die Tuer, an der der Fehltipp passiert ist - sonst
+          // muesste man sie sich nach dem Auto-Weiter wieder heraussuchen.
+          setHouseNumber(lastDone.houseNumber);
+          setBellLabel(lastDone.label);
           setLastDone(null);
         }
         router.refresh();
@@ -838,7 +930,8 @@ export function TourClient({
             <button
               type="button"
               onClick={() => setSheet("bells")}
-              className="shrink-0 text-xs font-semibold underline"
+              className="shrink-0 rounded-lg border px-2.5 py-1.5 text-xs font-semibold"
+              style={{ borderColor: "var(--brand-400)" }}
             >
               {currentBells.length === 0 ? "anlegen" : "wechseln"}
             </button>
@@ -1167,7 +1260,7 @@ export function TourClient({
                 <p className="muted text-xs">
                   {currentBells.length === 0
                     ? "Namen vom Klingelbrett abtippen – oder einfach die Anzahl."
-                    : `${doneBellCount} von ${currentBells.length} Klingeln erfasst – antippen und erfassen.`}
+                    : "Klingel antippen, dann unten das Ergebnis."}
                 </p>
               </div>
               <button
@@ -1180,10 +1273,39 @@ export function TourClient({
             </div>
 
             {currentBells.length > 0 && (
+              <div className="mb-3">
+                <div className="mb-1 flex items-baseline justify-between text-xs">
+                  <span className="muted">
+                    {doneBellCount} von {currentBells.length} erledigt
+                  </span>
+                  <span className="font-semibold">
+                    {currentBells.length - doneBellCount === 0
+                      ? "Haus fertig"
+                      : `noch ${currentBells.length - doneBellCount}`}
+                  </span>
+                </div>
+                <div
+                  className="h-1.5 w-full overflow-hidden rounded-full"
+                  style={{ background: "color-mix(in srgb, var(--ink) 12%, transparent)" }}
+                >
+                  <div
+                    className="h-full rounded-full transition-all"
+                    style={{
+                      width: `${(doneBellCount / currentBells.length) * 100}%`,
+                      background: "var(--brand-600)",
+                    }}
+                  />
+                </div>
+              </div>
+            )}
+
+            {currentBells.length > 0 && (
               <ul className="mb-4 space-y-1.5">
-                {currentBells.map((bell) => {
+                {currentBells.map((bell, index) => {
                   const bellDone = isBellDone(currentKey, bell);
                   const chosen = bellKey(bell.label) === bellKey(bellLabel);
+                  const isNext =
+                    !bellDone && nextOpenBell !== null && bell === nextOpenBell && !chosen;
 
                   if (editing && bell.id !== null && bell.id === editing.id) {
                     return (
@@ -1225,16 +1347,28 @@ export function TourClient({
                       <button
                         type="button"
                         onClick={() => chooseBell(bell)}
-                        className="flex min-w-0 flex-1 items-center gap-2 rounded-xl border px-3 py-2.5 text-left text-sm transition"
+                        className="flex min-w-0 flex-1 items-center gap-2.5 rounded-xl border px-3 py-3 text-left text-sm transition"
                         style={{
-                          borderColor: chosen ? "var(--brand-600)" : "var(--line)",
+                          borderColor: chosen
+                            ? "var(--brand-600)"
+                            : isNext
+                              ? "var(--brand-400)"
+                              : "var(--line)",
                           background: chosen
                             ? "color-mix(in srgb, var(--brand-500) 14%, transparent)"
                             : "var(--card)",
+                          opacity: bellDone && !chosen ? 0.65 : 1,
                         }}
-                        aria-label={`Klingel ${bell.label}${bellDone ? ", schon erfasst" : ""}`}
+                        aria-label={`Klingel ${index + 1}, ${bell.label}${
+                          bell.floor ? `, ${bell.floor}` : ""
+                        }${bellDone ? ", schon erfasst" : isNext ? ", hier geht es weiter" : ""}`}
                       >
-                        <span className="w-6 shrink-0 text-center">
+                        {/* Die Nummer vom Klingelbrett - so findet der Daumen
+                            die Zeile wieder, ohne den Namen zu lesen. */}
+                        <span className="muted w-4 shrink-0 text-right text-xs tabular-nums">
+                          {index + 1}
+                        </span>
+                        <span className="w-6 shrink-0 text-center text-base leading-none">
                           {bellDone
                             ? outcomeEmoji(bell.last_outcome ?? "", bell.last_reason_emoji)
                             : "🔔"}
@@ -1248,6 +1382,17 @@ export function TourClient({
                         >
                           {bell.label}
                         </span>
+                        {isNext && (
+                          <span
+                            className="shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold"
+                            style={{
+                              background: "color-mix(in srgb, var(--brand-500) 18%, transparent)",
+                              color: "var(--brand-600)",
+                            }}
+                          >
+                            weiter
+                          </span>
+                        )}
                         {bell.floor && (
                           <span className="muted shrink-0 text-xs">{bell.floor}</span>
                         )}
@@ -1409,8 +1554,17 @@ export function TourClient({
       )}
 
       {toast && (
-        <div className="fixed inset-x-0 bottom-[calc(5.5rem+env(safe-area-inset-bottom))] z-40 mx-auto w-fit max-w-[92vw] rounded-full bg-brand-900 px-4 py-2 text-center text-sm font-semibold text-white shadow-lg md:bottom-8">
-          {toast}
+        <div className="fixed inset-x-0 bottom-[calc(5.5rem+env(safe-area-inset-bottom))] z-40 mx-auto flex w-fit max-w-[92vw] items-center gap-3 rounded-full bg-brand-900 py-2 pl-4 pr-2 text-center text-sm font-semibold text-white shadow-lg md:bottom-8">
+          <span className="min-w-0">{toast.text}</span>
+          {toast.undo && lastVisitId !== null && (
+            <button
+              type="button"
+              onClick={() => void undo()}
+              className="shrink-0 rounded-full bg-white/15 px-3 py-1 text-xs font-bold"
+            >
+              Rückgängig
+            </button>
+          )}
         </div>
       )}
     </div>
