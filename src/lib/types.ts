@@ -58,6 +58,10 @@ export interface HouseNumber {
   lng: number | null;
   sort_order: number;
   building_type: BuildingType;
+  /** Gesetzt, wenn hier ausdruecklich nicht mehr geklingelt werden soll. */
+  blocked_at: string | null;
+  blocked_by: number | null;
+  blocked_note: string;
 }
 
 /**
@@ -75,6 +79,10 @@ export interface Doorbell {
   floor: string;
   sort_order: number;
   created_at: string;
+  /** Gesetzt, wenn hier ausdruecklich nicht mehr geklingelt werden soll. */
+  blocked_at: string | null;
+  blocked_by: number | null;
+  blocked_note: string;
 }
 
 export interface RejectionReason {

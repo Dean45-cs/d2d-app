@@ -18,9 +18,16 @@ import {
   parseDoorbellLines,
   type DoorbellInput,
 } from "@/lib/doorbells";
+import {
+  doorFinished,
+  doorStatus,
+  MAX_NOT_HOME_ATTEMPTS,
+  whenLabel,
+  type DoorFacts,
+} from "@/lib/doors";
 import { IconArrowRight, IconCheck } from "@/components/icons";
 import { StatTile } from "@/components/ui";
-import { readDraft, writeDraft } from "@/lib/tour-draft";
+import { readDraft, writeDraft, type LocalVisits } from "@/lib/tour-draft";
 import {
   enqueue,
   flush,
@@ -49,9 +56,29 @@ interface Bell {
   label: string;
   floor: string;
   visit_count: number;
+  not_home_count: number;
+  met_count: number;
   last_outcome: VisitOutcome | null;
   last_reason_emoji: string | null;
+  last_visit_at: string | null;
+  last_visit_user: string | null;
+  blocked_at: string | null;
+  blocked_by_name: string | null;
 }
+
+/** Eine frisch angelegte Klingel - noch nichts passiert. */
+const NEW_BELL = {
+  id: null,
+  visit_count: 0,
+  not_home_count: 0,
+  met_count: 0,
+  last_outcome: null,
+  last_reason_emoji: null,
+  last_visit_at: null,
+  last_visit_user: null,
+  blocked_at: null,
+  blocked_by_name: null,
+} as const;
 
 type SaveResult =
   | { status: "saved"; id: number; nextBell: string | null }
@@ -64,6 +91,8 @@ interface Props {
   houseNumbers: HouseNumberWithStats[];
   doorbells: DoorbellWithStats[];
   reasons: RejectionReason[];
+  /** Nur die Teamleitung darf eine Sperre wieder aufheben. */
+  isLeader: boolean;
   todayTotals: Totals;
   recent: VisitRow[];
   tarifrechnerUrl: string;
@@ -81,6 +110,7 @@ export function TourClient({
   houseNumbers,
   doorbells,
   reasons,
+  isLeader,
   todayTotals,
   recent,
   tarifrechnerUrl,
@@ -93,12 +123,13 @@ export function TourClient({
   const [streetId, setStreetId] = useState<number | null>(null);
   const [houseNumber, setHouseNumber] = useState("");
   const [product, setProduct] = useState<EnergyType>("BEIDES");
-  const [sheet, setSheet] = useState<null | "reason" | "building" | "bells">(null);
+  const [sheet, setSheet] = useState<null | "reason" | "building" | "bells" | "block">(null);
   const [note, setNote] = useState("");
   /** Name der gerade gewaehlten Klingel - leer im Einfamilienhaus. */
   const [bellLabel, setBellLabel] = useState("");
   const [bellDraft, setBellDraft] = useState("");
   const [bellCount, setBellCount] = useState("");
+  const [blockNote, setBlockNote] = useState("");
   const [editing, setEditing] = useState<
     { id: number; original: string; label: string; floor: string } | null
   >(null);
@@ -161,6 +192,12 @@ export function TourClient({
             ? "1 gepufferter Eintrag wurde gesendet"
             : `${result.sent} gepufferte Einträge wurden gesendet`,
         );
+        // Erst wenn nichts mehr wartet, kennt der Server alles - dann darf der
+        // lokale Zuschlag weg, sonst wuerde er ein zweites Mal mitgezaehlt.
+        if (result.remaining === 0) {
+          setLocalVisits(new Map());
+          setLocalBlocked(new Set());
+        }
         router.refresh();
       }
       if (result.rejected > 0) {
@@ -198,14 +235,29 @@ export function TourClient({
   );
 
   /**
-   * In dieser Sitzung erfasste Nummern und Klingeln. Der Server weiss es erst
-   * nach dem Neuladen, und ohne Netz gar nicht - deshalb wird es hier
-   * mitgezaehlt, damit die Plakette sofort umspringt.
+   * In dieser Sitzung erfasste Versuche und gesetzte Sperren, als Zuschlag auf
+   * den Serverstand. Der Server weiss davon erst nach dem Neuladen, ohne Netz
+   * gar nicht - deshalb wird hier mitgezaehlt, damit die Plakette sofort
+   * umspringt.
    */
-  const [justDone, setJustDone] = useState<Set<string>>(new Set());
-  const [justDoneBells, setJustDoneBells] = useState<Set<string>>(new Set());
+  const [localVisits, setLocalVisits] = useState<Map<string, LocalVisits>>(new Map());
+  const [localBlocked, setLocalBlocked] = useState<Set<string>>(new Set());
+
+  /**
+   * Gerade online gespeicherte Eintraege, bis der Server sie zurueckmeldet.
+   *
+   * Getrennt von der gepufferten Liste oben: sobald frische Serverdaten da
+   * sind, stecken diese Eintraege dort drin. Der Zuschlag muss deshalb in
+   * derselben Render-Runde verschwinden, in der die neuen Daten ankommen -
+   * sonst zaehlt ein Versuch doppelt und die Tuer waere zu frueh durch.
+   */
+  const [fresh, setFresh] = useState<{
+    from: HouseNumberWithStats[];
+    visits: Map<string, LocalVisits>;
+  }>(() => ({ from: houseNumbers, visits: EMPTY_VISITS }));
+  const freshVisits = fresh.from === houseNumbers ? fresh.visits : EMPTY_VISITS;
   const [lastDone, setLastDone] = useState<
-    { key: string; bell: boolean; houseNumber: string; label: string } | null
+    { key: string; notHome: boolean; houseNumber: string; label: string } | null
   >(null);
 
   /**
@@ -226,8 +278,8 @@ export function TourClient({
     if (draft) {
       setLocalTypes(new Map(draft.types));
       setLocalBells(new Map(draft.bells));
-      setJustDone(new Set(draft.doneHouses));
-      setJustDoneBells(new Set(draft.doneBells));
+      setLocalVisits(new Map(draft.visits));
+      setLocalBlocked(new Set(draft.blocked));
     }
     setDraftLoaded(true);
   }, []);
@@ -237,10 +289,10 @@ export function TourClient({
     writeDraft({
       types: [...localTypes],
       bells: [...localBells],
-      doneHouses: [...justDone],
-      doneBells: [...justDoneBells],
+      visits: [...localVisits],
+      blocked: [...localBlocked],
     });
-  }, [draftLoaded, localTypes, localBells, justDone, justDoneBells]);
+  }, [draftLoaded, localTypes, localBells, localVisits, localBlocked]);
 
   /** Klingeln je Hausnummer, einmal vorsortiert statt je Plakette gesucht. */
   const serverBells = useMemo(() => {
@@ -252,8 +304,14 @@ export function TourClient({
         label: bell.label,
         floor: bell.floor,
         visit_count: bell.visit_count,
+        not_home_count: bell.not_home_count,
+        met_count: bell.met_count,
         last_outcome: bell.last_outcome,
         last_reason_emoji: bell.last_reason_emoji,
+        last_visit_at: bell.last_visit_at,
+        last_visit_user: bell.last_visit_user,
+        blocked_at: bell.blocked_at,
+        blocked_by_name: bell.blocked_by_name,
       });
       map.set(bell.house_number_id, list);
     }
@@ -278,24 +336,39 @@ export function TourClient({
       for (const entry of localBells.get(key) ?? []) {
         if (seen.has(bellKey(entry.label))) continue;
         seen.add(bellKey(entry.label));
-        out.push({
-          id: null,
-          label: entry.label,
-          floor: entry.floor,
-          visit_count: 0,
-          last_outcome: null,
-          last_reason_emoji: null,
-        });
+        out.push({ ...NEW_BELL, label: entry.label, floor: entry.floor });
       }
       return out;
     },
     [serverBells, localBells],
   );
 
+  /**
+   * Serverstand plus das, was in dieser Sitzung dazukam. Daraus ergibt sich
+   * der Bearbeitungsstand der Tuer - auch ohne Netz.
+   */
+  const factsOf = useCallback(
+    (key: string, base: DoorFacts): DoorFacts => {
+      const queued = localVisits.get(key);
+      const online = freshVisits.get(key);
+      return {
+        blocked_at: localBlocked.has(key) ? (base.blocked_at ?? "lokal") : base.blocked_at,
+        not_home_count:
+          base.not_home_count + (queued?.notHome ?? 0) + (online?.notHome ?? 0),
+        met_count: base.met_count + (queued?.met ?? 0) + (online?.met ?? 0),
+      };
+    },
+    [localVisits, freshVisits, localBlocked],
+  );
+
+  const bellFacts = useCallback(
+    (key: string, bell: Bell) => factsOf(bellSlot(key, bell.label), bell),
+    [factsOf],
+  );
+
   const isBellDone = useCallback(
-    (key: string, bell: Bell) =>
-      bell.visit_count > 0 || justDoneBells.has(`${key}:${bellKey(bell.label)}`),
-    [justDoneBells],
+    (key: string, bell: Bell) => doorFinished(bellFacts(key, bell)),
+    [bellFacts],
   );
 
   /**
@@ -309,9 +382,9 @@ export function TourClient({
         const bells = bellsOf(key, house.id);
         return bells.length > 0 && bells.every((bell) => isBellDone(key, bell));
       }
-      return house.visit_count > 0 || justDone.has(key);
+      return doorFinished(factsOf(key, house));
     },
-    [justDone, typeOf, bellsOf, isBellDone],
+    [typeOf, bellsOf, isBellDone, factsOf],
   );
 
   /* ------------------------- das gerade offene Haus ----------------------- */
@@ -339,6 +412,22 @@ export function TourClient({
   const nextOpenBell =
     currentBells.find((bell) => !isBellDone(currentKey, bell)) ?? null;
 
+  /** Stand der Tuer, an der man gerade steht - Haus oder gewaehlte Klingel. */
+  const currentHouseFacts: DoorFacts = currentKey
+    ? factsOf(currentKey, currentHouse ?? { blocked_at: null, not_home_count: 0, met_count: 0 })
+    : { blocked_at: null, not_home_count: 0, met_count: 0 };
+  const currentDoorFacts: DoorFacts =
+    activeBell && currentKey ? bellFacts(currentKey, activeBell) : currentHouseFacts;
+  const currentDoorStatus = doorStatus(currentDoorFacts);
+  /** Gesperrt ist gesperrt - auch wenn nur das Haus gesperrt wurde. */
+  const doorLocked = currentDoorStatus === "BLOCKED" || Boolean(currentHouseFacts.blocked_at);
+  const lastAt = activeBell ? activeBell.last_visit_at : (currentHouse?.last_visit_at ?? null);
+  const lastBy = activeBell ? activeBell.last_visit_user : (currentHouse?.last_visit_user ?? null);
+  const lastWhat = activeBell ? activeBell.last_outcome : (currentHouse?.last_outcome ?? null);
+  const blockedBy = activeBell
+    ? (activeBell.blocked_by_name ?? currentHouse?.blocked_by_name ?? null)
+    : (currentHouse?.blocked_by_name ?? null);
+
   /** Naechste noch offene Hausnummer - der Weg die Strasse hinauf. */
   function nextHouse(): string | null {
     if (houses.length === 0) return null;
@@ -364,7 +453,12 @@ export function TourClient({
    * nachgesendet werden, ohne dass etwas doppelt entsteht.
    */
   async function describeHouse(
-    patch: { buildingType?: BuildingType; doorbells?: DoorbellInput[] },
+    patch: {
+      buildingType?: BuildingType;
+      doorbells?: DoorbellInput[];
+      blocked?: boolean;
+      blockedNote?: string;
+    },
     label: string,
     rollback?: () => void,
   ): Promise<void> {
@@ -540,6 +634,71 @@ export function TourClient({
     }
   }
 
+  /**
+   * Tuer sperren oder freigeben.
+   *
+   * Gesperrt wird die gewaehlte Klingel, sonst das ganze Haus - man steht ja
+   * vor genau dieser Tuer. Lokal gilt die Sperre sofort, damit auch ohne Netz
+   * niemand weiterklingelt.
+   */
+  async function setBlocked(blocked: boolean) {
+    if (!streetId || !currentNumber) return;
+    const bell = activeBell;
+    const key = bell ? bellSlot(currentKey, bell.label) : currentKey;
+
+    setLocalBlocked((prev) => {
+      const next = new Set(prev);
+      if (blocked) next.add(key);
+      else next.delete(key);
+      return next;
+    });
+    setSheet(null);
+
+    const note = blockNote.trim();
+    setBlockNote("");
+
+    // Eine Klingel mit ID laeuft ueber ihre eigene Route, alles andere ueber
+    // das Haus - dort reichen Strasse und Hausnummer, also auch ohne Netz.
+    if (bell && bell.id !== null) {
+      try {
+        const response = await fetch(`/api/doorbells/${bell.id}`, {
+          method: "PATCH",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ blocked, blockedNote: note }),
+        });
+        const data = await response.json();
+        if (!response.ok) {
+          setLocalBlocked((prev) => {
+            const next = new Set(prev);
+            if (blocked) next.delete(key);
+            else next.add(key);
+            return next;
+          });
+          setToast(data.error ?? "Nicht möglich");
+          return;
+        }
+        setToast(blocked ? "Klingel gesperrt" : "Sperre aufgehoben");
+        router.refresh();
+      } catch {
+        setToast("Ohne Verbindung nicht möglich");
+      }
+      return;
+    }
+
+    await describeHouse(
+      { blocked, blockedNote: note },
+      `${street?.name ?? ""} ${currentNumber} · ${blocked ? "gesperrt" : "Sperre aufgehoben"}`,
+      () =>
+        setLocalBlocked((prev) => {
+          const next = new Set(prev);
+          if (blocked) next.delete(key);
+          else next.add(key);
+          return next;
+        }),
+    );
+    if (blocked) setToast("Adresse gesperrt");
+  }
+
   /** Tipp auf eine Plakette: beim ersten Mal wird zuerst der Haustyp gewaehlt. */
   function openHouse(house: HouseNumberWithStats) {
     setHouseNumber(house.number);
@@ -574,16 +733,24 @@ export function TourClient({
 
     // Die gerade erfasste Tuer gilt sofort als erledigt - im Mehrfamilienhaus
     // die einzelne Klingel, sonst die Hausnummer.
-    const markDone = () => {
+    const markDone = (queued: boolean) => {
       if (!currentKey) return;
-      if (bell) {
-        const key = `${currentKey}:${bellKey(bell.label)}`;
-        setJustDoneBells((prev) => new Set(prev).add(key));
-        setLastDone({ key, bell: true, houseNumber: currentNumber, label: bell.label });
-      } else {
-        setJustDone((prev) => new Set(prev).add(currentKey));
-        setLastDone({ key: currentKey, bell: false, houseNumber: currentNumber, label: "" });
-      }
+      const key = bell ? bellSlot(currentKey, bell.label) : currentKey;
+      const notHome = outcome === "NOT_HOME";
+      const add = (prev: Map<string, LocalVisits>) => {
+        const next = new Map(prev);
+        const seen = next.get(key) ?? { notHome: 0, met: 0 };
+        next.set(key, {
+          notHome: seen.notHome + (notHome ? 1 : 0),
+          met: seen.met + (notHome ? 0 : 1),
+        });
+        return next;
+      };
+      // Gepuffert: bleibt liegen, bis die Warteschlange durch ist.
+      // Online: gilt nur bis zur naechsten Antwort des Servers.
+      if (queued) setLocalVisits(add);
+      else setFresh((prev) => ({ from: houseNumbers, visits: add(prev.from === houseNumbers ? prev.visits : EMPTY_VISITS) }));
+      setLastDone({ key, notHome, houseNumber: currentNumber, label: bell?.label ?? "" });
     };
 
     /*
@@ -622,7 +789,7 @@ export function TourClient({
         return { status: "error" };
       }
       setLastVisitId(data.id);
-      markDone();
+      markDone(false);
       const nextBell = advance();
       router.refresh();
       return { status: "saved", id: data.id as number, nextBell };
@@ -639,7 +806,7 @@ export function TourClient({
         .join(" ");
       enqueue(label, payload);
       setLastVisitId(null);
-      markDone();
+      markDone(true);
       const nextBell = advance();
       return { status: "queued", nextBell };
     } finally {
@@ -728,13 +895,9 @@ export function TourClient({
         // Den Vermerk aus dieser Sitzung mitnehmen, sonst bliebe die Klingel
         // durchgestrichen, obwohl der Eintrag weg ist.
         if (lastDone) {
-          const drop = (prev: Set<string>) => {
-            const next = new Set(prev);
-            next.delete(lastDone.key);
-            return next;
-          };
-          if (lastDone.bell) setJustDoneBells(drop);
-          else setJustDone(drop);
+          // Den Zuschlag muss hier niemand zuruecknehmen: rueckgaengig gibt es
+          // nur fuer online gespeicherte Eintraege, und der Refresh gleich
+          // darunter bringt den Serverstand ohne diesen Eintrag zurueck.
           // Zurueck an die Tuer, an der der Fehltipp passiert ist - sonst
           // muesste man sie sich nach dem Auto-Weiter wieder heraussuchen.
           setHouseNumber(lastDone.houseNumber);
@@ -973,12 +1136,22 @@ export function TourClient({
           </button>
         </div>
 
-        {/* Haustyp der getippten Nummer - beim Antippen fragt die App von selbst. */}
-        {streetId !== null && currentNumber !== "" && currentType !== "MFH" && (
-          <div className="muted mb-4 -mt-2 flex items-center gap-2 text-xs">
-            {currentType === "EFH" ? (
+        {/* Haustyp und Sperre der gewaehlten Nummer. */}
+        {streetId !== null && currentNumber !== "" && (
+          <div className="muted mb-2 -mt-2 flex items-center gap-2 text-xs">
+            {currentType === "" ? (
+              <button
+                type="button"
+                onClick={() => setSheet("building")}
+                className="font-semibold underline"
+              >
+                Ein- oder Mehrfamilienhaus?
+              </button>
+            ) : (
               <>
-                <span>🏠 Einfamilienhaus</span>
+                <span>
+                  {currentType === "EFH" ? "🏠 Einfamilienhaus" : "🏢 Mehrfamilienhaus"}
+                </span>
                 <button
                   type="button"
                   onClick={() => setSheet("building")}
@@ -987,15 +1160,55 @@ export function TourClient({
                   ändern
                 </button>
               </>
+            )}
+            <span className="flex-1" />
+            {doorLocked ? (
+              isLeader ? (
+                <button
+                  type="button"
+                  onClick={() => void setBlocked(false)}
+                  className="font-semibold underline"
+                >
+                  Sperre aufheben
+                </button>
+              ) : null
             ) : (
               <button
                 type="button"
-                onClick={() => setSheet("building")}
+                onClick={() => setSheet("block")}
                 className="font-semibold underline"
               >
-                Ein- oder Mehrfamilienhaus?
+                🚫 Sperren
               </button>
             )}
+          </div>
+        )}
+
+        {/* Wer war zuletzt hier? Verhindert, dass zwei Leute dieselbe Tür laufen. */}
+        {currentNumber !== "" && !doorLocked && lastAt && (
+          <div
+            className="mb-4 flex items-start gap-2 rounded-xl px-3 py-2 text-xs"
+            style={{
+              background:
+                currentDoorStatus === "RETRY"
+                  ? "color-mix(in srgb, var(--gas-500) 14%, transparent)"
+                  : "color-mix(in srgb, var(--ink) 6%, transparent)",
+            }}
+          >
+            <span className="shrink-0 text-base leading-none">
+              {outcomeEmoji(lastWhat ?? "", null)}
+            </span>
+            <span className="min-w-0 flex-1 leading-snug">
+              <span className="block truncate">
+                Zuletzt {lastBy ? <strong>{lastBy}</strong> : "jemand"}, {whenLabel(lastAt)}
+              </span>
+              <span className="muted block truncate">
+                {lastWhat ? OUTCOME_LABEL[lastWhat] : ""}
+                {currentDoorStatus === "RETRY"
+                  ? `${lastWhat ? " · " : ""}${currentDoorFacts.not_home_count}. von ${MAX_NOT_HOME_ATTEMPTS} Versuchen`
+                  : ""}
+              </span>
+            </span>
           </div>
         )}
 
@@ -1013,6 +1226,22 @@ export function TourClient({
                 const mfh = typeOf(house) === "MFH";
                 const bells = mfh ? bellsOf(key, house.id) : [];
                 const bellsDone = bells.filter((bell) => isBellDone(key, bell)).length;
+                const facts = factsOf(key, house);
+                const blocked = Boolean(facts.blocked_at);
+                // Gelb heisst: hier war schon jemand, aber es ist noch offen.
+                const retry = !blocked && !mfh && doorStatus(facts) === "RETRY";
+                const badge = blocked
+                  ? "🚫"
+                  : mfh
+                    ? bells.length > 0
+                      ? `${bellsDone}/${bells.length}`
+                      : "🔔"
+                    : retry
+                      ? `${facts.not_home_count}/${MAX_NOT_HOME_ATTEMPTS}`
+                      : "";
+                const wasHere = house.last_visit_user
+                  ? `${house.last_visit_user}, ${whenLabel(house.last_visit_at)}`
+                  : "";
                 return (
                   <li key={house.id}>
                     <button
@@ -1020,37 +1249,58 @@ export function TourClient({
                       onClick={() => openHouse(house)}
                       className="rounded-lg border px-2.5 py-1.5 text-sm font-semibold tabular-nums transition"
                       style={{
-                        borderColor: active ? "var(--brand-600)" : "var(--line)",
+                        borderColor: active
+                          ? "var(--brand-600)"
+                          : blocked
+                            ? "var(--signal-500)"
+                            : retry
+                              ? "var(--gas-500)"
+                              : "var(--line)",
                         background: active
                           ? "color-mix(in srgb, var(--brand-500) 16%, transparent)"
-                          : done
-                            ? "color-mix(in srgb, var(--ink) 7%, transparent)"
-                            : "var(--card)",
-                        color: done && !active ? "var(--ink-muted)" : "var(--ink)",
-                        textDecoration: done ? "line-through" : undefined,
+                          : blocked
+                            ? "color-mix(in srgb, var(--signal-500) 14%, transparent)"
+                            : retry
+                              ? "color-mix(in srgb, var(--gas-500) 14%, transparent)"
+                              : done
+                                ? "color-mix(in srgb, var(--ink) 7%, transparent)"
+                                : "var(--card)",
+                        color: blocked
+                          ? "var(--signal-600)"
+                          : done && !active
+                            ? "var(--ink-muted)"
+                            : "var(--ink)",
+                        textDecoration: done && !blocked ? "line-through" : undefined,
                       }}
                       title={[
+                        blocked ? "Gesperrt – nicht mehr anlaufen" : null,
                         mfh ? "Mehrfamilienhaus" : null,
                         mfh && bells.length > 0
                           ? `${bellsDone} von ${bells.length} Klingeln`
                           : null,
+                        retry
+                          ? `${facts.not_home_count}. Versuch von ${MAX_NOT_HOME_ATTEMPTS}`
+                          : null,
+                        wasHere ? `zuletzt: ${wasHere}` : null,
                         house.units > 1 ? `${house.units} Wohneinheiten` : null,
                       ]
                         .filter(Boolean)
                         .join(" · ") || undefined}
                       aria-label={`Hausnummer ${house.number}${
+                        blocked ? ", gesperrt" : ""
+                      }${
                         mfh
                           ? `, Mehrfamilienhaus mit ${bellsDone} von ${bells.length} erfassten Klingeln`
-                          : house.units > 1
-                            ? `, ${house.units} Wohneinheiten`
+                          : retry
+                            ? `, ${facts.not_home_count} von ${MAX_NOT_HOME_ATTEMPTS} Versuchen`
                             : ""
-                      }${done ? ", schon erfasst" : ""}`}
+                      }${wasHere ? `, zuletzt ${wasHere}` : ""}${
+                        done && !blocked ? ", abgearbeitet" : ""
+                      }`}
                     >
                       {house.number}
-                      {mfh && (
-                        <span className="ml-1 text-[10px] font-medium opacity-70">
-                          {bells.length > 0 ? `${bellsDone}/${bells.length}` : "🔔"}
-                        </span>
+                      {badge && (
+                        <span className="ml-1 text-[10px] font-medium opacity-70">{badge}</span>
                       )}
                     </button>
                   </li>
@@ -1060,6 +1310,34 @@ export function TourClient({
           </div>
         )}
 
+        {doorLocked ? (
+          <div
+            className="rounded-xl border p-4 text-center"
+            style={{
+              borderColor: "var(--signal-500)",
+              background: "color-mix(in srgb, var(--signal-500) 10%, transparent)",
+            }}
+          >
+            <p className="text-base font-bold" style={{ color: "var(--signal-600)" }}>
+              🚫 Hier nicht mehr klingeln
+            </p>
+            <p className="muted mt-1 text-xs">
+              {blockedBy ? `${blockedBy} hat diese Tür gesperrt.` : "Diese Tür ist gesperrt."}{" "}
+              Hier wurde ausdrücklich widersprochen – weiteres Anlaufen wäre rechtlich
+              angreifbar.
+            </p>
+            {isLeader && (
+              <button
+                type="button"
+                className="btn btn-ghost mt-3 w-full"
+                onClick={() => void setBlocked(false)}
+              >
+                Sperre aufheben
+              </button>
+            )}
+          </div>
+        ) : (
+          <>
         {/* Produktwahl – gilt für den nächsten Abschluss */}
         <div className="mb-4">
           <p className="label">Produkt für den Abschluss</p>
@@ -1127,6 +1405,8 @@ export function TourClient({
         <p className="muted mt-2 text-center text-[11px]">
           Öffnet den Tarifrechner des Partners und speichert den Abschluss automatisch.
         </p>
+          </>
+        )}
 
         {lastVisitId && (
           <button
@@ -1306,6 +1586,22 @@ export function TourClient({
                   const chosen = bellKey(bell.label) === bellKey(bellLabel);
                   const isNext =
                     !bellDone && nextOpenBell !== null && bell === nextOpenBell && !chosen;
+                  const facts = bellFacts(currentKey, bell);
+                  const bellBlocked = Boolean(facts.blocked_at);
+                  const retry = doorStatus(facts) === "RETRY";
+                  const sub = bellBlocked
+                    ? `gesperrt${bell.blocked_by_name ? ` von ${bell.blocked_by_name}` : ""}`
+                    : bell.last_visit_at
+                      ? [
+                          bell.last_visit_user ?? "",
+                          whenLabel(bell.last_visit_at),
+                          retry
+                            ? `${facts.not_home_count}/${MAX_NOT_HOME_ATTEMPTS} Versuche`
+                            : "",
+                        ]
+                          .filter(Boolean)
+                          .join(" · ")
+                      : "";
 
                   if (editing && bell.id !== null && bell.id === editing.id) {
                     return (
@@ -1351,13 +1647,19 @@ export function TourClient({
                         style={{
                           borderColor: chosen
                             ? "var(--brand-600)"
-                            : isNext
-                              ? "var(--brand-400)"
-                              : "var(--line)",
+                            : bellBlocked
+                              ? "var(--signal-500)"
+                              : retry
+                                ? "var(--gas-500)"
+                                : isNext
+                                  ? "var(--brand-400)"
+                                  : "var(--line)",
                           background: chosen
                             ? "color-mix(in srgb, var(--brand-500) 14%, transparent)"
-                            : "var(--card)",
-                          opacity: bellDone && !chosen ? 0.65 : 1,
+                            : bellBlocked
+                              ? "color-mix(in srgb, var(--signal-500) 10%, transparent)"
+                              : "var(--card)",
+                          opacity: bellDone && !chosen && !bellBlocked ? 0.65 : 1,
                         }}
                         aria-label={`Klingel ${index + 1}, ${bell.label}${
                           bell.floor ? `, ${bell.floor}` : ""
@@ -1369,18 +1671,29 @@ export function TourClient({
                           {index + 1}
                         </span>
                         <span className="w-6 shrink-0 text-center text-base leading-none">
-                          {bellDone
-                            ? outcomeEmoji(bell.last_outcome ?? "", bell.last_reason_emoji)
-                            : "🔔"}
+                          {bellBlocked
+                            ? "🚫"
+                            : bellDone
+                              ? outcomeEmoji(bell.last_outcome ?? "", bell.last_reason_emoji)
+                              : "🔔"}
                         </span>
-                        <span
-                          className="min-w-0 flex-1 truncate font-semibold"
-                          style={{
-                            textDecoration: bellDone ? "line-through" : undefined,
-                            color: bellDone && !chosen ? "var(--ink-muted)" : undefined,
-                          }}
-                        >
-                          {bell.label}
+                        <span className="min-w-0 flex-1">
+                          <span
+                            className="block truncate font-semibold"
+                            style={{
+                              textDecoration: bellDone && !bellBlocked ? "line-through" : undefined,
+                              color: bellBlocked
+                                ? "var(--signal-600)"
+                                : bellDone && !chosen
+                                  ? "var(--ink-muted)"
+                                  : undefined,
+                            }}
+                          >
+                            {bell.label}
+                          </span>
+                          {sub && (
+                            <span className="muted block truncate text-[11px]">{sub}</span>
+                          )}
                         </span>
                         {isNext && (
                           <span
@@ -1416,13 +1729,38 @@ export function TourClient({
                         </button>
                       )}
                       {!bellDone && (
+                        <>
+                          <button
+                            type="button"
+                            className="muted shrink-0 px-1.5 py-2 text-sm"
+                            aria-label={`${bell.label} sperren`}
+                            onClick={() => {
+                              setBellLabel(bell.label);
+                              setSheet("block");
+                            }}
+                          >
+                            🚫
+                          </button>
+                          <button
+                            type="button"
+                            className="muted shrink-0 px-1.5 py-2 text-sm"
+                            aria-label={`${bell.label} entfernen`}
+                            onClick={() => void removeBell(bell)}
+                          >
+                            ✕
+                          </button>
+                        </>
+                      )}
+                      {bellBlocked && isLeader && (
                         <button
                           type="button"
-                          className="muted shrink-0 px-1.5 py-2 text-sm"
-                          aria-label={`${bell.label} entfernen`}
-                          onClick={() => void removeBell(bell)}
+                          className="muted shrink-0 px-1.5 py-2 text-[11px] underline"
+                          onClick={() => {
+                            setBellLabel(bell.label);
+                            void setBlocked(false);
+                          }}
                         >
-                          ✕
+                          aufheben
                         </button>
                       )}
                     </li>
@@ -1492,6 +1830,64 @@ export function TourClient({
               }}
             >
               Fertig
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Bottom-Sheet: Tür sperren */}
+      {sheet === "block" && (
+        <div
+          className="fixed inset-0 z-30 flex items-end bg-black/45 md:items-center md:justify-center"
+          onClick={() => setSheet(null)}
+        >
+          <div
+            className="max-h-[88dvh] w-full overflow-y-auto rounded-t-3xl bg-[var(--card)] p-5 pb-[max(2rem,env(safe-area-inset-bottom))] md:max-w-lg md:rounded-3xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 className="text-base font-bold">
+              {activeBell
+                ? `„${activeBell.label}" sperren?`
+                : `${street?.name ?? ""} ${currentNumber} sperren?`}
+            </h2>
+            <p className="muted mt-2 text-xs">
+              Gilt fürs ganze Team und dauerhaft – hier klingelt danach niemand mehr.
+              Richtig, wenn ausdrücklich widersprochen wurde oder ein Schild „Keine
+              Werbung" bzw. „Für Vertreter verboten" hängt: ein erkennbares Verbot zu
+              missachten ist eine unzumutbare Belästigung. Aufheben kann die Sperre
+              nur die Teamleitung.
+            </p>
+
+            <div className="mt-4">
+              <label className="label" htmlFor="block-note">
+                Grund (optional)
+              </label>
+              <input
+                id="block-note"
+                className="input"
+                placeholder="z. B. Schild „Keine Werbung“"
+                value={blockNote}
+                onChange={(e) => setBlockNote(e.target.value.slice(0, 200))}
+              />
+            </div>
+
+            <button
+              type="button"
+              disabled={busy}
+              className="btn btn-danger mt-4 w-full py-4 text-base"
+              onClick={() => void setBlocked(true)}
+            >
+              🚫 Sperren
+            </button>
+            <button
+              type="button"
+              className="btn btn-ghost mt-2 w-full"
+              onClick={() => {
+                setSheet(null);
+                setBlockNote("");
+              }}
+            >
+              Abbrechen
             </button>
           </div>
         </div>
@@ -1569,6 +1965,13 @@ export function TourClient({
       )}
     </div>
   );
+}
+
+const EMPTY_VISITS: Map<string, LocalVisits> = new Map();
+
+/** Schluessel einer einzelnen Klingel in den Merklisten dieser Sitzung. */
+function bellSlot(houseKey: string, label: string): string {
+  return `${houseKey}:${bellKey(label)}`;
 }
 
 /** Schluessel eines Hauses in den Merklisten dieser Sitzung. */

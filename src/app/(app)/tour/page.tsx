@@ -60,6 +60,7 @@ export default async function TourPage() {
       streets={streets}
       houseNumbers={houseNumbers}
       doorbells={doorbells}
+      isLeader={user.role === "LEADER"}
       reasons={listReasons(user.team_id)}
       todayTotals={todayTotals}
       recent={recent}

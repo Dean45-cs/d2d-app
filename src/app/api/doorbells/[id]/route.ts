@@ -1,6 +1,11 @@
 import { requireUser } from "@/lib/auth";
 import { handle, optionalText } from "@/lib/api";
-import { deleteDoorbell, requireTeamDoorbell, updateDoorbell } from "@/lib/queries";
+import {
+  deleteDoorbell,
+  requireTeamDoorbell,
+  setDoorBlocked,
+  updateDoorbell,
+} from "@/lib/queries";
 
 export const dynamic = "force-dynamic";
 
@@ -19,6 +24,16 @@ export async function PATCH(
       label: body.label === undefined ? undefined : optionalText(body.label, 60),
       floor: body.floor === undefined ? undefined : optionalText(body.floor, 20),
     });
+
+    // Sperren darf jeder an der Tuer, aufheben nur die Teamleitung.
+    if (body.blocked !== undefined) {
+      if (body.blocked) {
+        setDoorBlocked("doorbells", bell.id, user.id, optionalText(body.blockedNote, 200));
+      } else {
+        if (user.role !== "LEADER") throw new Error("Nur die Teamleitung kann eine Sperre aufheben.");
+        setDoorBlocked("doorbells", bell.id, null);
+      }
+    }
     return { ok: true };
   });
 }
