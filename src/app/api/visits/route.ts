@@ -2,6 +2,7 @@ import { requireUser } from "@/lib/auth";
 import { getDb } from "@/lib/db";
 import {
   createVisit,
+  doorBlocked,
   ensureDoorbell,
   ensureHouseNumber,
   listVisits,
@@ -55,13 +56,22 @@ export async function POST(request: Request) {
      */
     let doorbellId: number | null = null;
     const doorbellLabel = optionalText(body.doorbellLabel, 60);
-    if (doorbellLabel && streetId !== null && houseNumber) {
+    if (streetId !== null && houseNumber) {
       const houseNumberId = ensureHouseNumber(streetId, houseNumber);
-      doorbellId = ensureDoorbell(
-        houseNumberId,
-        doorbellLabel,
-        optionalText(body.doorbellFloor, 20),
-      );
+      // Eine Sperre muss auch halten, wenn der Eintrag nachgesendet wird.
+      if (doorBlocked("house_numbers", houseNumberId)) {
+        throw new Error("Diese Adresse ist gesperrt.");
+      }
+      if (doorbellLabel) {
+        doorbellId = ensureDoorbell(
+          houseNumberId,
+          doorbellLabel,
+          optionalText(body.doorbellFloor, 20),
+        );
+        if (doorBlocked("doorbells", doorbellId)) {
+          throw new Error("Diese Klingel ist gesperrt.");
+        }
+      }
     }
 
     const id = createVisit({

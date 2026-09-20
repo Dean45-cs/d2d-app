@@ -1,5 +1,6 @@
 import { getDb } from "./db";
 import { bellKey, MAX_BELLS_PER_HOUSE, normalizeFloor, normalizeLabel } from "./doorbells";
+import { MAX_NOT_HOME_ATTEMPTS } from "./doors";
 import type { DoorbellInput } from "./doorbells";
 import type {
   BuildingType,
@@ -297,14 +298,38 @@ export interface HouseNumberWithStats {
   lng: number | null;
   sort_order: number;
   building_type: BuildingType;
-  /** Erfasste Tueren an dieser Hausnummer. */
+  /** Erfasste Tueren an dieser Hausnummer, Klingeln eingerechnet. */
   visit_count: number;
   sale_count: number;
   /** Angelegte Klingelschilder - nur im Mehrfamilienhaus ueber 0. */
   bell_count: number;
-  /** Davon schon abgeklingelt. */
+  /** Davon abgearbeitet oder gesperrt. */
   bell_done_count: number;
+  /** Erfolglose Versuche am Haus selbst, ohne die Klingeln. */
+  not_home_count: number;
+  /** Eintraege am Haus selbst, bei denen jemand an der Tuer war. */
+  met_count: number;
+  /** Letzter Eintrag an dieser Adresse - auch wenn er an einer Klingel hing. */
+  last_visit_at: string | null;
+  last_visit_user: string | null;
+  last_outcome: VisitOutcome | null;
+  blocked_at: string | null;
+  blocked_by: number | null;
+  blocked_note: string;
+  blocked_by_name: string | null;
 }
+
+/** Trifft ein Besuch diese Hausnummer? Leerzeichen und Grossschreibung egal. */
+const HOUSE_MATCH =
+  "v.street_id = h.street_id AND lower(replace(v.house_number, ' ', '')) = lower(h.number)";
+
+/** Eine Klingel ist durch, wenn gesperrt, angetroffen oder alle Versuche verbraucht. */
+const BELL_DONE = `(
+  d.blocked_at IS NOT NULL
+  OR EXISTS (SELECT 1 FROM visits v WHERE v.doorbell_id = d.id AND v.outcome <> 'NOT_HOME')
+  OR (SELECT COUNT(*) FROM visits v
+        WHERE v.doorbell_id = d.id AND v.outcome = 'NOT_HOME') >= ${MAX_NOT_HOME_ATTEMPTS}
+)`;
 
 /**
  * Hausnummern samt Bearbeitungsstand. Abgeglichen wird ueber den Text der
@@ -316,17 +341,27 @@ export function listHouseNumbers(streetIds: number[]): HouseNumberWithStats[] {
   return getDb()
     .prepare(
       `SELECT h.*,
+              (SELECT COUNT(*) FROM visits v WHERE ${HOUSE_MATCH})        AS visit_count,
               (SELECT COUNT(*) FROM visits v
-                WHERE v.street_id = h.street_id
-                  AND lower(replace(v.house_number, ' ', '')) = lower(h.number)) AS visit_count,
+                WHERE ${HOUSE_MATCH} AND v.outcome = 'SALE')              AS sale_count,
               (SELECT COUNT(*) FROM visits v
-                WHERE v.street_id = h.street_id AND v.outcome = 'SALE'
-                  AND lower(replace(v.house_number, ' ', '')) = lower(h.number)) AS sale_count,
+                WHERE ${HOUSE_MATCH} AND v.doorbell_id IS NULL
+                  AND v.outcome = 'NOT_HOME')                             AS not_home_count,
+              (SELECT COUNT(*) FROM visits v
+                WHERE ${HOUSE_MATCH} AND v.doorbell_id IS NULL
+                  AND v.outcome <> 'NOT_HOME')                            AS met_count,
+              (SELECT v.created_at FROM visits v WHERE ${HOUSE_MATCH}
+                ORDER BY v.created_at DESC, v.id DESC LIMIT 1)            AS last_visit_at,
+              (SELECT u.name FROM visits v JOIN users u ON u.id = v.user_id
+                WHERE ${HOUSE_MATCH}
+                ORDER BY v.created_at DESC, v.id DESC LIMIT 1)            AS last_visit_user,
+              (SELECT v.outcome FROM visits v WHERE ${HOUSE_MATCH}
+                ORDER BY v.created_at DESC, v.id DESC LIMIT 1)            AS last_outcome,
+              (SELECT u.name FROM users u WHERE u.id = h.blocked_by)      AS blocked_by_name,
               (SELECT COUNT(*) FROM doorbells d
-                WHERE d.house_number_id = h.id)                                  AS bell_count,
+                WHERE d.house_number_id = h.id)                           AS bell_count,
               (SELECT COUNT(*) FROM doorbells d
-                WHERE d.house_number_id = h.id
-                  AND EXISTS (SELECT 1 FROM visits v WHERE v.doorbell_id = d.id)) AS bell_done_count
+                WHERE d.house_number_id = h.id AND ${BELL_DONE})          AS bell_done_count
          FROM house_numbers h
         WHERE h.street_id IN (${placeholders})
         ORDER BY h.street_id, h.sort_order, h.number`,
@@ -400,9 +435,16 @@ export interface DoorbellWithStats extends Doorbell {
   /** Erfasste Tueren an dieser Klingel. */
   visit_count: number;
   sale_count: number;
+  /** Erfolglose Versuche - nach MAX_NOT_HOME_ATTEMPTS ist die Klingel durch. */
+  not_home_count: number;
+  /** Eintraege, bei denen jemand an der Tuer war. */
+  met_count: number;
   /** Ergebnis des letzten Eintrags - fuer das Symbol in der Liste. */
   last_outcome: VisitOutcome | null;
   last_reason_emoji: string | null;
+  last_visit_at: string | null;
+  last_visit_user: string | null;
+  blocked_by_name: string | null;
 }
 
 /** Klingelschilder mehrerer Haeuser auf einmal, in Reihenfolge des Klingelbretts. */
@@ -415,12 +457,22 @@ export function listDoorbells(houseNumberIds: number[]): DoorbellWithStats[] {
               (SELECT COUNT(*) FROM visits v WHERE v.doorbell_id = d.id) AS visit_count,
               (SELECT COUNT(*) FROM visits v
                 WHERE v.doorbell_id = d.id AND v.outcome = 'SALE')        AS sale_count,
+              (SELECT COUNT(*) FROM visits v
+                WHERE v.doorbell_id = d.id AND v.outcome = 'NOT_HOME')    AS not_home_count,
+              (SELECT COUNT(*) FROM visits v
+                WHERE v.doorbell_id = d.id AND v.outcome <> 'NOT_HOME')   AS met_count,
               (SELECT v.outcome FROM visits v WHERE v.doorbell_id = d.id
                 ORDER BY v.created_at DESC, v.id DESC LIMIT 1)            AS last_outcome,
               (SELECT r.emoji FROM visits v
                  LEFT JOIN rejection_reasons r ON r.id = v.reason_id
                 WHERE v.doorbell_id = d.id
-                ORDER BY v.created_at DESC, v.id DESC LIMIT 1)            AS last_reason_emoji
+                ORDER BY v.created_at DESC, v.id DESC LIMIT 1)            AS last_reason_emoji,
+              (SELECT v.created_at FROM visits v WHERE v.doorbell_id = d.id
+                ORDER BY v.created_at DESC, v.id DESC LIMIT 1)            AS last_visit_at,
+              (SELECT u.name FROM visits v JOIN users u ON u.id = v.user_id
+                WHERE v.doorbell_id = d.id
+                ORDER BY v.created_at DESC, v.id DESC LIMIT 1)            AS last_visit_user,
+              (SELECT u.name FROM users u WHERE u.id = d.blocked_by)      AS blocked_by_name
          FROM doorbells d
         WHERE d.house_number_id IN (${placeholders})
         ORDER BY d.house_number_id, d.sort_order, d.id`,
@@ -584,6 +636,43 @@ export function updateDoorbell(
 
 export function deleteDoorbell(doorbellId: number): void {
   getDb().prepare("DELETE FROM doorbells WHERE id = ?").run(doorbellId);
+}
+
+/**
+ * Tuer sperren oder wieder freigeben.
+ *
+ * userId gesetzt = sperren, null = freigeben. Der Tabellenname kommt aus einer
+ * festen Auswahl, nicht aus einer Eingabe.
+ */
+export function setDoorBlocked(
+  table: "house_numbers" | "doorbells",
+  id: number,
+  userId: number | null,
+  note = "",
+): void {
+  const db = getDb();
+  if (userId === null) {
+    db.prepare(
+      `UPDATE ${table} SET blocked_at = NULL, blocked_by = NULL, blocked_note = '' WHERE id = ?`,
+    ).run(id);
+    return;
+  }
+  db.prepare(
+    `UPDATE ${table}
+        SET blocked_at = datetime('now'), blocked_by = ?, blocked_note = ?
+      WHERE id = ?`,
+  ).run(userId, note, id);
+}
+
+/** Ist diese Tuer gesperrt? Wird vor jedem Eintrag geprueft, auch beim Nachsenden. */
+export function doorBlocked(
+  table: "house_numbers" | "doorbells",
+  id: number,
+): boolean {
+  const row = getDb()
+    .prepare(`SELECT blocked_at FROM ${table} WHERE id = ?`)
+    .get(id) as { blocked_at: string | null } | undefined;
+  return Boolean(row?.blocked_at);
 }
 
 /** Prueft, dass die Strasse ueber ihr Gebiet zum Team gehoert. */

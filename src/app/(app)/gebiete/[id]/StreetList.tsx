@@ -6,6 +6,7 @@ import type { HouseNumberWithStats, StreetWithStats } from "@/lib/queries";
 import { IconPlus } from "@/components/icons";
 import { ProgressBar } from "@/components/ui";
 import { routeUrl } from "@/lib/map";
+import { doorStatus, MAX_NOT_HOME_ATTEMPTS, whenLabel } from "@/lib/doors";
 
 export function StreetList({
   territoryId,
@@ -212,44 +213,80 @@ export function StreetList({
   );
 }
 
-/** Eine Hausnummer als Plakette: grau = offen, blau = erfasst, grün = Abschluss. */
+/**
+ * Eine Hausnummer als Plakette: grau = offen, gelb = angefangen,
+ * blau = erfasst, grün = Abschluss, rot = gesperrt.
+ */
 function HouseChip({ house }: { house: HouseNumberWithStats }) {
   // Ein Mehrfamilienhaus ist erst durch, wenn jede Klingel dran war - sonst
   // saehe die Gebietsuebersicht nach dem ersten Eintrag schon fertig aus.
   const mfh = house.building_type === "MFH";
-  const done = mfh
-    ? house.bell_count > 0 && house.bell_done_count >= house.bell_count
-    : house.visit_count > 0;
+  const status = doorStatus(house);
+  const blocked = status === "BLOCKED";
+  const retry = !mfh && status === "RETRY";
+  const done = blocked
+    ? true
+    : mfh
+      ? house.bell_count > 0 && house.bell_done_count >= house.bell_count
+      : status === "DONE";
   const sale = house.sale_count > 0;
+  const wasHere = house.last_visit_user
+    ? `zuletzt ${house.last_visit_user}, ${whenLabel(house.last_visit_at)}`
+    : null;
   return (
     <span
       className="inline-flex items-center rounded-lg px-1.5 py-0.5 text-xs font-semibold tabular-nums"
       style={{
-        background: sale
-          ? "color-mix(in srgb, var(--energy-500) 20%, transparent)"
-          : done
-            ? "color-mix(in srgb, var(--brand-500) 16%, transparent)"
-            : "color-mix(in srgb, var(--ink) 7%, transparent)",
-        color: sale ? "var(--energy-700)" : done ? "var(--brand-600)" : "var(--ink-muted)",
+        background: blocked
+          ? "color-mix(in srgb, var(--signal-500) 16%, transparent)"
+          : retry
+            ? "color-mix(in srgb, var(--gas-500) 18%, transparent)"
+            : sale
+              ? "color-mix(in srgb, var(--energy-500) 20%, transparent)"
+              : done
+                ? "color-mix(in srgb, var(--brand-500) 16%, transparent)"
+                : "color-mix(in srgb, var(--ink) 7%, transparent)",
+        color: blocked
+          ? "var(--signal-600)"
+          : retry
+            ? "var(--gas-600)"
+            : sale
+              ? "var(--energy-700)"
+              : done
+                ? "var(--brand-600)"
+                : "var(--ink-muted)",
       }}
       title={[
         `Hausnummer ${house.number}`,
+        blocked
+          ? `gesperrt${house.blocked_by_name ? ` von ${house.blocked_by_name}` : ""}${
+              house.blocked_note ? ` – ${house.blocked_note}` : ""
+            }`
+          : null,
         mfh ? "Mehrfamilienhaus" : house.building_type === "EFH" ? "Einfamilienhaus" : null,
         mfh && house.bell_count > 0
           ? `${house.bell_done_count} von ${house.bell_count} Klingeln`
           : null,
+        retry ? `${house.not_home_count} von ${MAX_NOT_HOME_ATTEMPTS} Versuchen` : null,
         house.units > 1 ? `${house.units} Wohneinheiten` : null,
-        sale ? "Abschluss" : done ? "erfasst" : "offen",
+        wasHere,
+        blocked ? null : sale ? "Abschluss" : done ? "erfasst" : "offen",
       ]
         .filter(Boolean)
         .join(" · ")}
     >
       {house.number}
-      {mfh && (
+      {blocked ? (
+        <span className="ml-1 text-[10px] font-medium">🚫</span>
+      ) : mfh ? (
         <span className="ml-1 text-[10px] font-medium opacity-70">
           {house.bell_count > 0 ? `${house.bell_done_count}/${house.bell_count}` : "🔔"}
         </span>
-      )}
+      ) : retry ? (
+        <span className="ml-1 text-[10px] font-medium opacity-70">
+          {house.not_home_count}/{MAX_NOT_HOME_ATTEMPTS}
+        </span>
+      ) : null}
     </span>
   );
 }

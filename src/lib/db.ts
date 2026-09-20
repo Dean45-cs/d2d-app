@@ -195,6 +195,14 @@ function migrate(db: Database.Database) {
   );
   addColumn(db, "visits", "doorbell_id", "INTEGER REFERENCES doorbells(id) ON DELETE SET NULL");
 
+  // Gesperrte Tueren: hier wurde ausdruecklich widersprochen. Gilt fuers ganze
+  // Team - wer nach uns in die Strasse geht, soll dort nicht mehr klingeln.
+  for (const table of ["house_numbers", "doorbells"]) {
+    addColumn(db, table, "blocked_at", "TEXT");
+    addColumn(db, table, "blocked_by", "INTEGER REFERENCES users(id) ON DELETE SET NULL");
+    addColumn(db, table, "blocked_note", "TEXT NOT NULL DEFAULT ''");
+  }
+
   // Erst hier, denn vor addColumn gibt es die Spalte in alten Datenbanken nicht.
   db.exec("CREATE INDEX IF NOT EXISTS idx_visits_doorbell ON visits (doorbell_id)");
 }

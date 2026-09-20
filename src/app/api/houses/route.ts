@@ -6,6 +6,7 @@ import {
   listDoorbells,
   requireTeamStreet,
   setBuildingType,
+  setDoorBlocked,
 } from "@/lib/queries";
 import type { BuildingType } from "@/lib/types";
 
@@ -44,6 +45,20 @@ export async function POST(request: Request) {
     let added = 0;
     if (body.doorbells !== undefined) {
       added = addDoorbells(houseNumberId, parseDoorbellList(body.doorbells));
+    }
+
+    /*
+     * Sperren darf jeder, der an der Tuer steht - dort faellt der Widerspruch
+     * an. Aufheben nur die Teamleitung: sonst raeumt der naechste Kollege die
+     * Sperre weg, weil er die Vorgeschichte nicht kennt.
+     */
+    if (body.blocked !== undefined) {
+      if (body.blocked) {
+        setDoorBlocked("house_numbers", houseNumberId, user.id, optionalText(body.blockedNote, 200));
+      } else {
+        if (user.role !== "LEADER") throw new Error("Nur die Teamleitung kann eine Sperre aufheben.");
+        setDoorBlocked("house_numbers", houseNumberId, null);
+      }
     }
 
     return { ok: true, houseNumberId, added, doorbells: listDoorbells([houseNumberId]) };
