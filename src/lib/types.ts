@@ -44,6 +44,9 @@ export interface Street {
   created_at: string;
 }
 
+/** Ein- oder Mehrfamilienhaus. '' = beim ersten Antippen noch zu waehlen. */
+export type BuildingType = "" | "EFH" | "MFH";
+
 /** Eine Hausnummer einer Strasse, so wie sie in OpenStreetMap steht. */
 export interface HouseNumber {
   id: number;
@@ -54,6 +57,24 @@ export interface HouseNumber {
   lat: number | null;
   lng: number | null;
   sort_order: number;
+  building_type: BuildingType;
+}
+
+/**
+ * Ein Klingelschild in einem Mehrfamilienhaus.
+ *
+ * Erkannt wird es am Namen, nicht an der ID: nur so kann die App im
+ * Treppenhaus ohne Netz eine Klingel anlegen und den Besuch daran haengen.
+ */
+export interface Doorbell {
+  id: number;
+  house_number_id: number;
+  /** Name auf dem Schild, z. B. "Mueller". */
+  label: string;
+  /** Etage, z. B. "2. OG" - optional. */
+  floor: string;
+  sort_order: number;
+  created_at: string;
 }
 
 export interface RejectionReason {
@@ -74,6 +95,8 @@ export interface Visit {
   territory_id: number | null;
   street_id: number | null;
   house_number: string;
+  /** Gesetzt, wenn der Eintrag an einer einzelnen Klingel haengt. */
+  doorbell_id: number | null;
   outcome: VisitOutcome;
   reason_id: number | null;
   reason_note: string;
@@ -108,6 +131,11 @@ export const OUTCOME_LABEL: Record<VisitOutcome, string> = {
   MET_NO_SALE: "Angetroffen – kein Abschluss",
   APPOINTMENT: "Termin vereinbart",
   SALE: "Abschluss",
+};
+
+export const BUILDING_TYPE_LABEL: Record<Exclude<BuildingType, "">, string> = {
+  EFH: "Einfamilienhaus",
+  MFH: "Mehrfamilienhaus",
 };
 
 /** Ein Kontakt zaehlt als "angetroffen", wenn tatsaechlich jemand an der Tuer war. */

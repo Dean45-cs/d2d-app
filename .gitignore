@@ -17,3 +17,7 @@ data/*.db-wal
 # Von Capacitor erzeugte Projekte (nur auf dem Mac gebraucht, siehe docs/IPHONE-IPAD.md)
 ios/
 android/
+
+# Von "next dev" erzeugte Agent-Hinweise (werden bei jedem Lauf neu geschrieben)
+AGENTS.md
+CLAUDE.md

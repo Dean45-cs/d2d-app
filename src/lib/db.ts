@@ -94,6 +94,19 @@ function migrate(db: Database.Database) {
       UNIQUE (street_id, number)
     );
 
+    /* Klingelschilder eines Mehrfamilienhauses. Der Name auf dem Schild ist
+       der Schluessel: so laesst sich eine Klingel auch ohne Netz eindeutig
+       benennen, ohne dass der Server vorher eine ID vergeben musste. */
+    CREATE TABLE IF NOT EXISTS doorbells (
+      id              INTEGER PRIMARY KEY AUTOINCREMENT,
+      house_number_id INTEGER NOT NULL REFERENCES house_numbers(id) ON DELETE CASCADE,
+      label           TEXT NOT NULL,
+      floor           TEXT NOT NULL DEFAULT '',
+      sort_order      INTEGER NOT NULL DEFAULT 0,
+      created_at      TEXT NOT NULL DEFAULT (datetime('now')),
+      UNIQUE (house_number_id, label)
+    );
+
     CREATE TABLE IF NOT EXISTS rejection_reasons (
       id         INTEGER PRIMARY KEY AUTOINCREMENT,
       team_id    INTEGER NOT NULL REFERENCES teams(id) ON DELETE CASCADE,
@@ -130,6 +143,7 @@ function migrate(db: Database.Database) {
     CREATE INDEX IF NOT EXISTS idx_visits_street       ON visits (street_id);
     CREATE INDEX IF NOT EXISTS idx_streets_territory   ON streets (territory_id);
     CREATE INDEX IF NOT EXISTS idx_numbers_street      ON house_numbers (street_id, sort_order);
+    CREATE INDEX IF NOT EXISTS idx_doorbells_house     ON doorbells (house_number_id, sort_order);
     CREATE INDEX IF NOT EXISTS idx_territories_team    ON territories (team_id);
 
     CREATE TABLE IF NOT EXISTS energy_prices (
@@ -173,6 +187,16 @@ function migrate(db: Database.Database) {
   addColumn(db, "territories", "area_json", "TEXT NOT NULL DEFAULT ''");
   addColumn(db, "streets", "lat", "REAL");
   addColumn(db, "streets", "lng", "REAL");
+  addColumn(
+    db,
+    "house_numbers",
+    "building_type",
+    "TEXT NOT NULL DEFAULT '' CHECK (building_type IN ('','EFH','MFH'))",
+  );
+  addColumn(db, "visits", "doorbell_id", "INTEGER REFERENCES doorbells(id) ON DELETE SET NULL");
+
+  // Erst hier, denn vor addColumn gibt es die Spalte in alten Datenbanken nicht.
+  db.exec("CREATE INDEX IF NOT EXISTS idx_visits_doorbell ON visits (doorbell_id)");
 }
 
 /** Fuegt eine Spalte hinzu, falls sie noch fehlt. */
