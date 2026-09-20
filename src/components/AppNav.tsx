@@ -6,6 +6,7 @@ import {
   IconBolt,
   IconChart,
   IconCog,
+  IconDoc,
   IconDoor,
   IconHome,
   IconLogout,
@@ -22,6 +23,7 @@ const ICONS: Record<IconName, (props: { className?: string }) => React.ReactElem
   bolt: IconBolt,
   chart: IconChart,
   users: IconUsers,
+  doc: IconDoc,
   cog: IconCog,
 };
 
@@ -112,6 +114,9 @@ export function MobileTopBar({ userName }: { userName: string }) {
 
 export function MobileTabBar({ items }: { items: NavItem[] }) {
   const pathname = usePathname();
+  // Ab sieben Punkten wird die Spalte auf schmalen Geraeten zu eng fuer
+  // "Gebiete" - dann rueckt die Schrift eine Stufe herunter.
+  const dense = items.length > 6;
   return (
     <nav
       className="fixed inset-x-0 bottom-0 z-20 grid border-t bg-[var(--card)] pb-[max(0.25rem,env(safe-area-inset-bottom))] md:hidden"
@@ -127,12 +132,14 @@ export function MobileTabBar({ items }: { items: NavItem[] }) {
           <Link
             key={item.href}
             href={item.href}
-            className={`flex flex-col items-center gap-0.5 py-2 text-[10px] font-semibold ${
-              active ? "text-brand-600" : "muted"
-            }`}
+            className={`flex flex-col items-center gap-0.5 py-2 font-semibold ${
+              dense ? "text-[9px]" : "text-[10px]"
+            } ${active ? "text-brand-600" : "muted"}`}
           >
             <Icon className="h-5 w-5" />
-            {item.short}
+            {/* Bei vielen Punkten wird die Spalte schmal - der Text darf dann
+                kuerzen, aber nie ueberlaufen. */}
+            <span className="w-full truncate px-0.5 text-center">{item.short}</span>
           </Link>
         );
       })}

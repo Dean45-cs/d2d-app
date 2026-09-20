@@ -7,6 +7,7 @@ export type IconName =
   | "bolt"
   | "chart"
   | "users"
+  | "doc"
   | "cog";
 
 export interface NavItem {
@@ -27,6 +28,7 @@ export function navItems(role: Role): NavItem[] {
       { href: "/start", label: "Übersicht", short: "Start", icon: "home" },
       { href: "/gebiete", label: "Gebiete", short: "Gebiete", icon: "map" },
       { href: "/tour", label: "Klinken", short: "Klinken", icon: "door" },
+      { href: "/auftraege", label: "Aufträge", short: "Auftrag", icon: "doc" },
       { href: "/karte", label: "Energiekarte", short: "Karte", icon: "bolt" },
       { href: "/auswertung", label: "Auswertung", short: "Zahlen", icon: "chart" },
       { href: "/team", label: "Team", short: "Team", icon: "users" },
@@ -35,6 +37,7 @@ export function navItems(role: Role): NavItem[] {
   }
   return [
     { href: "/tour", label: "Klinken", short: "Klinken", icon: "door" },
+    { href: "/auftraege", label: "Aufträge & Termine", short: "Auftrag", icon: "doc" },
     { href: "/gebiete", label: "Meine Gebiete", short: "Gebiete", icon: "map" },
     { href: "/karte", label: "Energiekarte", short: "Karte", icon: "bolt" },
     { href: "/auswertung", label: "Meine Zahlen", short: "Zahlen", icon: "chart" },

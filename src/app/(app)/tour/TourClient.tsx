@@ -1,9 +1,11 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { routeUrl } from "@/lib/map";
 import type {
+  AppointmentRow,
   DoorbellWithStats,
   HouseNumberWithStats,
   StreetWithStats,
@@ -27,6 +29,18 @@ import {
 } from "@/lib/doors";
 import { IconArrowRight, IconCheck } from "@/components/icons";
 import { StatTile } from "@/components/ui";
+import { SignaturePad } from "@/components/SignaturePad";
+import {
+  normalizeSlot,
+  quickSlots,
+  toSlot,
+  slotDate,
+  slotLabel,
+  slotOverdue,
+  slotTime,
+  slotToday,
+} from "@/lib/appointments";
+import { orderProblems } from "@/lib/orders";
 import { readDraft, writeDraft, type LocalVisits } from "@/lib/tour-draft";
 import {
   enqueue,
@@ -95,8 +109,48 @@ interface Props {
   isLeader: boolean;
   todayTotals: Totals;
   recent: VisitRow[];
+  /** Offene Termine von heute und aelter - der Rueckweg des Tages. */
+  appointments: AppointmentRow[];
   tarifrechnerUrl: string;
 }
+
+/** Die Auftragsdaten, so wie sie im Sheet stehen - alles als Text. */
+interface OrderForm {
+  /** Vom Geraet vergeben, sobald das Sheet aufgeht. */
+  ref: string;
+  customerName: string;
+  customerPhone: string;
+  customerEmail: string;
+  tariff: string;
+  previousProvider: string;
+  meterStrom: string;
+  meterGas: string;
+  usageStrom: string;
+  usageGas: string;
+  startDate: string;
+  note: string;
+  signature: string;
+  withdrawalGiven: boolean;
+  privacyGiven: boolean;
+}
+
+const EMPTY_ORDER: OrderForm = {
+  ref: "",
+  customerName: "",
+  customerPhone: "",
+  customerEmail: "",
+  tariff: "",
+  previousProvider: "",
+  meterStrom: "",
+  meterGas: "",
+  usageStrom: "",
+  usageGas: "",
+  startDate: "",
+  note: "",
+  signature: "",
+  withdrawalGiven: false,
+  privacyGiven: false,
+};
 
 const PRODUCTS: Array<{ value: EnergyType; label: string }> = [
   { value: "STROM", label: "Strom" },
@@ -113,6 +167,7 @@ export function TourClient({
   isLeader,
   todayTotals,
   recent,
+  appointments,
   tarifrechnerUrl,
 }: Props) {
   const router = useRouter();
@@ -123,13 +178,22 @@ export function TourClient({
   const [streetId, setStreetId] = useState<number | null>(null);
   const [houseNumber, setHouseNumber] = useState("");
   const [product, setProduct] = useState<EnergyType>("BEIDES");
-  const [sheet, setSheet] = useState<null | "reason" | "building" | "bells" | "block">(null);
+  const [sheet, setSheet] = useState<
+    null | "reason" | "building" | "bells" | "block" | "appointment" | "order"
+  >(null);
   const [note, setNote] = useState("");
   /** Name der gerade gewaehlten Klingel - leer im Einfamilienhaus. */
   const [bellLabel, setBellLabel] = useState("");
   const [bellDraft, setBellDraft] = useState("");
   const [bellCount, setBellCount] = useState("");
   const [blockNote, setBlockNote] = useState("");
+  /** Termin: Ortszeit "2026-09-21 18:00", dazu der Ansprechpartner. */
+  const [slot, setSlot] = useState("");
+  const [contactName, setContactName] = useState("");
+  const [contactPhone, setContactPhone] = useState("");
+  /** Auftrag an der Tuer - erst im Sheet, dann in einem Zug gespeichert. */
+  const [order, setOrder] = useState<OrderForm>(EMPTY_ORDER);
+  const [orderMore, setOrderMore] = useState(false);
   const [editing, setEditing] = useState<
     { id: number; original: string; label: string; floor: string } | null
   >(null);
@@ -145,6 +209,12 @@ export function TourClient({
   const [pending, setPending] = useState<QueuedWrite[]>([]);
   const [online, setOnline] = useState(true);
   const [draftLoaded, setDraftLoaded] = useState(false);
+  /*
+   * Die Uhr des Geraets - erst nach dem Einblenden gesetzt. Auf dem Server
+   * gibt es sie nicht, und "heute" wuerde dort womoeglich anders ausfallen
+   * als hier vor der Tuer.
+   */
+  const [now, setNow] = useState<Date | null>(null);
 
   /* --------------------------- Gerät & Umgebung --------------------------- */
 
@@ -161,6 +231,13 @@ export function TourClient({
       if (street) setTerritoryId(street.territory_id);
     }
   }, [streets]);
+
+  useEffect(() => {
+    setNow(new Date());
+    // Ueber einen langen Vormittag darf die Liste nicht einfrieren.
+    const timer = window.setInterval(() => setNow(new Date()), 60_000);
+    return () => window.clearInterval(timer);
+  }, []);
 
   useEffect(() => {
     if (!navigator.geolocation) return;
@@ -386,6 +463,14 @@ export function TourClient({
     },
     [typeOf, bellsOf, isBellDone, factsOf],
   );
+
+  /** Termine, die heute anstehen oder schon ueberfaellig sind. */
+  const dueAppointments = useMemo(() => {
+    if (!now) return [];
+    return appointments.filter(
+      (item) => slotToday(item.follow_up_at, now) || slotOverdue(item.follow_up_at, now),
+    );
+  }, [appointments, now]);
 
   /* ------------------------- das gerade offene Haus ----------------------- */
 
@@ -710,11 +795,32 @@ export function TourClient({
     else setSheet(null);
   }
 
+  /** Tipp auf einen Termin: Strasse und Hausnummer stehen sofort richtig. */
+  function goToAppointment(item: AppointmentRow) {
+    const target = item.street_id ? streets.find((s) => s.id === item.street_id) : null;
+    if (target) {
+      setTerritoryId(target.territory_id);
+      chooseStreet(target.id);
+    }
+    setHouseNumber(item.house_number);
+    setBellLabel(item.doorbell_label ?? "");
+    setSheet(null);
+    setToast(`${item.contact_name || "Termin"} · ${slotLabel(item.follow_up_at, now ?? undefined)}`);
+  }
+
   /* ------------------------------- Speichern ------------------------------ */
 
   async function save(
     outcome: VisitOutcome,
-    extra: { reasonId?: number | null; reasonNote?: string } = {},
+    extra: {
+      reasonId?: number | null;
+      reasonNote?: string;
+      followUpAt?: string;
+      contactName?: string;
+      contactPhone?: string;
+      /** Auftragsdaten - fahren beim Abschluss im selben Aufruf mit. */
+      order?: Record<string, unknown>;
+    } = {},
   ): Promise<SaveResult> {
     const bell = activeBell;
     const payload = {
@@ -727,6 +833,10 @@ export function TourClient({
       reasonId: extra.reasonId ?? null,
       reasonNote: extra.reasonNote ?? "",
       energyType: outcome === "SALE" ? product : "",
+      followUpAt: extra.followUpAt ?? "",
+      contactName: extra.contactName ?? "",
+      contactPhone: extra.contactPhone ?? "",
+      ...(extra.order ? { order: extra.order } : {}),
       lat: position?.lat ?? null,
       lng: position?.lng ?? null,
     };
@@ -801,6 +911,7 @@ export function TourClient({
         bell ? `· ${bell.label}` : "",
         "·",
         OUTCOME_LABEL[outcome],
+        extra.order ? `· Auftrag ${String(extra.order.customerName ?? "")}` : "",
       ]
         .filter(Boolean)
         .join(" ");
@@ -848,25 +959,124 @@ export function TourClient({
       setSheet("reason");
       return;
     }
+    if (outcome === "APPOINTMENT") {
+      openAppointment();
+      return;
+    }
     const result = await save(outcome);
-    report(
-      result,
-      outcome === "NOT_HOME" ? "Nicht angetroffen gespeichert" : "Termin gespeichert",
-    );
+    report(result, "Nicht angetroffen gespeichert");
+  }
+
+  /* -------------------------------- Termin -------------------------------- */
+
+  /**
+   * Ein Termin ohne Uhrzeit ist keiner: er taucht nirgends wieder auf und der
+   * Weg zurueck faellt aus. Deshalb fragt die App hier kurz nach - mit
+   * Vorschlaegen, damit es beim Tippen bleibt.
+   */
+  function openAppointment() {
+    const slots = quickSlots();
+    setSlot(slots[0]?.value ?? "");
+    // Am Klingelbrett steht der Name schon - den muss niemand abtippen.
+    setContactName(activeBell?.label ?? "");
+    setContactPhone("");
+    setNote("");
+    setSheet("appointment");
+  }
+
+  async function submitAppointment() {
+    if (!slot) {
+      setToast("Bitte Tag und Uhrzeit wählen");
+      return;
+    }
+    const result = await save("APPOINTMENT", {
+      followUpAt: slot,
+      contactName: contactName.trim(),
+      contactPhone: contactPhone.trim(),
+      reasonNote: note.trim(),
+    });
+    if (result.status === "error") return;
+    setSheet(null);
+    report(result, `Termin ${slotLabel(slot)} gespeichert`);
+    setSlot("");
+    setContactName("");
+    setContactPhone("");
+  }
+
+  /* -------------------------------- Auftrag ------------------------------- */
+
+  /** Abschluss: erst der Auftrag, dann der Eintrag - beides in einem Zug. */
+  function openOrder() {
+    if (bellMissing()) return;
+    setOrder({
+      ...EMPTY_ORDER,
+      ref: newClientRef(),
+      // Der Name vom Klingelschild ist fast immer der des Kunden.
+      customerName: activeBell?.label ?? "",
+    });
+    setOrderMore(false);
+    setSheet("order");
   }
 
   /**
-   * Abschluss: Der Tarifrechner wird SOFORT beim Tippen geöffnet (sonst blockt
-   * der Browser das Fenster), gespeichert wird parallel im Hintergrund.
+   * Auftrag speichern.
+   *
+   * Der Tarifrechner des Partners wird - wenn gewuenscht - SOFORT beim Tippen
+   * geoeffnet, sonst blockt der Browser das Fenster.
    */
-  async function handleSale() {
-    // Vor dem Fenster pruefen: ein geoeffneter Tarifrechner ohne Eintrag
-    // waere das Schlimmste, was hier passieren kann.
+  async function submitOrder(withCalculator: boolean) {
+    const problems = orderProblems({
+      customerName: order.customerName,
+      customerPhone: order.customerPhone,
+      signature: order.signature,
+      withdrawalGiven: order.withdrawalGiven,
+      privacyGiven: order.privacyGiven,
+    });
+    if (problems.length > 0) {
+      setToast(problems[0]);
+      return;
+    }
+
+    const win = withCalculator
+      ? window.open(tarifrechnerUrl, "_blank", "noopener,noreferrer")
+      : null;
+
+    const result = await save("SALE", {
+      order: {
+        clientRef: order.ref,
+        customerName: order.customerName.trim(),
+        customerPhone: order.customerPhone.trim(),
+        customerEmail: order.customerEmail.trim(),
+        energyType: product,
+        tariff: order.tariff.trim(),
+        previousProvider: order.previousProvider.trim(),
+        meterStrom: order.meterStrom.trim(),
+        meterGas: order.meterGas.trim(),
+        usageStrom: order.usageStrom,
+        usageGas: order.usageGas,
+        startDate: order.startDate,
+        note: order.note.trim(),
+        signature: order.signature,
+        withdrawalGiven: order.withdrawalGiven,
+        privacyGiven: order.privacyGiven,
+      },
+    });
+    if (result.status === "error") return;
+
+    setSheet(null);
+    setOrder(EMPTY_ORDER);
+    report(result, `Auftrag für ${order.customerName.trim()} gespeichert`);
+    if (withCalculator && !win) window.location.href = tarifrechnerUrl;
+  }
+
+  /** Abschluss ohne Auftragsdaten - zaehlt mit, aber ohne Unterlagen. */
+  async function saleWithoutOrder() {
     if (bellMissing()) return;
-    const win = window.open(tarifrechnerUrl, "_blank", "noopener,noreferrer");
     const result = await save("SALE");
-    report(result, "Abschluss gespeichert – viel Erfolg bei der Erfassung!");
-    if (!win) window.location.href = tarifrechnerUrl;
+    if (result.status === "error") return;
+    setSheet(null);
+    setOrder(EMPTY_ORDER);
+    report(result, "Abschluss gezählt – Auftragsdaten fehlen noch");
   }
 
   async function handleReason(reason: RejectionReason) {
@@ -967,6 +1177,65 @@ export function TourClient({
               Jetzt senden
             </button>
           )}
+        </div>
+      )}
+
+      {/* Termine, die heute anstehen - der Rueckweg gehoert an den Anfang. */}
+      {dueAppointments.length > 0 && (
+        <div className="card mb-3 p-3">
+          <div className="mb-1.5 flex items-baseline justify-between gap-2">
+            <p className="text-sm font-semibold">
+              📅 {dueAppointments.length === 1 ? "1 Termin" : `${dueAppointments.length} Termine`}{" "}
+              heute
+            </p>
+            <Link href="/auftraege" className="shrink-0 text-xs font-semibold text-brand-600">
+              alle →
+            </Link>
+          </div>
+          <ul className="space-y-1">
+            {dueAppointments.slice(0, 3).map((item) => {
+              const late = slotOverdue(item.follow_up_at, now ?? undefined);
+              return (
+                <li key={item.id} className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => goToAppointment(item)}
+                    className="flex min-w-0 flex-1 items-center gap-2 rounded-lg px-1.5 py-1.5 text-left text-sm hover:bg-brand-500/8"
+                  >
+                    <span
+                      className="shrink-0 rounded-lg px-1.5 py-0.5 text-xs font-bold tabular-nums"
+                      style={{
+                        background: late
+                          ? "color-mix(in srgb, var(--signal-500) 15%, transparent)"
+                          : "color-mix(in srgb, var(--brand-500) 14%, transparent)",
+                        color: late ? "var(--signal-600)" : "var(--brand-600)",
+                      }}
+                    >
+                      {slotLabel(item.follow_up_at, now ?? undefined)}
+                    </span>
+                    {/* Der Name steht vorn: die Strasse kennt man, den Kunden
+                        muss man wiedererkennen. */}
+                    <span className="min-w-0 flex-1 truncate">
+                      {item.contact_name || "Termin"}
+                      <span className="muted">
+                        {" · "}
+                        {item.street_name ?? ""} {item.house_number}
+                      </span>
+                    </span>
+                  </button>
+                  {item.contact_phone && (
+                    <a
+                      href={`tel:${item.contact_phone.replace(/[^+\d]/g, "")}`}
+                      className="shrink-0 rounded-lg px-2 py-1.5 text-base leading-none"
+                      aria-label={`${item.contact_name || "Kunde"} anrufen`}
+                    >
+                      📞
+                    </a>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
         </div>
       )}
 
@@ -1395,15 +1664,16 @@ export function TourClient({
         <button
           type="button"
           disabled={busy}
-          onClick={handleSale}
+          onClick={openOrder}
           className="btn btn-success mt-2 w-full py-5 text-lg"
         >
           <IconCheck />
-          Abschluss – zur Auftragserfassung
+          Abschluss – Auftrag aufnehmen
           <IconArrowRight />
         </button>
         <p className="muted mt-2 text-center text-[11px]">
-          Öffnet den Tarifrechner des Partners und speichert den Abschluss automatisch.
+          Kundendaten, Unterschrift und Widerrufsbelehrung – danach öffnet der
+          Tarifrechner des Partners.
         </p>
           </>
         )}
@@ -1893,6 +2163,449 @@ export function TourClient({
         </div>
       )}
 
+      {/* Bottom-Sheet: Termin vereinbaren */}
+      {sheet === "appointment" && (
+        <div
+          className="fixed inset-0 z-30 flex items-end bg-black/45 md:items-center md:justify-center"
+          onClick={() => setSheet(null)}
+        >
+          <div
+            className="max-h-[88dvh] w-full overflow-y-auto rounded-t-3xl bg-[var(--card)] p-5 pb-[max(2rem,env(safe-area-inset-bottom))] md:max-w-lg md:rounded-3xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="mb-4">
+              <h2 className="text-base font-bold">Wann passt es?</h2>
+              <p className="muted text-xs">
+                {street?.name} {currentNumber}
+                {activeBell ? ` · ${activeBell.label}` : ""} – ein Termin ohne Uhrzeit
+                geht unter.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2">
+              {quickSlots(now ?? undefined).map((option) => (
+                <button
+                  key={option.value}
+                  type="button"
+                  onClick={() => setSlot(option.value)}
+                  className={`rounded-xl border px-2 py-3 text-sm font-semibold transition ${
+                    slot === option.value
+                      ? "border-transparent bg-brand-600 text-white"
+                      : "hairline border"
+                  }`}
+                >
+                  {option.label}
+                </button>
+              ))}
+            </div>
+
+            <div className="mt-3 flex gap-2">
+              <div className="min-w-0 flex-1">
+                <label className="label" htmlFor="slot-date">
+                  Tag
+                </label>
+                <input
+                  id="slot-date"
+                  type="date"
+                  className="input"
+                  value={slotDate(slot)}
+                  onChange={(e) =>
+                    setSlot(
+                      normalizeSlot(`${e.target.value} ${slotTime(slot) || "18:00"}`),
+                    )
+                  }
+                />
+              </div>
+              <div className="w-32 shrink-0">
+                <label className="label" htmlFor="slot-time">
+                  Uhrzeit
+                </label>
+                <input
+                  id="slot-time"
+                  type="time"
+                  className="input"
+                  value={slotTime(slot)}
+                  onChange={(e) =>
+                    setSlot(
+                      normalizeSlot(
+                        `${slotDate(slot) || toSlot(now ?? new Date()).slice(0, 10)} ${
+                          e.target.value
+                        }`,
+                      ),
+                    )
+                  }
+                />
+              </div>
+            </div>
+
+            <div className="mt-3 flex gap-2">
+              <div className="min-w-0 flex-1">
+                <label className="label" htmlFor="contact-name">
+                  Name
+                </label>
+                <input
+                  id="contact-name"
+                  className="input"
+                  autoComplete="off"
+                  placeholder="z. B. Frau Müller"
+                  value={contactName}
+                  onChange={(e) => setContactName(e.target.value.slice(0, 120))}
+                />
+              </div>
+              <div className="w-40 shrink-0">
+                <label className="label" htmlFor="contact-phone">
+                  Telefon
+                </label>
+                <input
+                  id="contact-phone"
+                  className="input"
+                  inputMode="tel"
+                  autoComplete="off"
+                  placeholder="optional"
+                  value={contactPhone}
+                  onChange={(e) => setContactPhone(e.target.value.slice(0, 40))}
+                />
+              </div>
+            </div>
+
+            <div className="mt-3">
+              <label className="label" htmlFor="appointment-note">
+                Notiz (optional)
+              </label>
+              <input
+                id="appointment-note"
+                className="input"
+                placeholder="z. B. letzte Abrechnung bereitlegen"
+                value={note}
+                onChange={(e) => setNote(e.target.value)}
+              />
+            </div>
+
+            <p className="muted mt-3 text-[11px]">
+              Mit Rufnummer lässt sich der Termin vorher kurz bestätigen – das spart den
+              vergeblichen Weg.
+            </p>
+
+            <button
+              type="button"
+              disabled={busy || !slot}
+              className="btn btn-primary mt-3 w-full py-4 text-base"
+              onClick={() => void submitAppointment()}
+            >
+              📅 Termin speichern
+              {slot ? ` · ${slotLabel(slot, now ?? undefined)}` : ""}
+            </button>
+            <button
+              type="button"
+              className="btn btn-ghost mt-2 w-full"
+              onClick={() => setSheet(null)}
+            >
+              Abbrechen
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Bottom-Sheet: Auftrag aufnehmen */}
+      {sheet === "order" && (
+        <div
+          className="fixed inset-0 z-30 flex items-end bg-black/45 md:items-center md:justify-center"
+          onClick={() => setSheet(null)}
+        >
+          <div
+            className="max-h-[92dvh] w-full overflow-y-auto rounded-t-3xl bg-[var(--card)] p-5 pb-[max(2rem,env(safe-area-inset-bottom))] md:max-w-lg md:rounded-3xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="mb-4">
+              <h2 className="text-base font-bold">Auftrag aufnehmen</h2>
+              <p className="muted text-xs">
+                {street?.name} {currentNumber}
+                {activeBell ? ` · ${activeBell.label}` : ""}
+                {territory?.postal_code || territory?.city
+                  ? ` · ${territory?.postal_code ?? ""} ${territory?.city ?? ""}`.trimEnd()
+                  : ""}
+              </p>
+            </div>
+
+            <div className="mb-3">
+              <p className="label">Produkt</p>
+              <div className="grid grid-cols-3 gap-2">
+                {PRODUCTS.map((p) => (
+                  <button
+                    key={p.value}
+                    type="button"
+                    onClick={() => chooseProduct(p.value)}
+                    className={`rounded-xl border px-2 py-2 text-sm font-semibold transition ${
+                      product === p.value
+                        ? "border-transparent bg-brand-600 text-white"
+                        : "hairline border"
+                    }`}
+                  >
+                    {p.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="mb-3">
+              <label className="label" htmlFor="order-name">
+                Kunde
+              </label>
+              <input
+                id="order-name"
+                className="input"
+                autoComplete="off"
+                placeholder="Vor- und Nachname"
+                value={order.customerName}
+                onChange={(e) =>
+                  setOrder({ ...order, customerName: e.target.value.slice(0, 120) })
+                }
+              />
+            </div>
+
+            <div className="mb-3 flex gap-2">
+              <div className="min-w-0 flex-1">
+                <label className="label" htmlFor="order-phone">
+                  Telefon
+                </label>
+                <input
+                  id="order-phone"
+                  className="input"
+                  inputMode="tel"
+                  autoComplete="off"
+                  value={order.customerPhone}
+                  onChange={(e) =>
+                    setOrder({ ...order, customerPhone: e.target.value.slice(0, 40) })
+                  }
+                />
+              </div>
+              <div className="min-w-0 flex-1">
+                <label className="label" htmlFor="order-mail">
+                  E-Mail
+                </label>
+                <input
+                  id="order-mail"
+                  className="input"
+                  inputMode="email"
+                  autoComplete="off"
+                  value={order.customerEmail}
+                  onChange={(e) =>
+                    setOrder({ ...order, customerEmail: e.target.value.slice(0, 120) })
+                  }
+                />
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setOrderMore((v) => !v)}
+              className="muted mb-3 w-full text-left text-xs font-semibold underline"
+            >
+              {orderMore ? "Weitere Angaben ausblenden" : "Zähler, Verbrauch, Anbieter …"}
+            </button>
+
+            {orderMore && (
+              <div className="mb-3 rounded-xl border p-3 hairline">
+                <div className="flex gap-2">
+                  <div className="min-w-0 flex-1">
+                    <label className="label" htmlFor="order-usage-strom">
+                      Strom kWh/Jahr
+                    </label>
+                    <input
+                      id="order-usage-strom"
+                      className="input"
+                      inputMode="numeric"
+                      value={order.usageStrom}
+                      onChange={(e) =>
+                        setOrder({ ...order, usageStrom: e.target.value.slice(0, 7) })
+                      }
+                    />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <label className="label" htmlFor="order-usage-gas">
+                      Gas kWh/Jahr
+                    </label>
+                    <input
+                      id="order-usage-gas"
+                      className="input"
+                      inputMode="numeric"
+                      value={order.usageGas}
+                      onChange={(e) =>
+                        setOrder({ ...order, usageGas: e.target.value.slice(0, 7) })
+                      }
+                    />
+                  </div>
+                </div>
+
+                <div className="mt-3 flex gap-2">
+                  <div className="min-w-0 flex-1">
+                    <label className="label" htmlFor="order-meter-strom">
+                      Zähler Strom
+                    </label>
+                    <input
+                      id="order-meter-strom"
+                      className="input"
+                      autoComplete="off"
+                      value={order.meterStrom}
+                      onChange={(e) =>
+                        setOrder({ ...order, meterStrom: e.target.value.slice(0, 40) })
+                      }
+                    />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <label className="label" htmlFor="order-meter-gas">
+                      Zähler Gas
+                    </label>
+                    <input
+                      id="order-meter-gas"
+                      className="input"
+                      autoComplete="off"
+                      value={order.meterGas}
+                      onChange={(e) =>
+                        setOrder({ ...order, meterGas: e.target.value.slice(0, 40) })
+                      }
+                    />
+                  </div>
+                </div>
+
+                <div className="mt-3">
+                  <label className="label" htmlFor="order-provider">
+                    Bisheriger Anbieter
+                  </label>
+                  <input
+                    id="order-provider"
+                    className="input"
+                    autoComplete="off"
+                    value={order.previousProvider}
+                    onChange={(e) =>
+                      setOrder({ ...order, previousProvider: e.target.value.slice(0, 120) })
+                    }
+                  />
+                </div>
+
+                <div className="mt-3 flex gap-2">
+                  <div className="min-w-0 flex-1">
+                    <label className="label" htmlFor="order-tariff">
+                      Tarif
+                    </label>
+                    <input
+                      id="order-tariff"
+                      className="input"
+                      autoComplete="off"
+                      value={order.tariff}
+                      onChange={(e) =>
+                        setOrder({ ...order, tariff: e.target.value.slice(0, 120) })
+                      }
+                    />
+                  </div>
+                  <div className="w-44 shrink-0">
+                    <label className="label" htmlFor="order-start">
+                      Lieferbeginn
+                    </label>
+                    <input
+                      id="order-start"
+                      type="date"
+                      className="input"
+                      value={order.startDate}
+                      onChange={(e) => setOrder({ ...order, startDate: e.target.value })}
+                    />
+                  </div>
+                </div>
+
+                <div className="mt-3">
+                  <label className="label" htmlFor="order-note">
+                    Notiz
+                  </label>
+                  <input
+                    id="order-note"
+                    className="input"
+                    placeholder="z. B. Zählerstand 12345"
+                    value={order.note}
+                    onChange={(e) => setOrder({ ...order, note: e.target.value.slice(0, 500) })}
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* Pflichtteil: ohne diese drei Punkte ist der Auftrag nicht sauber. */}
+            <div className="mb-3 space-y-2">
+              <label className="flex items-start gap-2.5 text-sm">
+                <input
+                  type="checkbox"
+                  className="mt-0.5 h-5 w-5 shrink-0 accent-[var(--brand-600)]"
+                  checked={order.withdrawalGiven}
+                  onChange={(e) => setOrder({ ...order, withdrawalGiven: e.target.checked })}
+                />
+                <span>
+                  Widerrufsbelehrung ausgehändigt und erklärt
+                  <span className="muted block text-[11px]">
+                    14 Tage Widerrufsrecht ab heute – das gilt an der Haustür immer.
+                  </span>
+                </span>
+              </label>
+              <label className="flex items-start gap-2.5 text-sm">
+                <input
+                  type="checkbox"
+                  className="mt-0.5 h-5 w-5 shrink-0 accent-[var(--brand-600)]"
+                  checked={order.privacyGiven}
+                  onChange={(e) => setOrder({ ...order, privacyGiven: e.target.checked })}
+                />
+                <span>
+                  Datenschutzhinweis übergeben
+                  <span className="muted block text-[11px]">
+                    Der Kunde weiß, wofür seine Daten erfasst werden.
+                  </span>
+                </span>
+              </label>
+            </div>
+
+            <div className="mb-4">
+              <p className="label">Unterschrift des Kunden</p>
+              <SignaturePad
+                value={order.signature}
+                onChange={(signature) => setOrder((prev) => ({ ...prev, signature }))}
+              />
+            </div>
+
+            <button
+              type="button"
+              disabled={busy}
+              className="btn btn-success w-full py-4 text-base"
+              onClick={() => void submitOrder(true)}
+            >
+              <IconCheck />
+              Auftrag speichern & Tarifrechner
+              <IconArrowRight />
+            </button>
+            <button
+              type="button"
+              disabled={busy}
+              className="btn btn-ghost mt-2 w-full"
+              onClick={() => void submitOrder(false)}
+            >
+              Nur speichern – Tarifrechner später
+            </button>
+            <div className="mt-3 flex items-center justify-between gap-3">
+              <button
+                type="button"
+                className="muted text-xs font-semibold underline"
+                onClick={() => setSheet(null)}
+              >
+                Abbrechen
+              </button>
+              <button
+                type="button"
+                disabled={busy}
+                className="muted text-xs font-semibold underline"
+                onClick={() => void saleWithoutOrder()}
+              >
+                Abschluss ohne Auftragsdaten zählen
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Bottom-Sheet: Ablehnungsgrund */}
       {sheet === "reason" && (
         <div
@@ -1968,6 +2681,23 @@ export function TourClient({
 }
 
 const EMPTY_VISITS: Map<string, LocalVisits> = new Map();
+
+/**
+ * Kennung fuer einen Auftrag, vom Geraet vergeben.
+ *
+ * Sie entsteht, sobald das Auftrags-Sheet aufgeht, und faehrt durch die
+ * Warteschlange mit: egal wie oft der Eintrag nachgesendet wird, der Server
+ * legt daraus genau einen Auftrag an.
+ */
+function newClientRef(): string {
+  const raw =
+    typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+      ? crypto.randomUUID()
+      : `${Date.now()}-${Math.random().toString(36).slice(2)}-${Math.random()
+          .toString(36)
+          .slice(2)}`;
+  return raw.replace(/[^A-Za-z0-9_-]/g, "");
+}
 
 /** Schluessel einer einzelnen Klingel in den Merklisten dieser Sitzung. */
 function bellSlot(houseKey: string, label: string): string {

@@ -4,9 +4,15 @@ Eine Web-App für Door-to-Door-Teams im Energievertrieb:
 
 - **Gebiete auf der Karte abstecken** – Fläche einkreisen, die Straßen holt die App
   selbst aus OpenStreetMap; auf Wunsch gleich ausgewogen auf mehrere Leute aufgeteilt
-- **Türen tracken** – nicht angetroffen / angetroffen / Termin / Abschluss, mit einem Daumen bedienbar
+- **Türen tracken** – nicht angetroffen / angetroffen / Termin / Abschluss, mit einem Daumen bedienbar;
+  Ein- und Mehrfamilienhäuser mit eigenem Klingelbrett, höchstens drei Versuche je Tür
 - **Ablehnungsgründe mit einem Tap** – konfigurierbare Kachel-Auswahl statt Freitext
-- **Abschluss-Button** – speichert den Verkauf und öffnet direkt die Auftragserfassung des Partners
+- **Auftrag an der Tür** – Kundendaten, Zähler und Verbrauch, Unterschrift auf dem Gerät,
+  Widerrufsbelehrung; danach öffnet der Tarifrechner des Partners
+- **Nachbearbeitung** – Bestätigungsanruf, Einreichung beim Partner, Bestätigung oder
+  Widerruf, mit laufender 14-Tage-Frist je Auftrag
+- **Termine mit Uhrzeit** – Vorschläge für den Abend, Rufnummer dazu, und am nächsten Tag
+  stehen sie oben auf der Tour
 - **Energiekarte** – zeigt täglich aktualisiert, wo der Grundversorger besonders teuer ist
 - **Auswertung** – Antreff- und Abschlussquoten je Mitarbeiter, Gebiet und Zeitraum
 - **Installierbar auf iPhone und iPad** – eigenes Symbol, Vollbild ohne Browserleiste,
@@ -71,22 +77,62 @@ angelegt – praktisch zum Ausprobieren, für den Echtbetrieb weglassen.
    Straße als Plaketten bereit (erfasste durchgestrichen), „weiter“ springt zur
    nächsten offenen. Ohne hinterlegte Nummern: eintippen, `+1` zählt hoch.
 3. Eines der drei Ergebnisse tippen:
-   - **Nicht angetroffen** – sofort gespeichert
+   - **Nicht angetroffen** – sofort gespeichert. Nach dem dritten Versuch gilt die Tür als
+     abgearbeitet, damit niemand dieselbe Klingel ein viertes Mal läuft.
    - **Angetroffen – kein Abschluss** – es öffnet sich die Kachel-Auswahl mit den
      Ablehnungsgründen; ein Tap speichert. Optional eine Notiz dazu.
-   - **Termin vereinbart** – sofort gespeichert
-4. **Abschluss** – der große grüne Button speichert den Verkauf **und öffnet im selben
-   Moment den Tarifrechner des Partners**
+   - **Termin vereinbart** – kurze Abfrage: Vorschläge wie „Morgen 18:00“ oder freie
+     Eingabe, dazu Name und Rufnummer. Ein Termin ohne Uhrzeit verfällt, deshalb fragt die
+     App danach.
+4. **Abschluss – Auftrag aufnehmen**: Kunde, Telefon und (aufklappbar) Zähler, Verbrauch,
+   bisheriger Anbieter und Wunschtermin. Pflicht sind der Name, die bestätigte
+   Widerrufsbelehrung, der Datenschutzhinweis und die **Unterschrift auf dem Gerät** –
+   dieselbe Prüfung läuft noch einmal auf dem Server. Der Knopf speichert den Auftrag
+   **und öffnet im selben Moment den Tarifrechner des Partners**
    (`https://portal-ep24.de/menues/tarifrechner/`, änderbar über
    `NEXT_PUBLIC_TARIFRECHNER_URL`). Das Fenster wird direkt beim Antippen geöffnet, damit
    kein Popup-Blocker dazwischenkommt; blockiert der Browser es trotzdem, wechselt die App
-   selbst auf die Seite.
+   selbst auf die Seite. Wer die Daten nicht vor Ort aufnehmen kann, zählt den Abschluss
+   über „ohne Auftragsdaten“ – die Teamleitung sieht dann, dass die Unterlagen fehlen.
 5. Vertippt? „Letzten Eintrag rückgängig machen“ – für eigene Einträge bis 15 Minuten,
    die Teamleitung kann jederzeit korrigieren.
+
+Beim ersten Antippen einer Hausnummer fragt die App nach **Ein- oder Mehrfamilienhaus**.
+Im Mehrfamilienhaus werden die Klingelschilder angelegt (Namen abtippen oder „6 Klingeln
+ohne Namen“), danach zählt jede Klingel als eigene Tür und die App springt von selbst zur
+nächsten. Wer ausdrücklich keinen Besuch will, bekommt über **Sperren** einen dauerhaften
+Eintrag fürs ganze Team – aufheben kann ihn nur die Teamleitung.
 
 Die Ablehnungsgründe sind vorbelegt (zufrieden mit Anbieter, kein Interesse, Vertrag läuft
 noch, muss mit Partner sprechen, keine Haustürgeschäfte …) und unter **Einstellungen**
 frei änderbar: umbenennen, ausblenden, sortieren, eigene ergänzen.
+
+---
+
+## Aufträge und Termine
+
+Unter **Aufträge** (Teamleitung: alle, Außendienst: die eigenen) steht, was nach der Tür
+noch zu tun ist.
+
+**Termine** stehen oben, der nächste zuerst; überfällige sind rot umrandet. Von dort aus
+lässt sich anrufen, die Route öffnen oder der Termin abhaken. Termine von heute erscheinen
+zusätzlich am Kopf der Tour – ein Tipp darauf stellt Straße, Hausnummer und Klingel ein.
+
+**Aufträge** durchlaufen danach die Nachbearbeitung:
+
+| Schritt | Bedeutung |
+|---|---|
+| An der Tür erfasst | Der Kunde hat unterschrieben. |
+| Bestätigungsanruf erledigt | Alle Auftragsbestandteile wurden mit dem Kunden durchgesprochen. |
+| Beim Partner eingereicht | Der Auftrag liegt beim Partner. |
+| Bestätigt | Der Vertrag ist zustande gekommen. |
+| Storniert / Widerrufen | Zählt nicht als Abschluss. |
+
+Weitersetzen darf die Schritte nur die Teamleitung; jeder Schritt merkt sich, wer ihn
+wann gesetzt hat, und kann eine Notiz tragen. Zu jedem offenen Auftrag zeigt die Liste,
+wie lange die **14-tägige Widerrufsfrist** noch läuft. Abschlüsse, die ohne Auftragsdaten
+gezählt wurden, stehen als Hinweis oben – ohne Kundendaten und Unterschrift wird daraus
+kein Vertrag.
 
 ---
 
@@ -383,6 +429,7 @@ src/
     (app)/            Bereich nach dem Login (Layout mit Navigation)
       start/          Dashboard der Teamleitung
       tour/           Türerfassung (das Herzstück)
+      auftraege/      Aufträge und Termine (Nacharbeit)
       gebiete/        Gebiete und Straßen
       karte/          Energiekarte
       auswertung/     Zahlen
@@ -394,9 +441,12 @@ src/
     db.ts             Schema und Verbindung
     auth.ts           Login, Rollen, Passwörter
     queries.ts        alle Datenbankabfragen
+    orders.ts         Auftragsstatus, Widerrufsfrist, Pflichtangaben
+    appointments.ts   Terminzeiten, Vorschläge, Beschriftung
+    doors.ts          Türstatus: offen, Wiedervorlage, fertig, gesperrt
     energy/           Städteliste, Datenquellen-Adapter, Tagesabruf
     geo/              Flächenberechnung, Aufteilung, OpenStreetMap-Abfragen
-    offline-queue.ts  Puffer für Türeinträge ohne Netz
+    offline-queue.ts  Puffer für Türeinträge und Aufträge ohne Netz
   components/         UI-Bausteine, Diagramme, Navigation
 public/
   manifest.webmanifest, sw.js, offline.html, App-Icons
@@ -439,8 +489,26 @@ npm run energy:refresh  # Energiepreise abrufen
 
 ## Datenschutz
 
-Die App speichert Besuchsergebnisse pro Hausnummer, keine Namen oder Kontaktdaten von
-Kundinnen und Kunden. Wird beim Erfassen die Standortfreigabe erteilt, wird zusätzlich die
-Position des Erfassenden gespeichert – das ist eine Mitarbeiterortung und gehört mit dem
-Betriebsrat bzw. den Beschäftigten abgestimmt. Wer das nicht möchte: in
+Die App speichert **personenbezogene Daten**, sobald an der Tür etwas zustande kommt:
+
+- **Türeinträge** hängen an der Hausnummer bzw. am Namen des Klingelschilds.
+- **Termine** speichern Name und Rufnummer des Ansprechpartners.
+- **Aufträge** speichern Kundendaten, Zähler, Verbrauch und die Unterschrift als Bild.
+
+Dafür braucht es eine Rechtsgrundlage (Vertragsanbahnung), eine Information der Kundschaft
+und eine Löschfrist – Aufträge sind Geschäftsunterlagen, Termine und Klingelschilder
+dagegen nicht. Beides gehört mit dem eigenen Datenschutzbeauftragten abgestimmt; die App
+gibt keine Frist vor und löscht nichts von selbst.
+
+Ohne Netz liegen wartende Einträge **auf dem Gerät** im lokalen Speicher des Browsers, bis
+sie gesendet sind – auch die Auftragsdaten. Geräte des Außendienstes gehören deshalb
+gesperrt und im Verlustfall gelöscht.
+
+Wird beim Erfassen die Standortfreigabe erteilt, wird zusätzlich die Position des
+Erfassenden gespeichert – das ist eine Mitarbeiterortung und gehört mit dem Betriebsrat
+bzw. den Beschäftigten abgestimmt. Wer das nicht möchte: in
 `src/app/(app)/tour/TourClient.tsx` den `navigator.geolocation`-Block entfernen.
+
+Ein erkennbares Verbot („Keine Werbung“, „Für Vertreter verboten“) und ein ausdrückliches
+„kein Interesse“ sind bindend: dafür gibt es die Sperre, die serverseitig auch beim
+Nachsenden greift.

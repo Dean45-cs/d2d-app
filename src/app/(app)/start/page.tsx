@@ -3,9 +3,12 @@ import { redirect } from "next/navigation";
 import { requireUser } from "@/lib/auth";
 import {
   dailySeries,
+  listAppointments,
   listTerritories,
   memberStats,
+  orderTotals,
   reasonStats,
+  salesWithoutOrder,
   totals,
 } from "@/lib/queries";
 import { DailyBars, ReasonBars } from "@/components/charts";
@@ -26,6 +29,12 @@ export default async function StartPage() {
   const members = memberStats(user.team_id, weekAgo);
   const reasons = reasonStats(user.team_id, weekAgo);
   const territories = listTerritories(user.team_id);
+
+  // Nacharbeit: was an Auftraegen und Terminen offen ist, gehoert ins Dashboard -
+  // ein Auftrag ohne Bestaetigungsanruf wird sonst schlicht vergessen.
+  const orders = orderTotals(user.team_id, { since: weekAgo });
+  const missingOrders = salesWithoutOrder(user.team_id, { since: weekAgo });
+  const openAppointments = listAppointments(user.team_id, { limit: 100 }).length;
 
   const open = territories.filter((t) => t.status === "OPEN");
   const unassigned = territories.filter((t) => !t.assigned_user_id);
@@ -104,6 +113,29 @@ export default async function StartPage() {
                 ))}
               </tbody>
             </table>
+          )}
+        </section>
+
+        <section className="card p-4">
+          <div className="mb-3 flex items-center justify-between">
+            <h2 className="text-sm font-semibold">Nacharbeit (7 Tage)</h2>
+            <Link href="/auftraege" className="text-xs font-semibold text-brand-600">
+              Aufträge →
+            </Link>
+          </div>
+          <div className="grid grid-cols-3 gap-2">
+            {/* Ohne Zusatzzeile: auf 360 px stehen hier drei Kacheln nebeneinander. */}
+            <StatTile label="Wartet auf Anruf" value={orders.waiting_call ?? 0} tone="warn" />
+            <StatTile label="Bestätigt" value={orders.confirmed ?? 0} tone="success" />
+            <StatTile label="Offene Termine" value={openAppointments} tone="brand" />
+          </div>
+          {missingOrders > 0 && (
+            <p className="mt-3 text-xs font-medium" style={{ color: "var(--gas-600)" }}>
+              {missingOrders === 1
+                ? "1 Abschluss ohne Auftragsdaten"
+                : `${missingOrders} Abschlüsse ohne Auftragsdaten`}{" "}
+              – ohne Kundendaten und Unterschrift wird daraus kein Vertrag.
+            </p>
           )}
         </section>
 
