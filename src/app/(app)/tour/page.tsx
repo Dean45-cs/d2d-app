@@ -3,6 +3,7 @@ import { getDb } from "@/lib/db";
 import {
   listAppointments,
   listDoorbells,
+  listMembers,
   listHouseNumbers,
   listReasons,
   listTerritories,
@@ -56,6 +57,17 @@ export default async function TourPage() {
    */
   const appointments = listAppointments(user.team_id, { userId: user.id, limit: 20 });
 
+  /*
+   * Name und Profilbild der Kollegen. Die Liste faehrt einmal komplett mit:
+   * an der Tuer steht damit neben "zuletzt hier war ..." ein Gesicht - auch
+   * dann, wenn im Treppenhaus kein Netz ist.
+   */
+  const team = listMembers(user.team_id).map((member) => ({
+    id: member.id,
+    name: member.name,
+    avatar: member.avatar,
+  }));
+
   return (
     <TourClient
       territories={territories.map((t) => ({
@@ -68,6 +80,7 @@ export default async function TourPage() {
       houseNumbers={houseNumbers}
       doorbells={doorbells}
       isLeader={user.role === "LEADER"}
+      team={team}
       reasons={listReasons(user.team_id)}
       todayTotals={todayTotals}
       recent={recent}

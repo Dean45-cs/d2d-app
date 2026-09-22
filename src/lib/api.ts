@@ -35,6 +35,26 @@ export function optionalText(value: unknown, max = 2000): string {
   return String(value ?? "").trim().slice(0, max);
 }
 
+/**
+ * Groesse des Profilbilds in Zeichen der Data-URL. 200.000 Zeichen sind rund
+ * 150 KB Bild - fuer ein Gesicht in einer Liste weit mehr als genug, und die
+ * Datenbank bleibt klein genug fuer den Offline-Abgleich.
+ */
+export const MAX_AVATAR_CHARS = 200_000;
+
+/** Profilbild pruefen: nur echte Bild-Data-URLs, und klein genug. */
+export function optionalAvatar(value: unknown): string {
+  const text = String(value ?? "").trim();
+  if (!text) return "";
+  if (!/^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/=]+$/.test(text)) {
+    throw new ValidationError("Das Profilbild muss ein Bild sein (PNG, JPEG oder WebP).");
+  }
+  if (text.length > MAX_AVATAR_CHARS) {
+    throw new ValidationError("Das Profilbild ist zu groß – bitte ein kleineres Bild wählen.");
+  }
+  return text;
+}
+
 export function optionalNumber(value: unknown): number | null {
   if (value === null || value === undefined || value === "") return null;
   const n = Number(value);

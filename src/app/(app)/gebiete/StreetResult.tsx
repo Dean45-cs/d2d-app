@@ -1,7 +1,7 @@
 "use client";
 
 import type { User } from "@/lib/types";
-import { GroupLabel, Note, Segmented, plural } from "@/components/ui";
+import { GroupLabel, Note, Segmented, SkeletonLine, plural } from "@/components/ui";
 import { IconCheck, IconInfo, IconList, IconPin, IconSplit } from "@/components/icons";
 import { MAX_PLOTS } from "@/lib/geo/split";
 
@@ -290,4 +290,36 @@ export function pointsOf(street: FoundStreet): [number, number][] {
 function preview(street: FoundStreet): string {
   const first = street.numbers.slice(0, 6).map((h) => h.number).join(", ");
   return street.numbers.length > 6 ? `${first} …` : first;
+}
+
+/**
+ * Platzhalter, solange OpenStreetMap antwortet.
+ *
+ * Die Abfrage dauert je nach Groesse der Flaeche ein paar Sekunden - in der
+ * Zeit steht die Liste schon da, statt dass der Schritt leer bleibt.
+ */
+export function StreetResultSkeleton() {
+  return (
+    <div className="space-y-3" aria-busy="true" aria-label="Straßen werden gesucht">
+      <div className="inset flex items-center gap-3 px-3.5 py-3">
+        <span className="skeleton h-10 w-10 shrink-0 rounded-full" />
+        <span className="min-w-0 flex-1 space-y-2">
+          <SkeletonLine width="55%" height={14} />
+          <SkeletonLine width="35%" height={11} />
+        </span>
+      </div>
+      <SkeletonLine height={34} />
+      <div className="list">
+        {Array.from({ length: 5 }, (_, i) => (
+          <div key={i} className="flex items-center gap-3 px-3 py-2.5">
+            <span className="skeleton h-6 w-6 shrink-0 rounded-full" />
+            <span className="min-w-0 flex-1 space-y-1.5">
+              <SkeletonLine width={`${65 - i * 7}%`} height={13} />
+              <SkeletonLine width={`${40 - i * 4}%`} height={10} />
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
 }

@@ -543,8 +543,9 @@ export function AreaPicker({
         </div>
 
         {!ready && (
-          <div className="absolute inset-0 grid place-items-center bg-[var(--card)]">
-            <p className="muted animate-pulse text-sm">Karte wird geladen …</p>
+          <div className="absolute inset-0 bg-[var(--card)] p-3">
+            <div className="skeleton h-full w-full rounded-[var(--r-md)]" aria-hidden />
+            <p className="sr-only">Karte wird geladen</p>
           </div>
         )}
       </div>

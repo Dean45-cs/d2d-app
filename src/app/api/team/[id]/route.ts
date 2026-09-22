@@ -1,6 +1,6 @@
 import { hashPassword, requireRole } from "@/lib/auth";
 import { getDb } from "@/lib/db";
-import { handle, optionalText } from "@/lib/api";
+import { handle, optionalAvatar, optionalText } from "@/lib/api";
 
 export const dynamic = "force-dynamic";
 
@@ -30,6 +30,11 @@ export async function PATCH(
     if (body.phone !== undefined) {
       fields.push("phone = ?");
       values.push(optionalText(body.phone, 40));
+    }
+    if (body.avatar !== undefined) {
+      // Leerer Wert nimmt das Bild wieder weg.
+      fields.push("avatar = ?");
+      values.push(optionalAvatar(body.avatar));
     }
     if (body.active !== undefined) {
       if (userId === leader.id && !body.active) {

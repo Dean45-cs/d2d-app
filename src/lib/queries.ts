@@ -18,7 +18,7 @@ import type {
 export function listMembers(teamId: number): User[] {
   return getDb()
     .prepare(
-      `SELECT id, team_id, name, email, role, phone, active, created_at
+      `SELECT id, team_id, name, email, role, phone, active, avatar, created_at
          FROM users WHERE team_id = ? ORDER BY active DESC, role, name`,
     )
     .all(teamId) as User[];
@@ -312,6 +312,8 @@ export interface HouseNumberWithStats {
   /** Letzter Eintrag an dieser Adresse - auch wenn er an einer Klingel hing. */
   last_visit_at: string | null;
   last_visit_user: string | null;
+  /** Wer zuletzt hier war - fuer Name und Profilbild in der Liste. */
+  last_visit_user_id: number | null;
   last_outcome: VisitOutcome | null;
   blocked_at: string | null;
   blocked_by: number | null;
@@ -355,6 +357,8 @@ export function listHouseNumbers(streetIds: number[]): HouseNumberWithStats[] {
               (SELECT u.name FROM visits v JOIN users u ON u.id = v.user_id
                 WHERE ${HOUSE_MATCH}
                 ORDER BY v.created_at DESC, v.id DESC LIMIT 1)            AS last_visit_user,
+              (SELECT v.user_id FROM visits v WHERE ${HOUSE_MATCH}
+                ORDER BY v.created_at DESC, v.id DESC LIMIT 1)            AS last_visit_user_id,
               (SELECT v.outcome FROM visits v WHERE ${HOUSE_MATCH}
                 ORDER BY v.created_at DESC, v.id DESC LIMIT 1)            AS last_outcome,
               (SELECT u.name FROM users u WHERE u.id = h.blocked_by)      AS blocked_by_name,
@@ -444,6 +448,8 @@ export interface DoorbellWithStats extends Doorbell {
   last_reason_emoji: string | null;
   last_visit_at: string | null;
   last_visit_user: string | null;
+  /** Wer zuletzt an dieser Klingel war - fuer Name und Profilbild. */
+  last_visit_user_id: number | null;
   blocked_by_name: string | null;
 }
 
@@ -472,6 +478,8 @@ export function listDoorbells(houseNumberIds: number[]): DoorbellWithStats[] {
               (SELECT u.name FROM visits v JOIN users u ON u.id = v.user_id
                 WHERE v.doorbell_id = d.id
                 ORDER BY v.created_at DESC, v.id DESC LIMIT 1)            AS last_visit_user,
+              (SELECT v.user_id FROM visits v WHERE v.doorbell_id = d.id
+                ORDER BY v.created_at DESC, v.id DESC LIMIT 1)            AS last_visit_user_id,
               (SELECT u.name FROM users u WHERE u.id = d.blocked_by)      AS blocked_by_name
          FROM doorbells d
         WHERE d.house_number_id IN (${placeholders})

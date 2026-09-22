@@ -201,6 +201,13 @@ function migrate(db: Database.Database) {
   );
   addColumn(db, "visits", "doorbell_id", "INTEGER REFERENCES doorbells(id) ON DELETE SET NULL");
 
+  /* Profilbild des Mitarbeiters als Data-URL (kleines JPEG, von der
+     Teamleitung beim Anlegen gesetzt). An der Tuer steht damit ein Gesicht
+     neben "zuletzt hier war ..." - ein Name allein sagt im Treppenhaus
+     weniger als das Bild des Kollegen. Als Text in der Datenbank, weil die
+     App sonst keinen Ort fuer Dateien haette. */
+  addColumn(db, "users", "avatar", "TEXT NOT NULL DEFAULT ''");
+
   // Termine: wer wann nochmal aufmacht, steht am Eintrag selbst. Die Uhrzeit
   // ist bewusst Ortszeit ("2026-09-21 18:00") - vor der Tuer zaehlt die Uhr an
   // der Wand, nicht die Zeitzone des Servers.

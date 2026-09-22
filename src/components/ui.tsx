@@ -263,16 +263,53 @@ export function Segmented<T extends string>({
   );
 }
 
-/** Kuerzel einer Person im Kreis - „Alex Krüger“ wird zu „AK“. */
+/**
+ * Eine Person im Kreis: das Profilbild, sonst das Kuerzel des Namens
+ * („Alex Krüger“ wird zu „AK“).
+ */
 export function Avatar({
   name,
+  src,
   size = 28,
   tone = "brand",
+  loading = false,
 }: {
   name: string | null;
+  /** Profilbild als Data-URL; ohne Bild erscheint das Kuerzel. */
+  src?: string | null;
   size?: number;
   tone?: "brand" | "muted";
+  /** Zeigt einen Platzhalter, solange das Bild noch entsteht. */
+  loading?: boolean;
 }) {
+  if (loading) {
+    return (
+      <span
+        className="skeleton inline-block shrink-0 rounded-full"
+        style={{ width: size, height: size }}
+        aria-hidden
+      />
+    );
+  }
+
+  if (src) {
+    return (
+      // Das Bild steckt als Data-URL in den Teamdaten - kein Netzweg, den
+      // next/image optimieren koennte.
+      // eslint-disable-next-line @next/next/no-img-element
+      <img
+        src={src}
+        alt=""
+        className="shrink-0 rounded-full object-cover"
+        style={{
+          width: size,
+          height: size,
+          boxShadow: "inset 0 0 0 1px rgb(11 21 36 / 0.08)",
+        }}
+      />
+    );
+  }
+
   const short = name
     ? name
         .trim()
@@ -366,6 +403,75 @@ export function EmptyState({
       <p className="text-[17px] font-semibold">{title}</p>
       <p className="muted max-w-sm text-sm leading-relaxed">{text}</p>
       {action && <div className="mt-3">{action}</div>}
+    </div>
+  );
+}
+
+/* ------------------------------ Ladezustaende ---------------------------- */
+
+/**
+ * Ein grauer Balken, der die Stelle eines Textes einnimmt.
+ *
+ * Die Rundung kommt als Wert und nicht als Klasse: so laesst sie sich fuer
+ * groessere Flaechen (Karte, Kachel) ueberschreiben, ohne dass zwei
+ * Rundungs-Klassen um den Vorrang streiten.
+ */
+export function SkeletonLine({
+  width = "100%",
+  height = 12,
+  radius = 999,
+  className = "",
+}: {
+  width?: string | number;
+  height?: number;
+  radius?: number;
+  className?: string;
+}) {
+  return (
+    <span
+      className={`skeleton block ${className}`}
+      style={{ width, height, borderRadius: radius }}
+      aria-hidden
+    />
+  );
+}
+
+/**
+ * Platzhalter-Karte, solange die Daten unterwegs sind.
+ *
+ * Besser als ein Kreisel: die Seite steht schon an ihrem Platz und springt
+ * nicht, wenn die Inhalte eintreffen.
+ */
+export function SkeletonCard({
+  lines = 3,
+  className = "",
+}: {
+  lines?: number;
+  className?: string;
+}) {
+  return (
+    <div className={`card space-y-2.5 p-4 ${className}`} aria-hidden>
+      <SkeletonLine width="55%" height={14} />
+      {Array.from({ length: lines }, (_, i) => (
+        <SkeletonLine key={i} width={i === lines - 1 ? "70%" : "100%"} />
+      ))}
+    </div>
+  );
+}
+
+/** Mehrere Platzhalter-Zeilen in einer Liste, je mit Kreis und zwei Balken. */
+export function SkeletonRows({ rows = 4 }: { rows?: number }) {
+  return (
+    <div className="list" aria-hidden>
+      {Array.from({ length: rows }, (_, i) => (
+        <div key={i} className="flex items-center gap-3 px-3.5 py-3">
+          <span className="skeleton h-9 w-9 shrink-0 rounded-full" />
+          <span className="min-w-0 flex-1 space-y-1.5">
+            <SkeletonLine width={`${70 - i * 7}%`} height={13} />
+            <SkeletonLine width={`${45 - i * 4}%`} height={10} />
+          </span>
+        </div>
+      ))}
     </div>
   );
 }
