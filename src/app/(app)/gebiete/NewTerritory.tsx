@@ -19,6 +19,7 @@ import { outlineOf, splitStreets } from "@/lib/geo/split";
 import { AreaPicker, type ExistingArea, type OverlayPlot, type OverlayStreet } from "./AreaPicker";
 import {
   StreetResult,
+  StreetResultSkeleton,
   doorsOf,
   pointsOf,
   type FoundStreet,
@@ -205,12 +206,22 @@ export function NewTerritoryButton({
         setError("Bitte zuerst ein Gebiet auf der Karte markieren.");
         return;
       }
-      // Die Straßen holt die App beim Weitergehen - ein Knopf weniger.
-      if (!result && !(await loadStreets())) return;
+      /* Die Straßen holt die App beim Weitergehen - ein Knopf weniger. Der
+         Schritt geht sofort auf und zeigt so lange Platzhalter: die Abfrage
+         bei OpenStreetMap dauert je nach Fläche ein paar Sekunden. */
       setStep(2);
+      if (!result) void loadStreets();
       return;
     }
     if (step === 2) {
+      if (!result) {
+        setError(
+          loadingStreets
+            ? "Die Straßen werden noch geladen."
+            : "Für diese Fläche liegen keine Straßen vor.",
+        );
+        return;
+      }
       if (plotCount > 1 && plots.length < 2) {
         setError("Für die Aufteilung werden mindestens zwei Straßen gebraucht.");
         return;
@@ -467,6 +478,27 @@ export function NewTerritoryButton({
           )}
 
           {/* --------------------- Schritt 2: Straßen und Pakete --------------- */}
+          {step === 2 && tab === "map" && !result && (
+            <>
+              {loadingStreets ? (
+                <StreetResultSkeleton />
+              ) : (
+                <div className="space-y-3">
+                  <Note icon={<IconInfo className="h-4 w-4" />} tone="warn">
+                    Für diese Fläche kamen keine Straßen zurück.
+                  </Note>
+                  <button
+                    type="button"
+                    className="btn btn-ghost w-full"
+                    onClick={() => void loadStreets()}
+                  >
+                    Erneut versuchen
+                  </button>
+                </div>
+              )}
+            </>
+          )}
+
           {step === 2 && tab === "map" && result && (
             <div className="space-y-3">
               <StreetResult

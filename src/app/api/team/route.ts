@@ -1,6 +1,6 @@
 import { hashPassword, requireRole } from "@/lib/auth";
 import { getDb } from "@/lib/db";
-import { handle, optionalText, requireText } from "@/lib/api";
+import { handle, optionalAvatar, optionalText, requireText } from "@/lib/api";
 
 export const dynamic = "force-dynamic";
 
@@ -23,8 +23,8 @@ export async function POST(request: Request) {
 
     const id = getDb()
       .prepare(
-        `INSERT INTO users (team_id, name, email, password_hash, role, phone)
-         VALUES (?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO users (team_id, name, email, password_hash, role, phone, avatar)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`,
       )
       .run(
         leader.team_id,
@@ -33,6 +33,7 @@ export async function POST(request: Request) {
         hashPassword(password),
         role,
         optionalText(body.phone, 40),
+        optionalAvatar(body.avatar),
       ).lastInsertRowid as number;
 
     return { ok: true, id };

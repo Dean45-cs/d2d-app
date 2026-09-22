@@ -3,6 +3,8 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { IconPlus } from "@/components/icons";
+import { Avatar } from "@/components/ui";
+import { fileToAvatar } from "@/lib/avatar";
 import type { User } from "@/lib/types";
 
 type Row = User & {
@@ -31,6 +33,7 @@ export function TeamTable({
     phone: "",
     password: "",
     role: "MEMBER",
+    avatar: "",
   });
 
   async function createMember(event: React.FormEvent) {
@@ -49,7 +52,7 @@ export function TeamTable({
         return;
       }
       setOpen(false);
-      setForm({ name: "", email: "", phone: "", password: "", role: "MEMBER" });
+      setForm({ name: "", email: "", phone: "", password: "", role: "MEMBER", avatar: "" });
       router.refresh();
     } finally {
       setBusy(false);
@@ -96,7 +99,9 @@ export function TeamTable({
         {rows.map((m) => (
           <div key={m.id} className="card p-4">
             <div className="flex flex-wrap items-start justify-between gap-3">
-              <div className="min-w-0">
+              <div className="flex min-w-0 items-start gap-3">
+                <Avatar name={m.name} src={m.avatar} size={44} />
+                <div className="min-w-0">
                 <p className="font-semibold">
                   {m.name}
                   {m.role === "LEADER" && (
@@ -110,13 +115,14 @@ export function TeamTable({
                     </span>
                   )}
                 </p>
-                <p className="muted text-sm">{m.email}</p>
-                {m.phone && <p className="muted text-sm">{m.phone}</p>}
+                <p className="muted text-[13px]">{m.email}</p>
+                {m.phone && <p className="muted text-[13px]">{m.phone}</p>}
                 {m.territories.length > 0 && (
                   <p className="muted mt-1 text-xs">
                     Gebiete: {m.territories.join(", ")}
                   </p>
                 )}
+                </div>
               </div>
 
               <div className="muted flex gap-4 text-center text-xs">
@@ -141,9 +147,14 @@ export function TeamTable({
               </div>
             </div>
 
-            <div className="mt-3 flex flex-wrap gap-2 border-t pt-3 hairline">
+            <div className="mt-3 flex flex-wrap gap-1.5 border-t pt-3 hairline">
+              <AvatarButton
+                name={m.name}
+                hasImage={Boolean(m.avatar)}
+                onPick={(avatar) => patch(m.id, { avatar })}
+              />
               <button
-                className="btn btn-ghost px-3 py-1.5 text-xs"
+                className="btn btn-ghost btn-sm btn-pill"
                 onClick={() => setResetFor(resetFor === m.id ? null : m.id)}
               >
                 Passwort neu setzen
@@ -151,7 +162,7 @@ export function TeamTable({
               {m.id !== currentUserId && (
                 <>
                   <button
-                    className="btn btn-ghost px-3 py-1.5 text-xs"
+                    className="btn btn-ghost btn-sm btn-pill"
                     onClick={() =>
                       patch(m.id, { role: m.role === "LEADER" ? "MEMBER" : "LEADER" })
                     }
@@ -159,7 +170,7 @@ export function TeamTable({
                     {m.role === "LEADER" ? "Zu Vertrieb machen" : "Zur Teamleitung machen"}
                   </button>
                   <button
-                    className="btn btn-ghost px-3 py-1.5 text-xs"
+                    className="btn btn-ghost btn-sm btn-pill"
                     onClick={() => patch(m.id, { active: !m.active })}
                   >
                     {m.active ? "Deaktivieren" : "Wieder aktivieren"}
@@ -201,6 +212,11 @@ export function TeamTable({
           >
             <h2 className="mb-4 text-lg font-bold">Mitarbeiter anlegen</h2>
             <div className="space-y-3">
+              <AvatarPicker
+                name={form.name}
+                value={form.avatar}
+                onChange={(avatar) => setForm((prev) => ({ ...prev, avatar }))}
+              />
               <div>
                 <label className="label" htmlFor="m-name">Name</label>
                 <input
@@ -279,5 +295,110 @@ export function TeamTable({
         </div>
       )}
     </>
+  );
+}
+
+/**
+ * Profilbild waehlen - Vorschau links, Knopf rechts.
+ *
+ * Das Bild wird im Browser auf ein kleines Quadrat gerechnet; waehrend das
+ * laeuft, steht ein Platzhalter an seiner Stelle.
+ */
+function AvatarPicker({
+  name,
+  value,
+  onChange,
+}: {
+  name: string;
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function pick(file: File | undefined) {
+    if (!file) return;
+    setBusy(true);
+    setError(null);
+    try {
+      onChange(await fileToAvatar(file));
+    } catch (problem) {
+      setError(problem instanceof Error ? problem.message : "Bild nicht lesbar.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="inset flex items-center gap-3 p-3">
+      <Avatar name={name || "?"} src={value} size={56} loading={busy} />
+      <div className="min-w-0 flex-1">
+        <p className="text-[13px] font-semibold">Profilbild</p>
+        <p className="muted text-[11px] leading-snug">
+          Erscheint an der Tür bei „zuletzt hier war …“.
+        </p>
+        {error && <p className="mt-1 text-[11px] font-semibold text-signal-600">{error}</p>}
+      </div>
+      <div className="flex shrink-0 gap-1">
+        <label className="btn btn-ghost btn-sm btn-pill cursor-pointer">
+          <input
+            type="file"
+            accept="image/*"
+            className="sr-only"
+            onChange={(e) => void pick(e.target.files?.[0])}
+          />
+          {value ? "ändern" : "wählen"}
+        </label>
+        {value && (
+          <button
+            type="button"
+            className="btn btn-plain btn-sm btn-pill"
+            onClick={() => onChange("")}
+          >
+            weg
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/** Profilbild einer vorhandenen Person tauschen. */
+function AvatarButton({
+  name,
+  hasImage,
+  onPick,
+}: {
+  name: string;
+  hasImage: boolean;
+  onPick: (avatar: string) => void;
+}) {
+  const [busy, setBusy] = useState(false);
+
+  async function pick(file: File | undefined) {
+    if (!file) return;
+    setBusy(true);
+    try {
+      onPick(await fileToAvatar(file));
+    } catch (problem) {
+      alert(problem instanceof Error ? problem.message : "Bild nicht lesbar.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <label
+      className="btn btn-ghost btn-sm btn-pill cursor-pointer"
+      aria-label={`Profilbild von ${name} ${hasImage ? "ändern" : "setzen"}`}
+    >
+      <input
+        type="file"
+        accept="image/*"
+        className="sr-only"
+        onChange={(e) => void pick(e.target.files?.[0])}
+      />
+      {busy ? "Bild wird verkleinert …" : hasImage ? "Profilbild ändern" : "Profilbild setzen"}
+    </label>
   );
 }

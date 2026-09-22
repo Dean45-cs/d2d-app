@@ -12,7 +12,7 @@ import type {
   Totals,
   VisitRow,
 } from "@/lib/queries";
-import type { BuildingType, RejectionReason, VisitOutcome } from "@/lib/types";
+import type { BuildingType, RejectionReason, TeamFace, VisitOutcome } from "@/lib/types";
 import { BUILDING_TYPE_LABEL, OUTCOME_LABEL } from "@/lib/types";
 import {
   bellKey,
@@ -36,6 +36,7 @@ import {
   IconCalendar,
   IconCheck,
   IconChevronDown,
+  IconChevronLeft,
   IconChevronRight,
   IconClock,
   IconCloudUp,
@@ -55,6 +56,7 @@ import {
 } from "@/components/icons";
 import { Sheet } from "@/components/Sheet";
 import {
+  Avatar,
   EmptyState,
   GroupLabel,
   Note,
@@ -108,6 +110,8 @@ interface Bell {
   last_reason_emoji: string | null;
   last_visit_at: string | null;
   last_visit_user: string | null;
+  /** Wer zuletzt hier geklingelt hat - dazu gehoert das Profilbild. */
+  last_visit_user_id: number | null;
   blocked_at: string | null;
   blocked_by_name: string | null;
 }
@@ -122,6 +126,7 @@ const NEW_BELL = {
   last_reason_emoji: null,
   last_visit_at: null,
   last_visit_user: null,
+  last_visit_user_id: null,
   blocked_at: null,
   blocked_by_name: null,
 } as const;
@@ -139,6 +144,8 @@ interface Props {
   reasons: RejectionReason[];
   /** Nur die Teamleitung darf eine Sperre wieder aufheben. */
   isLeader: boolean;
+  /** Name und Profilbild der Kollegen - fuer "zuletzt hier war ...". */
+  team: TeamFace[];
   todayTotals: Totals;
   recent: VisitRow[];
   /** Offene Termine von heute und aelter - der Rueckweg des Tages. */
@@ -159,6 +166,7 @@ export function TourClient({
   doorbells,
   reasons,
   isLeader,
+  team,
   todayTotals,
   recent,
   appointments,
@@ -173,8 +181,23 @@ export function TourClient({
   const [houseNumber, setHouseNumber] = useState("");
   const [product, setProduct] = useState<EnergyType>("BEIDES");
   const [sheet, setSheet] = useState<
-    null | "street" | "reason" | "building" | "bells" | "block" | "appointment"
+    null | "street" | "reason" | "block" | "appointment"
   >(null);
+  /*
+   * Der Haus-Bildschirm. An einer Hausnummer geht die Liste der
+   * Klingelschilder auf - ein eigener Bildschirm statt eines Blattes ueber
+   * der Strasse: im Treppenhaus arbeitet man sich durch dieses Haus, und
+   * alles andere waere dabei nur im Weg.
+   */
+  const [houseOpen, setHouseOpen] = useState(false);
+  /** Das Feld zum Nachtragen von Schildern - zugeklappt, bis es gebraucht wird. */
+  const [addBellsOpen, setAddBellsOpen] = useState(false);
+  /*
+   * Die Haustyp-Wahl. Sie geht beim ersten Mal von selbst auf und danach nur
+   * noch auf Tipp: der Typ gilt fuers ganze Team, ein Umschalten aus Versehen
+   * waere fuer alle sichtbar.
+   */
+  const [typeChoice, setTypeChoice] = useState(false);
   /** Suchfeld im Blatt der Strassenwahl - erst ab vielen Strassen sichtbar. */
   const [streetQuery, setStreetQuery] = useState("");
   /** Blendet abgearbeitete Hausnummern aus, wenn die Strasse lang wird. */
@@ -297,6 +320,13 @@ export function TourClient({
 
   /* -------------------------------- Auswahl ------------------------------- */
 
+  /** Kollege zu einer Nutzer-ID - fuer Name und Profilbild an der Tuer. */
+  const faces = useMemo(() => new Map(team.map((person) => [person.id, person])), [team]);
+  const faceOf = useCallback(
+    (userId: number | null | undefined) => (userId ? (faces.get(userId) ?? null) : null),
+    [faces],
+  );
+
   const streetsOfTerritory = useMemo(
     () => streets.filter((s) => s.territory_id === territoryId),
     [streets, territoryId],
@@ -388,6 +418,7 @@ export function TourClient({
         last_reason_emoji: bell.last_reason_emoji,
         last_visit_at: bell.last_visit_at,
         last_visit_user: bell.last_visit_user,
+        last_visit_user_id: bell.last_visit_user_id,
         blocked_at: bell.blocked_at,
         blocked_by_name: bell.blocked_by_name,
       });
@@ -586,7 +617,8 @@ export function TourClient({
     const before = localTypes.get(key);
     setLocalTypes((prev) => new Map(prev).set(key, type));
     setBellLabel("");
-    setSheet(type === "MFH" ? "bells" : null);
+    setTypeChoice(false);
+    setAddBellsOpen(type === "MFH" && currentBells.length === 0);
     await describeHouse(
       { buildingType: type },
       `${street?.name ?? ""} ${currentNumber} · ${BUILDING_TYPE_LABEL[type]}`,
@@ -647,6 +679,7 @@ export function TourClient({
       return;
     }
     setBellDraft("");
+    setAddBellsOpen(false);
     void addBells(entries);
   }
 
@@ -661,14 +694,15 @@ export function TourClient({
       currentBells.map((bell) => bell.label),
     );
     setBellCount("");
+    setAddBellsOpen(false);
     void addBells(entries);
   }
 
-  /** Klingel waehlen und zurueck zu den Ergebnis-Kacheln. */
+  /** Klingel waehlen - die Ergebnis-Kacheln darunter meinen ab jetzt sie. */
   function chooseBell(bell: Bell) {
     setBellLabel(bell.label);
     setEditing(null);
-    setSheet(null);
+    setAddBellsOpen(false);
   }
 
   async function removeBell(bell: Bell) {
@@ -793,15 +827,35 @@ export function TourClient({
     if (blocked) setToast("Adresse gesperrt");
   }
 
-  /** Tipp auf eine Plakette: beim ersten Mal wird zuerst der Haustyp gewaehlt. */
+  /** Tipp auf eine Plakette: das Haus geht auf. */
   function openHouse(house: HouseNumberWithStats) {
     setHouseNumber(house.number);
     setBellLabel("");
     setEditing(null);
-    const type = typeOf(house);
-    if (!type) setSheet("building");
-    else if (type === "MFH") setSheet("bells");
-    else setSheet(null);
+    setBellEdit(false);
+    setAddBellsOpen(false);
+    setTypeChoice(false);
+    setHouseOpen(true);
+  }
+
+  /** Die eingetippte Hausnummer oeffnen. */
+  function openTypedHouse() {
+    if (!streetId || !currentNumber) return;
+    setBellLabel("");
+    setEditing(null);
+    setBellEdit(false);
+    setAddBellsOpen(false);
+    setTypeChoice(false);
+    setHouseOpen(true);
+  }
+
+  /** Zurueck zur Strasse - das Haus bleibt stehen, wo es war. */
+  function closeHouse() {
+    setHouseOpen(false);
+    setEditing(null);
+    setBellEdit(false);
+    setAddBellsOpen(false);
+    setTypeChoice(false);
   }
 
   /** Tipp auf einen Termin: Strasse und Hausnummer stehen sofort richtig. */
@@ -814,6 +868,7 @@ export function TourClient({
     setHouseNumber(item.house_number);
     setBellLabel(item.doorbell_label ?? "");
     setSheet(null);
+    setHouseOpen(true);
     setToast(`${item.contact_name || "Termin"} · ${slotLabel(item.follow_up_at, now ?? undefined)}`);
   }
 
@@ -894,15 +949,16 @@ export function TourClient({
         if (open.length > 0) {
           if (named) {
             setBellLabel("");
-            setSheet("bells");
             return { nextBell: null, pickBell: true };
           }
           setBellLabel(open[0].label);
           return { nextBell: open[0].label, pickBell: false };
         }
       }
+      // Das Haus ist durch - zurueck zur Strasse, dort steht die naechste Nummer.
       setHouseNumber("");
       setBellLabel("");
+      setHouseOpen(false);
       return { nextBell: null, pickBell: false };
     };
 
@@ -967,7 +1023,8 @@ export function TourClient({
    */
   function bellMissing(): boolean {
     if (currentType !== "MFH" || activeBell) return false;
-    setSheet("bells");
+    setHouseOpen(true);
+    setAddBellsOpen(currentBells.length === 0);
     setToast(
       currentBells.length === 0
         ? "Erst die Klingelschilder anlegen"
@@ -1089,6 +1146,7 @@ export function TourClient({
           // muesste man sie sich nach dem Auto-Weiter wieder heraussuchen.
           setHouseNumber(lastDone.houseNumber);
           setBellLabel(lastDone.label);
+          setHouseOpen(true);
           setLastDone(null);
         }
         router.refresh();
@@ -1128,7 +1186,7 @@ export function TourClient({
     );
   }
 
-  /* -------------------------------- Ansicht ------------------------------- */
+  /* ------------------------ Dinge, die beide Seiten brauchen -------------- */
 
   const openHouses = houses.filter((house) => !isDone(house)).length;
   /* Die gerade gewaehlte Nummer bleibt stehen, auch wenn sie durch ist - sonst
@@ -1140,648 +1198,18 @@ export function TourClient({
   const streetMatches = needle
     ? streetsOfTerritory.filter((s) => s.name.toLocaleLowerCase("de-DE").includes(needle))
     : streetsOfTerritory;
+  const nextOpenNumber = houses.find((house) => !isDone(house))?.number ?? null;
+  /** Das ganze Haus ist durch - im Mehrfamilienhaus erst mit der letzten Klingel. */
+  const houseDone =
+    currentType === "MFH"
+      ? currentBells.length > 0 && doneBellCount >= currentBells.length
+      : doorFinished(currentHouseFacts);
 
-  return (
-    <div className="mx-auto max-w-2xl space-y-3">
-      {/* ---------------------------- Netz & Puffer --------------------------- */}
-      {(!online || pending.length > 0) && (
-        <div
-          className="card rise flex items-center gap-3 px-3.5 py-2.5"
-          style={{ borderColor: "color-mix(in srgb, var(--gas-500) 45%, var(--line))" }}
-        >
-          <span
-            className="tile-icon h-9 w-9"
-            style={{
-              background: "color-mix(in srgb, var(--gas-500) 16%, transparent)",
-              color: "var(--gas-600)",
-            }}
-            aria-hidden
-          >
-            {online ? <IconCloudUp className="h-5 w-5" /> : <IconOffline className="h-5 w-5" />}
-          </span>
-          <div className="min-w-0 flex-1">
-            <p className="text-[13px] font-semibold leading-tight">
-              {pending.length > 0
-                ? `${pending.length} ${pending.length === 1 ? "Eintrag wartet" : "Einträge warten"}`
-                : "Kein Netz"}
-            </p>
-            <p className="muted text-[11px] leading-tight">
-              Erfassen geht weiter – die App sendet alles automatisch nach.
-            </p>
-          </div>
-          {pending.length > 0 && online && (
-            <button type="button" onClick={sendPendingNow} className="btn btn-ghost btn-sm shrink-0">
-              Jetzt senden
-            </button>
-          )}
-        </div>
-      )}
+  /* ---------------- Blätter und Rückmeldung (auf beiden Seiten) ----------- */
 
-      {/* ------------------------------ Tagesstand ---------------------------- */}
-      <StatGroup
-        items={[
-          { label: "Türen heute", value: todayTotals.doors ?? 0 },
-          {
-            label: "Angetroffen",
-            value: todayTotals.met ?? 0,
-            tone: "brand",
-            hint: todayTotals.doors
-              ? `${Math.round(((todayTotals.met ?? 0) / todayTotals.doors) * 100)} % Quote`
-              : undefined,
-          },
-          { label: "Abschlüsse", value: todayTotals.sales ?? 0, tone: "success" },
-        ]}
-      />
-
-      {/* Termine, die heute anstehen - der Rueckweg gehoert an den Anfang. */}
-      {dueAppointments.length > 0 && (
-        <div className="card overflow-hidden">
-          <div className="flex items-center gap-2 px-4 pb-2 pt-3">
-            <IconCalendar className="h-4 w-4 text-brand-600" />
-            <p className="flex-1 text-[13px] font-semibold">
-              {dueAppointments.length === 1 ? "1 Termin" : `${dueAppointments.length} Termine`} heute
-            </p>
-            <Link
-              href="/termine"
-              className="shrink-0 text-[12px] font-semibold text-brand-600 hover:underline"
-            >
-              Alle Termine
-            </Link>
-          </div>
-          <ul>
-            {dueAppointments.slice(0, 3).map((item) => {
-              const late = slotOverdue(item.follow_up_at, now ?? undefined);
-              return (
-                <li
-                  key={item.id}
-                  className="flex items-center gap-1 border-t"
-                  style={{ borderColor: "var(--line)" }}
-                >
-                  <button
-                    type="button"
-                    onClick={() => goToAppointment(item)}
-                    className="list-row min-w-0 flex-1"
-                  >
-                    <span
-                      className="shrink-0 rounded-lg px-2 py-1 text-[12px] font-bold tabular-nums"
-                      style={{
-                        background: late
-                          ? "color-mix(in srgb, var(--signal-500) 15%, transparent)"
-                          : "color-mix(in srgb, var(--brand-500) 14%, transparent)",
-                        color: late ? "var(--signal-600)" : "var(--brand-600)",
-                      }}
-                    >
-                      {slotLabel(item.follow_up_at, now ?? undefined)}
-                    </span>
-                    {/* Der Name steht vorn: die Strasse kennt man, den Kunden
-                        muss man wiedererkennen. */}
-                    <span className="min-w-0 flex-1">
-                      <span className="block truncate text-[14px] font-medium">
-                        {item.contact_name || "Termin"}
-                      </span>
-                      <span className="muted block truncate text-[12px]">
-                        {item.street_name ?? ""} {item.house_number}
-                        {item.doorbell_label ? ` · ${item.doorbell_label}` : ""}
-                      </span>
-                    </span>
-                    <IconChevronRight className="h-4 w-4 shrink-0 opacity-35" />
-                  </button>
-                  {item.contact_phone && (
-                    <a
-                      href={`tel:${item.contact_phone.replace(/[^+\d]/g, "")}`}
-                      className="icon-btn mr-2 shrink-0"
-                      style={{ color: "var(--brand-600)" }}
-                      aria-label={`${item.contact_name || "Kunde"} anrufen`}
-                    >
-                      <IconPhone className="h-[18px] w-[18px]" />
-                    </a>
-                  )}
-                </li>
-              );
-            })}
-          </ul>
-        </div>
-      )}
-
-      {/* ============================== Wo stehe ich? ========================= */}
-      <div className="card overflow-hidden">
-        {/* Straße - ein Tipp oeffnet die Auswahl */}
-        <div className="flex items-center gap-1 pr-2">
-          <button
-            type="button"
-            onClick={() => {
-              setStreetQuery("");
-              setSheet("street");
-            }}
-            className="list-row min-w-0 flex-1 px-4 py-3"
-          >
-            <span
-              className="tile-icon h-10 w-10 shrink-0"
-              style={{
-                background: "color-mix(in srgb, var(--brand-500) 13%, transparent)",
-                color: "var(--brand-600)",
-              }}
-              aria-hidden
-            >
-              <IconMap />
-            </span>
-            <span className="min-w-0 flex-1">
-              <span className="block truncate text-[16px] font-semibold">
-                {street ? street.name : "Straße wählen"}
-              </span>
-              <span className="muted block truncate text-[12px]">
-                {territory
-                  ? [territory.name, [territory.postal_code, territory.city].filter(Boolean).join(" ")]
-                      .filter(Boolean)
-                      .join(" · ")
-                  : "Gebiet wählen"}
-              </span>
-            </span>
-            {street && street.visit_count > 0 && (
-              <Pill tone="neutral">
-                <span className="tabular-nums">{street.visit_count}</span> Türen
-              </Pill>
-            )}
-            <IconChevronDown className="muted h-4 w-4 shrink-0" />
-          </button>
-          {/* Kommt die Strasse aus der Kartenauswahl, fuehrt der Pfeil direkt hin. */}
-          {street?.lat != null && street?.lng != null && (
-            <a
-              href={routeUrl(street.lat, street.lng)}
-              target="_blank"
-              rel="noreferrer"
-              className="icon-btn shrink-0"
-              style={{ color: "var(--brand-600)" }}
-              title={`Route zur ${street.name}`}
-              aria-label={`Route zur ${street.name}`}
-            >
-              <IconNavigate className="h-[18px] w-[18px]" />
-            </a>
-          )}
-        </div>
-
-        {/* Hausnummer */}
-        <div className="border-t px-4 py-3.5" style={{ borderColor: "var(--line)" }}>
-          <label className="label" htmlFor="house">
-            Hausnummer
-          </label>
-          <div className="flex gap-2">
-            <input
-              id="house"
-              className="input text-[22px] font-bold tabular-nums"
-              inputMode="numeric"
-              autoComplete="off"
-              placeholder="12a"
-              value={houseNumber}
-              onChange={(e) => setHouseNumber(e.target.value.slice(0, 12))}
-            />
-            <button
-              type="button"
-              className="btn btn-ghost shrink-0 px-4"
-              aria-label={
-                houses.length > 0 ? "Zur nächsten offenen Hausnummer" : "Hausnummer um 1 erhöhen"
-              }
-              onClick={() => {
-                // Kennt die App die Hausnummern der Straße, springt sie zur
-                // nächsten offenen - sonst bleibt es beim schlichten Hochzählen.
-                const next = nextHouse();
-                if (next) {
-                  setHouseNumber(next);
-                  return;
-                }
-                const match = houseNumber.match(/^(\d+)(.*)$/);
-                setHouseNumber(match ? `${Number(match[1]) + 1}${match[2]}` : "1");
-              }}
-            >
-              {houses.length > 0 ? "weiter" : "+1"}
-              <IconArrowRight className="h-4 w-4" />
-            </button>
-          </div>
-
-          {houses.length > 0 && (
-            <div className="mt-3">
-              <div className="mb-1.5 flex items-center gap-2">
-                <p className="muted flex-1 text-[11px] font-semibold">
-                  {openHouses} von {houses.length} Häusern offen
-                </p>
-                <button
-                  type="button"
-                  onClick={() => setOnlyOpen((value) => !value)}
-                  className="badge"
-                  aria-pressed={onlyOpen}
-                  style={{
-                    background: onlyOpen
-                      ? "color-mix(in srgb, var(--brand-500) 14%, transparent)"
-                      : "color-mix(in srgb, var(--ink) 7%, transparent)",
-                    color: onlyOpen ? "var(--brand-600)" : "var(--ink-muted)",
-                  }}
-                >
-                  nur offene
-                </button>
-              </div>
-              <ul className="flex max-h-32 flex-wrap gap-1.5 overflow-y-auto pb-0.5">
-                {shownHouses.map((house) => {
-                  const done = isDone(house);
-                  const active = sameNumber(house.number, houseNumber);
-                  const key = doneKey(house.street_id, house.number);
-                  const mfh = typeOf(house) === "MFH";
-                  const bells = mfh ? bellsOf(key, house.id) : [];
-                  const bellsDone = bells.filter((bell) => isBellDone(key, bell)).length;
-                  const facts = factsOf(key, house);
-                  const blocked = Boolean(facts.blocked_at);
-                  // Gelb heisst: hier war schon jemand, aber es ist noch offen.
-                  const retry = !blocked && !mfh && doorStatus(facts) === "RETRY";
-                  const badge = blocked
-                    ? "🚫"
-                    : mfh
-                      ? bells.length > 0
-                        ? `${bellsDone}/${bells.length}`
-                        : "🔔"
-                      : retry
-                        ? `${facts.not_home_count}/${MAX_NOT_HOME_ATTEMPTS}`
-                        : "";
-                  const wasHere = house.last_visit_user
-                    ? `${house.last_visit_user}, ${whenLabel(house.last_visit_at)}`
-                    : "";
-                  return (
-                    <li key={house.id}>
-                      <button
-                        type="button"
-                        onClick={() => openHouse(house)}
-                        className="rounded-[var(--r-xs)] border px-2.5 py-1.5 text-sm font-semibold tabular-nums transition active:scale-95"
-                        style={{
-                          borderColor: active
-                            ? "var(--brand-600)"
-                            : blocked
-                              ? "var(--signal-500)"
-                              : retry
-                                ? "var(--gas-500)"
-                                : "var(--line)",
-                          background: active
-                            ? "color-mix(in srgb, var(--brand-500) 16%, transparent)"
-                            : blocked
-                              ? "color-mix(in srgb, var(--signal-500) 14%, transparent)"
-                              : retry
-                                ? "color-mix(in srgb, var(--gas-500) 14%, transparent)"
-                                : done
-                                  ? "color-mix(in srgb, var(--ink) 7%, transparent)"
-                                  : "var(--card)",
-                          color: blocked
-                            ? "var(--signal-600)"
-                            : done && !active
-                              ? "var(--ink-muted)"
-                              : "var(--ink)",
-                          boxShadow: active ? "0 0 0 1px var(--brand-600)" : undefined,
-                          textDecoration: done && !blocked ? "line-through" : undefined,
-                        }}
-                        title={[
-                          blocked ? "Gesperrt – nicht mehr anlaufen" : null,
-                          mfh ? "Mehrfamilienhaus" : null,
-                          mfh && bells.length > 0
-                            ? `${bellsDone} von ${bells.length} Klingeln`
-                            : null,
-                          retry
-                            ? `${facts.not_home_count}. Versuch von ${MAX_NOT_HOME_ATTEMPTS}`
-                            : null,
-                          wasHere ? `zuletzt: ${wasHere}` : null,
-                          house.units > 1 ? `${house.units} Wohneinheiten` : null,
-                        ]
-                          .filter(Boolean)
-                          .join(" · ") || undefined}
-                        aria-label={`Hausnummer ${house.number}${
-                          blocked ? ", gesperrt" : ""
-                        }${
-                          mfh
-                            ? `, Mehrfamilienhaus mit ${bellsDone} von ${bells.length} erfassten Klingeln`
-                            : retry
-                              ? `, ${facts.not_home_count} von ${MAX_NOT_HOME_ATTEMPTS} Versuchen`
-                              : ""
-                        }${wasHere ? `, zuletzt ${wasHere}` : ""}${
-                          done && !blocked ? ", abgearbeitet" : ""
-                        }`}
-                      >
-                        {house.number}
-                        {badge && (
-                          <span className="ml-1 text-[10px] font-medium opacity-70">{badge}</span>
-                        )}
-                      </button>
-                    </li>
-                  );
-                })}
-              </ul>
-            </div>
-          )}
-        </div>
-
-        {/* Haustyp und Sperre der gewaehlten Nummer. */}
-        {streetId !== null && currentNumber !== "" && (
-          <div
-            className="flex flex-wrap items-center gap-2 border-t px-4 py-2.5"
-            style={{ borderColor: "var(--line)" }}
-          >
-            {currentType === "" ? (
-              <button
-                type="button"
-                onClick={() => setSheet("building")}
-                className="btn btn-ghost btn-sm btn-pill"
-                style={{ borderColor: "var(--brand-400)", color: "var(--brand-600)" }}
-              >
-                <IconBuilding className="h-4 w-4" />
-                Ein- oder Mehrfamilienhaus?
-              </button>
-            ) : (
-              <button
-                type="button"
-                onClick={() => setSheet("building")}
-                className="btn btn-ghost btn-sm btn-pill"
-              >
-                {currentType === "EFH" ? (
-                  <IconHome className="h-4 w-4" />
-                ) : (
-                  <IconBuilding className="h-4 w-4" />
-                )}
-                {currentType === "EFH" ? "Einfamilienhaus" : "Mehrfamilienhaus"}
-                <IconPencil className="muted h-3.5 w-3.5" />
-              </button>
-            )}
-            <span className="flex-1" />
-            {doorLocked ? (
-              isLeader ? (
-                <button
-                  type="button"
-                  onClick={() => void setBlocked(false)}
-                  className="btn btn-ghost btn-sm btn-pill"
-                >
-                  Sperre aufheben
-                </button>
-              ) : null
-            ) : (
-              <button
-                type="button"
-                onClick={() => setSheet("block")}
-                className="btn btn-ghost btn-sm btn-pill"
-                style={{ color: "var(--signal-600)" }}
-              >
-                <IconBan className="h-4 w-4" />
-                Sperren
-              </button>
-            )}
-          </div>
-        )}
-
-        {/* Welche Tür ist gerade gemeint? Im Mehrfamilienhaus die Klingel. */}
-        {currentType === "MFH" && currentNumber && (
-          <button
-            type="button"
-            onClick={() => setSheet("bells")}
-            aria-label={
-              currentBells.length === 0 ? "Klingelschilder anlegen" : "Klingel wechseln"
-            }
-            className="list-row border-t px-4 py-3"
-            style={{
-              borderColor: "var(--line)",
-              background: "color-mix(in srgb, var(--brand-500) 7%, transparent)",
-            }}
-          >
-            <ProgressRing
-              value={doneBellCount}
-              max={Math.max(currentBells.length, 1)}
-              size={40}
-              tone={currentBells.length > 0 && doneBellCount >= currentBells.length ? "success" : "brand"}
-            >
-              {currentBells.length > 0 ? (
-                `${doneBellCount}/${currentBells.length}`
-              ) : (
-                <IconBell className="h-4 w-4" />
-              )}
-            </ProgressRing>
-            <span className="min-w-0 flex-1">
-              <span className="block truncate text-[15px] font-semibold">
-                {activeBell
-                  ? activeBell.label
-                  : currentBells.length === 0
-                    ? "Noch keine Klingelschilder"
-                    : "Keine Klingel gewählt"}
-              </span>
-              <span className="muted block truncate text-[12px]">
-                {activeBell?.floor
-                  ? `${activeBell.floor} · Klingel wechseln`
-                  : currentBells.length === 0
-                    ? "Klingelbrett abtippen oder Anzahl angeben"
-                    : `${currentBells.length - doneBellCount} von ${currentBells.length} noch offen`}
-              </span>
-            </span>
-            <span className="btn btn-ghost btn-sm btn-pill shrink-0" aria-hidden>
-              {currentBells.length === 0 ? "anlegen" : "wechseln"}
-            </span>
-          </button>
-        )}
-
-        {/* Wer war zuletzt hier? Verhindert, dass zwei Leute dieselbe Tür laufen. */}
-        {currentNumber !== "" && !doorLocked && lastAt && (
-          <div
-            className="flex items-start gap-2.5 border-t px-4 py-2.5 text-[12px]"
-            style={{
-              borderColor: "var(--line)",
-              background:
-                currentDoorStatus === "RETRY"
-                  ? "color-mix(in srgb, var(--gas-500) 10%, transparent)"
-                  : "transparent",
-            }}
-          >
-            <span
-              className="tile-icon mt-px h-7 w-7 shrink-0"
-              style={{ background: "color-mix(in srgb, var(--ink) 7%, transparent)" }}
-              aria-hidden
-            >
-              <OutcomeGlyph outcome={lastWhat ?? ""} reasonEmoji={null} className="h-4 w-4" />
-            </span>
-            <span className="min-w-0 flex-1 leading-snug">
-              <span className="block truncate">
-                Zuletzt {lastBy ? <strong>{lastBy}</strong> : "jemand"}, {whenLabel(lastAt)}
-              </span>
-              <span className="muted block truncate">
-                {lastWhat ? OUTCOME_LABEL[lastWhat] : ""}
-                {currentDoorStatus === "RETRY"
-                  ? `${lastWhat ? " · " : ""}${currentDoorFacts.not_home_count}. von ${MAX_NOT_HOME_ATTEMPTS} Versuchen`
-                  : ""}
-              </span>
-            </span>
-          </div>
-        )}
-      </div>
-
-      {/* ============================== Was ist passiert? ===================== */}
-      {doorLocked ? (
-        <div
-          className="card p-5 text-center"
-          style={{
-            borderColor: "color-mix(in srgb, var(--signal-500) 45%, var(--line))",
-            background: "color-mix(in srgb, var(--signal-500) 7%, var(--card))",
-          }}
-        >
-          <span
-            className="tile-icon mx-auto mb-2 h-12 w-12"
-            style={{
-              background: "color-mix(in srgb, var(--signal-500) 15%, transparent)",
-              color: "var(--signal-600)",
-            }}
-            aria-hidden
-          >
-            <IconBan className="h-6 w-6" />
-          </span>
-          <p className="text-[17px] font-bold" style={{ color: "var(--signal-600)" }}>
-            Hier nicht mehr klingeln
-          </p>
-          <p className="muted mx-auto mt-1 max-w-sm text-[12px] leading-relaxed">
-            {blockedBy ? `${blockedBy} hat diese Tür gesperrt.` : "Diese Tür ist gesperrt."} Hier
-            wurde ausdrücklich widersprochen – weiteres Anlaufen wäre rechtlich angreifbar.
-          </p>
-          {isLeader && (
-            <button
-              type="button"
-              className="btn btn-ghost mt-4 w-full"
-              onClick={() => void setBlocked(false)}
-            >
-              Sperre aufheben
-            </button>
-          )}
-        </div>
-      ) : (
-        <div className="card p-4">
-          {/* Produktwahl – gilt für den nächsten Abschluss */}
-          <div className="mb-3.5">
-            <p className="label">Produkt für den Abschluss</p>
-            <Segmented
-              options={PRODUCTS}
-              value={product}
-              onChange={chooseProduct}
-              tone="brand"
-              ariaLabel="Produkt für den Abschluss"
-            />
-          </div>
-
-          {/* Die drei Ergebnisse */}
-          <div className="grid grid-cols-3 gap-2">
-            <OutcomeTile
-              icon={<IconDoor className="h-[22px] w-[22px]" />}
-              label="Nicht angetroffen"
-              tone="neutral"
-              disabled={busy}
-              onClick={() => handleOutcome("NOT_HOME")}
-            />
-            <OutcomeTile
-              icon={<IconPerson className="h-[22px] w-[22px]" />}
-              label="Kein Abschluss"
-              tone="danger"
-              disabled={busy}
-              onClick={() => handleOutcome("MET_NO_SALE")}
-            />
-            <OutcomeTile
-              icon={<IconCalendar className="h-[22px] w-[22px]" />}
-              label="Termin"
-              tone="brand"
-              disabled={busy}
-              onClick={() => handleOutcome("APPOINTMENT")}
-            />
-          </div>
-
-          <button
-            type="button"
-            disabled={busy}
-            onClick={handleSale}
-            className="btn btn-success btn-lg mt-2.5 w-full"
-          >
-            <IconCheck className="h-5 w-5" />
-            Abschluss – Auftrag erfassen
-            <IconArrowRight className="h-[18px] w-[18px]" />
-          </button>
-          <p className="muted mt-2 text-center text-[11px] leading-snug">
-            Öffnet den Tarifrechner des Partners und speichert den Abschluss automatisch.
-          </p>
-
-          {lastVisitId && (
-            <button
-              type="button"
-              onClick={undo}
-              className="btn btn-plain btn-sm mx-auto mt-2 flex"
-            >
-              <IconUndo className="h-4 w-4" />
-              Letzten Eintrag rückgängig machen
-            </button>
-          )}
-        </div>
-      )}
-
-      {/* Letzte Einträge – wartende zuerst */}
-      {(pending.length > 0 || recent.length > 0) && (
-        <div className="card overflow-hidden">
-          <p className="px-4 pb-1.5 pt-3 text-[13px] font-semibold">Zuletzt erfasst</p>
-          <ul>
-            {pending.map((item) => (
-              <li
-                key={item.localId}
-                className="flex items-center gap-2.5 border-t px-4 py-2.5 text-sm"
-                style={{ borderColor: "var(--line)" }}
-              >
-                <span
-                  className="tile-icon h-7 w-7 shrink-0"
-                  style={{
-                    background: "color-mix(in srgb, var(--gas-500) 15%, transparent)",
-                    color: "var(--gas-600)",
-                  }}
-                  aria-hidden
-                >
-                  {item.kind === "house" ? (
-                    <IconBuilding className="h-4 w-4" />
-                  ) : (
-                    <IconClock className="h-4 w-4" />
-                  )}
-                </span>
-                <span className="min-w-0 flex-1 truncate text-[13px]">{item.label}</span>
-                <button
-                  type="button"
-                  onClick={() => removeQueued(item.localId)}
-                  className="muted shrink-0 text-[11px] font-semibold underline"
-                >
-                  verwerfen
-                </button>
-              </li>
-            ))}
-            {recent.map((v) => (
-              <li
-                key={v.id}
-                className="flex items-center gap-2.5 border-t px-4 py-2.5"
-                style={{ borderColor: "var(--line)" }}
-              >
-                <span
-                  className="tile-icon h-7 w-7 shrink-0"
-                  style={{
-                    background: `color-mix(in srgb, ${outcomeColor(v.outcome)} 14%, transparent)`,
-                    color: outcomeColor(v.outcome),
-                  }}
-                  aria-hidden
-                >
-                  <OutcomeGlyph
-                    outcome={v.outcome}
-                    reasonEmoji={v.reason_emoji}
-                    className="h-4 w-4"
-                  />
-                </span>
-                <span className="min-w-0 flex-1 truncate text-[13px]">
-                  {v.street_name ?? "–"} {v.house_number}
-                  {v.reason_label && <span className="muted"> · {v.reason_label}</span>}
-                </span>
-                <span className="muted shrink-0 text-[11px] tabular-nums">
-                  {formatTime(v.created_at)}
-                </span>
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
-
-      {/* ========================== Blatt: Straße wählen ====================== */}
+  const overlays = (
+    <>
+      {/* ========================== Blatt: Straße wählen ==================== */}
       {sheet === "street" && (
         <Sheet
           title="Wo bist du unterwegs?"
@@ -1872,9 +1300,7 @@ export function TourClient({
                   );
                 })}
                 {streetMatches.length === 0 && (
-                  <li className="muted px-4 py-5 text-center text-sm">
-                    Keine Straße gefunden.
-                  </li>
+                  <li className="muted px-4 py-5 text-center text-sm">Keine Straße gefunden.</li>
                 )}
               </ul>
             </>
@@ -1882,422 +1308,13 @@ export function TourClient({
         </Sheet>
       )}
 
-      {/* ======================== Blatt: Ein- oder Mehrfamilienhaus =========== */}
-      {sheet === "building" && (
-        <Sheet
-          title={`${street?.name ?? ""} ${currentNumber}`}
-          subtitle="Was für ein Haus? Einmal festlegen – dann kennt es das ganze Team."
-          onClose={() => setSheet(null)}
-        >
-          <div className="grid grid-cols-2 gap-2.5 pb-2">
-            <button
-              type="button"
-              disabled={busy}
-              onClick={() => void chooseBuildingType("EFH")}
-              className="tap-tile"
-              style={{
-                minHeight: "7.5rem",
-                borderColor: suggestMfh ? undefined : "var(--brand-500)",
-                boxShadow: suggestMfh ? undefined : "0 0 0 1px var(--brand-500)",
-              }}
-            >
-              <span
-                className="tile-icon h-12 w-12"
-                style={{
-                  background: "color-mix(in srgb, var(--brand-500) 12%, transparent)",
-                  color: "var(--brand-600)",
-                }}
-                aria-hidden
-              >
-                <IconHome className="h-6 w-6" />
-              </span>
-              Einfamilienhaus
-            </button>
-            <button
-              type="button"
-              disabled={busy}
-              onClick={() => void chooseBuildingType("MFH")}
-              className="tap-tile"
-              style={{
-                minHeight: "7.5rem",
-                borderColor: suggestMfh ? "var(--brand-500)" : undefined,
-                boxShadow: suggestMfh ? "0 0 0 1px var(--brand-500)" : undefined,
-              }}
-            >
-              <span
-                className="tile-icon h-12 w-12"
-                style={{
-                  background: "color-mix(in srgb, var(--brand-500) 12%, transparent)",
-                  color: "var(--brand-600)",
-                }}
-                aria-hidden
-              >
-                <IconBuilding className="h-6 w-6" />
-              </span>
-              Mehrfamilienhaus
-            </button>
-          </div>
-
-          {suggestMfh && (
-            <div className="mt-3">
-              <Note icon={<IconInfo className="h-4 w-4" />} tone="brand">
-                Die Karte kennt hier {currentHouse?.units} Wohneinheiten – wahrscheinlich ein
-                Mehrfamilienhaus.
-              </Note>
-            </div>
-          )}
-        </Sheet>
-      )}
-
-      {/* ========================== Blatt: Klingelschilder ==================== */}
-      {sheet === "bells" && (
-        <Sheet
-          title="Klingelbrett"
-          subtitle={
-            <>
-              <span className="font-semibold text-[var(--ink)]">
-                {street?.name} {currentNumber}
-              </span>
-              {" · "}
-              {currentBells.length === 0
-                ? "Namen abtippen oder einfach die Anzahl angeben."
-                : bellEdit
-                  ? "Umbenennen, sperren oder entfernen."
-                  : "Klingel antippen, dann unten das Ergebnis erfassen."}
-            </>
-          }
-          onClose={() => {
-            setSheet(null);
-            setEditing(null);
-            setBellEdit(false);
-          }}
-          action={
-            <>
-              <button
-                type="button"
-                onClick={() => setSheet("building")}
-                className="btn btn-ghost btn-sm btn-pill shrink-0"
-              >
-                Haustyp
-              </button>
-              {currentBells.length > 0 && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setBellEdit((value) => !value);
-                    setEditing(null);
-                  }}
-                  aria-pressed={bellEdit}
-                  aria-label="Klingeln bearbeiten"
-                  className="icon-btn shrink-0"
-                  style={
-                    bellEdit
-                      ? {
-                          background: "color-mix(in srgb, var(--brand-500) 16%, transparent)",
-                          color: "var(--brand-600)",
-                        }
-                      : { background: "color-mix(in srgb, var(--ink) 6%, transparent)" }
-                  }
-                >
-                  <IconPencil className="h-4 w-4" />
-                </button>
-              )}
-            </>
-          }
-          footer={
-            <button
-              type="button"
-              className="btn btn-primary w-full"
-              onClick={() => {
-                setSheet(null);
-                setEditing(null);
-                setBellEdit(false);
-              }}
-            >
-              Fertig
-            </button>
-          }
-        >
-          {currentBells.length > 0 && (
-            <div className="inset mb-3 flex items-center gap-3 px-3.5 py-3">
-              <ProgressRing
-                value={doneBellCount}
-                max={currentBells.length}
-                size={44}
-                tone={doneBellCount >= currentBells.length ? "success" : "brand"}
-              >
-                {`${doneBellCount}/${currentBells.length}`}
-              </ProgressRing>
-              <div className="min-w-0 flex-1">
-                <p className="text-[14px] font-semibold">
-                  {currentBells.length - doneBellCount === 0
-                    ? "Haus fertig"
-                    : `Noch ${currentBells.length - doneBellCount} ${
-                        currentBells.length - doneBellCount === 1 ? "Klingel" : "Klingeln"
-                      }`}
-                </p>
-                <p className="muted text-[12px]">
-                  {doneBellCount} von {currentBells.length} erledigt
-                </p>
-              </div>
-            </div>
-          )}
-
-          {currentBells.length > 0 && (
-            <ul className="list mb-4">
-              {currentBells.map((bell, index) => {
-                const bellDone = isBellDone(currentKey, bell);
-                const chosen = bellKey(bell.label) === bellKey(bellLabel);
-                const isNext =
-                  !bellDone && nextOpenBell !== null && bell === nextOpenBell && !chosen;
-                const facts = bellFacts(currentKey, bell);
-                const bellBlocked = Boolean(facts.blocked_at);
-                const retry = doorStatus(facts) === "RETRY";
-                const sub = bellBlocked
-                  ? `gesperrt${bell.blocked_by_name ? ` von ${bell.blocked_by_name}` : ""}`
-                  : bell.last_visit_at
-                    ? [
-                        bell.last_visit_user ?? "",
-                        whenLabel(bell.last_visit_at),
-                        // Kurz halten: Name und Zeitpunkt sind hier wichtiger
-                        // als das Wort "Versuche" - die Zeile ist schmal.
-                        retry ? `${facts.not_home_count}/${MAX_NOT_HOME_ATTEMPTS}` : "",
-                      ]
-                        .filter(Boolean)
-                        .join(" · ")
-                    : "";
-
-                if (editing && bell.id !== null && bell.id === editing.id) {
-                  return (
-                    <li key={`edit-${bell.id}`} className="flex flex-wrap items-center gap-2 p-2.5">
-                      <input
-                        className="input min-w-0 flex-1"
-                        value={editing.label}
-                        onChange={(e) => setEditing({ ...editing, label: e.target.value })}
-                        placeholder="Name"
-                        aria-label="Name auf dem Schild"
-                      />
-                      <input
-                        className="input w-24 shrink-0"
-                        value={editing.floor}
-                        onChange={(e) => setEditing({ ...editing, floor: e.target.value })}
-                        placeholder="Etage"
-                        aria-label="Etage"
-                      />
-                      <button
-                        type="button"
-                        className="btn btn-success btn-sm"
-                        onClick={() => void saveRename()}
-                      >
-                        Sichern
-                      </button>
-                      <button
-                        type="button"
-                        className="btn btn-ghost btn-sm"
-                        onClick={() => setEditing(null)}
-                      >
-                        Zurück
-                      </button>
-                    </li>
-                  );
-                }
-
-                return (
-                  <li
-                    key={bell.id ?? `neu-${bellKey(bell.label)}`}
-                    className="flex items-center gap-0.5 pr-1.5"
-                    style={{
-                      background: chosen
-                        ? "color-mix(in srgb, var(--brand-500) 10%, transparent)"
-                        : bellBlocked
-                          ? "color-mix(in srgb, var(--signal-500) 8%, transparent)"
-                          : undefined,
-                    }}
-                  >
-                    <button
-                      type="button"
-                      onClick={() => chooseBell(bell)}
-                      className="list-row min-w-0 flex-1"
-                      aria-label={`Klingel ${index + 1}, ${bell.label}${
-                        bell.floor ? `, ${bell.floor}` : ""
-                      }${bellDone ? ", schon erfasst" : isNext ? ", hier geht es weiter" : ""}`}
-                    >
-                      {/* Die Nummer vom Klingelbrett - so findet der Daumen
-                          die Zeile wieder, ohne den Namen zu lesen. */}
-                      <span className="muted w-4 shrink-0 text-right text-[11px] tabular-nums">
-                        {index + 1}
-                      </span>
-                      <span
-                        className="tile-icon h-8 w-8 shrink-0"
-                        style={{
-                          background: bellBlocked
-                            ? "color-mix(in srgb, var(--signal-500) 14%, transparent)"
-                            : bellDone
-                              ? `color-mix(in srgb, ${outcomeColor(bell.last_outcome ?? "")} 14%, transparent)`
-                              : "color-mix(in srgb, var(--ink) 7%, transparent)",
-                          color: bellBlocked
-                            ? "var(--signal-600)"
-                            : bellDone
-                              ? outcomeColor(bell.last_outcome ?? "")
-                              : "var(--ink-muted)",
-                        }}
-                        aria-hidden
-                      >
-                        {bellBlocked ? (
-                          <IconBan className="h-4 w-4" />
-                        ) : bellDone ? (
-                          <OutcomeGlyph
-                            outcome={bell.last_outcome ?? ""}
-                            reasonEmoji={bell.last_reason_emoji}
-                            className="h-4 w-4"
-                          />
-                        ) : (
-                          <IconBell className="h-4 w-4" />
-                        )}
-                      </span>
-                      <span className="min-w-0 flex-1">
-                        <span
-                          className="block truncate text-[15px] font-semibold"
-                          style={{
-                            textDecoration: bellDone && !bellBlocked ? "line-through" : undefined,
-                            color: bellBlocked
-                              ? "var(--signal-600)"
-                              : bellDone && !chosen
-                                ? "var(--ink-muted)"
-                                : undefined,
-                          }}
-                        >
-                          {bell.label}
-                        </span>
-                        {sub && <span className="muted block truncate text-[11px]">{sub}</span>}
-                      </span>
-                      {isNext && (
-                        <Pill tone="brand">weiter</Pill>
-                      )}
-                      {bell.floor && (
-                        <span className="muted shrink-0 text-[12px]">{bell.floor}</span>
-                      )}
-                      {chosen && <IconCheck className="h-5 w-5 shrink-0 text-brand-600" />}
-                    </button>
-
-                    {bellEdit && bell.id !== null && (
-                      <button
-                        type="button"
-                        className="icon-btn h-8 w-8 shrink-0"
-                        aria-label={`${bell.label} umbenennen`}
-                        onClick={() =>
-                          setEditing({
-                            id: bell.id as number,
-                            original: bell.label,
-                            label: bell.label,
-                            floor: bell.floor,
-                          })
-                        }
-                      >
-                        <IconPencil className="h-4 w-4" />
-                      </button>
-                    )}
-                    {bellEdit && !bellDone && (
-                      <>
-                        <button
-                          type="button"
-                          className="icon-btn h-8 w-8 shrink-0"
-                          aria-label={`${bell.label} sperren`}
-                          onClick={() => {
-                            setBellLabel(bell.label);
-                            setSheet("block");
-                          }}
-                        >
-                          <IconBan className="h-4 w-4" />
-                        </button>
-                        <button
-                          type="button"
-                          className="icon-btn h-8 w-8 shrink-0"
-                          aria-label={`${bell.label} entfernen`}
-                          onClick={() => void removeBell(bell)}
-                        >
-                          <IconX className="h-4 w-4" />
-                        </button>
-                      </>
-                    )}
-                    {bellBlocked && isLeader && (
-                      <button
-                        type="button"
-                        className="muted shrink-0 px-1.5 py-2 text-[11px] underline"
-                        onClick={() => {
-                          setBellLabel(bell.label);
-                          void setBlocked(false);
-                        }}
-                      >
-                        aufheben
-                      </button>
-                    )}
-                  </li>
-                );
-              })}
-            </ul>
-          )}
-
-          <div className="hairline border-t pt-4">
-            <label className="label" htmlFor="bell-names">
-              Namen vom Klingelbrett
-            </label>
-            <textarea
-              id="bell-names"
-              className="textarea"
-              rows={4}
-              placeholder={"Müller, 2. OG\nSchmidt\nKaya, EG"}
-              value={bellDraft}
-              onChange={(e) => setBellDraft(e.target.value)}
-            />
-            <p className="muted mt-1 text-[11px]">
-              Ein Name pro Zeile. Nach dem Komma darf die Etage stehen.
-            </p>
-            <button
-              type="button"
-              disabled={busy}
-              className="btn btn-primary mt-2 w-full"
-              onClick={submitBellDraft}
-            >
-              <IconPlus className="h-4 w-4" />
-              Schilder anlegen
-            </button>
-
-            <div className="mt-4 flex items-end gap-2">
-              <div className="w-24 shrink-0">
-                <label className="label" htmlFor="bell-count">
-                  Anzahl
-                </label>
-                <input
-                  id="bell-count"
-                  className="input"
-                  inputMode="numeric"
-                  placeholder={suggestMfh ? String(currentHouse?.units) : "6"}
-                  value={bellCount}
-                  onChange={(e) => setBellCount(e.target.value.slice(0, 3))}
-                />
-              </div>
-              <button
-                type="button"
-                disabled={busy}
-                className="btn btn-ghost flex-1"
-                onClick={submitBellCount}
-              >
-                Ohne Namen anlegen
-              </button>
-            </div>
-            <p className="muted mt-1 text-[11px]">
-              Legt „Klingel 1“, „Klingel 2“ … an – Namen kannst du später nachtragen.
-            </p>
-          </div>
-        </Sheet>
-      )}
-
-      {/* ============================ Blatt: Tür sperren ====================== */}
+      {/* ============================ Blatt: Tür sperren ==================== */}
       {sheet === "block" && (
         <Sheet
           title={
-            activeBell ? `„${activeBell.label}“ sperren?` : `${street?.name ?? ""} ${currentNumber} sperren?`
+            activeBell
+              ? `„${activeBell.label}“ sperren?`
+              : `${street?.name ?? ""} ${currentNumber} sperren?`
           }
           subtitle="Gilt fürs ganze Team und dauerhaft – hier klingelt danach niemand mehr."
           onClose={() => {
@@ -2349,7 +1366,7 @@ export function TourClient({
         </Sheet>
       )}
 
-      {/* ========================= Blatt: Termin vereinbaren =================== */}
+      {/* ========================= Blatt: Termin vereinbaren ================= */}
       {sheet === "appointment" && (
         <Sheet
           title="Wann passt es?"
@@ -2480,15 +1497,15 @@ export function TourClient({
         </Sheet>
       )}
 
-      {/* ========================= Blatt: Ablehnungsgrund ===================== */}
+      {/* ========================= Blatt: Ablehnungsgrund =================== */}
       {sheet === "reason" && (
         <Sheet
           title="Warum kein Abschluss?"
           subtitle="Einmal tippen genügt – der Eintrag wird sofort gespeichert."
           onClose={() => setSheet(null)}
         >
-          {/* Zeichen links, Text rechts: so passen zehn Gruende auf einen
-              Blick, ohne dass die Flaeche zum Tippen kleiner wird. */}
+          {/* Zeichen links, Text rechts: so passen alle Gründe auf einen
+              Blick, ohne dass die Fläche zum Tippen kleiner wird. */}
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
             {reasons.map((reason) => (
               <button
@@ -2506,7 +1523,7 @@ export function TourClient({
                 >
                   {reason.emoji || "💬"}
                 </span>
-                <span className="min-w-0 flex-1 leading-tight">{reason.label}</span>
+                <span className="min-w-0 flex-1">{reason.label}</span>
               </button>
             ))}
           </div>
@@ -2526,10 +1543,10 @@ export function TourClient({
         </Sheet>
       )}
 
-      {/* ---------------------------- Rückmeldung ----------------------------- */}
+      {/* ---------------------------- Rückmeldung --------------------------- */}
       {toast && (
         <div
-          className="glass fixed inset-x-0 bottom-[calc(5.5rem+env(safe-area-inset-bottom))] z-40 mx-auto flex w-fit max-w-[92vw] items-center gap-3 rounded-full border py-2 pl-4 pr-2 text-center text-[13px] font-semibold shadow-lg md:bottom-8"
+          className="glass fixed inset-x-0 bottom-[calc(5.5rem+env(safe-area-inset-bottom))] z-40 mx-auto flex w-fit max-w-[92vw] items-center gap-3 rounded-full border py-2 pl-4 pr-2 text-center text-[13px] font-semibold md:bottom-8"
           style={{
             borderColor: "var(--line)",
             boxShadow: "var(--shadow-3)",
@@ -2553,9 +1570,1198 @@ export function TourClient({
           )}
         </div>
       )}
+    </>
+  );
+
+  /* ======================================================================== */
+  /*  Haus-Bildschirm: hier wird geklingelt                                   */
+  /* ======================================================================== */
+
+  if (houseOpen && street && currentNumber) {
+    const houseFace = faceOf(currentHouse?.last_visit_user_id);
+    const houseRetry = currentDoorStatus === "RETRY";
+
+    return (
+      <div className="mx-auto max-w-2xl space-y-3">
+        {/* ------------------------------ Kopfzeile ------------------------- */}
+        <div className="card flex items-center gap-2 p-3">
+          <button
+            type="button"
+            onClick={closeHouse}
+            className="icon-btn -ml-1 shrink-0"
+            aria-label="Zurück zur Straße"
+          >
+            <IconChevronLeft className="h-5 w-5" />
+          </button>
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-[18px] font-bold leading-tight">
+              {street.name} {currentNumber}
+            </p>
+            <p className="muted truncate text-[12px]">
+              {[territory?.name, [territory?.postal_code, territory?.city].filter(Boolean).join(" ")]
+                .filter(Boolean)
+                .join(" · ")}
+            </p>
+          </div>
+          {currentType === "MFH" && currentBells.length > 0 && (
+            <ProgressRing
+              value={doneBellCount}
+              max={currentBells.length}
+              size={42}
+              tone={houseDone ? "success" : "brand"}
+            >
+              {`${doneBellCount}/${currentBells.length}`}
+            </ProgressRing>
+          )}
+        </div>
+
+        {/* --------------------------- Angaben zum Haus --------------------- */}
+        <div className="flex flex-wrap items-center gap-2">
+          {currentType === "" ? (
+            <Pill tone="warn">Haustyp offen</Pill>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setTypeChoice((value) => !value)}
+              aria-pressed={typeChoice}
+              className="btn btn-ghost btn-sm btn-pill"
+              title="Haustyp ändern"
+            >
+              {currentType === "EFH" ? (
+                <IconHome className="h-4 w-4" />
+              ) : (
+                <IconBuilding className="h-4 w-4" />
+              )}
+              {currentType === "EFH" ? "Einfamilienhaus" : "Mehrfamilienhaus"}
+              <IconPencil className="muted h-3.5 w-3.5" />
+            </button>
+          )}
+          {(currentHouse?.units ?? 0) > 1 && (
+            <Pill tone="neutral">{currentHouse?.units} Wohneinheiten</Pill>
+          )}
+          <span className="flex-1" />
+          {currentHouse?.lat != null && currentHouse?.lng != null && (
+            <a
+              href={routeUrl(currentHouse.lat, currentHouse.lng)}
+              target="_blank"
+              rel="noreferrer"
+              className="btn btn-ghost btn-sm btn-pill"
+              style={{ color: "var(--brand-600)" }}
+            >
+              <IconNavigate className="h-4 w-4" />
+              Route
+            </a>
+          )}
+          {!doorLocked && (
+            <button
+              type="button"
+              onClick={() => setSheet("block")}
+              className="btn btn-ghost btn-sm btn-pill"
+              style={{ color: "var(--signal-600)" }}
+            >
+              <IconBan className="h-4 w-4" />
+              Sperren
+            </button>
+          )}
+        </div>
+
+        {/* ---------------------- Haustyp beim ersten Mal ------------------- */}
+        {(currentType === "" || typeChoice) && !doorLocked && (
+          <div className="card rise p-4">
+            <p className="text-[15px] font-semibold">Was für ein Haus ist das?</p>
+            <p className="muted mb-3 text-[12px]">
+              Einmal festlegen – dann kennt es die App für das ganze Team.
+            </p>
+            <div className="grid grid-cols-2 gap-2.5">
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => void chooseBuildingType("EFH")}
+                className="tap-tile"
+                aria-pressed={currentType === "EFH"}
+                style={{
+                  minHeight: "7rem",
+                  borderColor:
+                    currentType === "EFH" || (currentType === "" && !suggestMfh)
+                      ? "var(--brand-500)"
+                      : undefined,
+                  boxShadow:
+                    currentType === "EFH" || (currentType === "" && !suggestMfh)
+                      ? "0 0 0 1px var(--brand-500)"
+                      : undefined,
+                }}
+              >
+                <span
+                  className="tile-icon h-12 w-12"
+                  style={{
+                    background: "color-mix(in srgb, var(--brand-500) 12%, transparent)",
+                    color: "var(--brand-600)",
+                  }}
+                  aria-hidden
+                >
+                  <IconHome className="h-6 w-6" />
+                </span>
+                Einfamilienhaus
+              </button>
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => void chooseBuildingType("MFH")}
+                className="tap-tile"
+                aria-pressed={currentType === "MFH"}
+                style={{
+                  minHeight: "7rem",
+                  borderColor:
+                    currentType === "MFH" || (currentType === "" && suggestMfh)
+                      ? "var(--brand-500)"
+                      : undefined,
+                  boxShadow:
+                    currentType === "MFH" || (currentType === "" && suggestMfh)
+                      ? "0 0 0 1px var(--brand-500)"
+                      : undefined,
+                }}
+              >
+                <span
+                  className="tile-icon h-12 w-12"
+                  style={{
+                    background: "color-mix(in srgb, var(--brand-500) 12%, transparent)",
+                    color: "var(--brand-600)",
+                  }}
+                  aria-hidden
+                >
+                  <IconBuilding className="h-6 w-6" />
+                </span>
+                Mehrfamilienhaus
+              </button>
+            </div>
+            {suggestMfh && (
+              <div className="mt-3">
+                <Note icon={<IconInfo className="h-4 w-4" />} tone="brand">
+                  Die Karte kennt hier {currentHouse?.units} Wohneinheiten – wahrscheinlich ein
+                  Mehrfamilienhaus.
+                </Note>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ------------------------------- gesperrt ------------------------- */}
+        {doorLocked ? (
+          <div
+            className="card p-5 text-center"
+            style={{
+              borderColor: "color-mix(in srgb, var(--signal-500) 45%, var(--line))",
+              background: "color-mix(in srgb, var(--signal-500) 7%, var(--card))",
+            }}
+          >
+            <span
+              className="tile-icon mx-auto mb-2 h-12 w-12"
+              style={{
+                background: "color-mix(in srgb, var(--signal-500) 15%, transparent)",
+                color: "var(--signal-600)",
+              }}
+              aria-hidden
+            >
+              <IconBan className="h-6 w-6" />
+            </span>
+            <p className="text-[17px] font-bold" style={{ color: "var(--signal-600)" }}>
+              Hier nicht mehr klingeln
+            </p>
+            <p className="muted mx-auto mt-1 max-w-sm text-[12px] leading-relaxed">
+              {blockedBy ? `${blockedBy} hat diese Tür gesperrt.` : "Diese Tür ist gesperrt."} Hier
+              wurde ausdrücklich widersprochen – weiteres Anlaufen wäre rechtlich angreifbar.
+            </p>
+            {isLeader && (
+              <button
+                type="button"
+                className="btn btn-ghost mt-4 w-full"
+                onClick={() => void setBlocked(false)}
+              >
+                Sperre aufheben
+              </button>
+            )}
+            <button type="button" className="btn btn-plain mt-1 w-full" onClick={closeHouse}>
+              Zurück zur Straße
+            </button>
+          </div>
+        ) : (
+          <>
+            {/* ====================== Klingelschilder ======================== */}
+            {currentType === "MFH" && (
+              <div className="card overflow-hidden">
+                <div className="flex items-center gap-2 px-4 pb-2 pt-3">
+                  <IconBell className="h-4 w-4 shrink-0 text-brand-600" />
+                  <p className="min-w-0 flex-1 text-[13px] font-semibold">
+                    Klingelschilder{" "}
+                    <span className="muted font-normal tabular-nums">
+                      ({currentBells.length})
+                    </span>
+                  </p>
+                  {currentBells.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setBellEdit((value) => !value);
+                        setEditing(null);
+                      }}
+                      aria-pressed={bellEdit}
+                      aria-label="Klingeln bearbeiten"
+                      className="icon-btn h-8 w-8 shrink-0"
+                      style={
+                        bellEdit
+                          ? {
+                              background: "color-mix(in srgb, var(--brand-500) 16%, transparent)",
+                              color: "var(--brand-600)",
+                            }
+                          : { background: "color-mix(in srgb, var(--ink) 6%, transparent)" }
+                      }
+                    >
+                      <IconPencil className="h-4 w-4" />
+                    </button>
+                  )}
+                </div>
+
+                {currentBells.length === 0 ? (
+                  <p className="muted px-4 pb-4 text-[13px] leading-snug">
+                    Noch keine Schilder angelegt. Unten die Namen vom Klingelbrett abtippen –
+                    oder einfach die Anzahl eintragen.
+                  </p>
+                ) : (
+                  <ul>
+                    {currentBells.map((bell, index) => {
+                      const bellDone = isBellDone(currentKey, bell);
+                      const chosen = bellKey(bell.label) === bellKey(bellLabel);
+                      const isNext =
+                        !bellDone && nextOpenBell !== null && bell === nextOpenBell && !chosen;
+                      const facts = bellFacts(currentKey, bell);
+                      const bellBlocked = Boolean(facts.blocked_at);
+                      const retry = doorStatus(facts) === "RETRY";
+                      const face = faceOf(bell.last_visit_user_id);
+
+                      if (editing && bell.id !== null && bell.id === editing.id) {
+                        return (
+                          <li
+                            key={`edit-${bell.id}`}
+                            className="flex flex-wrap items-center gap-2 border-t p-2.5"
+                            style={{ borderColor: "var(--line)" }}
+                          >
+                            <input
+                              className="input min-w-0 flex-1"
+                              value={editing.label}
+                              onChange={(e) => setEditing({ ...editing, label: e.target.value })}
+                              placeholder="Name"
+                              aria-label="Name auf dem Schild"
+                            />
+                            <input
+                              className="input w-24 shrink-0"
+                              value={editing.floor}
+                              onChange={(e) => setEditing({ ...editing, floor: e.target.value })}
+                              placeholder="Etage"
+                              aria-label="Etage"
+                            />
+                            <button
+                              type="button"
+                              className="btn btn-success btn-sm"
+                              onClick={() => void saveRename()}
+                            >
+                              Sichern
+                            </button>
+                            <button
+                              type="button"
+                              className="btn btn-ghost btn-sm"
+                              onClick={() => setEditing(null)}
+                            >
+                              Zurück
+                            </button>
+                          </li>
+                        );
+                      }
+
+                      return (
+                        <li
+                          key={bell.id ?? `neu-${bellKey(bell.label)}`}
+                          className="flex items-center gap-0.5 border-t pr-1.5"
+                          style={{
+                            borderColor: "var(--line)",
+                            background: chosen
+                              ? "color-mix(in srgb, var(--brand-500) 10%, transparent)"
+                              : bellBlocked
+                                ? "color-mix(in srgb, var(--signal-500) 8%, transparent)"
+                                : undefined,
+                          }}
+                        >
+                          <button
+                            type="button"
+                            onClick={() => chooseBell(bell)}
+                            className="list-row min-w-0 flex-1 py-2.5"
+                            aria-label={`Klingel ${index + 1}, ${bell.label}${
+                              bell.floor ? `, ${bell.floor}` : ""
+                            }${
+                              bell.last_visit_user
+                                ? `, zuletzt ${bell.last_visit_user}, ${whenLabel(bell.last_visit_at)}`
+                                : ", hier war noch niemand"
+                            }${bellDone ? ", schon erfasst" : isNext ? ", hier geht es weiter" : ""}`}
+                          >
+                            {/* Die Nummer vom Klingelbrett - so findet der Daumen
+                                die Zeile wieder, ohne den Namen zu lesen. */}
+                            <span className="muted w-4 shrink-0 text-right text-[11px] tabular-nums">
+                              {index + 1}
+                            </span>
+
+                            {/* Das Gesicht des Kollegen, der hier zuletzt geklingelt
+                                hat. Ohne Eintrag steht dort das Klingelsymbol. */}
+                            <span className="relative shrink-0" aria-hidden>
+                              {face ? (
+                                <Avatar name={face.name} src={face.avatar} size={38} />
+                              ) : (
+                                <span
+                                  className="tile-icon h-[38px] w-[38px]"
+                                  style={{
+                                    background: bellBlocked
+                                      ? "color-mix(in srgb, var(--signal-500) 14%, transparent)"
+                                      : "color-mix(in srgb, var(--ink) 7%, transparent)",
+                                    color: bellBlocked
+                                      ? "var(--signal-600)"
+                                      : "var(--ink-muted)",
+                                  }}
+                                >
+                                  {bellBlocked ? (
+                                    <IconBan className="h-[18px] w-[18px]" />
+                                  ) : (
+                                    <IconBell className="h-[18px] w-[18px]" />
+                                  )}
+                                </span>
+                              )}
+                              {(bell.last_outcome || bellBlocked) && (
+                                <span
+                                  className="absolute -bottom-0.5 -right-0.5 grid h-[17px] w-[17px] place-items-center rounded-full border-2 text-white"
+                                  style={{
+                                    background: bellBlocked
+                                      ? "var(--signal-600)"
+                                      : outcomeColor(bell.last_outcome ?? ""),
+                                    borderColor: "var(--card)",
+                                  }}
+                                >
+                                  {bellBlocked ? (
+                                    <IconBan className="h-2.5 w-2.5" />
+                                  ) : (
+                                    <OutcomeGlyph
+                                      outcome={bell.last_outcome ?? ""}
+                                      reasonEmoji={null}
+                                      className="h-2.5 w-2.5"
+                                    />
+                                  )}
+                                </span>
+                              )}
+                            </span>
+
+                            <span className="min-w-0 flex-1">
+                              <span
+                                className="block truncate text-[15px] font-semibold"
+                                style={{
+                                  textDecoration:
+                                    bellDone && !bellBlocked ? "line-through" : undefined,
+                                  color: bellBlocked
+                                    ? "var(--signal-600)"
+                                    : bellDone && !chosen
+                                      ? "var(--ink-muted)"
+                                      : undefined,
+                                }}
+                              >
+                                {bell.label}
+                              </span>
+                              <span className="muted block truncate text-[11px]">
+                                {bellBlocked
+                                  ? `gesperrt${
+                                      bell.blocked_by_name ? ` von ${bell.blocked_by_name}` : ""
+                                    }`
+                                  : bell.last_visit_at
+                                    ? [
+                                        bell.last_visit_user ?? "jemand",
+                                        whenLabel(bell.last_visit_at),
+                                        retry
+                                          ? `${facts.not_home_count}/${MAX_NOT_HOME_ATTEMPTS}`
+                                          : "",
+                                      ]
+                                        .filter(Boolean)
+                                        .join(" · ")
+                                    : "noch niemand hier"}
+                              </span>
+                            </span>
+
+                            {bell.floor && (
+                              <span className="muted shrink-0 text-[12px]">{bell.floor}</span>
+                            )}
+                            {isNext && <Pill tone="brand">weiter</Pill>}
+                            {chosen ? (
+                              <IconCheck className="h-5 w-5 shrink-0 text-brand-600" />
+                            ) : (
+                              <IconChevronRight className="h-4 w-4 shrink-0 opacity-25" />
+                            )}
+                          </button>
+
+                          {bellEdit && bell.id !== null && (
+                            <button
+                              type="button"
+                              className="icon-btn h-8 w-8 shrink-0"
+                              aria-label={`${bell.label} umbenennen`}
+                              onClick={() =>
+                                setEditing({
+                                  id: bell.id as number,
+                                  original: bell.label,
+                                  label: bell.label,
+                                  floor: bell.floor,
+                                })
+                              }
+                            >
+                              <IconPencil className="h-4 w-4" />
+                            </button>
+                          )}
+                          {bellEdit && !bellDone && (
+                            <>
+                              <button
+                                type="button"
+                                className="icon-btn h-8 w-8 shrink-0"
+                                aria-label={`${bell.label} sperren`}
+                                onClick={() => {
+                                  setBellLabel(bell.label);
+                                  setSheet("block");
+                                }}
+                              >
+                                <IconBan className="h-4 w-4" />
+                              </button>
+                              <button
+                                type="button"
+                                className="icon-btn h-8 w-8 shrink-0"
+                                aria-label={`${bell.label} entfernen`}
+                                onClick={() => void removeBell(bell)}
+                              >
+                                <IconX className="h-4 w-4" />
+                              </button>
+                            </>
+                          )}
+                          {bellBlocked && isLeader && (
+                            <button
+                              type="button"
+                              className="muted shrink-0 px-1.5 py-2 text-[11px] underline"
+                              onClick={() => {
+                                setBellLabel(bell.label);
+                                void setBlocked(false);
+                              }}
+                            >
+                              aufheben
+                            </button>
+                          )}
+                        </li>
+                      );
+                    })}
+                  </ul>
+                )}
+
+                {/* ---------------------- Schilder nachtragen --------------- */}
+                <div className="border-t" style={{ borderColor: "var(--line)" }}>
+                  <button
+                    type="button"
+                    onClick={() => setAddBellsOpen((value) => !value)}
+                    aria-expanded={addBellsOpen}
+                    className="list-row w-full px-4 py-2.5 text-[13px] font-semibold text-brand-600"
+                  >
+                    <IconPlus className="h-4 w-4" />
+                    <span className="flex-1">Schilder anlegen</span>
+                    <IconChevronDown
+                      className={`h-4 w-4 transition-transform ${addBellsOpen ? "rotate-180" : ""}`}
+                    />
+                  </button>
+
+                  {addBellsOpen && (
+                    <div className="rise px-4 pb-4">
+                      <label className="label" htmlFor="bell-names">
+                        Namen vom Klingelbrett
+                      </label>
+                      <textarea
+                        id="bell-names"
+                        className="textarea"
+                        rows={4}
+                        placeholder={"Müller, 2. OG\nSchmidt\nKaya, EG"}
+                        value={bellDraft}
+                        onChange={(e) => setBellDraft(e.target.value)}
+                      />
+                      <p className="muted mt-1 text-[11px]">
+                        Ein Name pro Zeile. Nach dem Komma darf die Etage stehen.
+                      </p>
+                      <button
+                        type="button"
+                        disabled={busy}
+                        className="btn btn-primary mt-2 w-full"
+                        onClick={submitBellDraft}
+                      >
+                        <IconPlus className="h-4 w-4" />
+                        Schilder anlegen
+                      </button>
+
+                      <div className="mt-4 flex items-end gap-2">
+                        <div className="w-24 shrink-0">
+                          <label className="label" htmlFor="bell-count">
+                            Anzahl
+                          </label>
+                          <input
+                            id="bell-count"
+                            className="input"
+                            inputMode="numeric"
+                            placeholder={suggestMfh ? String(currentHouse?.units) : "6"}
+                            value={bellCount}
+                            onChange={(e) => setBellCount(e.target.value.slice(0, 3))}
+                          />
+                        </div>
+                        <button
+                          type="button"
+                          disabled={busy}
+                          className="btn btn-ghost flex-1"
+                          onClick={submitBellCount}
+                        >
+                          Ohne Namen anlegen
+                        </button>
+                      </div>
+                      <p className="muted mt-1 text-[11px]">
+                        Legt „Klingel 1“, „Klingel 2“ … an – Namen kannst du später nachtragen.
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* ========================== Einfamilienhaus ==================== */}
+            {currentType === "EFH" && (
+              <div className="card p-4">
+                <div className="flex items-center gap-3">
+                  <span className="relative shrink-0" aria-hidden>
+                    {houseFace ? (
+                      <Avatar name={houseFace.name} src={houseFace.avatar} size={44} />
+                    ) : (
+                      <span
+                        className="tile-icon h-11 w-11"
+                        style={{
+                          background: "color-mix(in srgb, var(--ink) 7%, transparent)",
+                          color: "var(--ink-muted)",
+                        }}
+                      >
+                        <IconDoor className="h-5 w-5" />
+                      </span>
+                    )}
+                    {lastWhat && (
+                      <span
+                        className="absolute -bottom-0.5 -right-0.5 grid h-[18px] w-[18px] place-items-center rounded-full border-2 text-white"
+                        style={{
+                          background: outcomeColor(lastWhat),
+                          borderColor: "var(--card)",
+                        }}
+                      >
+                        <OutcomeGlyph
+                          outcome={lastWhat}
+                          reasonEmoji={null}
+                          className="h-2.5 w-2.5"
+                        />
+                      </span>
+                    )}
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-[15px] font-semibold">Haustür</p>
+                    <p className="muted text-[12px] leading-snug">
+                      {lastAt
+                        ? `Zuletzt ${lastBy ?? "jemand"}, ${whenLabel(lastAt)}${
+                            lastWhat ? ` · ${OUTCOME_LABEL[lastWhat]}` : ""
+                          }`
+                        : "Hier war noch niemand."}
+                    </p>
+                  </div>
+                  {houseRetry && (
+                    <Pill tone="warn">
+                      {currentDoorFacts.not_home_count}/{MAX_NOT_HOME_ATTEMPTS} Versuche
+                    </Pill>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* ============================ Haus fertig ====================== */}
+            {houseDone && (
+              <div
+                className="card rise p-4 text-center"
+                style={{
+                  borderColor: "color-mix(in srgb, var(--energy-500) 45%, var(--line))",
+                  background: "color-mix(in srgb, var(--energy-500) 7%, var(--card))",
+                }}
+              >
+                <span
+                  className="tile-icon mx-auto mb-2 h-11 w-11"
+                  style={{
+                    background: "color-mix(in srgb, var(--energy-500) 16%, transparent)",
+                    color: "var(--energy-700)",
+                  }}
+                  aria-hidden
+                >
+                  <IconCheck className="h-5 w-5" />
+                </span>
+                <p className="text-[16px] font-bold" style={{ color: "var(--energy-700)" }}>
+                  Haus fertig
+                </p>
+                <p className="muted mt-0.5 text-[12px]">
+                  {currentType === "MFH"
+                    ? "Alle Klingeln sind erfasst."
+                    : "Diese Tür ist abgearbeitet."}
+                </p>
+                <button type="button" className="btn btn-ghost mt-3 w-full" onClick={closeHouse}>
+                  <IconChevronLeft className="h-4 w-4" />
+                  Zurück zur Straße
+                  {nextOpenNumber ? ` · weiter mit Nr. ${nextOpenNumber}` : ""}
+                </button>
+              </div>
+            )}
+
+            {/* ========================= Ergebnis erfassen =================== */}
+            {currentType !== "" && (
+              <div className="card p-4">
+                {currentType === "MFH" && !activeBell ? (
+                  <Note icon={<IconBell className="h-4 w-4" />} tone="brand">
+                    {currentBells.length === 0
+                      ? "Erst die Klingelschilder anlegen – danach wird hier erfasst."
+                      : "Tippe oben die Klingel an, an der du stehst. Dann erscheinen hier die Ergebnisse."}
+                  </Note>
+                ) : (
+                  <>
+                    {/* An welcher Tür stehe ich gerade? */}
+                    <div className="mb-3 flex items-center gap-2.5">
+                      <span
+                        className="tile-icon h-9 w-9 shrink-0"
+                        style={{
+                          background: "color-mix(in srgb, var(--brand-500) 12%, transparent)",
+                          color: "var(--brand-600)",
+                        }}
+                        aria-hidden
+                      >
+                        {activeBell ? (
+                          <IconBell className="h-[18px] w-[18px]" />
+                        ) : (
+                          <IconDoor className="h-[18px] w-[18px]" />
+                        )}
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-[15px] font-semibold">
+                          {activeBell ? activeBell.label : "Haustür"}
+                        </p>
+                        <p className="muted truncate text-[11px]">
+                          {street.name} {currentNumber}
+                          {activeBell?.floor ? ` · ${activeBell.floor}` : ""}
+                        </p>
+                      </div>
+                      {currentDoorStatus === "RETRY" && (
+                        <Pill tone="warn">
+                          {currentDoorFacts.not_home_count}/{MAX_NOT_HOME_ATTEMPTS}
+                        </Pill>
+                      )}
+                    </div>
+
+                    <div className="mb-3.5">
+                      <p className="label">Produkt für den Abschluss</p>
+                      <Segmented
+                        options={PRODUCTS}
+                        value={product}
+                        onChange={chooseProduct}
+                        tone="brand"
+                        ariaLabel="Produkt für den Abschluss"
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-2">
+                      <OutcomeTile
+                        icon={<IconDoor className="h-[22px] w-[22px]" />}
+                        label="Nicht angetroffen"
+                        tone="neutral"
+                        disabled={busy}
+                        onClick={() => handleOutcome("NOT_HOME")}
+                      />
+                      <OutcomeTile
+                        icon={<IconPerson className="h-[22px] w-[22px]" />}
+                        label="Kein Abschluss"
+                        tone="danger"
+                        disabled={busy}
+                        onClick={() => handleOutcome("MET_NO_SALE")}
+                      />
+                      <OutcomeTile
+                        icon={<IconCalendar className="h-[22px] w-[22px]" />}
+                        label="Termin"
+                        tone="brand"
+                        disabled={busy}
+                        onClick={() => handleOutcome("APPOINTMENT")}
+                      />
+                    </div>
+
+                    <button
+                      type="button"
+                      disabled={busy}
+                      onClick={handleSale}
+                      className="btn btn-success btn-lg mt-2.5 w-full"
+                    >
+                      <IconCheck className="h-5 w-5" />
+                      Abschluss – Auftrag erfassen
+                      <IconArrowRight className="h-[18px] w-[18px]" />
+                    </button>
+                    <p className="muted mt-2 text-center text-[11px] leading-snug">
+                      Öffnet den Tarifrechner des Partners und speichert den Abschluss
+                      automatisch.
+                    </p>
+
+                    {lastVisitId && (
+                      <button
+                        type="button"
+                        onClick={undo}
+                        className="btn btn-plain btn-sm mx-auto mt-2 flex"
+                      >
+                        <IconUndo className="h-4 w-4" />
+                        Letzten Eintrag rückgängig machen
+                      </button>
+                    )}
+                  </>
+                )}
+              </div>
+            )}
+          </>
+        )}
+
+        {overlays}
+      </div>
+    );
+  }
+
+  /* ======================================================================== */
+  /*  Straßen-Bildschirm: wo bin ich, und welches Haus kommt als Nächstes     */
+  /* ======================================================================== */
+
+  return (
+    <div className="mx-auto max-w-2xl space-y-3">
+      {/* ---------------------------- Netz & Puffer ------------------------- */}
+      {(!online || pending.length > 0) && (
+        <div
+          className="card rise flex items-center gap-3 px-3.5 py-2.5"
+          style={{ borderColor: "color-mix(in srgb, var(--gas-500) 45%, var(--line))" }}
+        >
+          <span
+            className="tile-icon h-9 w-9"
+            style={{
+              background: "color-mix(in srgb, var(--gas-500) 16%, transparent)",
+              color: "var(--gas-600)",
+            }}
+            aria-hidden
+          >
+            {online ? <IconCloudUp className="h-5 w-5" /> : <IconOffline className="h-5 w-5" />}
+          </span>
+          <div className="min-w-0 flex-1">
+            <p className="text-[13px] font-semibold leading-tight">
+              {pending.length > 0
+                ? `${pending.length} ${pending.length === 1 ? "Eintrag wartet" : "Einträge warten"}`
+                : "Kein Netz"}
+            </p>
+            <p className="muted text-[11px] leading-tight">
+              Erfassen geht weiter – die App sendet alles automatisch nach.
+            </p>
+          </div>
+          {pending.length > 0 && online && (
+            <button type="button" onClick={sendPendingNow} className="btn btn-ghost btn-sm shrink-0">
+              Jetzt senden
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* ------------------------------ Tagesstand -------------------------- */}
+      <StatGroup
+        items={[
+          { label: "Türen heute", value: todayTotals.doors ?? 0 },
+          {
+            label: "Angetroffen",
+            value: todayTotals.met ?? 0,
+            tone: "brand",
+            hint: todayTotals.doors
+              ? `${Math.round(((todayTotals.met ?? 0) / todayTotals.doors) * 100)} % Quote`
+              : undefined,
+          },
+          { label: "Abschlüsse", value: todayTotals.sales ?? 0, tone: "success" },
+        ]}
+      />
+
+      {/* Termine, die heute anstehen - der Rueckweg gehoert an den Anfang. */}
+      {dueAppointments.length > 0 && (
+        <div className="card overflow-hidden">
+          <div className="flex items-center gap-2 px-4 pb-2 pt-3">
+            <IconCalendar className="h-4 w-4 text-brand-600" />
+            <p className="flex-1 text-[13px] font-semibold">
+              {dueAppointments.length === 1 ? "1 Termin" : `${dueAppointments.length} Termine`}{" "}
+              heute
+            </p>
+            <Link
+              href="/termine"
+              className="shrink-0 text-[12px] font-semibold text-brand-600 hover:underline"
+            >
+              Alle Termine
+            </Link>
+          </div>
+          <ul>
+            {dueAppointments.slice(0, 3).map((item) => {
+              const late = slotOverdue(item.follow_up_at, now ?? undefined);
+              return (
+                <li
+                  key={item.id}
+                  className="flex items-center gap-1 border-t"
+                  style={{ borderColor: "var(--line)" }}
+                >
+                  <button
+                    type="button"
+                    onClick={() => goToAppointment(item)}
+                    className="list-row min-w-0 flex-1"
+                  >
+                    <span
+                      className="shrink-0 rounded-lg px-2 py-1 text-[12px] font-bold tabular-nums"
+                      style={{
+                        background: late
+                          ? "color-mix(in srgb, var(--signal-500) 15%, transparent)"
+                          : "color-mix(in srgb, var(--brand-500) 14%, transparent)",
+                        color: late ? "var(--signal-600)" : "var(--brand-600)",
+                      }}
+                    >
+                      {slotLabel(item.follow_up_at, now ?? undefined)}
+                    </span>
+                    {/* Der Name steht vorn: die Strasse kennt man, den Kunden
+                        muss man wiedererkennen. */}
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-[14px] font-medium">
+                        {item.contact_name || "Termin"}
+                      </span>
+                      <span className="muted block truncate text-[12px]">
+                        {item.street_name ?? ""} {item.house_number}
+                        {item.doorbell_label ? ` · ${item.doorbell_label}` : ""}
+                      </span>
+                    </span>
+                    <IconChevronRight className="h-4 w-4 shrink-0 opacity-35" />
+                  </button>
+                  {item.contact_phone && (
+                    <a
+                      href={`tel:${item.contact_phone.replace(/[^+\d]/g, "")}`}
+                      className="icon-btn mr-2 shrink-0"
+                      style={{ color: "var(--brand-600)" }}
+                      aria-label={`${item.contact_name || "Kunde"} anrufen`}
+                    >
+                      <IconPhone className="h-[18px] w-[18px]" />
+                    </a>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      )}
+
+      {/* ============================ Straße und Haus ======================= */}
+      <div className="card overflow-hidden">
+        <div className="flex items-center gap-1 pr-2">
+          <button
+            type="button"
+            onClick={() => {
+              setStreetQuery("");
+              setSheet("street");
+            }}
+            className="list-row min-w-0 flex-1 px-4 py-3"
+          >
+            <span
+              className="tile-icon h-10 w-10 shrink-0"
+              style={{
+                background: "color-mix(in srgb, var(--brand-500) 13%, transparent)",
+                color: "var(--brand-600)",
+              }}
+              aria-hidden
+            >
+              <IconMap />
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="block truncate text-[16px] font-semibold">
+                {street ? street.name : "Straße wählen"}
+              </span>
+              <span className="muted block truncate text-[12px]">
+                {territory
+                  ? [territory.name, [territory.postal_code, territory.city].filter(Boolean).join(" ")]
+                      .filter(Boolean)
+                      .join(" · ")
+                  : "Gebiet wählen"}
+              </span>
+            </span>
+            {street && street.visit_count > 0 && (
+              <Pill tone="neutral">
+                <span className="tabular-nums">{street.visit_count}</span> Türen
+              </Pill>
+            )}
+            <IconChevronDown className="muted h-4 w-4 shrink-0" />
+          </button>
+          {/* Kommt die Strasse aus der Kartenauswahl, fuehrt der Pfeil direkt hin. */}
+          {street?.lat != null && street?.lng != null && (
+            <a
+              href={routeUrl(street.lat, street.lng)}
+              target="_blank"
+              rel="noreferrer"
+              className="icon-btn shrink-0"
+              style={{ color: "var(--brand-600)" }}
+              title={`Route zur ${street.name}`}
+              aria-label={`Route zur ${street.name}`}
+            >
+              <IconNavigate className="h-[18px] w-[18px]" />
+            </a>
+          )}
+        </div>
+
+        {/* Hausnummer eintippen und öffnen */}
+        <div className="border-t px-4 py-3.5" style={{ borderColor: "var(--line)" }}>
+          <label className="label" htmlFor="house">
+            Hausnummer
+          </label>
+          <div className="flex gap-2">
+            <input
+              id="house"
+              className="input text-[22px] font-bold tabular-nums"
+              inputMode="numeric"
+              autoComplete="off"
+              placeholder="12a"
+              value={houseNumber}
+              onChange={(e) => setHouseNumber(e.target.value.slice(0, 12))}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && streetId && houseNumber.trim()) {
+                  e.preventDefault();
+                  openTypedHouse();
+                }
+              }}
+              enterKeyHint="go"
+              disabled={!streetId}
+            />
+            <button
+              type="button"
+              className="btn btn-primary shrink-0 px-5"
+              disabled={!streetId || !currentNumber}
+              onClick={openTypedHouse}
+            >
+              Öffnen
+              <IconArrowRight className="h-4 w-4" />
+            </button>
+          </div>
+
+          {!streetId && (
+            <p className="muted mt-2 text-[11px]">
+              Wähle oben zuerst die Straße – danach zählt die App die Häuser mit.
+            </p>
+          )}
+
+          {houses.length > 0 && (
+            <div className="mt-3">
+              <div className="mb-1.5 flex items-center gap-2">
+                <p className="muted flex-1 text-[11px] font-semibold tabular-nums">
+                  {openHouses} von {houses.length} Häusern offen
+                </p>
+                {nextOpenNumber && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const next = houses.find((house) => !isDone(house));
+                      if (next) openHouse(next);
+                    }}
+                    className="badge"
+                    style={{
+                      background: "color-mix(in srgb, var(--brand-500) 14%, transparent)",
+                      color: "var(--brand-600)",
+                    }}
+                  >
+                    nächste offene · {nextOpenNumber}
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => setOnlyOpen((value) => !value)}
+                  className="badge"
+                  aria-pressed={onlyOpen}
+                  style={{
+                    background: onlyOpen
+                      ? "color-mix(in srgb, var(--brand-500) 14%, transparent)"
+                      : "color-mix(in srgb, var(--ink) 7%, transparent)",
+                    color: onlyOpen ? "var(--brand-600)" : "var(--ink-muted)",
+                  }}
+                >
+                  nur offene
+                </button>
+              </div>
+              <ul className="flex max-h-32 flex-wrap gap-1.5 overflow-y-auto pb-0.5">
+                {shownHouses.map((house) => {
+                  const done = isDone(house);
+                  const active = sameNumber(house.number, houseNumber);
+                  const key = doneKey(house.street_id, house.number);
+                  const mfh = typeOf(house) === "MFH";
+                  const bells = mfh ? bellsOf(key, house.id) : [];
+                  const bellsDone = bells.filter((bell) => isBellDone(key, bell)).length;
+                  const facts = factsOf(key, house);
+                  const blocked = Boolean(facts.blocked_at);
+                  // Gelb heisst: hier war schon jemand, aber es ist noch offen.
+                  const retry = !blocked && !mfh && doorStatus(facts) === "RETRY";
+                  const badge = blocked
+                    ? "🚫"
+                    : mfh
+                      ? bells.length > 0
+                        ? `${bellsDone}/${bells.length}`
+                        : "🔔"
+                      : retry
+                        ? `${facts.not_home_count}/${MAX_NOT_HOME_ATTEMPTS}`
+                        : "";
+                  const wasHere = house.last_visit_user
+                    ? `${house.last_visit_user}, ${whenLabel(house.last_visit_at)}`
+                    : "";
+                  return (
+                    <li key={house.id}>
+                      <button
+                        type="button"
+                        onClick={() => openHouse(house)}
+                        className="rounded-[var(--r-xs)] border px-2.5 py-1.5 text-sm font-semibold tabular-nums transition active:scale-95"
+                        style={{
+                          borderColor: active
+                            ? "var(--brand-600)"
+                            : blocked
+                              ? "var(--signal-500)"
+                              : retry
+                                ? "var(--gas-500)"
+                                : "var(--line)",
+                          background: active
+                            ? "color-mix(in srgb, var(--brand-500) 16%, transparent)"
+                            : blocked
+                              ? "color-mix(in srgb, var(--signal-500) 14%, transparent)"
+                              : retry
+                                ? "color-mix(in srgb, var(--gas-500) 14%, transparent)"
+                                : done
+                                  ? "color-mix(in srgb, var(--ink) 7%, transparent)"
+                                  : "var(--card)",
+                          color: blocked
+                            ? "var(--signal-600)"
+                            : done && !active
+                              ? "var(--ink-muted)"
+                              : "var(--ink)",
+                          boxShadow: active ? "0 0 0 1px var(--brand-600)" : undefined,
+                          textDecoration: done && !blocked ? "line-through" : undefined,
+                        }}
+                        title={[
+                          blocked ? "Gesperrt – nicht mehr anlaufen" : null,
+                          mfh ? "Mehrfamilienhaus" : null,
+                          mfh && bells.length > 0
+                            ? `${bellsDone} von ${bells.length} Klingeln`
+                            : null,
+                          retry
+                            ? `${facts.not_home_count}. Versuch von ${MAX_NOT_HOME_ATTEMPTS}`
+                            : null,
+                          wasHere ? `zuletzt: ${wasHere}` : null,
+                          house.units > 1 ? `${house.units} Wohneinheiten` : null,
+                        ]
+                          .filter(Boolean)
+                          .join(" · ") || undefined}
+                        aria-label={`Hausnummer ${house.number} öffnen${
+                          blocked ? ", gesperrt" : ""
+                        }${
+                          mfh
+                            ? `, Mehrfamilienhaus mit ${bellsDone} von ${bells.length} erfassten Klingeln`
+                            : retry
+                              ? `, ${facts.not_home_count} von ${MAX_NOT_HOME_ATTEMPTS} Versuchen`
+                              : ""
+                        }${wasHere ? `, zuletzt ${wasHere}` : ""}${
+                          done && !blocked ? ", abgearbeitet" : ""
+                        }`}
+                      >
+                        {house.number}
+                        {badge && (
+                          <span className="ml-1 text-[10px] font-medium opacity-70">{badge}</span>
+                        )}
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Letzte Einträge – wartende zuerst */}
+      {(pending.length > 0 || recent.length > 0) && (
+        <div className="card overflow-hidden">
+          <p className="px-4 pb-1.5 pt-3 text-[13px] font-semibold">Zuletzt erfasst</p>
+          <ul>
+            {pending.map((item) => (
+              <li
+                key={item.localId}
+                className="flex items-center gap-2.5 border-t px-4 py-2.5 text-sm"
+                style={{ borderColor: "var(--line)" }}
+              >
+                <span
+                  className="tile-icon h-7 w-7 shrink-0"
+                  style={{
+                    background: "color-mix(in srgb, var(--gas-500) 15%, transparent)",
+                    color: "var(--gas-600)",
+                  }}
+                  aria-hidden
+                >
+                  {item.kind === "house" ? (
+                    <IconBuilding className="h-4 w-4" />
+                  ) : (
+                    <IconClock className="h-4 w-4" />
+                  )}
+                </span>
+                <span className="min-w-0 flex-1 truncate text-[13px]">{item.label}</span>
+                <button
+                  type="button"
+                  onClick={() => removeQueued(item.localId)}
+                  className="muted shrink-0 text-[11px] font-semibold underline"
+                >
+                  verwerfen
+                </button>
+              </li>
+            ))}
+            {recent.map((v) => (
+              <li
+                key={v.id}
+                className="flex items-center gap-2.5 border-t px-4 py-2.5"
+                style={{ borderColor: "var(--line)" }}
+              >
+                <span
+                  className="tile-icon h-7 w-7 shrink-0"
+                  style={{
+                    background: `color-mix(in srgb, ${outcomeColor(v.outcome)} 14%, transparent)`,
+                    color: outcomeColor(v.outcome),
+                  }}
+                  aria-hidden
+                >
+                  <OutcomeGlyph
+                    outcome={v.outcome}
+                    reasonEmoji={v.reason_emoji}
+                    className="h-4 w-4"
+                  />
+                </span>
+                <span className="min-w-0 flex-1 truncate text-[13px]">
+                  {v.street_name ?? "–"} {v.house_number}
+                  {v.reason_label && <span className="muted"> · {v.reason_label}</span>}
+                </span>
+                <span className="muted shrink-0 text-[11px] tabular-nums">
+                  {formatTime(v.created_at)}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {overlays}
     </div>
   );
 }
+
 
 /** Eine der drei Ergebnis-Kacheln an der Tuer. */
 function OutcomeTile({

@@ -12,7 +12,16 @@ export interface User {
   role: Role;
   phone: string | null;
   active: number;
+  /** Profilbild als Data-URL, "" wenn keines hinterlegt ist. */
+  avatar: string;
   created_at: string;
+}
+
+/** Nur das, was die Oberflaeche von einem Kollegen braucht: Name und Bild. */
+export interface TeamFace {
+  id: number;
+  name: string;
+  avatar: string;
 }
 
 export interface Territory {
