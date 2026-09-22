@@ -96,61 +96,6 @@ export interface RejectionReason {
   active: number;
 }
 
-/** Wo ein Auftrag in der Nachbearbeitung steht. */
-export type OrderStatus =
-  | "ERFASST"
-  | "QUALITY_CALL"
-  | "EINGEREICHT"
-  | "BESTAETIGT"
-  | "STORNIERT"
-  | "WIDERRUFEN";
-
-/**
- * Ein an der Tuer aufgenommener Auftrag.
- *
- * Die Felder bilden ab, was fuer einen Energieliefervertrag gebraucht wird:
- * Kunde, Produkt, Zaehler und Verbrauch, bisheriger Anbieter, Wunschtermin -
- * dazu die Nachweise aus dem Gespraech (Unterschrift, Widerrufsbelehrung).
- */
-export interface Order {
-  id: number;
-  team_id: number;
-  user_id: number;
-  /** Vom Geraet vergeben, damit ein nachgesendeter Auftrag nicht doppelt entsteht. */
-  client_ref: string;
-  visit_id: number | null;
-  territory_id: number | null;
-  street_id: number | null;
-  street_name: string;
-  house_number: string;
-  doorbell_label: string;
-  postal_code: string;
-  city: string;
-  customer_name: string;
-  customer_phone: string;
-  customer_email: string;
-  energy_type: "STROM" | "GAS" | "BEIDES";
-  tariff: string;
-  previous_provider: string;
-  meter_strom: string;
-  meter_gas: string;
-  /** Jahresverbrauch in kWh, 0 = nicht erfasst. */
-  usage_strom: number;
-  usage_gas: number;
-  start_date: string | null;
-  note: string;
-  /** Unterschrift des Kunden als PNG-Daten-URL. */
-  signature: string;
-  signed_at: string | null;
-  withdrawal_given: number;
-  privacy_given: number;
-  status: OrderStatus;
-  status_note: string;
-  status_by: number | null;
-  status_at: string | null;
-  created_at: string;
-}
-
 export interface Visit {
   id: number;
   team_id: number;

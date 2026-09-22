@@ -6,12 +6,11 @@ import {
   listAppointments,
   listTerritories,
   memberStats,
-  orderTotals,
   reasonStats,
-  salesWithoutOrder,
   totals,
 } from "@/lib/queries";
 import { DailyBars, ReasonBars } from "@/components/charts";
+import { parseSlot } from "@/lib/appointments";
 import { PageHeader, StatTile, StatusBadge, percent } from "@/components/ui";
 
 export const dynamic = "force-dynamic";
@@ -30,11 +29,9 @@ export default async function StartPage() {
   const reasons = reasonStats(user.team_id, weekAgo);
   const territories = listTerritories(user.team_id);
 
-  // Nacharbeit: was an Auftraegen und Terminen offen ist, gehoert ins Dashboard -
-  // ein Auftrag ohne Bestaetigungsanruf wird sonst schlicht vergessen.
-  const orders = orderTotals(user.team_id, { since: weekAgo });
-  const missingOrders = salesWithoutOrder(user.team_id, { since: weekAgo });
-  const openAppointments = listAppointments(user.team_id, { limit: 100 }).length;
+  // Termine gehoeren ins Dashboard: ein Termin, den niemand mehr sieht,
+  // verfaellt - und mit ihm die beste Tuer der Woche.
+  const appointments = listAppointments(user.team_id, { limit: 100 });
 
   const open = territories.filter((t) => t.status === "OPEN");
   const unassigned = territories.filter((t) => !t.assigned_user_id);
@@ -118,24 +115,33 @@ export default async function StartPage() {
 
         <section className="card p-4">
           <div className="mb-3 flex items-center justify-between">
-            <h2 className="text-sm font-semibold">Nacharbeit (7 Tage)</h2>
-            <Link href="/auftraege" className="text-xs font-semibold text-brand-600">
-              Aufträge →
+            <h2 className="text-sm font-semibold">Offene Termine ({appointments.length})</h2>
+            <Link href="/termine" className="text-xs font-semibold text-brand-600">
+              Alle Termine →
             </Link>
           </div>
-          <div className="grid grid-cols-3 gap-2">
-            {/* Ohne Zusatzzeile: auf 360 px stehen hier drei Kacheln nebeneinander. */}
-            <StatTile label="Wartet auf Anruf" value={orders.waiting_call ?? 0} tone="warn" />
-            <StatTile label="Bestätigt" value={orders.confirmed ?? 0} tone="success" />
-            <StatTile label="Offene Termine" value={openAppointments} tone="brand" />
-          </div>
-          {missingOrders > 0 && (
-            <p className="mt-3 text-xs font-medium" style={{ color: "var(--gas-600)" }}>
-              {missingOrders === 1
-                ? "1 Abschluss ohne Auftragsdaten"
-                : `${missingOrders} Abschlüsse ohne Auftragsdaten`}{" "}
-              – ohne Kundendaten und Unterschrift wird daraus kein Vertrag.
+          {appointments.length === 0 ? (
+            <p className="muted text-sm">
+              Kein offener Termin. Termine entstehen an der Tür über „Termin vereinbart“.
             </p>
+          ) : (
+            <ul className="space-y-1.5">
+              {appointments.slice(0, 6).map((item) => (
+                <li key={item.id} className="flex items-center gap-2 text-sm">
+                  <span className="muted w-28 shrink-0 text-xs tabular-nums">
+                    {slotStamp(item.follow_up_at)}
+                  </span>
+                  <span className="min-w-0 flex-1 truncate">
+                    {item.contact_name || "Ohne Namen"}
+                    <span className="muted">
+                      {" · "}
+                      {item.street_name ?? ""} {item.house_number}
+                    </span>
+                  </span>
+                  <span className="muted shrink-0 truncate text-xs">{item.user_name}</span>
+                </li>
+              ))}
+            </ul>
           )}
         </section>
 
@@ -178,4 +184,22 @@ export default async function StartPage() {
       </div>
     </div>
   );
+}
+
+/**
+ * "Di, 22.09. · 18:00" aus der gespeicherten Ortszeit.
+ *
+ * Bewusst ohne "heute"/"morgen": auf dem Server ist nicht sicher, welcher Tag
+ * beim Team gerade ist - an der Tuer und auf der Terminseite macht das die
+ * Uhr des Geraets.
+ */
+function slotStamp(slot: string): string {
+  const date = parseSlot(slot);
+  if (!date) return slot;
+  const weekday = date.toLocaleDateString("de-DE", { weekday: "short" });
+  const day = date.toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit" });
+  const time = `${String(date.getHours()).padStart(2, "0")}:${String(
+    date.getMinutes(),
+  ).padStart(2, "0")}`;
+  return `${weekday}, ${day} · ${time}`;
 }

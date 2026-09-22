@@ -59,10 +59,10 @@ export function IconLogout({ className = base }: IconProps) {
     </svg>
   );
 }
-export function IconDoc({ className = base }: IconProps) {
+export function IconCalendar({ className = base }: IconProps) {
   return (
     <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M14 3H7a1 1 0 0 0-1 1v16a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1V7l-4-4Z" /><path d="M14 3v4h4" /><path d="M9 13h6" /><path d="M9 17h4" />
+      <rect x="3" y="5" width="18" height="16" rx="2" /><path d="M8 3v4" /><path d="M16 3v4" /><path d="M3 10h18" /><path d="M8 14h3" />
     </svg>
   );
 }

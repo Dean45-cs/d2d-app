@@ -16,6 +16,7 @@ import type { BuildingType, RejectionReason, VisitOutcome } from "@/lib/types";
 import { BUILDING_TYPE_LABEL, OUTCOME_LABEL } from "@/lib/types";
 import {
   bellKey,
+  hasNamedBells,
   numberedBells,
   parseDoorbellLines,
   type DoorbellInput,
@@ -29,7 +30,6 @@ import {
 } from "@/lib/doors";
 import { IconArrowRight, IconCheck } from "@/components/icons";
 import { StatTile } from "@/components/ui";
-import { SignaturePad } from "@/components/SignaturePad";
 import {
   normalizeSlot,
   quickSlots,
@@ -40,7 +40,6 @@ import {
   slotTime,
   slotToday,
 } from "@/lib/appointments";
-import { orderProblems } from "@/lib/orders";
 import { readDraft, writeDraft, type LocalVisits } from "@/lib/tour-draft";
 import {
   enqueue,
@@ -95,8 +94,8 @@ const NEW_BELL = {
 } as const;
 
 type SaveResult =
-  | { status: "saved"; id: number; nextBell: string | null }
-  | { status: "queued"; nextBell: string | null }
+  | { status: "saved"; id: number; nextBell: string | null; pickBell?: boolean }
+  | { status: "queued"; nextBell: string | null; pickBell?: boolean }
   | { status: "error" };
 
 interface Props {
@@ -113,44 +112,6 @@ interface Props {
   appointments: AppointmentRow[];
   tarifrechnerUrl: string;
 }
-
-/** Die Auftragsdaten, so wie sie im Sheet stehen - alles als Text. */
-interface OrderForm {
-  /** Vom Geraet vergeben, sobald das Sheet aufgeht. */
-  ref: string;
-  customerName: string;
-  customerPhone: string;
-  customerEmail: string;
-  tariff: string;
-  previousProvider: string;
-  meterStrom: string;
-  meterGas: string;
-  usageStrom: string;
-  usageGas: string;
-  startDate: string;
-  note: string;
-  signature: string;
-  withdrawalGiven: boolean;
-  privacyGiven: boolean;
-}
-
-const EMPTY_ORDER: OrderForm = {
-  ref: "",
-  customerName: "",
-  customerPhone: "",
-  customerEmail: "",
-  tariff: "",
-  previousProvider: "",
-  meterStrom: "",
-  meterGas: "",
-  usageStrom: "",
-  usageGas: "",
-  startDate: "",
-  note: "",
-  signature: "",
-  withdrawalGiven: false,
-  privacyGiven: false,
-};
 
 const PRODUCTS: Array<{ value: EnergyType; label: string }> = [
   { value: "STROM", label: "Strom" },
@@ -179,7 +140,7 @@ export function TourClient({
   const [houseNumber, setHouseNumber] = useState("");
   const [product, setProduct] = useState<EnergyType>("BEIDES");
   const [sheet, setSheet] = useState<
-    null | "reason" | "building" | "bells" | "block" | "appointment" | "order"
+    null | "reason" | "building" | "bells" | "block" | "appointment"
   >(null);
   const [note, setNote] = useState("");
   /** Name der gerade gewaehlten Klingel - leer im Einfamilienhaus. */
@@ -191,9 +152,6 @@ export function TourClient({
   const [slot, setSlot] = useState("");
   const [contactName, setContactName] = useState("");
   const [contactPhone, setContactPhone] = useState("");
-  /** Auftrag an der Tuer - erst im Sheet, dann in einem Zug gespeichert. */
-  const [order, setOrder] = useState<OrderForm>(EMPTY_ORDER);
-  const [orderMore, setOrderMore] = useState(false);
   const [editing, setEditing] = useState<
     { id: number; original: string; label: string; floor: string } | null
   >(null);
@@ -493,9 +451,17 @@ export function TourClient({
     currentBells.find((bell) => bellKey(bell.label) === bellKey(bellLabel)) ?? null;
   /** Kennt die Karte mehrere Wohneinheiten, ist Mehrfamilienhaus das Naheliegende. */
   const suggestMfh = (currentHouse?.units ?? 0) > 1;
-  /** Die Klingel, bei der es weitergeht - im Sheet hervorgehoben. */
-  const nextOpenBell =
-    currentBells.find((bell) => !isBellDone(currentKey, bell)) ?? null;
+  /** Stehen am Brett Namen statt "Klingel 1, 2, 3 ..."? */
+  const namedBells = hasNamedBells(currentBells.map((bell) => bell.label));
+  /*
+   * Die Klingel, bei der es weitergeht - im Sheet hervorgehoben.
+   *
+   * Nur bei durchnummerierten Schildern: wo Namen stehen, weiss die App nicht,
+   * wo der Verkaeufer gerade klingelt, und darf auch nichts vorschlagen.
+   */
+  const nextOpenBell = namedBells
+    ? null
+    : (currentBells.find((bell) => !isBellDone(currentKey, bell)) ?? null);
 
   /** Stand der Tuer, an der man gerade steht - Haus oder gewaehlte Klingel. */
   const currentHouseFacts: DoorFacts = currentKey
@@ -818,11 +784,11 @@ export function TourClient({
       followUpAt?: string;
       contactName?: string;
       contactPhone?: string;
-      /** Auftragsdaten - fahren beim Abschluss im selben Aufruf mit. */
-      order?: Record<string, unknown>;
     } = {},
   ): Promise<SaveResult> {
     const bell = activeBell;
+    /* Echte Namen am Brett? Dann gehoert jeder Eintrag ausdruecklich zugeordnet. */
+    const named = hasNamedBells(currentBells.map((item) => item.label));
     const payload = {
       territoryId,
       streetId,
@@ -836,7 +802,6 @@ export function TourClient({
       followUpAt: extra.followUpAt ?? "",
       contactName: extra.contactName ?? "",
       contactPhone: extra.contactPhone ?? "",
-      ...(extra.order ? { order: extra.order } : {}),
       lat: position?.lat ?? null,
       lng: position?.lng ?? null,
     };
@@ -864,26 +829,38 @@ export function TourClient({
     };
 
     /*
-     * Im Treppenhaus klingelt man sich durch: die naechste offene Klingel wird
-     * gleich vorgewaehlt. Erst wenn keine mehr offen ist, ist das Haus durch
-     * und das Feld wird wie gewohnt frei.
+     * Im Treppenhaus klingelt man sich durch. Wie es weitergeht, haengt am
+     * Klingelbrett:
+     *
+     *  - Stehen dort Namen, waehlt die App nichts vor. Geklingelt wird in der
+     *    Reihenfolge, die man vorfindet - ein Eintrag beim falschen Namen
+     *    waere schlimmer als ein Tipp mehr. Die Liste geht deshalb wieder auf.
+     *  - Bei "Klingel 1, 2, 3 ..." aus der Schnellanlage sagt die Reihenfolge
+     *    nichts aus, da springt die App wie gehabt zur naechsten offenen.
+     *
+     * Erst wenn keine Klingel mehr offen ist, ist das Haus durch und das Feld
+     * wird frei.
      */
-    const advance = (): string | null => {
+    const advance = (): { nextBell: string | null; pickBell: boolean } => {
       setNote("");
       if (bell) {
-        const next =
-          currentBells.find(
-            (other) =>
-              bellKey(other.label) !== bellKey(bell.label) && !isBellDone(currentKey, other),
-          ) ?? null;
-        if (next) {
-          setBellLabel(next.label);
-          return next.label;
+        const open = currentBells.filter(
+          (other) =>
+            bellKey(other.label) !== bellKey(bell.label) && !isBellDone(currentKey, other),
+        );
+        if (open.length > 0) {
+          if (named) {
+            setBellLabel("");
+            setSheet("bells");
+            return { nextBell: null, pickBell: true };
+          }
+          setBellLabel(open[0].label);
+          return { nextBell: open[0].label, pickBell: false };
         }
       }
       setHouseNumber("");
       setBellLabel("");
-      return null;
+      return { nextBell: null, pickBell: false };
     };
 
     setBusy(true);
@@ -900,9 +877,9 @@ export function TourClient({
       }
       setLastVisitId(data.id);
       markDone(false);
-      const nextBell = advance();
+      const { nextBell, pickBell } = advance();
       router.refresh();
-      return { status: "saved", id: data.id as number, nextBell };
+      return { status: "saved", id: data.id as number, nextBell, pickBell };
     } catch {
       // Kein Netz: Eintrag lokal puffern, damit nichts verloren geht.
       const label = [
@@ -911,15 +888,14 @@ export function TourClient({
         bell ? `· ${bell.label}` : "",
         "·",
         OUTCOME_LABEL[outcome],
-        extra.order ? `· Auftrag ${String(extra.order.customerName ?? "")}` : "",
       ]
         .filter(Boolean)
         .join(" ");
       enqueue(label, payload);
       setLastVisitId(null);
       markDone(true);
-      const nextBell = advance();
-      return { status: "queued", nextBell };
+      const { nextBell, pickBell } = advance();
+      return { status: "queued", nextBell, pickBell };
     } finally {
       setBusy(false);
     }
@@ -931,7 +907,11 @@ export function TourClient({
       result.status === "saved"
         ? savedText
         : "Kein Netz – gespeichert, wird automatisch nachgesendet";
-    const text = result.nextBell ? `${base} · weiter mit ${result.nextBell}` : base;
+    const text = result.nextBell
+      ? `${base} · weiter mit ${result.nextBell}`
+      : result.pickBell
+        ? `${base} · nächste Klingel wählen`
+        : base;
     // Rueckgaengig nur, wenn der Server den Eintrag bestaetigt hat - ohne ID
     // gibt es nichts zu loeschen.
     setToastState({ text, undo: result.status === "saved" });
@@ -1003,80 +983,34 @@ export function TourClient({
     setContactPhone("");
   }
 
-  /* -------------------------------- Auftrag ------------------------------- */
-
-  /** Abschluss: erst der Auftrag, dann der Eintrag - beides in einem Zug. */
-  function openOrder() {
-    if (bellMissing()) return;
-    setOrder({
-      ...EMPTY_ORDER,
-      ref: newClientRef(),
-      // Der Name vom Klingelschild ist fast immer der des Kunden.
-      customerName: activeBell?.label ?? "",
-    });
-    setOrderMore(false);
-    setSheet("order");
-  }
+  /* -------------------------------- Abschluss ----------------------------- */
 
   /**
-   * Auftrag speichern.
+   * Abschluss: der Tarifrechner des Partners wird SOFORT beim Tippen geoeffnet
+   * (sonst blockt der Browser das Fenster), gespeichert wird parallel.
    *
-   * Der Tarifrechner des Partners wird - wenn gewuenscht - SOFORT beim Tippen
-   * geoeffnet, sonst blockt der Browser das Fenster.
+   * Der Auftrag selbst entsteht dort - Kundendaten, Widerrufsbelehrung und
+   * Unterschrift gehoeren in den Tarifrechner, nicht ein zweites Mal hierher.
    */
-  async function submitOrder(withCalculator: boolean) {
-    const problems = orderProblems({
-      customerName: order.customerName,
-      customerPhone: order.customerPhone,
-      signature: order.signature,
-      withdrawalGiven: order.withdrawalGiven,
-      privacyGiven: order.privacyGiven,
-    });
-    if (problems.length > 0) {
-      setToast(problems[0]);
-      return;
-    }
-
-    const win = withCalculator
-      ? window.open(tarifrechnerUrl, "_blank", "noopener,noreferrer")
-      : null;
-
-    const result = await save("SALE", {
-      order: {
-        clientRef: order.ref,
-        customerName: order.customerName.trim(),
-        customerPhone: order.customerPhone.trim(),
-        customerEmail: order.customerEmail.trim(),
-        energyType: product,
-        tariff: order.tariff.trim(),
-        previousProvider: order.previousProvider.trim(),
-        meterStrom: order.meterStrom.trim(),
-        meterGas: order.meterGas.trim(),
-        usageStrom: order.usageStrom,
-        usageGas: order.usageGas,
-        startDate: order.startDate,
-        note: order.note.trim(),
-        signature: order.signature,
-        withdrawalGiven: order.withdrawalGiven,
-        privacyGiven: order.privacyGiven,
-      },
-    });
-    if (result.status === "error") return;
-
-    setSheet(null);
-    setOrder(EMPTY_ORDER);
-    report(result, `Auftrag für ${order.customerName.trim()} gespeichert`);
-    if (withCalculator && !win) window.location.href = tarifrechnerUrl;
-  }
-
-  /** Abschluss ohne Auftragsdaten - zaehlt mit, aber ohne Unterlagen. */
-  async function saleWithoutOrder() {
+  async function handleSale() {
+    // Vor dem Fenster pruefen: ein geoeffneter Tarifrechner ohne Eintrag
+    // waere das Schlimmste, was hier passieren kann.
     if (bellMissing()) return;
+
+    /*
+     * Ohne "noopener" geoeffnet, damit window.open das Fenster zurueckgibt -
+     * mit der Angabe liefert es laut Standard immer null, und die App waere
+     * dem Ersatzweg unten hinterhergesprungen, obwohl der Tarifrechner schon
+     * offen ist. Die Verbindung wird gleich danach gekappt, damit die fremde
+     * Seite die Tour nicht fernsteuern kann.
+     */
+    const win = window.open(tarifrechnerUrl, "_blank");
+    if (win) win.opener = null;
+
     const result = await save("SALE");
-    if (result.status === "error") return;
-    setSheet(null);
-    setOrder(EMPTY_ORDER);
-    report(result, "Abschluss gezählt – Auftragsdaten fehlen noch");
+    report(result, "Abschluss gespeichert – viel Erfolg bei der Erfassung!");
+    // Hat der Browser das Fenster blockiert, geht es eben hier weiter.
+    if (!win) window.location.href = tarifrechnerUrl;
   }
 
   async function handleReason(reason: RejectionReason) {
@@ -1188,7 +1122,7 @@ export function TourClient({
               📅 {dueAppointments.length === 1 ? "1 Termin" : `${dueAppointments.length} Termine`}{" "}
               heute
             </p>
-            <Link href="/auftraege" className="shrink-0 text-xs font-semibold text-brand-600">
+            <Link href="/termine" className="shrink-0 text-xs font-semibold text-brand-600">
               alle →
             </Link>
           </div>
@@ -1664,16 +1598,15 @@ export function TourClient({
         <button
           type="button"
           disabled={busy}
-          onClick={openOrder}
+          onClick={handleSale}
           className="btn btn-success mt-2 w-full py-5 text-lg"
         >
           <IconCheck />
-          Abschluss – Auftrag aufnehmen
+          Abschluss – zur Auftragserfassung
           <IconArrowRight />
         </button>
         <p className="muted mt-2 text-center text-[11px]">
-          Kundendaten, Unterschrift und Widerrufsbelehrung – danach öffnet der
-          Tarifrechner des Partners.
+          Öffnet den Tarifrechner des Partners und speichert den Abschluss automatisch.
         </p>
           </>
         )}
@@ -1865,9 +1798,9 @@ export function TourClient({
                       ? [
                           bell.last_visit_user ?? "",
                           whenLabel(bell.last_visit_at),
-                          retry
-                            ? `${facts.not_home_count}/${MAX_NOT_HOME_ATTEMPTS} Versuche`
-                            : "",
+                          // Kurz halten: Name und Zeitpunkt sind hier wichtiger
+                          // als das Wort "Versuche" - die Zeile ist schmal.
+                          retry ? `${facts.not_home_count}/${MAX_NOT_HOME_ATTEMPTS}` : "",
                         ]
                           .filter(Boolean)
                           .join(" · ")
@@ -2306,306 +2239,6 @@ export function TourClient({
         </div>
       )}
 
-      {/* Bottom-Sheet: Auftrag aufnehmen */}
-      {sheet === "order" && (
-        <div
-          className="fixed inset-0 z-30 flex items-end bg-black/45 md:items-center md:justify-center"
-          onClick={() => setSheet(null)}
-        >
-          <div
-            className="max-h-[92dvh] w-full overflow-y-auto rounded-t-3xl bg-[var(--card)] p-5 pb-[max(2rem,env(safe-area-inset-bottom))] md:max-w-lg md:rounded-3xl"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="mb-4">
-              <h2 className="text-base font-bold">Auftrag aufnehmen</h2>
-              <p className="muted text-xs">
-                {street?.name} {currentNumber}
-                {activeBell ? ` · ${activeBell.label}` : ""}
-                {territory?.postal_code || territory?.city
-                  ? ` · ${territory?.postal_code ?? ""} ${territory?.city ?? ""}`.trimEnd()
-                  : ""}
-              </p>
-            </div>
-
-            <div className="mb-3">
-              <p className="label">Produkt</p>
-              <div className="grid grid-cols-3 gap-2">
-                {PRODUCTS.map((p) => (
-                  <button
-                    key={p.value}
-                    type="button"
-                    onClick={() => chooseProduct(p.value)}
-                    className={`rounded-xl border px-2 py-2 text-sm font-semibold transition ${
-                      product === p.value
-                        ? "border-transparent bg-brand-600 text-white"
-                        : "hairline border"
-                    }`}
-                  >
-                    {p.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div className="mb-3">
-              <label className="label" htmlFor="order-name">
-                Kunde
-              </label>
-              <input
-                id="order-name"
-                className="input"
-                autoComplete="off"
-                placeholder="Vor- und Nachname"
-                value={order.customerName}
-                onChange={(e) =>
-                  setOrder({ ...order, customerName: e.target.value.slice(0, 120) })
-                }
-              />
-            </div>
-
-            <div className="mb-3 flex gap-2">
-              <div className="min-w-0 flex-1">
-                <label className="label" htmlFor="order-phone">
-                  Telefon
-                </label>
-                <input
-                  id="order-phone"
-                  className="input"
-                  inputMode="tel"
-                  autoComplete="off"
-                  value={order.customerPhone}
-                  onChange={(e) =>
-                    setOrder({ ...order, customerPhone: e.target.value.slice(0, 40) })
-                  }
-                />
-              </div>
-              <div className="min-w-0 flex-1">
-                <label className="label" htmlFor="order-mail">
-                  E-Mail
-                </label>
-                <input
-                  id="order-mail"
-                  className="input"
-                  inputMode="email"
-                  autoComplete="off"
-                  value={order.customerEmail}
-                  onChange={(e) =>
-                    setOrder({ ...order, customerEmail: e.target.value.slice(0, 120) })
-                  }
-                />
-              </div>
-            </div>
-
-            <button
-              type="button"
-              onClick={() => setOrderMore((v) => !v)}
-              className="muted mb-3 w-full text-left text-xs font-semibold underline"
-            >
-              {orderMore ? "Weitere Angaben ausblenden" : "Zähler, Verbrauch, Anbieter …"}
-            </button>
-
-            {orderMore && (
-              <div className="mb-3 rounded-xl border p-3 hairline">
-                <div className="flex gap-2">
-                  <div className="min-w-0 flex-1">
-                    <label className="label" htmlFor="order-usage-strom">
-                      Strom kWh/Jahr
-                    </label>
-                    <input
-                      id="order-usage-strom"
-                      className="input"
-                      inputMode="numeric"
-                      value={order.usageStrom}
-                      onChange={(e) =>
-                        setOrder({ ...order, usageStrom: e.target.value.slice(0, 7) })
-                      }
-                    />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <label className="label" htmlFor="order-usage-gas">
-                      Gas kWh/Jahr
-                    </label>
-                    <input
-                      id="order-usage-gas"
-                      className="input"
-                      inputMode="numeric"
-                      value={order.usageGas}
-                      onChange={(e) =>
-                        setOrder({ ...order, usageGas: e.target.value.slice(0, 7) })
-                      }
-                    />
-                  </div>
-                </div>
-
-                <div className="mt-3 flex gap-2">
-                  <div className="min-w-0 flex-1">
-                    <label className="label" htmlFor="order-meter-strom">
-                      Zähler Strom
-                    </label>
-                    <input
-                      id="order-meter-strom"
-                      className="input"
-                      autoComplete="off"
-                      value={order.meterStrom}
-                      onChange={(e) =>
-                        setOrder({ ...order, meterStrom: e.target.value.slice(0, 40) })
-                      }
-                    />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <label className="label" htmlFor="order-meter-gas">
-                      Zähler Gas
-                    </label>
-                    <input
-                      id="order-meter-gas"
-                      className="input"
-                      autoComplete="off"
-                      value={order.meterGas}
-                      onChange={(e) =>
-                        setOrder({ ...order, meterGas: e.target.value.slice(0, 40) })
-                      }
-                    />
-                  </div>
-                </div>
-
-                <div className="mt-3">
-                  <label className="label" htmlFor="order-provider">
-                    Bisheriger Anbieter
-                  </label>
-                  <input
-                    id="order-provider"
-                    className="input"
-                    autoComplete="off"
-                    value={order.previousProvider}
-                    onChange={(e) =>
-                      setOrder({ ...order, previousProvider: e.target.value.slice(0, 120) })
-                    }
-                  />
-                </div>
-
-                <div className="mt-3 flex gap-2">
-                  <div className="min-w-0 flex-1">
-                    <label className="label" htmlFor="order-tariff">
-                      Tarif
-                    </label>
-                    <input
-                      id="order-tariff"
-                      className="input"
-                      autoComplete="off"
-                      value={order.tariff}
-                      onChange={(e) =>
-                        setOrder({ ...order, tariff: e.target.value.slice(0, 120) })
-                      }
-                    />
-                  </div>
-                  <div className="w-44 shrink-0">
-                    <label className="label" htmlFor="order-start">
-                      Lieferbeginn
-                    </label>
-                    <input
-                      id="order-start"
-                      type="date"
-                      className="input"
-                      value={order.startDate}
-                      onChange={(e) => setOrder({ ...order, startDate: e.target.value })}
-                    />
-                  </div>
-                </div>
-
-                <div className="mt-3">
-                  <label className="label" htmlFor="order-note">
-                    Notiz
-                  </label>
-                  <input
-                    id="order-note"
-                    className="input"
-                    placeholder="z. B. Zählerstand 12345"
-                    value={order.note}
-                    onChange={(e) => setOrder({ ...order, note: e.target.value.slice(0, 500) })}
-                  />
-                </div>
-              </div>
-            )}
-
-            {/* Pflichtteil: ohne diese drei Punkte ist der Auftrag nicht sauber. */}
-            <div className="mb-3 space-y-2">
-              <label className="flex items-start gap-2.5 text-sm">
-                <input
-                  type="checkbox"
-                  className="mt-0.5 h-5 w-5 shrink-0 accent-[var(--brand-600)]"
-                  checked={order.withdrawalGiven}
-                  onChange={(e) => setOrder({ ...order, withdrawalGiven: e.target.checked })}
-                />
-                <span>
-                  Widerrufsbelehrung ausgehändigt und erklärt
-                  <span className="muted block text-[11px]">
-                    14 Tage Widerrufsrecht ab heute – das gilt an der Haustür immer.
-                  </span>
-                </span>
-              </label>
-              <label className="flex items-start gap-2.5 text-sm">
-                <input
-                  type="checkbox"
-                  className="mt-0.5 h-5 w-5 shrink-0 accent-[var(--brand-600)]"
-                  checked={order.privacyGiven}
-                  onChange={(e) => setOrder({ ...order, privacyGiven: e.target.checked })}
-                />
-                <span>
-                  Datenschutzhinweis übergeben
-                  <span className="muted block text-[11px]">
-                    Der Kunde weiß, wofür seine Daten erfasst werden.
-                  </span>
-                </span>
-              </label>
-            </div>
-
-            <div className="mb-4">
-              <p className="label">Unterschrift des Kunden</p>
-              <SignaturePad
-                value={order.signature}
-                onChange={(signature) => setOrder((prev) => ({ ...prev, signature }))}
-              />
-            </div>
-
-            <button
-              type="button"
-              disabled={busy}
-              className="btn btn-success w-full py-4 text-base"
-              onClick={() => void submitOrder(true)}
-            >
-              <IconCheck />
-              Auftrag speichern & Tarifrechner
-              <IconArrowRight />
-            </button>
-            <button
-              type="button"
-              disabled={busy}
-              className="btn btn-ghost mt-2 w-full"
-              onClick={() => void submitOrder(false)}
-            >
-              Nur speichern – Tarifrechner später
-            </button>
-            <div className="mt-3 flex items-center justify-between gap-3">
-              <button
-                type="button"
-                className="muted text-xs font-semibold underline"
-                onClick={() => setSheet(null)}
-              >
-                Abbrechen
-              </button>
-              <button
-                type="button"
-                disabled={busy}
-                className="muted text-xs font-semibold underline"
-                onClick={() => void saleWithoutOrder()}
-              >
-                Abschluss ohne Auftragsdaten zählen
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* Bottom-Sheet: Ablehnungsgrund */}
       {sheet === "reason" && (
         <div
@@ -2681,23 +2314,6 @@ export function TourClient({
 }
 
 const EMPTY_VISITS: Map<string, LocalVisits> = new Map();
-
-/**
- * Kennung fuer einen Auftrag, vom Geraet vergeben.
- *
- * Sie entsteht, sobald das Auftrags-Sheet aufgeht, und faehrt durch die
- * Warteschlange mit: egal wie oft der Eintrag nachgesendet wird, der Server
- * legt daraus genau einen Auftrag an.
- */
-function newClientRef(): string {
-  const raw =
-    typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
-      ? crypto.randomUUID()
-      : `${Date.now()}-${Math.random().toString(36).slice(2)}-${Math.random()
-          .toString(36)
-          .slice(2)}`;
-  return raw.replace(/[^A-Za-z0-9_-]/g, "");
-}
 
 /** Schluessel einer einzelnen Klingel in den Merklisten dieser Sitzung. */
 function bellSlot(houseKey: string, label: string): string {
