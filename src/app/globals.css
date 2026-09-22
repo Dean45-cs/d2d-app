@@ -28,34 +28,87 @@
   --color-signal-500: var(--signal-500);
   --color-signal-600: var(--signal-600);
 
-  --font-sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue",
-    Arial, sans-serif;
+  /* Die Systemschrift des Geraets: auf dem iPhone SF Pro, auf Android Roboto.
+     Nichts sieht auf einem Telefon so selbstverstaendlich aus wie seine
+     eigene Schrift. */
+  --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display",
+    "Segoe UI Variable Text", "Segoe UI", Roboto, "Helvetica Neue", Arial,
+    system-ui, sans-serif;
 }
 
+/* ==========================================================================
+   Grundwerte der Oberflaeche
+   ========================================================================== */
+
 :root {
-  --surface: #f4f7fb;
+  --surface: #eff2f7;
+  --surface-sunken: #e6eaf1;
   --card: #ffffff;
-  --ink: #0f172a;
-  --ink-muted: #5b6b82;
-  --line: #e2e8f0;
+  --card-inset: #f5f7fa;
+  --ink: #0b1524;
+  --ink-2: #33465f;
+  --ink-muted: #6b7f99;
+  --line: #e3e8ef;
+  --line-strong: #d2dae4;
+  --scrim: rgb(9 16 27 / 0.42);
+  --glass: rgb(255 255 255 / 0.74);
+
+  /* Radien - eine Leiter, keine Zufallswerte */
+  --r-xs: 0.5rem;
+  --r-sm: 0.75rem;
+  --r-md: 0.9375rem;
+  --r-lg: 1.25rem;
+  --r-xl: 1.75rem;
+
+  /* Schatten: knapper Kontaktschatten plus weiche Tiefe */
+  --shadow-1: 0 1px 1px rgb(11 21 36 / 0.04), 0 1px 3px rgb(11 21 36 / 0.06);
+  --shadow-2: 0 1px 2px rgb(11 21 36 / 0.05), 0 6px 18px -8px rgb(11 21 36 / 0.22);
+  --shadow-3: 0 2px 4px rgb(11 21 36 / 0.06), 0 18px 40px -16px rgb(11 21 36 / 0.32);
+  --shadow-sheet: 0 -8px 40px -12px rgb(11 21 36 / 0.35);
+
+  /* Bewegung im Tonfall von iOS: schnell anlaufen, weich auslaufen */
+  --ease-spring: cubic-bezier(0.32, 0.72, 0, 1);
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --surface: #0a1526;
-    --card: #101f36;
+    --surface: #080f1c;
+    --surface-sunken: #050b15;
+    --card: #101c30;
+    --card-inset: #16253c;
     --ink: #eaf1fb;
-    --ink-muted: #97aac4;
-    --line: #1e3252;
+    --ink-2: #c3d2e6;
+    --ink-muted: #8fa3bf;
+    --line: #1d2f4b;
+    --line-strong: #2a4062;
+    --scrim: rgb(2 6 12 / 0.6);
+    --glass: rgb(16 28 48 / 0.76);
+
+    --shadow-1: 0 1px 2px rgb(0 0 0 / 0.4);
+    --shadow-2: 0 2px 4px rgb(0 0 0 / 0.35), 0 10px 24px -10px rgb(0 0 0 / 0.6);
+    --shadow-3: 0 4px 8px rgb(0 0 0 / 0.4), 0 22px 48px -18px rgb(0 0 0 / 0.75);
+    --shadow-sheet: 0 -8px 40px -12px rgb(0 0 0 / 0.7);
   }
 }
 
 :root[data-theme="dark"] {
-  --surface: #0a1526;
-  --card: #101f36;
+  --surface: #080f1c;
+  --surface-sunken: #050b15;
+  --card: #101c30;
+  --card-inset: #16253c;
   --ink: #eaf1fb;
-  --ink-muted: #97aac4;
-  --line: #1e3252;
+  --ink-2: #c3d2e6;
+  --ink-muted: #8fa3bf;
+  --line: #1d2f4b;
+  --line-strong: #2a4062;
+  --scrim: rgb(2 6 12 / 0.6);
+  --glass: rgb(16 28 48 / 0.76);
+
+  --shadow-1: 0 1px 2px rgb(0 0 0 / 0.4);
+  --shadow-2: 0 2px 4px rgb(0 0 0 / 0.35), 0 10px 24px -10px rgb(0 0 0 / 0.6);
+  --shadow-3: 0 4px 8px rgb(0 0 0 / 0.4), 0 22px 48px -18px rgb(0 0 0 / 0.75);
+  --shadow-sheet: 0 -8px 40px -12px rgb(0 0 0 / 0.7);
 }
 
 html,
@@ -66,39 +119,153 @@ body {
 
 body {
   font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
   -webkit-tap-highlight-color: transparent;
-  /* Kein Gummiband-Effekt, wenn die App vom Home-Bildschirm läuft */
+  /* Kein Gummiband-Effekt, wenn die App vom Home-Bildschirm laeuft */
   overscroll-behavior-y: none;
 }
 
-/* Buttons und Kacheln sollen sich wie in einer App anfühlen: kein Zoom beim
-   Doppeltippen, keine Textmarkierung beim langen Drücken. */
+/* Ueberschriften duerfen enger stehen - so setzt Apple sie auch. */
+h1,
+h2,
+h3 {
+  letter-spacing: -0.021em;
+}
+
+/* Buttons und Kacheln sollen sich wie in einer App anfuehlen: kein Zoom beim
+   Doppeltippen, keine Textmarkierung beim langen Druecken. */
 button,
 .tap-tile,
 .btn,
+.seg,
 a[role="button"] {
   touch-action: manipulation;
   -webkit-user-select: none;
   user-select: none;
 }
 
+/* Eine sichtbare Spur fuer die Tastatur, aber nicht fuer den Daumen. */
+:focus-visible {
+  outline: 2px solid var(--brand-500);
+  outline-offset: 2px;
+  border-radius: var(--r-xs);
+}
+
 /* Im Standalone-Modus (vom Home-Bildschirm gestartet) gibt es keine
-   Safari-Leisten – der Inhalt reicht bis an die Gerätekanten. */
+   Safari-Leisten - der Inhalt reicht bis an die Geraetekanten. */
 @media (display-mode: standalone) {
   body {
     -webkit-touch-callout: none;
   }
 }
 
-/* ------------------------------ Bausteine ------------------------------- */
+/* Schmale, zurueckhaltende Rollbalken - sichtbar nur, wo gerollt wird. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--ink) 22%, transparent) transparent;
+}
+*::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+*::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--ink) 20%, transparent);
+  border-radius: 999px;
+}
+
+/* ==========================================================================
+   Bewegung
+   ========================================================================== */
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes sheet-up {
+  from {
+    transform: translateY(101%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+
+@keyframes sheet-pop {
+  from {
+    opacity: 0;
+    transform: translateY(14px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes toast-up {
+  from {
+    opacity: 0;
+    transform: translateY(14px) scale(0.94);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes shimmer {
+  from {
+    background-position: 200% 0;
+  }
+  to {
+    background-position: -200% 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ==========================================================================
+   Bausteine
+   ========================================================================== */
 
 @layer components {
   .card {
     background: var(--card);
     border: 1px solid var(--line);
-    border-radius: 1rem;
-    box-shadow: 0 1px 2px rgb(15 23 42 / 0.04),
-      0 8px 24px -16px rgb(15 23 42 / 0.25);
+    border-radius: var(--r-lg);
+    box-shadow: var(--shadow-2);
+  }
+
+  /* Eine Flaeche im Inneren einer Karte - fuer Gruppen, die zusammengehoeren. */
+  .inset {
+    background: var(--card-inset);
+    border-radius: var(--r-md);
   }
 
   .muted {
@@ -109,53 +276,121 @@ a[role="button"] {
     border-color: var(--line);
   }
 
+  /* Milchglas: Leisten, die ueber dem Inhalt liegen. */
+  .glass {
+    background: var(--glass);
+    -webkit-backdrop-filter: saturate(180%) blur(20px);
+    backdrop-filter: saturate(180%) blur(20px);
+  }
+
+  /* --------------------------------- Knoepfe ---------------------------- */
+
   .btn {
     display: inline-flex;
     align-items: center;
     justify-content: center;
     gap: 0.5rem;
-    border-radius: 0.75rem;
-    padding: 0.625rem 1.125rem;
+    border-radius: var(--r-sm);
+    padding: 0.6875rem 1.125rem;
+    min-height: 2.75rem;
     font-weight: 600;
     font-size: 0.9375rem;
     line-height: 1.25rem;
-    transition: filter 0.15s ease, transform 0.08s ease;
+    letter-spacing: -0.006em;
+    transition: background 0.18s var(--ease-out), border-color 0.18s var(--ease-out),
+      box-shadow 0.18s var(--ease-out), transform 0.12s var(--ease-spring),
+      opacity 0.18s ease;
     cursor: pointer;
     border: 1px solid transparent;
   }
   .btn:active:not(:disabled) {
-    transform: translateY(1px);
+    transform: scale(0.97);
   }
   .btn:disabled {
-    opacity: 0.55;
+    opacity: 0.45;
     cursor: not-allowed;
   }
   .btn-primary {
     background: var(--brand-600);
     color: #fff;
+    box-shadow: 0 1px 2px rgb(11 21 36 / 0.16),
+      0 6px 16px -8px color-mix(in srgb, var(--brand-600) 70%, transparent);
   }
   .btn-primary:hover:not(:disabled) {
-    filter: brightness(1.08);
+    background: var(--brand-500);
   }
   .btn-success {
     background: var(--energy-600);
     color: #fff;
+    box-shadow: 0 1px 2px rgb(11 21 36 / 0.16),
+      0 6px 16px -8px color-mix(in srgb, var(--energy-600) 70%, transparent);
   }
   .btn-success:hover:not(:disabled) {
-    filter: brightness(1.08);
+    background: var(--energy-500);
   }
   .btn-ghost {
-    background: transparent;
+    background: var(--card);
     color: var(--ink);
     border-color: var(--line);
+    box-shadow: var(--shadow-1);
   }
   .btn-ghost:hover:not(:disabled) {
-    background: color-mix(in srgb, var(--brand-500) 8%, transparent);
+    background: color-mix(in srgb, var(--brand-500) 7%, var(--card));
+    border-color: var(--line-strong);
+  }
+  /* Ohne Rahmen und Flaeche - fuer Nebensaechliches neben einer Hauptaktion. */
+  .btn-plain {
+    background: transparent;
+    color: var(--brand-600);
+  }
+  .btn-plain:hover:not(:disabled) {
+    background: color-mix(in srgb, var(--brand-500) 10%, transparent);
   }
   .btn-danger {
     background: var(--signal-500);
     color: #fff;
   }
+  .btn-danger:hover:not(:disabled) {
+    background: var(--signal-600);
+  }
+  .btn-sm {
+    min-height: 2.125rem;
+    padding: 0.375rem 0.75rem;
+    font-size: 0.8125rem;
+    border-radius: var(--r-xs);
+  }
+  .btn-lg {
+    min-height: 3.375rem;
+    padding: 0.875rem 1.5rem;
+    font-size: 1.0625rem;
+    border-radius: var(--r-md);
+  }
+  .btn-pill {
+    border-radius: 999px;
+  }
+
+  /* Runder Knopf fuer ein einzelnes Zeichen - Route, Anruf, Schliessen. */
+  .icon-btn {
+    display: inline-grid;
+    place-items: center;
+    width: 2.25rem;
+    height: 2.25rem;
+    border-radius: 999px;
+    color: var(--ink-muted);
+    background: transparent;
+    cursor: pointer;
+    transition: background 0.18s var(--ease-out), color 0.18s var(--ease-out),
+      transform 0.12s var(--ease-spring);
+  }
+  .icon-btn:hover {
+    background: color-mix(in srgb, var(--ink) 7%, transparent);
+    color: var(--ink);
+  }
+  .icon-btn:active {
+    transform: scale(0.92);
+  }
+
+  /* ------------------------------- Eingaben ------------------------------ */
 
   .input,
   .select,
@@ -164,25 +399,44 @@ a[role="button"] {
     background: var(--card);
     color: var(--ink);
     border: 1px solid var(--line);
-    border-radius: 0.75rem;
-    padding: 0.625rem 0.875rem;
+    border-radius: var(--r-sm);
+    padding: 0.6875rem 0.875rem;
+    /* Unter 16px zoomt iOS beim Hineintippen in das Feld. */
     font-size: 1rem;
+    line-height: 1.375rem;
     outline: none;
+    transition: border-color 0.18s var(--ease-out), box-shadow 0.18s var(--ease-out);
+    -webkit-appearance: none;
+    appearance: none;
+  }
+  .select {
+    padding-right: 2.25rem;
+    background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%236b7f99' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m4 6.5 4 4 4-4'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 0.75rem center;
+    background-size: 1rem 1rem;
   }
   .input:focus,
   .select:focus,
   .textarea:focus {
     border-color: var(--brand-400);
-    box-shadow: 0 0 0 3px color-mix(in srgb, var(--brand-400) 25%, transparent);
+    box-shadow: 0 0 0 3.5px color-mix(in srgb, var(--brand-400) 22%, transparent);
+  }
+  .input::placeholder,
+  .textarea::placeholder {
+    color: color-mix(in srgb, var(--ink-muted) 75%, transparent);
   }
 
   .label {
     display: block;
-    font-size: 0.8125rem;
+    font-size: 0.75rem;
     font-weight: 600;
+    letter-spacing: 0.01em;
     color: var(--ink-muted);
     margin-bottom: 0.375rem;
   }
+
+  /* -------------------------------- Plaketten ---------------------------- */
 
   .badge {
     display: inline-flex;
@@ -195,33 +449,225 @@ a[role="button"] {
     white-space: nowrap;
   }
 
+  /* --------------------------- Segmentierte Wahl ------------------------- */
+
+  /* Eine Leiste, aus der genau eine Kachel hervortritt - wie der Schalter
+     oben in den iOS-Einstellungen. */
+  .seg {
+    display: grid;
+    grid-auto-flow: column;
+    grid-auto-columns: 1fr;
+    gap: 0.125rem;
+    padding: 0.1875rem;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--ink) 7%, transparent);
+  }
+  .seg > button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.375rem;
+    min-height: 2.125rem;
+    padding: 0.3125rem 0.75rem;
+    border-radius: 999px;
+    font-size: 0.875rem;
+    font-weight: 600;
+    white-space: nowrap;
+    color: var(--ink-muted);
+    cursor: pointer;
+    transition: background 0.22s var(--ease-spring), color 0.22s var(--ease-out),
+      box-shadow 0.22s var(--ease-out), transform 0.12s var(--ease-spring);
+  }
+  .seg > button:active {
+    transform: scale(0.96);
+  }
+  .seg > button[aria-pressed="true"] {
+    background: var(--card);
+    color: var(--ink);
+    box-shadow: var(--shadow-1);
+  }
+  .seg-brand > button[aria-pressed="true"] {
+    background: var(--brand-600);
+    color: #fff;
+    box-shadow: 0 1px 3px rgb(11 21 36 / 0.2);
+  }
+
+  /* ------------------------------ Gruppenliste --------------------------- */
+
+  /* Zeilen mit Haarlinie dazwischen - die Grundform jeder iOS-Liste. */
+  .list {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: var(--r-lg);
+    overflow: hidden;
+  }
+  .list > * + * {
+    border-top: 1px solid var(--line);
+  }
+  .list-row {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    width: 100%;
+    min-height: 3.25rem;
+    padding: 0.625rem 0.875rem;
+    text-align: left;
+    background: transparent;
+    transition: background 0.15s var(--ease-out);
+  }
+  button.list-row,
+  a.list-row {
+    cursor: pointer;
+  }
+  button.list-row:active,
+  a.list-row:active {
+    background: color-mix(in srgb, var(--ink) 6%, transparent);
+  }
+
   /* Grosse Aktionsflaechen fuer die Bedienung mit einer Hand an der Tuer */
   .tap-tile {
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 0.375rem;
-    min-height: 5.5rem;
-    padding: 0.875rem 0.5rem;
-    border-radius: 1rem;
+    gap: 0.5rem;
+    min-height: 5.75rem;
+    padding: 0.875rem 0.625rem;
+    border-radius: var(--r-md);
     border: 1px solid var(--line);
     background: var(--card);
+    color: var(--ink);
     font-weight: 600;
     font-size: 0.875rem;
     text-align: center;
-    line-height: 1.2;
+    line-height: 1.25;
     cursor: pointer;
-    transition: transform 0.08s ease, border-color 0.15s ease;
+    box-shadow: var(--shadow-1);
+    transition: transform 0.12s var(--ease-spring), border-color 0.18s var(--ease-out),
+      box-shadow 0.18s var(--ease-out), background 0.18s var(--ease-out);
   }
-  .tap-tile:active {
-    transform: scale(0.97);
+  .tap-tile:active:not(:disabled) {
+    transform: scale(0.96);
+  }
+  .tap-tile:disabled {
+    opacity: 0.45;
   }
   .tap-tile-emoji {
     font-size: 1.625rem;
     line-height: 1;
   }
+  /* Der farbige Kreis, in dem das Zeichen der Kachel sitzt. */
+  .tile-icon {
+    display: grid;
+    place-items: center;
+    width: 2.5rem;
+    height: 2.5rem;
+    border-radius: 999px;
+  }
+
+  /* ---------------------------- Blatt und Schleier ----------------------- */
+
+  .scrim {
+    position: fixed;
+    inset: 0;
+    background: var(--scrim);
+    -webkit-backdrop-filter: blur(3px);
+    backdrop-filter: blur(3px);
+    animation: fade-in 0.22s var(--ease-out) both;
+  }
+  .sheet {
+    position: relative;
+    width: 100%;
+    max-height: 92dvh;
+    display: flex;
+    flex-direction: column;
+    background: var(--card);
+    border-top-left-radius: var(--r-xl);
+    border-top-right-radius: var(--r-xl);
+    box-shadow: var(--shadow-sheet);
+    animation: sheet-up 0.38s var(--ease-spring) both;
+  }
+  @media (min-width: 768px) {
+    .sheet {
+      border-radius: var(--r-xl);
+      box-shadow: var(--shadow-3);
+      animation: sheet-pop 0.26s var(--ease-out) both;
+    }
+  }
+  /* Der Griff am oberen Rand - das Zeichen dafuer, dass sich das Blatt
+     wegwischen laesst. */
+  .sheet-grip {
+    width: 2.25rem;
+    height: 0.3125rem;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--ink) 18%, transparent);
+  }
+  .sheet-body {
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .rise {
+    animation: rise 0.3s var(--ease-out) both;
+  }
+
+  /* --------------------------------- Regler ------------------------------ */
+
+  .slider {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 100%;
+    height: 1.75rem;
+    background: transparent;
+    cursor: pointer;
+  }
+  .slider::-webkit-slider-runnable-track {
+    height: 0.25rem;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--ink) 13%, transparent);
+  }
+  .slider::-moz-range-track {
+    height: 0.25rem;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--ink) 13%, transparent);
+  }
+  .slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 1.625rem;
+    height: 1.625rem;
+    margin-top: -0.6875rem;
+    border-radius: 999px;
+    background: #fff;
+    border: 0.5px solid rgb(11 21 36 / 0.06);
+    box-shadow: 0 1px 2px rgb(11 21 36 / 0.16), 0 3px 8px rgb(11 21 36 / 0.16);
+  }
+  .slider::-moz-range-thumb {
+    width: 1.625rem;
+    height: 1.625rem;
+    border-radius: 999px;
+    background: #fff;
+    border: 0.5px solid rgb(11 21 36 / 0.06);
+    box-shadow: 0 1px 2px rgb(11 21 36 / 0.16), 0 3px 8px rgb(11 21 36 / 0.16);
+  }
+
+  /* Platzhalter, solange Daten unterwegs sind. */
+  .skeleton {
+    background: linear-gradient(
+      90deg,
+      color-mix(in srgb, var(--ink) 6%, transparent) 25%,
+      color-mix(in srgb, var(--ink) 11%, transparent) 37%,
+      color-mix(in srgb, var(--ink) 6%, transparent) 63%
+    );
+    background-size: 200% 100%;
+    animation: shimmer 1.4s linear infinite;
+  }
 }
+
+/* ==========================================================================
+   Karte (Leaflet)
+   ========================================================================== */
 
 /* Leaflet-Grundstile (lokal eingebunden, kein externes CSS noetig) */
 .leaflet-container {
@@ -256,12 +702,46 @@ a[role="button"] {
   background: var(--card);
   color: var(--ink);
   border: 1px solid var(--line);
-  border-radius: 0.625rem;
-  box-shadow: 0 2px 10px rgb(15 23 42 / 0.18);
+  border-radius: var(--r-sm);
+  box-shadow: var(--shadow-2);
   font-size: 0.75rem;
+  font-weight: 500;
   line-height: 1.35;
-  padding: 0.375rem 0.5rem;
+  padding: 0.375rem 0.5625rem;
 }
 .leaflet-tooltip-top::before {
   border-top-color: var(--line);
+}
+
+/* Zoom-Knoepfe im Stil der App statt im Leaflet-Grau. */
+.leaflet-control-zoom {
+  border: none !important;
+  border-radius: var(--r-sm) !important;
+  overflow: hidden;
+  box-shadow: var(--shadow-2) !important;
+}
+.leaflet-control-zoom a {
+  background: var(--glass) !important;
+  -webkit-backdrop-filter: saturate(180%) blur(16px);
+  backdrop-filter: saturate(180%) blur(16px);
+  color: var(--ink) !important;
+  border: none !important;
+  border-bottom: 1px solid var(--line) !important;
+  width: 2rem !important;
+  height: 2rem !important;
+  line-height: 2rem !important;
+  font-weight: 500;
+}
+.leaflet-control-zoom a:last-child {
+  border-bottom: none !important;
+}
+.leaflet-control-attribution {
+  background: color-mix(in srgb, var(--card) 80%, transparent) !important;
+  color: var(--ink-muted) !important;
+  border-radius: var(--r-xs) 0 0 0;
+  font-size: 10px !important;
+  padding: 1px 6px !important;
+}
+.leaflet-control-attribution a {
+  color: var(--ink-muted) !important;
 }

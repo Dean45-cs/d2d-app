@@ -4,7 +4,8 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { AreaMap } from "@/components/AreaMap";
 import { progressColor } from "@/components/map-colors";
-import { plural } from "@/components/ui";
+import { Note, plural } from "@/components/ui";
+import { IconInfo, IconMap } from "@/components/icons";
 import { AreaPicker } from "../AreaPicker";
 import { centerOf, type LatLng } from "@/lib/geo/area";
 
@@ -123,13 +124,16 @@ export function TerritoryAreaCard({
   return (
     <div className="card mb-4 p-4">
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-        <p className="text-sm font-semibold">Gebiet auf der Karte</p>
+        <p className="flex items-center gap-2 text-[13px] font-semibold">
+          <IconMap className="h-4 w-4 text-brand-600" />
+          Gebiet auf der Karte
+        </p>
         {isLeader && (
           <div className="flex flex-wrap gap-2">
             {area && !editing && (
               <button
                 type="button"
-                className="btn btn-ghost px-3 py-1.5 text-sm"
+                className="btn btn-ghost btn-sm btn-pill"
                 onClick={importStreets}
                 disabled={busy}
               >
@@ -138,7 +142,7 @@ export function TerritoryAreaCard({
             )}
             <button
               type="button"
-              className="btn btn-ghost px-3 py-1.5 text-sm"
+              className="btn btn-ghost btn-sm btn-pill"
               onClick={() => {
                 setDraft(null);
                 setEditing((v) => !v);
@@ -154,11 +158,11 @@ export function TerritoryAreaCard({
 
       {editing ? (
         <div className="space-y-3">
-          <p className="muted text-xs">
+          <Note icon={<IconInfo className="h-4 w-4" />}>
             {area
               ? "Neue Fläche zeichnen – die bisherige liegt gestrichelt darunter und wird ersetzt."
               : "Fläche für dieses Gebiet abstecken."}
-          </p>
+          </Note>
           <AreaPicker
             tileUrl={tileUrl}
             onAreaChange={setDraft}
@@ -179,7 +183,10 @@ export function TerritoryAreaCard({
           </button>
         </div>
       ) : area ? (
-        <>
+        <div
+          className="overflow-hidden rounded-[var(--r-md)] border"
+          style={{ borderColor: "var(--line)" }}
+        >
           <AreaMap
             tileUrl={tileUrl}
             areas={[{ id: territoryId, name, area, tone: "brand" }]}
@@ -201,17 +208,18 @@ export function TerritoryAreaCard({
             }
             className="h-[40vh] min-h-[240px] w-full"
           />
-        </>
+        </div>
       ) : (
-        <p className="muted text-sm">
-          Für dieses Gebiet ist noch keine Fläche hinterlegt. Mit „Fläche festlegen“ lässt
-          sie sich auf der Karte nachtragen – danach können die Straßen automatisch
-          geladen werden.
-        </p>
+        <Note icon={<IconInfo className="h-4 w-4" />}>
+          Für dieses Gebiet ist noch keine Fläche hinterlegt. Mit „Fläche festlegen“ lässt sie
+          sich auf der Karte nachtragen – danach können die Straßen automatisch geladen werden.
+        </Note>
       )}
 
-      {message && <p className="mt-2 text-xs font-semibold text-brand-600">{message}</p>}
-      {error && <p className="mt-2 text-xs font-semibold text-signal-600">{error}</p>}
+      {message && (
+        <p className="mt-2 text-[12px] font-semibold text-brand-600">{message}</p>
+      )}
+      {error && <p className="mt-2 text-[12px] font-semibold text-signal-600">{error}</p>}
     </div>
   );
 }

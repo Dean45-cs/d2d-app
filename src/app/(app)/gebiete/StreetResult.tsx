@@ -1,7 +1,8 @@
 "use client";
 
 import type { User } from "@/lib/types";
-import { plural } from "@/components/ui";
+import { GroupLabel, Note, Segmented, plural } from "@/components/ui";
+import { IconCheck, IconInfo, IconList, IconPin, IconSplit } from "@/components/icons";
 import { MAX_PLOTS } from "@/lib/geo/split";
 
 export interface FoundAddress {
@@ -74,33 +75,46 @@ export function StreetResult({
 
   if (streets.length === 0) {
     return (
-      <div className="rounded-xl border px-3 py-4 hairline">
-        <p className="muted text-sm">
-          In dieser Fläche sind keine Straßen hinterlegt. Zeichne etwas größer oder trage
-          die Straßen über „Liste einfügen“ von Hand ein.
-        </p>
-      </div>
+      <Note icon={<IconInfo className="h-4 w-4" />}>
+        In dieser Fläche sind keine Straßen hinterlegt. Zeichne etwas größer oder trage die
+        Straßen über „Liste einfügen“ von Hand ein.
+      </Note>
     );
   }
 
   return (
-    <div className="rounded-xl border hairline">
-      <div className="flex flex-wrap items-center justify-between gap-2 border-b px-3 py-2 hairline">
-        <p className="text-sm font-semibold">
-          {plural(streets.length, "Straße", "Straßen")} ·{" "}
-          {plural(addressCount, "Adresse", "Adressen")}
-        </p>
-        <div className="flex gap-3">
+    <div className="space-y-3">
+      {/* --------------------------- Was gefunden wurde --------------------- */}
+      <div className="inset flex items-center gap-3 px-3.5 py-3">
+        <span
+          className="tile-icon h-10 w-10 shrink-0"
+          style={{
+            background: "color-mix(in srgb, var(--brand-500) 13%, transparent)",
+            color: "var(--brand-600)",
+          }}
+          aria-hidden
+        >
+          <IconList className="h-5 w-5" />
+        </span>
+        <div className="min-w-0 flex-1">
+          <p className="text-[15px] font-semibold tabular-nums">
+            {plural(selected.length, "Straße", "Straßen")} · {plural(doors, "Tür", "Türen")}
+          </p>
+          <p className="muted text-[12px] tabular-nums">
+            {streets.length} gefunden, {addressCount} Adressen aus OpenStreetMap
+          </p>
+        </div>
+        <div className="flex shrink-0 gap-1">
           <button
             type="button"
-            className="muted text-xs font-semibold underline"
+            className="btn btn-ghost btn-sm btn-pill"
             onClick={() => onChooseAll(true)}
           >
             alle
           </button>
           <button
             type="button"
-            className="muted text-xs font-semibold underline"
+            className="btn btn-ghost btn-sm btn-pill"
             onClick={() => onChooseAll(false)}
           >
             keine
@@ -108,49 +122,47 @@ export function StreetResult({
         </div>
       </div>
 
-      {/* ------------------------------ Aufteilen ----------------------------- */}
-      <div className="border-b px-3 py-2.5 hairline">
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="label mb-0">Aufteilen auf</span>
-          <div className="flex overflow-hidden rounded-xl border hairline">
-            {Array.from({ length: MAX_PLOTS }, (_, i) => i + 1).map((count) => (
-              <button
-                key={count}
-                type="button"
-                onClick={() => onPlotCount(count)}
-                aria-pressed={plotCount === count}
-                className={`w-10 py-1.5 text-sm font-semibold tabular-nums ${
-                  plotCount === count ? "bg-brand-600 text-white" : ""
-                }`}
-              >
-                {count}
-              </button>
-            ))}
-          </div>
-          <span className="muted text-xs">
-            {splitting
-              ? `${plots.length || plotCount} Gebiete, nach Türen ausgewogen`
-              : "ein Gebiet für eine Person"}
-          </span>
+      {/* ------------------------------ Aufteilen ---------------------------- */}
+      <div>
+        <div className="mb-2 flex items-center gap-2">
+          <IconSplit className="muted h-4 w-4" />
+          <GroupLabel>Auf wie viele Leute aufteilen?</GroupLabel>
         </div>
+        <Segmented
+          options={Array.from({ length: MAX_PLOTS }, (_, i) => ({
+            value: String(i + 1),
+            label: i === 0 ? "1 Person" : `${i + 1} Pakete`,
+          }))}
+          value={String(plotCount)}
+          onChange={(value) => onPlotCount(Number(value))}
+          tone="brand"
+          ariaLabel="Gebiet aufteilen"
+        />
+        <p className="muted mt-1.5 px-0.5 text-[11px]">
+          {splitting
+            ? `${plots.length || plotCount} Pakete, nach Türen ausgewogen – jedes bekommt eine eigene Farbe auf der Karte.`
+            : "Ein Gebiet für eine Person."}
+        </p>
 
-        {splitting && (
-          <ul className="mt-2.5 space-y-2">
+        {splitting && plots.length > 0 && (
+          <ul className="list mt-2.5">
             {plots.map((plot, index) => (
-              <li key={plot.label} className="flex flex-wrap items-center gap-2">
+              <li key={plot.label} className="flex flex-wrap items-center gap-2 px-3 py-2.5">
                 <span
-                  className="grid h-6 w-6 shrink-0 place-items-center rounded-full text-xs font-bold text-white"
+                  className="grid h-7 w-7 shrink-0 place-items-center rounded-full text-[13px] font-bold text-white"
                   style={{ background: plot.color }}
                   aria-hidden
                 >
                   {plot.label}
                 </span>
-                <span className="muted min-w-[9rem] flex-1 text-xs tabular-nums">
-                  {plural(plot.streets.length, "Straße", "Straßen")} ·{" "}
-                  {plural(plot.doors, "Tür", "Türen")}
+                <span className="muted min-w-[8rem] flex-1 text-[12px] tabular-nums">
+                  {plural(plot.streets.length, "Straße", "Straßen")}
+                  <span className="block font-semibold text-[var(--ink)]">
+                    {plural(plot.doors, "Tür", "Türen")}
+                  </span>
                 </span>
                 <select
-                  className="select w-full min-w-[10rem] px-2 py-1 text-sm sm:w-auto sm:flex-1"
+                  className="select w-full min-w-[9rem] px-2.5 py-1.5 text-[13px] sm:w-auto sm:flex-1"
                   value={assignees[index] ?? ""}
                   onChange={(e) => onAssignee(index, e.target.value)}
                   aria-label={`Teilgebiet ${plot.label} zuteilen an`}
@@ -170,26 +182,48 @@ export function StreetResult({
         )}
       </div>
 
-      {/* ----------------------------- Straßenliste ---------------------------- */}
-      <ul className="max-h-64 divide-y overflow-y-auto hairline">
-        {streets.map((street) => {
-          const isChosen = chosen.has(street.name);
-          const plotIndex = plotOf.get(street.name);
-          const plot = plotIndex !== undefined ? plots[plotIndex] : undefined;
-          return (
-            <li
-              key={street.name}
-              className={focus === street.name ? "bg-brand-500/8" : undefined}
-            >
-              <div className="flex items-center gap-2 px-3 py-2">
-                <input
-                  type="checkbox"
-                  id={`street-${street.name}`}
-                  className="h-5 w-5 shrink-0 accent-[var(--brand-600)]"
-                  checked={isChosen}
-                  onChange={() => onToggle(street.name)}
-                  aria-label={`${street.name} ins Gebiet übernehmen`}
-                />
+      {/* ----------------------------- Straßenliste -------------------------- */}
+      <div>
+        <GroupLabel>Straßen im Gebiet</GroupLabel>
+        <ul className="list max-h-72 overflow-y-auto">
+          {streets.map((street) => {
+            const isChosen = chosen.has(street.name);
+            const plotIndex = plotOf.get(street.name);
+            const plot = plotIndex !== undefined ? plots[plotIndex] : undefined;
+            return (
+              <li
+                key={street.name}
+                className="flex items-center gap-2.5 px-3 py-2"
+                style={
+                  focus === street.name
+                    ? { background: "color-mix(in srgb, var(--brand-500) 9%, transparent)" }
+                    : undefined
+                }
+              >
+                <label className="shrink-0 cursor-pointer p-1">
+                  <input
+                    type="checkbox"
+                    className="sr-only"
+                    checked={isChosen}
+                    onChange={() => onToggle(street.name)}
+                    aria-label={`${street.name} ins Gebiet übernehmen`}
+                  />
+                  <span
+                    className="grid h-6 w-6 place-items-center rounded-full border transition"
+                    style={
+                      isChosen
+                        ? {
+                            background: "var(--brand-600)",
+                            borderColor: "transparent",
+                            color: "#fff",
+                          }
+                        : { borderColor: "var(--line-strong)" }
+                    }
+                    aria-hidden
+                  >
+                    {isChosen && <IconCheck className="h-3.5 w-3.5" />}
+                  </span>
+                </label>
 
                 {splitting && isChosen && plot && (
                   <span
@@ -204,34 +238,38 @@ export function StreetResult({
                 <button
                   type="button"
                   onClick={() => onFocus(street.name)}
-                  className="min-w-0 flex-1 text-left"
+                  className="min-w-0 flex-1 py-1 text-left"
                   title="Auf der Karte zeigen"
                 >
-                  <span className={`block truncate text-sm ${isChosen ? "font-medium" : "muted"}`}>
+                  <span
+                    className={`block truncate text-[14px] ${
+                      isChosen ? "font-semibold" : "muted"
+                    }`}
+                  >
                     {street.name}
                   </span>
-                  <span className="muted block truncate text-xs">
+                  <span className="muted block truncate text-[11px]">
                     {street.numbers.length > 0
                       ? `${plural(street.numbers.length, "Hausnummer", "Hausnummern")}: ${preview(street)}`
                       : "keine Hausnummern hinterlegt"}
+                    {street.units > street.numbers.length
+                      ? ` · ${plural(street.units, "Wohneinheit", "Wohneinheiten")}`
+                      : ""}
                   </span>
-                  {street.units > street.numbers.length && (
-                    <span className="muted block text-xs">
-                      {plural(street.units, "Wohneinheit", "Wohneinheiten")}
-                    </span>
-                  )}
                 </button>
-              </div>
-            </li>
-          );
-        })}
-      </ul>
 
-      <p className="muted border-t px-3 py-2 text-xs hairline">
-        Ausgewählt: {plural(selected.length, "Straße", "Straßen")} mit{" "}
-        {plural(doors, "Tür", "Türen")}. Die Zahlen stammen aus OpenStreetMap und lassen
-        sich später anpassen.
-      </p>
+                <span className="muted shrink-0 pr-1" aria-hidden>
+                  <IconPin className="h-4 w-4" />
+                </span>
+              </li>
+            );
+          })}
+        </ul>
+        <p className="muted mt-1.5 px-0.5 text-[11px] leading-snug">
+          Die Zahlen stammen aus OpenStreetMap und lassen sich später anpassen. Ein Tipp auf
+          eine Zeile zeigt die Straße auf der Karte.
+        </p>
+      </div>
     </div>
   );
 }
