@@ -3,7 +3,16 @@ import { requireUser } from "@/lib/auth";
 import { listMembers, listTerritories } from "@/lib/queries";
 import { readArea } from "@/lib/geo/area";
 import { mapTileUrl } from "@/lib/map";
-import { EmptyState, PageHeader, ProgressBar, StatusBadge, percent } from "@/components/ui";
+import {
+  Avatar,
+  EmptyState,
+  PageHeader,
+  ProgressBar,
+  ProgressRing,
+  StatusBadge,
+  percent,
+} from "@/components/ui";
+import { IconChevronRight, IconMap } from "@/components/icons";
 import { NewTerritoryButton } from "./NewTerritory";
 import { TerritoryOverviewMap, type OverviewTerritory } from "./TerritoryOverviewMap";
 
@@ -62,6 +71,7 @@ export default async function TerritoriesPage() {
 
       {territories.length === 0 ? (
         <EmptyState
+          icon={<IconMap className="h-7 w-7" />}
           title={isLeader ? "Noch keine Gebiete" : "Dir ist noch kein Gebiet zugeteilt"}
           text={
             isLeader
@@ -75,43 +85,78 @@ export default async function TerritoriesPage() {
             // Sind Wohneinheiten hinterlegt, ist das der Nenner; sonst zeigt der
             // Balken nur, dass ueberhaupt gearbeitet wurde.
             const goal = t.unit_count > 0 ? t.unit_count : Math.max(t.visit_count, 1);
+            const share =
+              t.unit_count > 0 ? Math.min(100, Math.round((t.visit_count / t.unit_count) * 100)) : null;
             return (
               <Link
                 key={t.id}
                 href={`/gebiete/${t.id}`}
-                className="card block p-4 transition hover:shadow-md"
+                className="card block p-4 transition hover:shadow-lg active:scale-[0.99]"
               >
-                <div className="mb-2 flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <p className="truncate font-semibold">{t.name}</p>
-                    <p className="muted truncate text-xs">
+                <div className="mb-3 flex items-start gap-3">
+                  {share !== null ? (
+                    <ProgressRing
+                      value={t.visit_count}
+                      max={t.unit_count}
+                      size={46}
+                      tone={t.status === "DONE" ? "success" : "brand"}
+                    >
+                      {`${share}%`}
+                    </ProgressRing>
+                  ) : (
+                    <span
+                      className="tile-icon h-[46px] w-[46px] shrink-0"
+                      style={{
+                        background: "color-mix(in srgb, var(--brand-500) 12%, transparent)",
+                        color: "var(--brand-600)",
+                      }}
+                      aria-hidden
+                    >
+                      <IconMap />
+                    </span>
+                  )}
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-[16px] font-semibold">{t.name}</p>
+                    <p className="muted truncate text-[12px]">
                       {[t.postal_code, t.city].filter(Boolean).join(" ") || "Ohne Ortsangabe"}
                       {" · "}
                       {t.street_count} Straßen
                     </p>
+                    <div className="mt-1.5">
+                      <StatusBadge status={t.status} />
+                    </div>
                   </div>
-                  <StatusBadge status={t.status} />
+                  <IconChevronRight className="mt-3 h-4 w-4 shrink-0 opacity-25" />
                 </div>
 
-                <div className="mb-2">
-                  <ProgressBar value={t.visit_count} max={goal} />
-                </div>
+                <ProgressBar
+                  value={t.visit_count}
+                  max={goal}
+                  size="sm"
+                  tone={t.status === "DONE" ? "success" : "brand"}
+                />
 
-                <div className="muted grid grid-cols-4 gap-2 text-xs">
+                <div className="muted mt-2.5 grid grid-cols-4 gap-2 text-[11px]">
                   <div>
-                    <span className="block font-semibold text-[var(--ink)]">{t.visit_count}</span>
+                    <span className="block text-[15px] font-bold tabular-nums text-[var(--ink)]">
+                      {t.visit_count}
+                    </span>
                     Türen
                   </div>
                   <div>
-                    <span className="block font-semibold text-[var(--ink)]">{t.met_count}</span>
+                    <span className="block text-[15px] font-bold tabular-nums text-[var(--ink)]">
+                      {t.met_count}
+                    </span>
                     angetroffen
                   </div>
                   <div>
-                    <span className="block font-semibold text-energy-600">{t.sale_count}</span>
+                    <span className="block text-[15px] font-bold tabular-nums text-energy-600">
+                      {t.sale_count}
+                    </span>
                     Abschlüsse
                   </div>
                   <div>
-                    <span className="block font-semibold text-[var(--ink)]">
+                    <span className="block text-[15px] font-bold tabular-nums text-[var(--ink)]">
                       {percent(t.sale_count, t.met_count)}
                     </span>
                     Quote
@@ -119,11 +164,15 @@ export default async function TerritoriesPage() {
                 </div>
 
                 {isLeader && (
-                  <p className="muted mt-3 border-t pt-2 text-xs hairline">
-                    {t.assignee_name
-                      ? `Zugeteilt an ${t.assignee_name}`
-                      : "Noch niemandem zugeteilt"}
-                  </p>
+                  <div
+                    className="mt-3 flex items-center gap-2 border-t pt-2.5"
+                    style={{ borderColor: "var(--line)" }}
+                  >
+                    <Avatar name={t.assignee_name} size={26} tone={t.assignee_name ? "brand" : "muted"} />
+                    <span className="muted truncate text-[12px]">
+                      {t.assignee_name ? t.assignee_name : "Noch niemandem zugeteilt"}
+                    </span>
+                  </div>
                 )}
               </Link>
             );

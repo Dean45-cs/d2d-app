@@ -3,7 +3,13 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import type { HouseNumberWithStats, StreetWithStats } from "@/lib/queries";
-import { IconPlus } from "@/components/icons";
+import {
+  IconChevronDown,
+  IconList,
+  IconNavigate,
+  IconPlus,
+  IconX,
+} from "@/components/icons";
 import { ProgressBar } from "@/components/ui";
 import { routeUrl } from "@/lib/map";
 import { doorStatus, MAX_NOT_HOME_ATTEMPTS, whenLabel } from "@/lib/doors";
@@ -68,17 +74,24 @@ export function StreetList({
   return (
     <div className="card p-4">
       <div className="mb-3 flex items-center justify-between gap-3">
-        <p className="text-sm font-semibold">Straßen ({streets.length})</p>
+        <p className="flex items-center gap-2 text-[13px] font-semibold">
+          <IconList className="h-4 w-4 text-brand-600" />
+          Straßen
+          <span className="muted font-normal tabular-nums">({streets.length})</span>
+        </p>
         {isLeader && (
-          <button className="btn btn-ghost px-3 py-1.5 text-sm" onClick={() => setAdding((v) => !v)}>
+          <button
+            className="btn btn-ghost btn-sm btn-pill"
+            onClick={() => setAdding((v) => !v)}
+          >
             <IconPlus className="h-4 w-4" />
-            Straßen hinzufügen
+            Hinzufügen
           </button>
         )}
       </div>
 
       {adding && (
-        <form onSubmit={addStreets} className="mb-4 rounded-xl border p-3 hairline">
+        <form onSubmit={addStreets} className="inset mb-4 p-3">
           <label className="label" htmlFor="street-input">
             Eine Straße pro Zeile
           </label>
@@ -91,7 +104,7 @@ export function StreetList({
             onChange={(e) => setRaw(e.target.value)}
             required
           />
-          {error && <p className="mt-2 text-sm font-medium text-signal-600">{error}</p>}
+          {error && <p className="mt-2 text-[12px] font-semibold text-signal-600">{error}</p>}
           <div className="mt-3 flex gap-2">
             <button type="button" className="btn btn-ghost flex-1" onClick={() => setAdding(false)}>
               Abbrechen
@@ -108,22 +121,26 @@ export function StreetList({
           Noch keine Straßen in diesem Gebiet.
         </p>
       ) : (
-        <ul className="divide-y" style={{ borderColor: "var(--line)" }}>
+        <ul>
           {streets.map((s) => {
             const houses = numbers[s.id] ?? [];
             const doneHouses = houses.filter((h) => h.visit_count > 0).length;
             const expanded = openStreet === s.id;
             return (
-              <li key={s.id} className="py-2.5">
+              <li
+                key={s.id}
+                className="border-t py-2.5 first:border-t-0"
+                style={{ borderColor: "var(--line)" }}
+              >
                 <div className="flex items-center gap-2">
                   <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-medium">
+                    <p className="truncate text-[14px] font-medium">
                       {s.name}{" "}
                       {s.house_numbers && (
                         <span className="muted font-normal">{s.house_numbers}</span>
                       )}
                     </p>
-                    <p className="muted text-xs tabular-nums">
+                    <p className="muted text-[11px] tabular-nums">
                       {/* Kurz halten: der Fortschritt ist die wichtigste Zahl. */}
                       {s.units > 0
                         ? `${s.visit_count} von ${s.units} Türen`
@@ -131,10 +148,11 @@ export function StreetList({
                       {s.sale_count > 0 && ` · ${s.sale_count} Abschlüsse`}
                     </p>
                     {s.units > 0 && (
-                      <div className="mt-1 max-w-40">
+                      <div className="mt-1.5 max-w-40">
                         <ProgressBar
                           value={s.visit_count}
                           max={s.units}
+                          size="sm"
                           tone={s.status === "DONE" ? "success" : "brand"}
                         />
                       </div>
@@ -145,11 +163,15 @@ export function StreetList({
                     <button
                       type="button"
                       onClick={() => setOpenStreet(expanded ? null : s.id)}
-                      className="muted shrink-0 rounded-lg px-2 py-1 text-xs font-semibold hover:bg-brand-500/8"
+                      className="muted shrink-0 rounded-lg px-2 py-1 text-[11px] font-semibold hover:bg-brand-500/8"
                       aria-expanded={expanded}
                     >
                       {houses.length} Nr.
-                      <span aria-hidden className="ml-1">{expanded ? "▾" : "▸"}</span>
+                      <IconChevronDown
+                        className={`ml-0.5 inline h-3 w-3 transition-transform ${
+                          expanded ? "rotate-180" : ""
+                        }`}
+                      />
                     </button>
                   )}
 
@@ -158,18 +180,19 @@ export function StreetList({
                       href={routeUrl(s.lat, s.lng)}
                       target="_blank"
                       rel="noreferrer"
-                      className="muted shrink-0 px-1 text-base leading-none hover:text-brand-600"
+                      className="icon-btn h-8 w-8 shrink-0"
+                      style={{ color: "var(--brand-600)" }}
                       title={`Route zur ${s.name}`}
                       aria-label={`Route zur ${s.name}`}
                     >
-                      ➤
+                      <IconNavigate className="h-4 w-4" />
                     </a>
                   )}
 
                   {/* Das Auswahlfeld zeigt den Status schon an - eine zusaetzliche
                       Plakette daneben waere doppelt und kostet auf dem Handy Platz. */}
                   <select
-                    className="select w-auto shrink-0 px-2 py-1 text-xs"
+                    className="select w-auto shrink-0 px-2 py-1 text-[11px]"
                     value={s.status}
                     onChange={(e) => setStatus(s.id, e.target.value)}
                     aria-label={`Status von ${s.name}`}
@@ -182,17 +205,17 @@ export function StreetList({
                   {isLeader && (
                     <button
                       onClick={() => remove(s.id)}
-                      className="muted shrink-0 px-1 text-lg leading-none hover:text-signal-600"
+                      className="icon-btn h-8 w-8 shrink-0 hover:text-signal-600"
                       aria-label={`${s.name} entfernen`}
                     >
-                      ×
+                      <IconX className="h-4 w-4" />
                     </button>
                   )}
                 </div>
 
                 {expanded && (
-                  <div className="mt-2">
-                    <p className="muted mb-1.5 text-xs">
+                  <div className="mt-2 rise">
+                    <p className="muted mb-1.5 text-[11px]">
                       {doneHouses} von {houses.length} Häusern erfasst · grün = Abschluss
                     </p>
                     <ul className="flex flex-wrap gap-1">

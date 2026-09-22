@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { routeUrl } from "@/lib/map";
 import type {
   AppointmentRow,
@@ -28,8 +28,41 @@ import {
   whenLabel,
   type DoorFacts,
 } from "@/lib/doors";
-import { IconArrowRight, IconCheck } from "@/components/icons";
-import { StatTile } from "@/components/ui";
+import {
+  IconArrowRight,
+  IconBan,
+  IconBell,
+  IconBuilding,
+  IconCalendar,
+  IconCheck,
+  IconChevronDown,
+  IconChevronRight,
+  IconClock,
+  IconCloudUp,
+  IconDoor,
+  IconHome,
+  IconInfo,
+  IconMap,
+  IconNavigate,
+  IconOffline,
+  IconPencil,
+  IconPerson,
+  IconPhone,
+  IconPlus,
+  IconSearch,
+  IconUndo,
+  IconX,
+} from "@/components/icons";
+import { Sheet } from "@/components/Sheet";
+import {
+  EmptyState,
+  GroupLabel,
+  Note,
+  Pill,
+  ProgressRing,
+  Segmented,
+  StatGroup,
+} from "@/components/ui";
 import {
   normalizeSlot,
   quickSlots,
@@ -116,7 +149,7 @@ interface Props {
 const PRODUCTS: Array<{ value: EnergyType; label: string }> = [
   { value: "STROM", label: "Strom" },
   { value: "GAS", label: "Gas" },
-  { value: "BEIDES", label: "Strom + Gas" },
+  { value: "BEIDES", label: "Beides" },
 ];
 
 export function TourClient({
@@ -140,8 +173,18 @@ export function TourClient({
   const [houseNumber, setHouseNumber] = useState("");
   const [product, setProduct] = useState<EnergyType>("BEIDES");
   const [sheet, setSheet] = useState<
-    null | "reason" | "building" | "bells" | "block" | "appointment"
+    null | "street" | "reason" | "building" | "bells" | "block" | "appointment"
   >(null);
+  /** Suchfeld im Blatt der Strassenwahl - erst ab vielen Strassen sichtbar. */
+  const [streetQuery, setStreetQuery] = useState("");
+  /** Blendet abgearbeitete Hausnummern aus, wenn die Strasse lang wird. */
+  const [onlyOpen, setOnlyOpen] = useState(false);
+  /*
+   * Umbenennen, Sperren und Loeschen liegen hinter einem Schalter. An der Tuer
+   * wird nur getippt - ein Kreuz neben jeder Zeile waere dort ein Loeschen aus
+   * Versehen, und drei Symbole je Klingel machen die Liste unruhig.
+   */
+  const [bellEdit, setBellEdit] = useState(false);
   const [note, setNote] = useState("");
   /** Name der gerade gewaehlten Klingel - leer im Einfamilienhaus. */
   const [bellLabel, setBellLabel] = useState("");
@@ -1075,69 +1118,112 @@ export function TourClient({
 
   if (territories.length === 0) {
     return (
-      <div className="card mx-auto max-w-md px-6 py-12 text-center">
-        <p className="text-base font-semibold">Noch kein Gebiet zugeteilt</p>
-        <p className="muted mt-2 text-sm">
-          Deine Teamleitung muss dir zuerst ein Gebiet mit Straßen zuweisen.
-          Danach erscheint es hier automatisch.
-        </p>
+      <div className="mx-auto max-w-md">
+        <EmptyState
+          icon={<IconMap className="h-7 w-7" />}
+          title="Noch kein Gebiet zugeteilt"
+          text="Deine Teamleitung muss dir zuerst ein Gebiet mit Straßen zuweisen. Danach erscheint es hier automatisch."
+        />
       </div>
     );
   }
 
   /* -------------------------------- Ansicht ------------------------------- */
 
+  const openHouses = houses.filter((house) => !isDone(house)).length;
+  /* Die gerade gewaehlte Nummer bleibt stehen, auch wenn sie durch ist - sonst
+     verschwaende unter dem Daumen die Kachel, auf die eben getippt wurde. */
+  const shownHouses = onlyOpen
+    ? houses.filter((house) => !isDone(house) || sameNumber(house.number, houseNumber))
+    : houses;
+  const needle = streetQuery.trim().toLocaleLowerCase("de-DE");
+  const streetMatches = needle
+    ? streetsOfTerritory.filter((s) => s.name.toLocaleLowerCase("de-DE").includes(needle))
+    : streetsOfTerritory;
+
   return (
-    <div className="mx-auto max-w-2xl">
+    <div className="mx-auto max-w-2xl space-y-3">
+      {/* ---------------------------- Netz & Puffer --------------------------- */}
       {(!online || pending.length > 0) && (
         <div
-          className="mb-3 flex items-center gap-3 rounded-xl px-4 py-2.5 text-sm"
-          style={{
-            background: "color-mix(in srgb, var(--gas-500) 16%, transparent)",
-            color: "var(--gas-600)",
-          }}
+          className="card rise flex items-center gap-3 px-3.5 py-2.5"
+          style={{ borderColor: "color-mix(in srgb, var(--gas-500) 45%, var(--line))" }}
         >
-          <span className="text-lg leading-none">{online ? "⏳" : "📴"}</span>
-          <span className="min-w-0 flex-1 font-medium">
-            {pending.length > 0
-              ? `${pending.length} ${pending.length === 1 ? "Eintrag wartet" : "Einträge warten"} auf Verbindung`
-              : "Kein Netz – Einträge werden gepuffert"}
+          <span
+            className="tile-icon h-9 w-9"
+            style={{
+              background: "color-mix(in srgb, var(--gas-500) 16%, transparent)",
+              color: "var(--gas-600)",
+            }}
+            aria-hidden
+          >
+            {online ? <IconCloudUp className="h-5 w-5" /> : <IconOffline className="h-5 w-5" />}
           </span>
+          <div className="min-w-0 flex-1">
+            <p className="text-[13px] font-semibold leading-tight">
+              {pending.length > 0
+                ? `${pending.length} ${pending.length === 1 ? "Eintrag wartet" : "Einträge warten"}`
+                : "Kein Netz"}
+            </p>
+            <p className="muted text-[11px] leading-tight">
+              Erfassen geht weiter – die App sendet alles automatisch nach.
+            </p>
+          </div>
           {pending.length > 0 && online && (
-            <button
-              onClick={sendPendingNow}
-              className="shrink-0 font-semibold underline"
-            >
+            <button type="button" onClick={sendPendingNow} className="btn btn-ghost btn-sm shrink-0">
               Jetzt senden
             </button>
           )}
         </div>
       )}
 
+      {/* ------------------------------ Tagesstand ---------------------------- */}
+      <StatGroup
+        items={[
+          { label: "Türen heute", value: todayTotals.doors ?? 0 },
+          {
+            label: "Angetroffen",
+            value: todayTotals.met ?? 0,
+            tone: "brand",
+            hint: todayTotals.doors
+              ? `${Math.round(((todayTotals.met ?? 0) / todayTotals.doors) * 100)} % Quote`
+              : undefined,
+          },
+          { label: "Abschlüsse", value: todayTotals.sales ?? 0, tone: "success" },
+        ]}
+      />
+
       {/* Termine, die heute anstehen - der Rueckweg gehoert an den Anfang. */}
       {dueAppointments.length > 0 && (
-        <div className="card mb-3 p-3">
-          <div className="mb-1.5 flex items-baseline justify-between gap-2">
-            <p className="text-sm font-semibold">
-              📅 {dueAppointments.length === 1 ? "1 Termin" : `${dueAppointments.length} Termine`}{" "}
-              heute
+        <div className="card overflow-hidden">
+          <div className="flex items-center gap-2 px-4 pb-2 pt-3">
+            <IconCalendar className="h-4 w-4 text-brand-600" />
+            <p className="flex-1 text-[13px] font-semibold">
+              {dueAppointments.length === 1 ? "1 Termin" : `${dueAppointments.length} Termine`} heute
             </p>
-            <Link href="/termine" className="shrink-0 text-xs font-semibold text-brand-600">
-              alle →
+            <Link
+              href="/termine"
+              className="shrink-0 text-[12px] font-semibold text-brand-600 hover:underline"
+            >
+              Alle Termine
             </Link>
           </div>
-          <ul className="space-y-1">
+          <ul>
             {dueAppointments.slice(0, 3).map((item) => {
               const late = slotOverdue(item.follow_up_at, now ?? undefined);
               return (
-                <li key={item.id} className="flex items-center gap-2">
+                <li
+                  key={item.id}
+                  className="flex items-center gap-1 border-t"
+                  style={{ borderColor: "var(--line)" }}
+                >
                   <button
                     type="button"
                     onClick={() => goToAppointment(item)}
-                    className="flex min-w-0 flex-1 items-center gap-2 rounded-lg px-1.5 py-1.5 text-left text-sm hover:bg-brand-500/8"
+                    className="list-row min-w-0 flex-1"
                   >
                     <span
-                      className="shrink-0 rounded-lg px-1.5 py-0.5 text-xs font-bold tabular-nums"
+                      className="shrink-0 rounded-lg px-2 py-1 text-[12px] font-bold tabular-nums"
                       style={{
                         background: late
                           ? "color-mix(in srgb, var(--signal-500) 15%, transparent)"
@@ -1149,21 +1235,25 @@ export function TourClient({
                     </span>
                     {/* Der Name steht vorn: die Strasse kennt man, den Kunden
                         muss man wiedererkennen. */}
-                    <span className="min-w-0 flex-1 truncate">
-                      {item.contact_name || "Termin"}
-                      <span className="muted">
-                        {" · "}
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-[14px] font-medium">
+                        {item.contact_name || "Termin"}
+                      </span>
+                      <span className="muted block truncate text-[12px]">
                         {item.street_name ?? ""} {item.house_number}
+                        {item.doorbell_label ? ` · ${item.doorbell_label}` : ""}
                       </span>
                     </span>
+                    <IconChevronRight className="h-4 w-4 shrink-0 opacity-35" />
                   </button>
                   {item.contact_phone && (
                     <a
                       href={`tel:${item.contact_phone.replace(/[^+\d]/g, "")}`}
-                      className="shrink-0 rounded-lg px-2 py-1.5 text-base leading-none"
+                      className="icon-btn mr-2 shrink-0"
+                      style={{ color: "var(--brand-600)" }}
                       aria-label={`${item.contact_name || "Kunde"} anrufen`}
                     >
-                      📞
+                      <IconPhone className="h-[18px] w-[18px]" />
                     </a>
                   )}
                 </li>
@@ -1173,196 +1263,246 @@ export function TourClient({
         </div>
       )}
 
-      <div className="mb-4 grid grid-cols-3 gap-2">
-        <StatTile label="Türen heute" value={todayTotals.doors ?? 0} />
-        <StatTile
-          label="Angetroffen"
-          value={todayTotals.met ?? 0}
-          tone="brand"
-          hint={
-            todayTotals.doors
-              ? `${Math.round(((todayTotals.met ?? 0) / todayTotals.doors) * 100)} % Quote`
-              : undefined
-          }
-        />
-        <StatTile label="Abschlüsse" value={todayTotals.sales ?? 0} tone="success" />
-      </div>
-
-      {/* Gebiets- und Straßenwahl */}
-      <div className="card mb-4 p-4">
-        <label className="label" htmlFor="territory">
-          Gebiet
-        </label>
-        <select
-          id="territory"
-          className="select mb-3"
-          value={territoryId ?? ""}
-          onChange={(e) => {
-            setTerritoryId(Number(e.target.value));
-            chooseStreet(null);
-          }}
-        >
-          {territories.map((t) => (
-            <option key={t.id} value={t.id}>
-              {t.name}
-              {t.city ? ` · ${t.city}` : ""}
-            </option>
-          ))}
-        </select>
-
-        <label className="label" htmlFor="street">
-          Straße
-        </label>
-        {streetsOfTerritory.length === 0 ? (
-          <p className="muted text-sm">
-            In diesem Gebiet sind noch keine Straßen hinterlegt.
-          </p>
-        ) : (
-          <select
-            id="street"
-            className="select"
-            value={streetId ?? ""}
-            onChange={(e) => chooseStreet(e.target.value ? Number(e.target.value) : null)}
+      {/* ============================== Wo stehe ich? ========================= */}
+      <div className="card overflow-hidden">
+        {/* Straße - ein Tipp oeffnet die Auswahl */}
+        <div className="flex items-center gap-1 pr-2">
+          <button
+            type="button"
+            onClick={() => {
+              setStreetQuery("");
+              setSheet("street");
+            }}
+            className="list-row min-w-0 flex-1 px-4 py-3"
           >
-            <option value="">– Straße wählen –</option>
-            {streetsOfTerritory.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.name}
-                {s.house_numbers ? ` ${s.house_numbers}` : ""}
-                {s.visit_count ? ` · ${s.visit_count} erfasst` : ""}
-              </option>
-            ))}
-          </select>
-        )}
-      </div>
-
-      {/* Türerfassung */}
-      <div className="card p-4">
-        <div className="mb-3 flex items-baseline justify-between gap-3">
-          <div className="min-w-0">
-            <p className="truncate text-sm font-semibold">
-              {street ? street.name : "Keine Straße gewählt"}
-              {/* Kommt die Strasse aus der Kartenauswahl, fuehrt der Pfeil direkt hin. */}
-              {street?.lat != null && street?.lng != null && (
-                <a
-                  href={routeUrl(street.lat, street.lng)}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="muted ml-2 inline-block align-middle text-base leading-none hover:text-brand-600"
-                  title={`Route zur ${street.name}`}
-                  aria-label={`Route zur ${street.name}`}
-                >
-                  ➤
-                </a>
-              )}
-            </p>
-            <p className="muted truncate text-xs">
-              {territory?.postal_code} {territory?.city}
-            </p>
-          </div>
-          {street && street.visit_count > 0 && (
-            <p className="muted shrink-0 text-xs tabular-nums">
-              {street.visit_count} Türen · {street.sale_count} Abschl.
-            </p>
+            <span
+              className="tile-icon h-10 w-10 shrink-0"
+              style={{
+                background: "color-mix(in srgb, var(--brand-500) 13%, transparent)",
+                color: "var(--brand-600)",
+              }}
+              aria-hidden
+            >
+              <IconMap />
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="block truncate text-[16px] font-semibold">
+                {street ? street.name : "Straße wählen"}
+              </span>
+              <span className="muted block truncate text-[12px]">
+                {territory
+                  ? [territory.name, [territory.postal_code, territory.city].filter(Boolean).join(" ")]
+                      .filter(Boolean)
+                      .join(" · ")
+                  : "Gebiet wählen"}
+              </span>
+            </span>
+            {street && street.visit_count > 0 && (
+              <Pill tone="neutral">
+                <span className="tabular-nums">{street.visit_count}</span> Türen
+              </Pill>
+            )}
+            <IconChevronDown className="muted h-4 w-4 shrink-0" />
+          </button>
+          {/* Kommt die Strasse aus der Kartenauswahl, fuehrt der Pfeil direkt hin. */}
+          {street?.lat != null && street?.lng != null && (
+            <a
+              href={routeUrl(street.lat, street.lng)}
+              target="_blank"
+              rel="noreferrer"
+              className="icon-btn shrink-0"
+              style={{ color: "var(--brand-600)" }}
+              title={`Route zur ${street.name}`}
+              aria-label={`Route zur ${street.name}`}
+            >
+              <IconNavigate className="h-[18px] w-[18px]" />
+            </a>
           )}
         </div>
 
-        {/* Welche Tür ist gerade gemeint? Im Mehrfamilienhaus die Klingel. */}
-        {currentType === "MFH" && currentNumber && (
-          <div
-            className="mb-3 flex items-center gap-2 rounded-xl px-3 py-2 text-sm"
-            style={{ background: "color-mix(in srgb, var(--brand-500) 12%, transparent)" }}
-          >
-            <span className="text-base leading-none">🔔</span>
-            <span className="min-w-0 flex-1 truncate font-semibold">
-              {activeBell ? (
-                <>
-                  {activeBell.label}
-                  {activeBell.floor && (
-                    <span className="muted font-normal"> · {activeBell.floor}</span>
-                  )}
-                </>
-              ) : currentBells.length === 0 ? (
-                "Noch keine Klingelschilder"
-              ) : (
-                "Keine Klingel gewählt"
-              )}
-            </span>
-            {currentBells.length > 0 && (
-              <span className="muted shrink-0 text-xs tabular-nums">
-                {doneBellCount}/{currentBells.length}
-              </span>
-            )}
+        {/* Hausnummer */}
+        <div className="border-t px-4 py-3.5" style={{ borderColor: "var(--line)" }}>
+          <label className="label" htmlFor="house">
+            Hausnummer
+          </label>
+          <div className="flex gap-2">
+            <input
+              id="house"
+              className="input text-[22px] font-bold tabular-nums"
+              inputMode="numeric"
+              autoComplete="off"
+              placeholder="12a"
+              value={houseNumber}
+              onChange={(e) => setHouseNumber(e.target.value.slice(0, 12))}
+            />
             <button
               type="button"
-              onClick={() => setSheet("bells")}
-              className="shrink-0 rounded-lg border px-2.5 py-1.5 text-xs font-semibold"
-              style={{ borderColor: "var(--brand-400)" }}
+              className="btn btn-ghost shrink-0 px-4"
+              aria-label={
+                houses.length > 0 ? "Zur nächsten offenen Hausnummer" : "Hausnummer um 1 erhöhen"
+              }
+              onClick={() => {
+                // Kennt die App die Hausnummern der Straße, springt sie zur
+                // nächsten offenen - sonst bleibt es beim schlichten Hochzählen.
+                const next = nextHouse();
+                if (next) {
+                  setHouseNumber(next);
+                  return;
+                }
+                const match = houseNumber.match(/^(\d+)(.*)$/);
+                setHouseNumber(match ? `${Number(match[1]) + 1}${match[2]}` : "1");
+              }}
             >
-              {currentBells.length === 0 ? "anlegen" : "wechseln"}
+              {houses.length > 0 ? "weiter" : "+1"}
+              <IconArrowRight className="h-4 w-4" />
             </button>
           </div>
-        )}
 
-        <label className="label" htmlFor="house">
-          Hausnummer
-        </label>
-        <div className="mb-4 flex gap-2">
-          <input
-            id="house"
-            className="input text-lg font-semibold"
-            inputMode="numeric"
-            autoComplete="off"
-            placeholder="z. B. 12a"
-            value={houseNumber}
-            onChange={(e) => setHouseNumber(e.target.value.slice(0, 12))}
-          />
-          <button
-            type="button"
-            className="btn btn-ghost px-4 text-lg"
-            aria-label={
-              houses.length > 0 ? "Zur nächsten offenen Hausnummer" : "Hausnummer um 1 erhöhen"
-            }
-            onClick={() => {
-              // Kennt die App die Hausnummern der Straße, springt sie zur
-              // nächsten offenen - sonst bleibt es beim schlichten Hochzählen.
-              const next = nextHouse();
-              if (next) {
-                setHouseNumber(next);
-                return;
-              }
-              const match = houseNumber.match(/^(\d+)(.*)$/);
-              setHouseNumber(match ? `${Number(match[1]) + 1}${match[2]}` : "1");
-            }}
-          >
-            {houses.length > 0 ? "weiter" : "+1"}
-          </button>
+          {houses.length > 0 && (
+            <div className="mt-3">
+              <div className="mb-1.5 flex items-center gap-2">
+                <p className="muted flex-1 text-[11px] font-semibold">
+                  {openHouses} von {houses.length} Häusern offen
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setOnlyOpen((value) => !value)}
+                  className="badge"
+                  aria-pressed={onlyOpen}
+                  style={{
+                    background: onlyOpen
+                      ? "color-mix(in srgb, var(--brand-500) 14%, transparent)"
+                      : "color-mix(in srgb, var(--ink) 7%, transparent)",
+                    color: onlyOpen ? "var(--brand-600)" : "var(--ink-muted)",
+                  }}
+                >
+                  nur offene
+                </button>
+              </div>
+              <ul className="flex max-h-32 flex-wrap gap-1.5 overflow-y-auto pb-0.5">
+                {shownHouses.map((house) => {
+                  const done = isDone(house);
+                  const active = sameNumber(house.number, houseNumber);
+                  const key = doneKey(house.street_id, house.number);
+                  const mfh = typeOf(house) === "MFH";
+                  const bells = mfh ? bellsOf(key, house.id) : [];
+                  const bellsDone = bells.filter((bell) => isBellDone(key, bell)).length;
+                  const facts = factsOf(key, house);
+                  const blocked = Boolean(facts.blocked_at);
+                  // Gelb heisst: hier war schon jemand, aber es ist noch offen.
+                  const retry = !blocked && !mfh && doorStatus(facts) === "RETRY";
+                  const badge = blocked
+                    ? "🚫"
+                    : mfh
+                      ? bells.length > 0
+                        ? `${bellsDone}/${bells.length}`
+                        : "🔔"
+                      : retry
+                        ? `${facts.not_home_count}/${MAX_NOT_HOME_ATTEMPTS}`
+                        : "";
+                  const wasHere = house.last_visit_user
+                    ? `${house.last_visit_user}, ${whenLabel(house.last_visit_at)}`
+                    : "";
+                  return (
+                    <li key={house.id}>
+                      <button
+                        type="button"
+                        onClick={() => openHouse(house)}
+                        className="rounded-[var(--r-xs)] border px-2.5 py-1.5 text-sm font-semibold tabular-nums transition active:scale-95"
+                        style={{
+                          borderColor: active
+                            ? "var(--brand-600)"
+                            : blocked
+                              ? "var(--signal-500)"
+                              : retry
+                                ? "var(--gas-500)"
+                                : "var(--line)",
+                          background: active
+                            ? "color-mix(in srgb, var(--brand-500) 16%, transparent)"
+                            : blocked
+                              ? "color-mix(in srgb, var(--signal-500) 14%, transparent)"
+                              : retry
+                                ? "color-mix(in srgb, var(--gas-500) 14%, transparent)"
+                                : done
+                                  ? "color-mix(in srgb, var(--ink) 7%, transparent)"
+                                  : "var(--card)",
+                          color: blocked
+                            ? "var(--signal-600)"
+                            : done && !active
+                              ? "var(--ink-muted)"
+                              : "var(--ink)",
+                          boxShadow: active ? "0 0 0 1px var(--brand-600)" : undefined,
+                          textDecoration: done && !blocked ? "line-through" : undefined,
+                        }}
+                        title={[
+                          blocked ? "Gesperrt – nicht mehr anlaufen" : null,
+                          mfh ? "Mehrfamilienhaus" : null,
+                          mfh && bells.length > 0
+                            ? `${bellsDone} von ${bells.length} Klingeln`
+                            : null,
+                          retry
+                            ? `${facts.not_home_count}. Versuch von ${MAX_NOT_HOME_ATTEMPTS}`
+                            : null,
+                          wasHere ? `zuletzt: ${wasHere}` : null,
+                          house.units > 1 ? `${house.units} Wohneinheiten` : null,
+                        ]
+                          .filter(Boolean)
+                          .join(" · ") || undefined}
+                        aria-label={`Hausnummer ${house.number}${
+                          blocked ? ", gesperrt" : ""
+                        }${
+                          mfh
+                            ? `, Mehrfamilienhaus mit ${bellsDone} von ${bells.length} erfassten Klingeln`
+                            : retry
+                              ? `, ${facts.not_home_count} von ${MAX_NOT_HOME_ATTEMPTS} Versuchen`
+                              : ""
+                        }${wasHere ? `, zuletzt ${wasHere}` : ""}${
+                          done && !blocked ? ", abgearbeitet" : ""
+                        }`}
+                      >
+                        {house.number}
+                        {badge && (
+                          <span className="ml-1 text-[10px] font-medium opacity-70">{badge}</span>
+                        )}
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          )}
         </div>
 
         {/* Haustyp und Sperre der gewaehlten Nummer. */}
         {streetId !== null && currentNumber !== "" && (
-          <div className="muted mb-2 -mt-2 flex items-center gap-2 text-xs">
+          <div
+            className="flex flex-wrap items-center gap-2 border-t px-4 py-2.5"
+            style={{ borderColor: "var(--line)" }}
+          >
             {currentType === "" ? (
               <button
                 type="button"
                 onClick={() => setSheet("building")}
-                className="font-semibold underline"
+                className="btn btn-ghost btn-sm btn-pill"
+                style={{ borderColor: "var(--brand-400)", color: "var(--brand-600)" }}
               >
+                <IconBuilding className="h-4 w-4" />
                 Ein- oder Mehrfamilienhaus?
               </button>
             ) : (
-              <>
-                <span>
-                  {currentType === "EFH" ? "🏠 Einfamilienhaus" : "🏢 Mehrfamilienhaus"}
-                </span>
-                <button
-                  type="button"
-                  onClick={() => setSheet("building")}
-                  className="font-semibold underline"
-                >
-                  ändern
-                </button>
-              </>
+              <button
+                type="button"
+                onClick={() => setSheet("building")}
+                className="btn btn-ghost btn-sm btn-pill"
+              >
+                {currentType === "EFH" ? (
+                  <IconHome className="h-4 w-4" />
+                ) : (
+                  <IconBuilding className="h-4 w-4" />
+                )}
+                {currentType === "EFH" ? "Einfamilienhaus" : "Mehrfamilienhaus"}
+                <IconPencil className="muted h-3.5 w-3.5" />
+              </button>
             )}
             <span className="flex-1" />
             {doorLocked ? (
@@ -1370,7 +1510,7 @@ export function TourClient({
                 <button
                   type="button"
                   onClick={() => void setBlocked(false)}
-                  className="font-semibold underline"
+                  className="btn btn-ghost btn-sm btn-pill"
                 >
                   Sperre aufheben
                 </button>
@@ -1379,27 +1519,82 @@ export function TourClient({
               <button
                 type="button"
                 onClick={() => setSheet("block")}
-                className="font-semibold underline"
+                className="btn btn-ghost btn-sm btn-pill"
+                style={{ color: "var(--signal-600)" }}
               >
-                🚫 Sperren
+                <IconBan className="h-4 w-4" />
+                Sperren
               </button>
             )}
           </div>
         )}
 
+        {/* Welche Tür ist gerade gemeint? Im Mehrfamilienhaus die Klingel. */}
+        {currentType === "MFH" && currentNumber && (
+          <button
+            type="button"
+            onClick={() => setSheet("bells")}
+            aria-label={
+              currentBells.length === 0 ? "Klingelschilder anlegen" : "Klingel wechseln"
+            }
+            className="list-row border-t px-4 py-3"
+            style={{
+              borderColor: "var(--line)",
+              background: "color-mix(in srgb, var(--brand-500) 7%, transparent)",
+            }}
+          >
+            <ProgressRing
+              value={doneBellCount}
+              max={Math.max(currentBells.length, 1)}
+              size={40}
+              tone={currentBells.length > 0 && doneBellCount >= currentBells.length ? "success" : "brand"}
+            >
+              {currentBells.length > 0 ? (
+                `${doneBellCount}/${currentBells.length}`
+              ) : (
+                <IconBell className="h-4 w-4" />
+              )}
+            </ProgressRing>
+            <span className="min-w-0 flex-1">
+              <span className="block truncate text-[15px] font-semibold">
+                {activeBell
+                  ? activeBell.label
+                  : currentBells.length === 0
+                    ? "Noch keine Klingelschilder"
+                    : "Keine Klingel gewählt"}
+              </span>
+              <span className="muted block truncate text-[12px]">
+                {activeBell?.floor
+                  ? `${activeBell.floor} · Klingel wechseln`
+                  : currentBells.length === 0
+                    ? "Klingelbrett abtippen oder Anzahl angeben"
+                    : `${currentBells.length - doneBellCount} von ${currentBells.length} noch offen`}
+              </span>
+            </span>
+            <span className="btn btn-ghost btn-sm btn-pill shrink-0" aria-hidden>
+              {currentBells.length === 0 ? "anlegen" : "wechseln"}
+            </span>
+          </button>
+        )}
+
         {/* Wer war zuletzt hier? Verhindert, dass zwei Leute dieselbe Tür laufen. */}
         {currentNumber !== "" && !doorLocked && lastAt && (
           <div
-            className="mb-4 flex items-start gap-2 rounded-xl px-3 py-2 text-xs"
+            className="flex items-start gap-2.5 border-t px-4 py-2.5 text-[12px]"
             style={{
+              borderColor: "var(--line)",
               background:
                 currentDoorStatus === "RETRY"
-                  ? "color-mix(in srgb, var(--gas-500) 14%, transparent)"
-                  : "color-mix(in srgb, var(--ink) 6%, transparent)",
+                  ? "color-mix(in srgb, var(--gas-500) 10%, transparent)"
+                  : "transparent",
             }}
           >
-            <span className="shrink-0 text-base leading-none">
-              {outcomeEmoji(lastWhat ?? "", null)}
+            <span
+              className="tile-icon mt-px h-7 w-7 shrink-0"
+              style={{ background: "color-mix(in srgb, var(--ink) 7%, transparent)" }}
+              aria-hidden
+            >
+              <OutcomeGlyph outcome={lastWhat ?? ""} reasonEmoji={null} className="h-4 w-4" />
             </span>
             <span className="min-w-0 flex-1 leading-snug">
               <span className="block truncate">
@@ -1414,241 +1609,170 @@ export function TourClient({
             </span>
           </div>
         )}
-
-        {houses.length > 0 && (
-          <div className="mb-4">
-            <p className="muted mb-1.5 text-xs">
-              {houses.filter((h) => !isDone(h)).length} von {houses.length} Häusern offen –
-              antippen statt tippen
-            </p>
-            <ul className="flex max-h-28 flex-wrap gap-1.5 overflow-y-auto">
-              {houses.map((house) => {
-                const done = isDone(house);
-                const active = sameNumber(house.number, houseNumber);
-                const key = doneKey(house.street_id, house.number);
-                const mfh = typeOf(house) === "MFH";
-                const bells = mfh ? bellsOf(key, house.id) : [];
-                const bellsDone = bells.filter((bell) => isBellDone(key, bell)).length;
-                const facts = factsOf(key, house);
-                const blocked = Boolean(facts.blocked_at);
-                // Gelb heisst: hier war schon jemand, aber es ist noch offen.
-                const retry = !blocked && !mfh && doorStatus(facts) === "RETRY";
-                const badge = blocked
-                  ? "🚫"
-                  : mfh
-                    ? bells.length > 0
-                      ? `${bellsDone}/${bells.length}`
-                      : "🔔"
-                    : retry
-                      ? `${facts.not_home_count}/${MAX_NOT_HOME_ATTEMPTS}`
-                      : "";
-                const wasHere = house.last_visit_user
-                  ? `${house.last_visit_user}, ${whenLabel(house.last_visit_at)}`
-                  : "";
-                return (
-                  <li key={house.id}>
-                    <button
-                      type="button"
-                      onClick={() => openHouse(house)}
-                      className="rounded-lg border px-2.5 py-1.5 text-sm font-semibold tabular-nums transition"
-                      style={{
-                        borderColor: active
-                          ? "var(--brand-600)"
-                          : blocked
-                            ? "var(--signal-500)"
-                            : retry
-                              ? "var(--gas-500)"
-                              : "var(--line)",
-                        background: active
-                          ? "color-mix(in srgb, var(--brand-500) 16%, transparent)"
-                          : blocked
-                            ? "color-mix(in srgb, var(--signal-500) 14%, transparent)"
-                            : retry
-                              ? "color-mix(in srgb, var(--gas-500) 14%, transparent)"
-                              : done
-                                ? "color-mix(in srgb, var(--ink) 7%, transparent)"
-                                : "var(--card)",
-                        color: blocked
-                          ? "var(--signal-600)"
-                          : done && !active
-                            ? "var(--ink-muted)"
-                            : "var(--ink)",
-                        textDecoration: done && !blocked ? "line-through" : undefined,
-                      }}
-                      title={[
-                        blocked ? "Gesperrt – nicht mehr anlaufen" : null,
-                        mfh ? "Mehrfamilienhaus" : null,
-                        mfh && bells.length > 0
-                          ? `${bellsDone} von ${bells.length} Klingeln`
-                          : null,
-                        retry
-                          ? `${facts.not_home_count}. Versuch von ${MAX_NOT_HOME_ATTEMPTS}`
-                          : null,
-                        wasHere ? `zuletzt: ${wasHere}` : null,
-                        house.units > 1 ? `${house.units} Wohneinheiten` : null,
-                      ]
-                        .filter(Boolean)
-                        .join(" · ") || undefined}
-                      aria-label={`Hausnummer ${house.number}${
-                        blocked ? ", gesperrt" : ""
-                      }${
-                        mfh
-                          ? `, Mehrfamilienhaus mit ${bellsDone} von ${bells.length} erfassten Klingeln`
-                          : retry
-                            ? `, ${facts.not_home_count} von ${MAX_NOT_HOME_ATTEMPTS} Versuchen`
-                            : ""
-                      }${wasHere ? `, zuletzt ${wasHere}` : ""}${
-                        done && !blocked ? ", abgearbeitet" : ""
-                      }`}
-                    >
-                      {house.number}
-                      {badge && (
-                        <span className="ml-1 text-[10px] font-medium opacity-70">{badge}</span>
-                      )}
-                    </button>
-                  </li>
-                );
-              })}
-            </ul>
-          </div>
-        )}
-
-        {doorLocked ? (
-          <div
-            className="rounded-xl border p-4 text-center"
-            style={{
-              borderColor: "var(--signal-500)",
-              background: "color-mix(in srgb, var(--signal-500) 10%, transparent)",
-            }}
-          >
-            <p className="text-base font-bold" style={{ color: "var(--signal-600)" }}>
-              🚫 Hier nicht mehr klingeln
-            </p>
-            <p className="muted mt-1 text-xs">
-              {blockedBy ? `${blockedBy} hat diese Tür gesperrt.` : "Diese Tür ist gesperrt."}{" "}
-              Hier wurde ausdrücklich widersprochen – weiteres Anlaufen wäre rechtlich
-              angreifbar.
-            </p>
-            {isLeader && (
-              <button
-                type="button"
-                className="btn btn-ghost mt-3 w-full"
-                onClick={() => void setBlocked(false)}
-              >
-                Sperre aufheben
-              </button>
-            )}
-          </div>
-        ) : (
-          <>
-        {/* Produktwahl – gilt für den nächsten Abschluss */}
-        <div className="mb-4">
-          <p className="label">Produkt für den Abschluss</p>
-          <div className="grid grid-cols-3 gap-2">
-            {PRODUCTS.map((p) => (
-              <button
-                key={p.value}
-                type="button"
-                onClick={() => chooseProduct(p.value)}
-                className={`rounded-xl border px-2 py-2 text-sm font-semibold transition ${
-                  product === p.value
-                    ? "border-transparent bg-brand-600 text-white"
-                    : "hairline border"
-                }`}
-              >
-                {p.label}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* Die drei Ergebnisse */}
-        <div className="grid grid-cols-2 gap-2">
-          <button
-            type="button"
-            disabled={busy}
-            onClick={() => handleOutcome("NOT_HOME")}
-            className="tap-tile"
-          >
-            <span className="tap-tile-emoji">🚪</span>
-            Nicht angetroffen
-          </button>
-          <button
-            type="button"
-            disabled={busy}
-            onClick={() => handleOutcome("MET_NO_SALE")}
-            className="tap-tile"
-            style={{ borderColor: "var(--signal-400)" }}
-          >
-            <span className="tap-tile-emoji">🙋</span>
-            Angetroffen – kein Abschluss
-          </button>
-          <button
-            type="button"
-            disabled={busy}
-            onClick={() => handleOutcome("APPOINTMENT")}
-            className="tap-tile col-span-2"
-            style={{ borderColor: "var(--brand-400)", minHeight: "4rem" }}
-          >
-            <span className="tap-tile-emoji">📅</span>
-            Termin vereinbart
-          </button>
-        </div>
-
-        <button
-          type="button"
-          disabled={busy}
-          onClick={handleSale}
-          className="btn btn-success mt-2 w-full py-5 text-lg"
-        >
-          <IconCheck />
-          Abschluss – zur Auftragserfassung
-          <IconArrowRight />
-        </button>
-        <p className="muted mt-2 text-center text-[11px]">
-          Öffnet den Tarifrechner des Partners und speichert den Abschluss automatisch.
-        </p>
-          </>
-        )}
-
-        {lastVisitId && (
-          <button
-            type="button"
-            onClick={undo}
-            className="muted mt-3 w-full text-center text-xs font-semibold underline"
-          >
-            Letzten Eintrag rückgängig machen
-          </button>
-        )}
       </div>
+
+      {/* ============================== Was ist passiert? ===================== */}
+      {doorLocked ? (
+        <div
+          className="card p-5 text-center"
+          style={{
+            borderColor: "color-mix(in srgb, var(--signal-500) 45%, var(--line))",
+            background: "color-mix(in srgb, var(--signal-500) 7%, var(--card))",
+          }}
+        >
+          <span
+            className="tile-icon mx-auto mb-2 h-12 w-12"
+            style={{
+              background: "color-mix(in srgb, var(--signal-500) 15%, transparent)",
+              color: "var(--signal-600)",
+            }}
+            aria-hidden
+          >
+            <IconBan className="h-6 w-6" />
+          </span>
+          <p className="text-[17px] font-bold" style={{ color: "var(--signal-600)" }}>
+            Hier nicht mehr klingeln
+          </p>
+          <p className="muted mx-auto mt-1 max-w-sm text-[12px] leading-relaxed">
+            {blockedBy ? `${blockedBy} hat diese Tür gesperrt.` : "Diese Tür ist gesperrt."} Hier
+            wurde ausdrücklich widersprochen – weiteres Anlaufen wäre rechtlich angreifbar.
+          </p>
+          {isLeader && (
+            <button
+              type="button"
+              className="btn btn-ghost mt-4 w-full"
+              onClick={() => void setBlocked(false)}
+            >
+              Sperre aufheben
+            </button>
+          )}
+        </div>
+      ) : (
+        <div className="card p-4">
+          {/* Produktwahl – gilt für den nächsten Abschluss */}
+          <div className="mb-3.5">
+            <p className="label">Produkt für den Abschluss</p>
+            <Segmented
+              options={PRODUCTS}
+              value={product}
+              onChange={chooseProduct}
+              tone="brand"
+              ariaLabel="Produkt für den Abschluss"
+            />
+          </div>
+
+          {/* Die drei Ergebnisse */}
+          <div className="grid grid-cols-3 gap-2">
+            <OutcomeTile
+              icon={<IconDoor className="h-[22px] w-[22px]" />}
+              label="Nicht angetroffen"
+              tone="neutral"
+              disabled={busy}
+              onClick={() => handleOutcome("NOT_HOME")}
+            />
+            <OutcomeTile
+              icon={<IconPerson className="h-[22px] w-[22px]" />}
+              label="Kein Abschluss"
+              tone="danger"
+              disabled={busy}
+              onClick={() => handleOutcome("MET_NO_SALE")}
+            />
+            <OutcomeTile
+              icon={<IconCalendar className="h-[22px] w-[22px]" />}
+              label="Termin"
+              tone="brand"
+              disabled={busy}
+              onClick={() => handleOutcome("APPOINTMENT")}
+            />
+          </div>
+
+          <button
+            type="button"
+            disabled={busy}
+            onClick={handleSale}
+            className="btn btn-success btn-lg mt-2.5 w-full"
+          >
+            <IconCheck className="h-5 w-5" />
+            Abschluss – Auftrag erfassen
+            <IconArrowRight className="h-[18px] w-[18px]" />
+          </button>
+          <p className="muted mt-2 text-center text-[11px] leading-snug">
+            Öffnet den Tarifrechner des Partners und speichert den Abschluss automatisch.
+          </p>
+
+          {lastVisitId && (
+            <button
+              type="button"
+              onClick={undo}
+              className="btn btn-plain btn-sm mx-auto mt-2 flex"
+            >
+              <IconUndo className="h-4 w-4" />
+              Letzten Eintrag rückgängig machen
+            </button>
+          )}
+        </div>
+      )}
 
       {/* Letzte Einträge – wartende zuerst */}
       {(pending.length > 0 || recent.length > 0) && (
-        <div className="card mt-4 p-4">
-          <p className="mb-2 text-sm font-semibold">Zuletzt erfasst</p>
-          <ul className="space-y-1.5">
+        <div className="card overflow-hidden">
+          <p className="px-4 pb-1.5 pt-3 text-[13px] font-semibold">Zuletzt erfasst</p>
+          <ul>
             {pending.map((item) => (
-              <li key={item.localId} className="flex items-center gap-2 text-sm">
-                <span className="w-6 text-center">{item.kind === "house" ? "🏢" : "⏳"}</span>
-                <span className="min-w-0 flex-1 truncate">{item.label}</span>
+              <li
+                key={item.localId}
+                className="flex items-center gap-2.5 border-t px-4 py-2.5 text-sm"
+                style={{ borderColor: "var(--line)" }}
+              >
+                <span
+                  className="tile-icon h-7 w-7 shrink-0"
+                  style={{
+                    background: "color-mix(in srgb, var(--gas-500) 15%, transparent)",
+                    color: "var(--gas-600)",
+                  }}
+                  aria-hidden
+                >
+                  {item.kind === "house" ? (
+                    <IconBuilding className="h-4 w-4" />
+                  ) : (
+                    <IconClock className="h-4 w-4" />
+                  )}
+                </span>
+                <span className="min-w-0 flex-1 truncate text-[13px]">{item.label}</span>
                 <button
+                  type="button"
                   onClick={() => removeQueued(item.localId)}
-                  className="muted shrink-0 px-1 text-xs underline"
+                  className="muted shrink-0 text-[11px] font-semibold underline"
                 >
                   verwerfen
                 </button>
               </li>
             ))}
             {recent.map((v) => (
-              <li key={v.id} className="flex items-center gap-2 text-sm">
-                <span className="w-6 text-center">
-                  {outcomeEmoji(v.outcome, v.reason_emoji)}
+              <li
+                key={v.id}
+                className="flex items-center gap-2.5 border-t px-4 py-2.5"
+                style={{ borderColor: "var(--line)" }}
+              >
+                <span
+                  className="tile-icon h-7 w-7 shrink-0"
+                  style={{
+                    background: `color-mix(in srgb, ${outcomeColor(v.outcome)} 14%, transparent)`,
+                    color: outcomeColor(v.outcome),
+                  }}
+                  aria-hidden
+                >
+                  <OutcomeGlyph
+                    outcome={v.outcome}
+                    reasonEmoji={v.reason_emoji}
+                    className="h-4 w-4"
+                  />
                 </span>
-                <span className="min-w-0 flex-1 truncate">
+                <span className="min-w-0 flex-1 truncate text-[13px]">
                   {v.street_name ?? "–"} {v.house_number}
                   {v.reason_label && <span className="muted"> · {v.reason_label}</span>}
                 </span>
-                <span className="muted shrink-0 text-xs tabular-nums">
+                <span className="muted shrink-0 text-[11px] tabular-nums">
                   {formatTime(v.created_at)}
                 </span>
               </li>
@@ -1657,652 +1781,772 @@ export function TourClient({
         </div>
       )}
 
-      {/* Bottom-Sheet: Ein- oder Mehrfamilienhaus */}
-      {sheet === "building" && (
-        <div
-          className="fixed inset-0 z-30 flex items-end bg-black/45 md:items-center md:justify-center"
-          onClick={() => setSheet(null)}
+      {/* ========================== Blatt: Straße wählen ====================== */}
+      {sheet === "street" && (
+        <Sheet
+          title="Wo bist du unterwegs?"
+          subtitle="Gebiet und Straße – die Auswahl merkt sich die App."
+          onClose={() => setSheet(null)}
         >
-          <div
-            className="max-h-[88dvh] w-full overflow-y-auto rounded-t-3xl bg-[var(--card)] p-5 pb-[max(2rem,env(safe-area-inset-bottom))] md:max-w-lg md:rounded-3xl"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="mb-4">
-              <h2 className="text-base font-bold">
-                {street?.name} {currentNumber} – was für ein Haus?
-              </h2>
-              <p className="muted text-xs">
-                Einmal festlegen, dann kennt es die App – auch für alle anderen im Team.
-              </p>
-            </div>
+          {territories.length > 1 && (
+            <>
+              <GroupLabel>Gebiet</GroupLabel>
+              <ul className="mb-4 flex flex-wrap gap-1.5">
+                {territories.map((t) => (
+                  <li key={t.id}>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setTerritoryId(t.id);
+                        chooseStreet(null);
+                      }}
+                      aria-pressed={territoryId === t.id}
+                      className="btn btn-sm btn-pill"
+                      style={
+                        territoryId === t.id
+                          ? { background: "var(--brand-600)", color: "#fff" }
+                          : {
+                              background: "var(--card)",
+                              borderColor: "var(--line)",
+                              color: "var(--ink)",
+                            }
+                      }
+                    >
+                      {t.name}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </>
+          )}
 
-            <div className="grid grid-cols-2 gap-2">
-              <button
-                type="button"
-                disabled={busy}
-                onClick={() => void chooseBuildingType("EFH")}
-                className="tap-tile"
-                style={{
-                  minHeight: "6.5rem",
-                  borderColor: suggestMfh ? undefined : "var(--brand-400)",
-                }}
-              >
-                <span className="tap-tile-emoji">🏠</span>
-                Einfamilienhaus
-              </button>
-              <button
-                type="button"
-                disabled={busy}
-                onClick={() => void chooseBuildingType("MFH")}
-                className="tap-tile"
-                style={{
-                  minHeight: "6.5rem",
-                  borderColor: suggestMfh ? "var(--brand-400)" : undefined,
-                }}
-              >
-                <span className="tap-tile-emoji">🏢</span>
-                Mehrfamilienhaus
-              </button>
-            </div>
-
-            {suggestMfh && (
-              <p className="muted mt-3 text-center text-xs">
-                Die Karte kennt hier {currentHouse?.units} Wohneinheiten.
-              </p>
-            )}
-
-            <button
-              type="button"
-              className="btn btn-ghost mt-4 w-full"
-              onClick={() => setSheet(null)}
-            >
-              Abbrechen
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* Bottom-Sheet: Klingelschilder */}
-      {sheet === "bells" && (
-        <div
-          className="fixed inset-0 z-30 flex items-end bg-black/45 md:items-center md:justify-center"
-          onClick={() => {
-            setSheet(null);
-            setEditing(null);
-          }}
-        >
-          <div
-            className="max-h-[88dvh] w-full overflow-y-auto rounded-t-3xl bg-[var(--card)] p-5 pb-[max(2rem,env(safe-area-inset-bottom))] md:max-w-lg md:rounded-3xl"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="mb-4 flex items-start justify-between gap-3">
-              <div className="min-w-0">
-                <h2 className="truncate text-base font-bold">
-                  Klingelschilder · {street?.name} {currentNumber}
-                </h2>
-                <p className="muted text-xs">
-                  {currentBells.length === 0
-                    ? "Namen vom Klingelbrett abtippen – oder einfach die Anzahl."
-                    : "Klingel antippen, dann unten das Ergebnis."}
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setSheet("building")}
-                className="muted shrink-0 text-xs font-semibold underline"
-              >
-                Haustyp
-              </button>
-            </div>
-
-            {currentBells.length > 0 && (
-              <div className="mb-3">
-                <div className="mb-1 flex items-baseline justify-between text-xs">
-                  <span className="muted">
-                    {doneBellCount} von {currentBells.length} erledigt
-                  </span>
-                  <span className="font-semibold">
-                    {currentBells.length - doneBellCount === 0
-                      ? "Haus fertig"
-                      : `noch ${currentBells.length - doneBellCount}`}
-                  </span>
-                </div>
-                <div
-                  className="h-1.5 w-full overflow-hidden rounded-full"
-                  style={{ background: "color-mix(in srgb, var(--ink) 12%, transparent)" }}
-                >
-                  <div
-                    className="h-full rounded-full transition-all"
-                    style={{
-                      width: `${(doneBellCount / currentBells.length) * 100}%`,
-                      background: "var(--brand-600)",
-                    }}
+          {streetsOfTerritory.length === 0 ? (
+            <p className="muted py-6 text-center text-sm">
+              In diesem Gebiet sind noch keine Straßen hinterlegt.
+            </p>
+          ) : (
+            <>
+              {streetsOfTerritory.length > 6 && (
+                <div className="relative mb-3">
+                  <IconSearch className="muted pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2" />
+                  <input
+                    className="input pl-9"
+                    placeholder="Straße suchen"
+                    value={streetQuery}
+                    onChange={(e) => setStreetQuery(e.target.value)}
+                    aria-label="Straße suchen"
                   />
                 </div>
-              </div>
-            )}
-
-            {currentBells.length > 0 && (
-              <ul className="mb-4 space-y-1.5">
-                {currentBells.map((bell, index) => {
-                  const bellDone = isBellDone(currentKey, bell);
-                  const chosen = bellKey(bell.label) === bellKey(bellLabel);
-                  const isNext =
-                    !bellDone && nextOpenBell !== null && bell === nextOpenBell && !chosen;
-                  const facts = bellFacts(currentKey, bell);
-                  const bellBlocked = Boolean(facts.blocked_at);
-                  const retry = doorStatus(facts) === "RETRY";
-                  const sub = bellBlocked
-                    ? `gesperrt${bell.blocked_by_name ? ` von ${bell.blocked_by_name}` : ""}`
-                    : bell.last_visit_at
-                      ? [
-                          bell.last_visit_user ?? "",
-                          whenLabel(bell.last_visit_at),
-                          // Kurz halten: Name und Zeitpunkt sind hier wichtiger
-                          // als das Wort "Versuche" - die Zeile ist schmal.
-                          retry ? `${facts.not_home_count}/${MAX_NOT_HOME_ATTEMPTS}` : "",
-                        ]
-                          .filter(Boolean)
-                          .join(" · ")
-                      : "";
-
-                  if (editing && bell.id !== null && bell.id === editing.id) {
-                    return (
-                      <li key={`edit-${bell.id}`} className="flex flex-wrap items-center gap-2">
-                        <input
-                          className="input min-w-0 flex-1"
-                          value={editing.label}
-                          onChange={(e) => setEditing({ ...editing, label: e.target.value })}
-                          placeholder="Name"
-                          aria-label="Name auf dem Schild"
-                        />
-                        <input
-                          className="input w-24 shrink-0"
-                          value={editing.floor}
-                          onChange={(e) => setEditing({ ...editing, floor: e.target.value })}
-                          placeholder="Etage"
-                          aria-label="Etage"
-                        />
-                        <button
-                          type="button"
-                          className="btn btn-success px-3 py-2 text-sm"
-                          onClick={() => void saveRename()}
-                        >
-                          Sichern
-                        </button>
-                        <button
-                          type="button"
-                          className="btn btn-ghost px-3 py-2 text-sm"
-                          onClick={() => setEditing(null)}
-                        >
-                          Zurück
-                        </button>
-                      </li>
-                    );
-                  }
-
+              )}
+              <GroupLabel>Straßen</GroupLabel>
+              <ul className="list">
+                {streetMatches.map((s) => {
+                  const chosen = s.id === streetId;
                   return (
-                    <li key={bell.id ?? `neu-${bellKey(bell.label)}`} className="flex items-center gap-1">
+                    <li key={s.id}>
                       <button
                         type="button"
-                        onClick={() => chooseBell(bell)}
-                        className="flex min-w-0 flex-1 items-center gap-2.5 rounded-xl border px-3 py-3 text-left text-sm transition"
-                        style={{
-                          borderColor: chosen
-                            ? "var(--brand-600)"
-                            : bellBlocked
-                              ? "var(--signal-500)"
-                              : retry
-                                ? "var(--gas-500)"
-                                : isNext
-                                  ? "var(--brand-400)"
-                                  : "var(--line)",
-                          background: chosen
-                            ? "color-mix(in srgb, var(--brand-500) 14%, transparent)"
-                            : bellBlocked
-                              ? "color-mix(in srgb, var(--signal-500) 10%, transparent)"
-                              : "var(--card)",
-                          opacity: bellDone && !chosen && !bellBlocked ? 0.65 : 1,
+                        onClick={() => {
+                          chooseStreet(s.id);
+                          setHouseNumber("");
+                          setBellLabel("");
+                          setSheet(null);
                         }}
-                        aria-label={`Klingel ${index + 1}, ${bell.label}${
-                          bell.floor ? `, ${bell.floor}` : ""
-                        }${bellDone ? ", schon erfasst" : isNext ? ", hier geht es weiter" : ""}`}
+                        className="list-row"
                       >
-                        {/* Die Nummer vom Klingelbrett - so findet der Daumen
-                            die Zeile wieder, ohne den Namen zu lesen. */}
-                        <span className="muted w-4 shrink-0 text-right text-xs tabular-nums">
-                          {index + 1}
-                        </span>
-                        <span className="w-6 shrink-0 text-center text-base leading-none">
-                          {bellBlocked
-                            ? "🚫"
-                            : bellDone
-                              ? outcomeEmoji(bell.last_outcome ?? "", bell.last_reason_emoji)
-                              : "🔔"}
-                        </span>
                         <span className="min-w-0 flex-1">
-                          <span
-                            className="block truncate font-semibold"
-                            style={{
-                              textDecoration: bellDone && !bellBlocked ? "line-through" : undefined,
-                              color: bellBlocked
-                                ? "var(--signal-600)"
-                                : bellDone && !chosen
-                                  ? "var(--ink-muted)"
-                                  : undefined,
-                            }}
-                          >
-                            {bell.label}
+                          <span className="block truncate text-[15px] font-medium">{s.name}</span>
+                          <span className="muted block truncate text-[12px] tabular-nums">
+                            {s.house_numbers || "ohne Hausnummern"}
+                            {s.visit_count ? ` · ${s.visit_count} erfasst` : ""}
+                            {s.sale_count ? ` · ${s.sale_count} Abschl.` : ""}
                           </span>
-                          {sub && (
-                            <span className="muted block truncate text-[11px]">{sub}</span>
-                          )}
                         </span>
-                        {isNext && (
-                          <span
-                            className="shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold"
-                            style={{
-                              background: "color-mix(in srgb, var(--brand-500) 18%, transparent)",
-                              color: "var(--brand-600)",
-                            }}
-                          >
-                            weiter
-                          </span>
-                        )}
-                        {bell.floor && (
-                          <span className="muted shrink-0 text-xs">{bell.floor}</span>
+                        {chosen ? (
+                          <IconCheck className="h-5 w-5 shrink-0 text-brand-600" />
+                        ) : (
+                          <IconChevronRight className="h-4 w-4 shrink-0 opacity-30" />
                         )}
                       </button>
-
-                      {bell.id !== null && (
-                        <button
-                          type="button"
-                          className="muted shrink-0 px-1.5 py-2 text-sm"
-                          aria-label={`${bell.label} umbenennen`}
-                          onClick={() =>
-                            setEditing({
-                              id: bell.id as number,
-                              original: bell.label,
-                              label: bell.label,
-                              floor: bell.floor,
-                            })
-                          }
-                        >
-                          ✏️
-                        </button>
-                      )}
-                      {!bellDone && (
-                        <>
-                          <button
-                            type="button"
-                            className="muted shrink-0 px-1.5 py-2 text-sm"
-                            aria-label={`${bell.label} sperren`}
-                            onClick={() => {
-                              setBellLabel(bell.label);
-                              setSheet("block");
-                            }}
-                          >
-                            🚫
-                          </button>
-                          <button
-                            type="button"
-                            className="muted shrink-0 px-1.5 py-2 text-sm"
-                            aria-label={`${bell.label} entfernen`}
-                            onClick={() => void removeBell(bell)}
-                          >
-                            ✕
-                          </button>
-                        </>
-                      )}
-                      {bellBlocked && isLeader && (
-                        <button
-                          type="button"
-                          className="muted shrink-0 px-1.5 py-2 text-[11px] underline"
-                          onClick={() => {
-                            setBellLabel(bell.label);
-                            void setBlocked(false);
-                          }}
-                        >
-                          aufheben
-                        </button>
-                      )}
                     </li>
                   );
                 })}
+                {streetMatches.length === 0 && (
+                  <li className="muted px-4 py-5 text-center text-sm">
+                    Keine Straße gefunden.
+                  </li>
+                )}
               </ul>
-            )}
+            </>
+          )}
+        </Sheet>
+      )}
 
-            <div className="hairline border-t pt-4">
-              <label className="label" htmlFor="bell-names">
-                Namen vom Klingelbrett
-              </label>
-              <textarea
-                id="bell-names"
-                className="textarea"
-                rows={4}
-                placeholder={"Müller, 2. OG\nSchmidt\nKaya, EG"}
-                value={bellDraft}
-                onChange={(e) => setBellDraft(e.target.value)}
-              />
-              <p className="muted mt-1 text-[11px]">
-                Ein Name pro Zeile. Nach dem Komma darf die Etage stehen.
-              </p>
-              <button
-                type="button"
-                disabled={busy}
-                className="btn btn-primary mt-2 w-full"
-                onClick={submitBellDraft}
-              >
-                Schilder anlegen
-              </button>
-
-              <div className="mt-4 flex items-end gap-2">
-                <div className="w-24 shrink-0">
-                  <label className="label" htmlFor="bell-count">
-                    Anzahl
-                  </label>
-                  <input
-                    id="bell-count"
-                    className="input"
-                    inputMode="numeric"
-                    placeholder={suggestMfh ? String(currentHouse?.units) : "6"}
-                    value={bellCount}
-                    onChange={(e) => setBellCount(e.target.value.slice(0, 3))}
-                  />
-                </div>
-                <button
-                  type="button"
-                  disabled={busy}
-                  className="btn btn-ghost flex-1"
-                  onClick={submitBellCount}
-                >
-                  Ohne Namen anlegen
-                </button>
-              </div>
-              <p className="muted mt-1 text-[11px]">
-                Legt „Klingel 1“, „Klingel 2“ … an – Namen kannst du später nachtragen.
-              </p>
-            </div>
-
+      {/* ======================== Blatt: Ein- oder Mehrfamilienhaus =========== */}
+      {sheet === "building" && (
+        <Sheet
+          title={`${street?.name ?? ""} ${currentNumber}`}
+          subtitle="Was für ein Haus? Einmal festlegen – dann kennt es das ganze Team."
+          onClose={() => setSheet(null)}
+        >
+          <div className="grid grid-cols-2 gap-2.5 pb-2">
             <button
               type="button"
-              className="btn btn-ghost mt-4 w-full"
+              disabled={busy}
+              onClick={() => void chooseBuildingType("EFH")}
+              className="tap-tile"
+              style={{
+                minHeight: "7.5rem",
+                borderColor: suggestMfh ? undefined : "var(--brand-500)",
+                boxShadow: suggestMfh ? undefined : "0 0 0 1px var(--brand-500)",
+              }}
+            >
+              <span
+                className="tile-icon h-12 w-12"
+                style={{
+                  background: "color-mix(in srgb, var(--brand-500) 12%, transparent)",
+                  color: "var(--brand-600)",
+                }}
+                aria-hidden
+              >
+                <IconHome className="h-6 w-6" />
+              </span>
+              Einfamilienhaus
+            </button>
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => void chooseBuildingType("MFH")}
+              className="tap-tile"
+              style={{
+                minHeight: "7.5rem",
+                borderColor: suggestMfh ? "var(--brand-500)" : undefined,
+                boxShadow: suggestMfh ? "0 0 0 1px var(--brand-500)" : undefined,
+              }}
+            >
+              <span
+                className="tile-icon h-12 w-12"
+                style={{
+                  background: "color-mix(in srgb, var(--brand-500) 12%, transparent)",
+                  color: "var(--brand-600)",
+                }}
+                aria-hidden
+              >
+                <IconBuilding className="h-6 w-6" />
+              </span>
+              Mehrfamilienhaus
+            </button>
+          </div>
+
+          {suggestMfh && (
+            <div className="mt-3">
+              <Note icon={<IconInfo className="h-4 w-4" />} tone="brand">
+                Die Karte kennt hier {currentHouse?.units} Wohneinheiten – wahrscheinlich ein
+                Mehrfamilienhaus.
+              </Note>
+            </div>
+          )}
+        </Sheet>
+      )}
+
+      {/* ========================== Blatt: Klingelschilder ==================== */}
+      {sheet === "bells" && (
+        <Sheet
+          title="Klingelbrett"
+          subtitle={
+            <>
+              <span className="font-semibold text-[var(--ink)]">
+                {street?.name} {currentNumber}
+              </span>
+              {" · "}
+              {currentBells.length === 0
+                ? "Namen abtippen oder einfach die Anzahl angeben."
+                : bellEdit
+                  ? "Umbenennen, sperren oder entfernen."
+                  : "Klingel antippen, dann unten das Ergebnis erfassen."}
+            </>
+          }
+          onClose={() => {
+            setSheet(null);
+            setEditing(null);
+            setBellEdit(false);
+          }}
+          action={
+            <>
+              <button
+                type="button"
+                onClick={() => setSheet("building")}
+                className="btn btn-ghost btn-sm btn-pill shrink-0"
+              >
+                Haustyp
+              </button>
+              {currentBells.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setBellEdit((value) => !value);
+                    setEditing(null);
+                  }}
+                  aria-pressed={bellEdit}
+                  aria-label="Klingeln bearbeiten"
+                  className="icon-btn shrink-0"
+                  style={
+                    bellEdit
+                      ? {
+                          background: "color-mix(in srgb, var(--brand-500) 16%, transparent)",
+                          color: "var(--brand-600)",
+                        }
+                      : { background: "color-mix(in srgb, var(--ink) 6%, transparent)" }
+                  }
+                >
+                  <IconPencil className="h-4 w-4" />
+                </button>
+              )}
+            </>
+          }
+          footer={
+            <button
+              type="button"
+              className="btn btn-primary w-full"
               onClick={() => {
                 setSheet(null);
                 setEditing(null);
+                setBellEdit(false);
               }}
             >
               Fertig
             </button>
-          </div>
-        </div>
-      )}
-
-      {/* Bottom-Sheet: Tür sperren */}
-      {sheet === "block" && (
-        <div
-          className="fixed inset-0 z-30 flex items-end bg-black/45 md:items-center md:justify-center"
-          onClick={() => setSheet(null)}
+          }
         >
-          <div
-            className="max-h-[88dvh] w-full overflow-y-auto rounded-t-3xl bg-[var(--card)] p-5 pb-[max(2rem,env(safe-area-inset-bottom))] md:max-w-lg md:rounded-3xl"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <h2 className="text-base font-bold">
-              {activeBell
-                ? `„${activeBell.label}" sperren?`
-                : `${street?.name ?? ""} ${currentNumber} sperren?`}
-            </h2>
-            <p className="muted mt-2 text-xs">
-              Gilt fürs ganze Team und dauerhaft – hier klingelt danach niemand mehr.
-              Richtig, wenn ausdrücklich widersprochen wurde oder ein Schild „Keine
-              Werbung" bzw. „Für Vertreter verboten" hängt: ein erkennbares Verbot zu
-              missachten ist eine unzumutbare Belästigung. Aufheben kann die Sperre
-              nur die Teamleitung.
-            </p>
-
-            <div className="mt-4">
-              <label className="label" htmlFor="block-note">
-                Grund (optional)
-              </label>
-              <input
-                id="block-note"
-                className="input"
-                placeholder="z. B. Schild „Keine Werbung“"
-                value={blockNote}
-                onChange={(e) => setBlockNote(e.target.value.slice(0, 200))}
-              />
+          {currentBells.length > 0 && (
+            <div className="inset mb-3 flex items-center gap-3 px-3.5 py-3">
+              <ProgressRing
+                value={doneBellCount}
+                max={currentBells.length}
+                size={44}
+                tone={doneBellCount >= currentBells.length ? "success" : "brand"}
+              >
+                {`${doneBellCount}/${currentBells.length}`}
+              </ProgressRing>
+              <div className="min-w-0 flex-1">
+                <p className="text-[14px] font-semibold">
+                  {currentBells.length - doneBellCount === 0
+                    ? "Haus fertig"
+                    : `Noch ${currentBells.length - doneBellCount} ${
+                        currentBells.length - doneBellCount === 1 ? "Klingel" : "Klingeln"
+                      }`}
+                </p>
+                <p className="muted text-[12px]">
+                  {doneBellCount} von {currentBells.length} erledigt
+                </p>
+              </div>
             </div>
+          )}
 
+          {currentBells.length > 0 && (
+            <ul className="list mb-4">
+              {currentBells.map((bell, index) => {
+                const bellDone = isBellDone(currentKey, bell);
+                const chosen = bellKey(bell.label) === bellKey(bellLabel);
+                const isNext =
+                  !bellDone && nextOpenBell !== null && bell === nextOpenBell && !chosen;
+                const facts = bellFacts(currentKey, bell);
+                const bellBlocked = Boolean(facts.blocked_at);
+                const retry = doorStatus(facts) === "RETRY";
+                const sub = bellBlocked
+                  ? `gesperrt${bell.blocked_by_name ? ` von ${bell.blocked_by_name}` : ""}`
+                  : bell.last_visit_at
+                    ? [
+                        bell.last_visit_user ?? "",
+                        whenLabel(bell.last_visit_at),
+                        // Kurz halten: Name und Zeitpunkt sind hier wichtiger
+                        // als das Wort "Versuche" - die Zeile ist schmal.
+                        retry ? `${facts.not_home_count}/${MAX_NOT_HOME_ATTEMPTS}` : "",
+                      ]
+                        .filter(Boolean)
+                        .join(" · ")
+                    : "";
+
+                if (editing && bell.id !== null && bell.id === editing.id) {
+                  return (
+                    <li key={`edit-${bell.id}`} className="flex flex-wrap items-center gap-2 p-2.5">
+                      <input
+                        className="input min-w-0 flex-1"
+                        value={editing.label}
+                        onChange={(e) => setEditing({ ...editing, label: e.target.value })}
+                        placeholder="Name"
+                        aria-label="Name auf dem Schild"
+                      />
+                      <input
+                        className="input w-24 shrink-0"
+                        value={editing.floor}
+                        onChange={(e) => setEditing({ ...editing, floor: e.target.value })}
+                        placeholder="Etage"
+                        aria-label="Etage"
+                      />
+                      <button
+                        type="button"
+                        className="btn btn-success btn-sm"
+                        onClick={() => void saveRename()}
+                      >
+                        Sichern
+                      </button>
+                      <button
+                        type="button"
+                        className="btn btn-ghost btn-sm"
+                        onClick={() => setEditing(null)}
+                      >
+                        Zurück
+                      </button>
+                    </li>
+                  );
+                }
+
+                return (
+                  <li
+                    key={bell.id ?? `neu-${bellKey(bell.label)}`}
+                    className="flex items-center gap-0.5 pr-1.5"
+                    style={{
+                      background: chosen
+                        ? "color-mix(in srgb, var(--brand-500) 10%, transparent)"
+                        : bellBlocked
+                          ? "color-mix(in srgb, var(--signal-500) 8%, transparent)"
+                          : undefined,
+                    }}
+                  >
+                    <button
+                      type="button"
+                      onClick={() => chooseBell(bell)}
+                      className="list-row min-w-0 flex-1"
+                      aria-label={`Klingel ${index + 1}, ${bell.label}${
+                        bell.floor ? `, ${bell.floor}` : ""
+                      }${bellDone ? ", schon erfasst" : isNext ? ", hier geht es weiter" : ""}`}
+                    >
+                      {/* Die Nummer vom Klingelbrett - so findet der Daumen
+                          die Zeile wieder, ohne den Namen zu lesen. */}
+                      <span className="muted w-4 shrink-0 text-right text-[11px] tabular-nums">
+                        {index + 1}
+                      </span>
+                      <span
+                        className="tile-icon h-8 w-8 shrink-0"
+                        style={{
+                          background: bellBlocked
+                            ? "color-mix(in srgb, var(--signal-500) 14%, transparent)"
+                            : bellDone
+                              ? `color-mix(in srgb, ${outcomeColor(bell.last_outcome ?? "")} 14%, transparent)`
+                              : "color-mix(in srgb, var(--ink) 7%, transparent)",
+                          color: bellBlocked
+                            ? "var(--signal-600)"
+                            : bellDone
+                              ? outcomeColor(bell.last_outcome ?? "")
+                              : "var(--ink-muted)",
+                        }}
+                        aria-hidden
+                      >
+                        {bellBlocked ? (
+                          <IconBan className="h-4 w-4" />
+                        ) : bellDone ? (
+                          <OutcomeGlyph
+                            outcome={bell.last_outcome ?? ""}
+                            reasonEmoji={bell.last_reason_emoji}
+                            className="h-4 w-4"
+                          />
+                        ) : (
+                          <IconBell className="h-4 w-4" />
+                        )}
+                      </span>
+                      <span className="min-w-0 flex-1">
+                        <span
+                          className="block truncate text-[15px] font-semibold"
+                          style={{
+                            textDecoration: bellDone && !bellBlocked ? "line-through" : undefined,
+                            color: bellBlocked
+                              ? "var(--signal-600)"
+                              : bellDone && !chosen
+                                ? "var(--ink-muted)"
+                                : undefined,
+                          }}
+                        >
+                          {bell.label}
+                        </span>
+                        {sub && <span className="muted block truncate text-[11px]">{sub}</span>}
+                      </span>
+                      {isNext && (
+                        <Pill tone="brand">weiter</Pill>
+                      )}
+                      {bell.floor && (
+                        <span className="muted shrink-0 text-[12px]">{bell.floor}</span>
+                      )}
+                      {chosen && <IconCheck className="h-5 w-5 shrink-0 text-brand-600" />}
+                    </button>
+
+                    {bellEdit && bell.id !== null && (
+                      <button
+                        type="button"
+                        className="icon-btn h-8 w-8 shrink-0"
+                        aria-label={`${bell.label} umbenennen`}
+                        onClick={() =>
+                          setEditing({
+                            id: bell.id as number,
+                            original: bell.label,
+                            label: bell.label,
+                            floor: bell.floor,
+                          })
+                        }
+                      >
+                        <IconPencil className="h-4 w-4" />
+                      </button>
+                    )}
+                    {bellEdit && !bellDone && (
+                      <>
+                        <button
+                          type="button"
+                          className="icon-btn h-8 w-8 shrink-0"
+                          aria-label={`${bell.label} sperren`}
+                          onClick={() => {
+                            setBellLabel(bell.label);
+                            setSheet("block");
+                          }}
+                        >
+                          <IconBan className="h-4 w-4" />
+                        </button>
+                        <button
+                          type="button"
+                          className="icon-btn h-8 w-8 shrink-0"
+                          aria-label={`${bell.label} entfernen`}
+                          onClick={() => void removeBell(bell)}
+                        >
+                          <IconX className="h-4 w-4" />
+                        </button>
+                      </>
+                    )}
+                    {bellBlocked && isLeader && (
+                      <button
+                        type="button"
+                        className="muted shrink-0 px-1.5 py-2 text-[11px] underline"
+                        onClick={() => {
+                          setBellLabel(bell.label);
+                          void setBlocked(false);
+                        }}
+                      >
+                        aufheben
+                      </button>
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+
+          <div className="hairline border-t pt-4">
+            <label className="label" htmlFor="bell-names">
+              Namen vom Klingelbrett
+            </label>
+            <textarea
+              id="bell-names"
+              className="textarea"
+              rows={4}
+              placeholder={"Müller, 2. OG\nSchmidt\nKaya, EG"}
+              value={bellDraft}
+              onChange={(e) => setBellDraft(e.target.value)}
+            />
+            <p className="muted mt-1 text-[11px]">
+              Ein Name pro Zeile. Nach dem Komma darf die Etage stehen.
+            </p>
             <button
               type="button"
               disabled={busy}
-              className="btn btn-danger mt-4 w-full py-4 text-base"
-              onClick={() => void setBlocked(true)}
+              className="btn btn-primary mt-2 w-full"
+              onClick={submitBellDraft}
             >
-              🚫 Sperren
+              <IconPlus className="h-4 w-4" />
+              Schilder anlegen
             </button>
-            <button
-              type="button"
-              className="btn btn-ghost mt-2 w-full"
-              onClick={() => {
-                setSheet(null);
-                setBlockNote("");
-              }}
-            >
-              Abbrechen
-            </button>
+
+            <div className="mt-4 flex items-end gap-2">
+              <div className="w-24 shrink-0">
+                <label className="label" htmlFor="bell-count">
+                  Anzahl
+                </label>
+                <input
+                  id="bell-count"
+                  className="input"
+                  inputMode="numeric"
+                  placeholder={suggestMfh ? String(currentHouse?.units) : "6"}
+                  value={bellCount}
+                  onChange={(e) => setBellCount(e.target.value.slice(0, 3))}
+                />
+              </div>
+              <button
+                type="button"
+                disabled={busy}
+                className="btn btn-ghost flex-1"
+                onClick={submitBellCount}
+              >
+                Ohne Namen anlegen
+              </button>
+            </div>
+            <p className="muted mt-1 text-[11px]">
+              Legt „Klingel 1“, „Klingel 2“ … an – Namen kannst du später nachtragen.
+            </p>
           </div>
-        </div>
+        </Sheet>
       )}
 
-      {/* Bottom-Sheet: Termin vereinbaren */}
-      {sheet === "appointment" && (
-        <div
-          className="fixed inset-0 z-30 flex items-end bg-black/45 md:items-center md:justify-center"
-          onClick={() => setSheet(null)}
+      {/* ============================ Blatt: Tür sperren ====================== */}
+      {sheet === "block" && (
+        <Sheet
+          title={
+            activeBell ? `„${activeBell.label}“ sperren?` : `${street?.name ?? ""} ${currentNumber} sperren?`
+          }
+          subtitle="Gilt fürs ganze Team und dauerhaft – hier klingelt danach niemand mehr."
+          onClose={() => {
+            setSheet(null);
+            setBlockNote("");
+          }}
+          footer={
+            <>
+              <button
+                type="button"
+                disabled={busy}
+                className="btn btn-danger btn-lg w-full"
+                onClick={() => void setBlocked(true)}
+              >
+                <IconBan className="h-5 w-5" />
+                Dauerhaft sperren
+              </button>
+              <button
+                type="button"
+                className="btn btn-plain mt-1 w-full"
+                onClick={() => {
+                  setSheet(null);
+                  setBlockNote("");
+                }}
+              >
+                Abbrechen
+              </button>
+            </>
+          }
         >
-          <div
-            className="max-h-[88dvh] w-full overflow-y-auto rounded-t-3xl bg-[var(--card)] p-5 pb-[max(2rem,env(safe-area-inset-bottom))] md:max-w-lg md:rounded-3xl"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="mb-4">
-              <h2 className="text-base font-bold">Wann passt es?</h2>
-              <p className="muted text-xs">
-                {street?.name} {currentNumber}
-                {activeBell ? ` · ${activeBell.label}` : ""} – ein Termin ohne Uhrzeit
-                geht unter.
-              </p>
-            </div>
+          <Note icon={<IconInfo className="h-4 w-4" />} tone="danger">
+            Richtig, wenn ausdrücklich widersprochen wurde oder ein Schild „Keine Werbung“ bzw.
+            „Für Vertreter verboten“ hängt: ein erkennbares Verbot zu missachten ist eine
+            unzumutbare Belästigung. Aufheben kann die Sperre nur die Teamleitung.
+          </Note>
 
-            <div className="grid grid-cols-2 gap-2">
-              {quickSlots(now ?? undefined).map((option) => (
+          <div className="mt-4">
+            <label className="label" htmlFor="block-note">
+              Grund (optional)
+            </label>
+            <input
+              id="block-note"
+              className="input"
+              placeholder="z. B. Schild „Keine Werbung“"
+              value={blockNote}
+              onChange={(e) => setBlockNote(e.target.value.slice(0, 200))}
+            />
+          </div>
+        </Sheet>
+      )}
+
+      {/* ========================= Blatt: Termin vereinbaren =================== */}
+      {sheet === "appointment" && (
+        <Sheet
+          title="Wann passt es?"
+          subtitle={`${street?.name ?? ""} ${currentNumber}${
+            activeBell ? ` · ${activeBell.label}` : ""
+          } – ein Termin ohne Uhrzeit geht unter.`}
+          onClose={() => setSheet(null)}
+          footer={
+            <button
+              type="button"
+              disabled={busy || !slot}
+              className="btn btn-primary btn-lg w-full"
+              onClick={() => void submitAppointment()}
+            >
+              <IconCalendar className="h-5 w-5" />
+              Termin speichern
+              {slot ? ` · ${slotLabel(slot, now ?? undefined)}` : ""}
+            </button>
+          }
+        >
+          <GroupLabel>Vorschläge</GroupLabel>
+          <div className="mb-4 grid grid-cols-2 gap-2">
+            {quickSlots(now ?? undefined).map((option) => {
+              const chosen = slot === option.value;
+              return (
                 <button
                   key={option.value}
                   type="button"
                   onClick={() => setSlot(option.value)}
-                  className={`rounded-xl border px-2 py-3 text-sm font-semibold transition ${
-                    slot === option.value
-                      ? "border-transparent bg-brand-600 text-white"
-                      : "hairline border"
-                  }`}
+                  aria-pressed={chosen}
+                  className="rounded-[var(--r-sm)] border px-3 py-3 text-sm font-semibold transition active:scale-[0.97]"
+                  style={
+                    chosen
+                      ? { background: "var(--brand-600)", color: "#fff", borderColor: "transparent" }
+                      : { borderColor: "var(--line)", background: "var(--card)" }
+                  }
                 >
                   {option.label}
                 </button>
-              ))}
-            </div>
+              );
+            })}
+          </div>
 
-            <div className="mt-3 flex gap-2">
-              <div className="min-w-0 flex-1">
-                <label className="label" htmlFor="slot-date">
-                  Tag
-                </label>
-                <input
-                  id="slot-date"
-                  type="date"
-                  className="input"
-                  value={slotDate(slot)}
-                  onChange={(e) =>
-                    setSlot(
-                      normalizeSlot(`${e.target.value} ${slotTime(slot) || "18:00"}`),
-                    )
-                  }
-                />
-              </div>
-              <div className="w-32 shrink-0">
-                <label className="label" htmlFor="slot-time">
-                  Uhrzeit
-                </label>
-                <input
-                  id="slot-time"
-                  type="time"
-                  className="input"
-                  value={slotTime(slot)}
-                  onChange={(e) =>
-                    setSlot(
-                      normalizeSlot(
-                        `${slotDate(slot) || toSlot(now ?? new Date()).slice(0, 10)} ${
-                          e.target.value
-                        }`,
-                      ),
-                    )
-                  }
-                />
-              </div>
-            </div>
-
-            <div className="mt-3 flex gap-2">
-              <div className="min-w-0 flex-1">
-                <label className="label" htmlFor="contact-name">
-                  Name
-                </label>
-                <input
-                  id="contact-name"
-                  className="input"
-                  autoComplete="off"
-                  placeholder="z. B. Frau Müller"
-                  value={contactName}
-                  onChange={(e) => setContactName(e.target.value.slice(0, 120))}
-                />
-              </div>
-              <div className="w-40 shrink-0">
-                <label className="label" htmlFor="contact-phone">
-                  Telefon
-                </label>
-                <input
-                  id="contact-phone"
-                  className="input"
-                  inputMode="tel"
-                  autoComplete="off"
-                  placeholder="optional"
-                  value={contactPhone}
-                  onChange={(e) => setContactPhone(e.target.value.slice(0, 40))}
-                />
-              </div>
-            </div>
-
-            <div className="mt-3">
-              <label className="label" htmlFor="appointment-note">
-                Notiz (optional)
+          <GroupLabel>Genauer Zeitpunkt</GroupLabel>
+          <div className="mb-4 flex gap-2">
+            <div className="min-w-0 flex-1">
+              <label className="label" htmlFor="slot-date">
+                Tag
               </label>
               <input
-                id="appointment-note"
+                id="slot-date"
+                type="date"
                 className="input"
-                placeholder="z. B. letzte Abrechnung bereitlegen"
-                value={note}
-                onChange={(e) => setNote(e.target.value)}
+                value={slotDate(slot)}
+                onChange={(e) =>
+                  setSlot(normalizeSlot(`${e.target.value} ${slotTime(slot) || "18:00"}`))
+                }
               />
             </div>
-
-            <p className="muted mt-3 text-[11px]">
-              Mit Rufnummer lässt sich der Termin vorher kurz bestätigen – das spart den
-              vergeblichen Weg.
-            </p>
-
-            <button
-              type="button"
-              disabled={busy || !slot}
-              className="btn btn-primary mt-3 w-full py-4 text-base"
-              onClick={() => void submitAppointment()}
-            >
-              📅 Termin speichern
-              {slot ? ` · ${slotLabel(slot, now ?? undefined)}` : ""}
-            </button>
-            <button
-              type="button"
-              className="btn btn-ghost mt-2 w-full"
-              onClick={() => setSheet(null)}
-            >
-              Abbrechen
-            </button>
+            <div className="w-32 shrink-0">
+              <label className="label" htmlFor="slot-time">
+                Uhrzeit
+              </label>
+              <input
+                id="slot-time"
+                type="time"
+                className="input"
+                value={slotTime(slot)}
+                onChange={(e) =>
+                  setSlot(
+                    normalizeSlot(
+                      `${slotDate(slot) || toSlot(now ?? new Date()).slice(0, 10)} ${e.target.value}`,
+                    ),
+                  )
+                }
+              />
+            </div>
           </div>
-        </div>
+
+          <GroupLabel>Ansprechpartner</GroupLabel>
+          <div className="flex gap-2">
+            <div className="min-w-0 flex-1">
+              <label className="label" htmlFor="contact-name">
+                Name
+              </label>
+              <input
+                id="contact-name"
+                className="input"
+                autoComplete="off"
+                placeholder="z. B. Frau Müller"
+                value={contactName}
+                onChange={(e) => setContactName(e.target.value.slice(0, 120))}
+              />
+            </div>
+            <div className="w-40 shrink-0">
+              <label className="label" htmlFor="contact-phone">
+                Telefon
+              </label>
+              <input
+                id="contact-phone"
+                className="input"
+                inputMode="tel"
+                autoComplete="off"
+                placeholder="optional"
+                value={contactPhone}
+                onChange={(e) => setContactPhone(e.target.value.slice(0, 40))}
+              />
+            </div>
+          </div>
+
+          <div className="mt-3">
+            <label className="label" htmlFor="appointment-note">
+              Notiz (optional)
+            </label>
+            <input
+              id="appointment-note"
+              className="input"
+              placeholder="z. B. letzte Abrechnung bereitlegen"
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+            />
+          </div>
+
+          <p className="muted mt-3 text-[11px] leading-snug">
+            Mit Rufnummer lässt sich der Termin vorher kurz bestätigen – das spart den
+            vergeblichen Weg.
+          </p>
+        </Sheet>
       )}
 
-      {/* Bottom-Sheet: Ablehnungsgrund */}
+      {/* ========================= Blatt: Ablehnungsgrund ===================== */}
       {sheet === "reason" && (
-        <div
-          className="fixed inset-0 z-30 flex items-end bg-black/45 md:items-center md:justify-center"
-          onClick={() => setSheet(null)}
+        <Sheet
+          title="Warum kein Abschluss?"
+          subtitle="Einmal tippen genügt – der Eintrag wird sofort gespeichert."
+          onClose={() => setSheet(null)}
         >
-          <div
-            className="max-h-[88dvh] w-full overflow-y-auto rounded-t-3xl bg-[var(--card)] p-5 pb-[max(2rem,env(safe-area-inset-bottom))] md:max-w-lg md:rounded-3xl"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="mb-4">
-              <h2 className="text-base font-bold">Warum kein Abschluss?</h2>
-              <p className="muted text-xs">
-                Einmal tippen genügt – der Eintrag wird sofort gespeichert.
-              </p>
-            </div>
-
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-              {reasons.map((reason) => (
-                <button
-                  key={reason.id}
-                  type="button"
-                  disabled={busy}
-                  onClick={() => handleReason(reason)}
-                  className="tap-tile"
+          {/* Zeichen links, Text rechts: so passen zehn Gruende auf einen
+              Blick, ohne dass die Flaeche zum Tippen kleiner wird. */}
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+            {reasons.map((reason) => (
+              <button
+                key={reason.id}
+                type="button"
+                disabled={busy}
+                onClick={() => handleReason(reason)}
+                className="tap-tile flex-row items-center justify-start gap-2.5 px-2.5 text-left text-[13px] leading-tight"
+                style={{ minHeight: "3.75rem" }}
+              >
+                <span
+                  className="tile-icon h-8 w-8 shrink-0 text-[17px]"
+                  style={{ background: "color-mix(in srgb, var(--ink) 6%, transparent)" }}
+                  aria-hidden
                 >
-                  <span className="tap-tile-emoji">{reason.emoji || "💬"}</span>
-                  {reason.label}
-                </button>
-              ))}
-            </div>
-
-            <div className="mt-4">
-              <label className="label" htmlFor="note">
-                Notiz (optional)
-              </label>
-              <input
-                id="note"
-                className="input"
-                placeholder="z. B. nächste Woche nochmal"
-                value={note}
-                onChange={(e) => setNote(e.target.value)}
-              />
-            </div>
-
-            <button
-              type="button"
-              className="btn btn-ghost mt-4 w-full"
-              onClick={() => setSheet(null)}
-            >
-              Abbrechen
-            </button>
+                  {reason.emoji || "💬"}
+                </span>
+                <span className="min-w-0 flex-1 leading-tight">{reason.label}</span>
+              </button>
+            ))}
           </div>
-        </div>
+
+          <div className="mt-4 pb-2">
+            <label className="label" htmlFor="note">
+              Notiz (optional)
+            </label>
+            <input
+              id="note"
+              className="input"
+              placeholder="z. B. nächste Woche nochmal"
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+            />
+          </div>
+        </Sheet>
       )}
 
+      {/* ---------------------------- Rückmeldung ----------------------------- */}
       {toast && (
-        <div className="fixed inset-x-0 bottom-[calc(5.5rem+env(safe-area-inset-bottom))] z-40 mx-auto flex w-fit max-w-[92vw] items-center gap-3 rounded-full bg-brand-900 py-2 pl-4 pr-2 text-center text-sm font-semibold text-white shadow-lg md:bottom-8">
+        <div
+          className="glass fixed inset-x-0 bottom-[calc(5.5rem+env(safe-area-inset-bottom))] z-40 mx-auto flex w-fit max-w-[92vw] items-center gap-3 rounded-full border py-2 pl-4 pr-2 text-center text-[13px] font-semibold shadow-lg md:bottom-8"
+          style={{
+            borderColor: "var(--line)",
+            boxShadow: "var(--shadow-3)",
+            animation: "toast-up .32s var(--ease-spring) both",
+          }}
+          role="status"
+        >
           <span className="min-w-0">{toast.text}</span>
           {toast.undo && lastVisitId !== null && (
             <button
               type="button"
               onClick={() => void undo()}
-              className="shrink-0 rounded-full bg-white/15 px-3 py-1 text-xs font-bold"
+              className="shrink-0 rounded-full px-3 py-1 text-[12px] font-bold"
+              style={{
+                background: "color-mix(in srgb, var(--brand-500) 16%, transparent)",
+                color: "var(--brand-600)",
+              }}
             >
               Rückgängig
             </button>
@@ -2311,6 +2555,73 @@ export function TourClient({
       )}
     </div>
   );
+}
+
+/** Eine der drei Ergebnis-Kacheln an der Tuer. */
+function OutcomeTile({
+  icon,
+  label,
+  tone,
+  disabled,
+  onClick,
+}: {
+  icon: ReactNode;
+  label: string;
+  tone: "neutral" | "brand" | "danger";
+  disabled?: boolean;
+  onClick: () => void;
+}) {
+  const color =
+    tone === "brand"
+      ? "var(--brand-600)"
+      : tone === "danger"
+        ? "var(--signal-600)"
+        : "var(--ink-2)";
+  return (
+    <button
+      type="button"
+      disabled={disabled}
+      onClick={onClick}
+      className="tap-tile text-[13px]"
+    >
+      <span
+        className="tile-icon h-11 w-11"
+        style={{ background: `color-mix(in srgb, ${color} 12%, transparent)`, color }}
+        aria-hidden
+      >
+        {icon}
+      </span>
+      {label}
+    </button>
+  );
+}
+
+/** Farbe eines Ergebnisses - dieselbe in Liste, Klingelbrett und Verlauf. */
+function outcomeColor(outcome: string): string {
+  if (outcome === "SALE") return "var(--energy-600)";
+  if (outcome === "APPOINTMENT") return "var(--brand-600)";
+  if (outcome === "NOT_HOME") return "var(--ink-muted)";
+  return "var(--signal-600)";
+}
+
+/**
+ * Zeichen eines Ergebnisses. Der Ablehnungsgrund bringt sein eigenes Emoji
+ * mit - das stammt aus den Einstellungen des Teams und bleibt deshalb stehen.
+ */
+function OutcomeGlyph({
+  outcome,
+  reasonEmoji,
+  className,
+}: {
+  outcome: string;
+  reasonEmoji: string | null;
+  className?: string;
+}) {
+  if (outcome === "SALE") return <IconCheck className={className} />;
+  if (outcome === "APPOINTMENT") return <IconCalendar className={className} />;
+  if (outcome === "NOT_HOME") return <IconDoor className={className} />;
+  if (reasonEmoji) return <span className="text-[13px] leading-none">{reasonEmoji}</span>;
+  return <IconPerson className={className} />;
 }
 
 const EMPTY_VISITS: Map<string, LocalVisits> = new Map();
@@ -2331,13 +2642,6 @@ function sameNumber(a: string, b: string): boolean {
     a.trim().replace(/\s+/g, "").toLowerCase() ===
     b.trim().replace(/\s+/g, "").toLowerCase()
   );
-}
-
-function outcomeEmoji(outcome: string, reasonEmoji: string | null): string {
-  if (outcome === "SALE") return "✅";
-  if (outcome === "APPOINTMENT") return "📅";
-  if (outcome === "NOT_HOME") return "🚪";
-  return reasonEmoji || "🙋";
 }
 
 function formatTime(value: string): string {

@@ -3,6 +3,8 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import type { User } from "@/lib/types";
+import { Pill } from "@/components/ui";
+import { IconCheck, IconClock } from "@/components/icons";
 
 interface Props {
   territory: {
@@ -98,19 +100,29 @@ export function TerritoryControls({ territory, members, isLeader }: Props) {
         </div>
       </div>
 
-      {!isLeader && (
-        <p className="muted mt-2 text-xs">
-          Melde das Gebiet auf „Fertig“, sobald du alle Straßen abgearbeitet hast.
-        </p>
-      )}
-      {territory.due_date && (
-        <p className="muted mt-2 text-xs">
-          Zieltermin: {new Date(territory.due_date).toLocaleDateString("de-DE")}
-        </p>
-      )}
-      {message && (
-        <p className="mt-2 text-xs font-semibold text-energy-600">{message}</p>
-      )}
+      <div className="mt-3 flex flex-wrap items-center gap-2">
+        {territory.due_date && (
+          <Pill tone="neutral">
+            <IconClock className="h-3.5 w-3.5" />
+            Bis {new Date(territory.due_date).toLocaleDateString("de-DE")}
+          </Pill>
+        )}
+        {!isLeader && (
+          <p className="muted text-[11px]">
+            Melde das Gebiet auf „Fertig“, sobald du alle Straßen abgearbeitet hast.
+          </p>
+        )}
+        <span className="flex-1" />
+        {message && (
+          <span className="badge rise" style={{
+            background: "color-mix(in srgb, var(--energy-500) 16%, transparent)",
+            color: "var(--energy-700)",
+          }}>
+            <IconCheck className="h-3.5 w-3.5" />
+            {message}
+          </span>
+        )}
+      </div>
     </div>
   );
 }

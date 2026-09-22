@@ -5,6 +5,7 @@ import { useMemo, useState } from "react";
 import { AreaMap, type AreaTone, type MapArea } from "@/components/AreaMap";
 import { cssColor } from "@/components/map-colors";
 import { plural } from "@/components/ui";
+import { IconChevronDown, IconMap } from "@/components/icons";
 
 export interface OverviewTerritory {
   id: number;
@@ -81,57 +82,68 @@ export function TerritoryOverviewMap({
   }));
 
   return (
-    <div className="card mb-4 p-3">
-      <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-        <p className="text-sm font-semibold">
-          Gebietskarte ({shown.length}
-          {shown.length !== territories.length && ` von ${territories.length}`})
+    <div className="card mb-4 overflow-hidden">
+      <div className="flex flex-wrap items-center gap-2 px-4 py-3">
+        <IconMap className="h-4 w-4 shrink-0 text-brand-600" />
+        <p className="flex-1 text-[13px] font-semibold">
+          Gebietskarte{" "}
+          <span className="muted font-normal tabular-nums">
+            ({shown.length}
+            {shown.length !== territories.length && ` von ${territories.length}`})
+          </span>
         </p>
-        <div className="flex items-center gap-3">
-          {open && people.length > 1 && (
-            <select
-              className="select w-auto px-2 py-1 text-xs"
-              value={person}
-              onChange={(e) => setPerson(e.target.value)}
-              aria-label="Karte nach Mitarbeiter filtern"
-            >
-              <option value="">alle Gebiete</option>
-              <option value="-">nicht zugeteilt</option>
-              {people.map((name) => (
-                <option key={name} value={name}>
-                  {name}
-                </option>
-              ))}
-            </select>
-          )}
-          <button
-            type="button"
-            className="muted text-xs font-semibold underline"
-            onClick={() => setOpen((v) => !v)}
+        {open && people.length > 1 && (
+          <select
+            className="select w-auto px-2.5 py-1 text-[12px]"
+            value={person}
+            onChange={(e) => setPerson(e.target.value)}
+            aria-label="Karte nach Mitarbeiter filtern"
           >
-            {open ? "ausblenden" : "anzeigen"}
-          </button>
-        </div>
+            <option value="">alle Gebiete</option>
+            <option value="-">nicht zugeteilt</option>
+            {people.map((name) => (
+              <option key={name} value={name}>
+                {name}
+              </option>
+            ))}
+          </select>
+        )}
+        <button
+          type="button"
+          className="icon-btn shrink-0"
+          onClick={() => setOpen((v) => !v)}
+          aria-expanded={open}
+          aria-label={open ? "Karte ausblenden" : "Karte anzeigen"}
+        >
+          <IconChevronDown
+            className={`h-4 w-4 transition-transform ${open ? "rotate-180" : ""}`}
+          />
+        </button>
       </div>
 
       {open && (
-        <>
-          <AreaMap
-            tileUrl={tileUrl}
-            areas={areas}
-            legend={[
-              { color: cssColor("--brand-600", "#0f5cab"), label: "in Arbeit" },
-              { color: cssColor("--energy-600", "#059450"), label: "fertig" },
-              { color: cssColor("--gas-500", "#f59e0b"), label: "pausiert" },
-              { color: cssColor("--ink-muted", "#5b6b82"), label: "offen" },
-            ]}
-            className="h-[40vh] min-h-[240px] w-full"
-            onSelect={(id) => router.push(`/gebiete/${id}`)}
-          />
-          <p className="muted mt-2 text-xs">
+        <div className="px-3 pb-3">
+          <div
+            className="overflow-hidden rounded-[var(--r-md)] border"
+            style={{ borderColor: "var(--line)" }}
+          >
+            <AreaMap
+              tileUrl={tileUrl}
+              areas={areas}
+              legend={[
+                { color: cssColor("--brand-600", "#0f5cab"), label: "in Arbeit" },
+                { color: cssColor("--energy-600", "#059450"), label: "fertig" },
+                { color: cssColor("--gas-500", "#f59e0b"), label: "pausiert" },
+                { color: cssColor("--ink-muted", "#5b6b82"), label: "offen" },
+              ]}
+              className="h-[40vh] min-h-[240px] w-full"
+              onSelect={(id) => router.push(`/gebiete/${id}`)}
+            />
+          </div>
+          <p className="muted mt-2 px-1 text-[11px]">
             Auf eine Fläche tippen, um das Gebiet zu öffnen. Das Kürzel zeigt, wer dran ist.
           </p>
-        </>
+        </div>
       )}
     </div>
   );

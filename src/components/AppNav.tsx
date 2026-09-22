@@ -99,7 +99,7 @@ export function MobileTopBar({ userName }: { userName: string }) {
     router.refresh();
   }
   return (
-    <header className="sticky top-0 z-20 flex items-center justify-between bg-brand-900 px-4 py-3 pt-[max(0.75rem,env(safe-area-inset-top))] text-white md:hidden">
+    <header className="sticky top-0 z-20 flex items-center justify-between bg-brand-900 px-4 py-3 pt-[max(0.75rem,env(safe-area-inset-top))] text-white shadow-sm md:hidden">
       <Logo size={30} />
       <button
         onClick={logout}
@@ -119,7 +119,7 @@ export function MobileTabBar({ items }: { items: NavItem[] }) {
   const dense = items.length > 6;
   return (
     <nav
-      className="fixed inset-x-0 bottom-0 z-20 grid border-t bg-[var(--card)] pb-[max(0.25rem,env(safe-area-inset-bottom))] md:hidden"
+      className="glass fixed inset-x-0 bottom-0 z-20 grid border-t pb-[max(0.25rem,env(safe-area-inset-bottom))] md:hidden"
       style={{
         gridTemplateColumns: `repeat(${items.length}, minmax(0, 1fr))`,
         borderColor: "var(--line)",
@@ -132,10 +132,21 @@ export function MobileTabBar({ items }: { items: NavItem[] }) {
           <Link
             key={item.href}
             href={item.href}
-            className={`flex flex-col items-center gap-0.5 py-2 font-semibold ${
+            aria-current={active ? "page" : undefined}
+            className={`relative flex flex-col items-center gap-0.5 pb-2 pt-2.5 font-semibold transition-colors ${
               dense ? "text-[9px]" : "text-[10px]"
             } ${active ? "text-brand-600" : "muted"}`}
           >
+            {/* Ein kurzer Strich ueber dem aktiven Punkt - er sagt auf einen
+                Blick, wo man gerade ist, ohne die Zeile zu verbreitern. */}
+            <span
+              className="absolute inset-x-0 top-0 mx-auto h-[2.5px] w-7 rounded-full transition-opacity"
+              style={{
+                background: "var(--brand-600)",
+                opacity: active ? 1 : 0,
+              }}
+              aria-hidden
+            />
             <Icon className="h-5 w-5" />
             {/* Bei vielen Punkten wird die Spalte schmal - der Text darf dann
                 kuerzen, aber nie ueberlaufen. */}

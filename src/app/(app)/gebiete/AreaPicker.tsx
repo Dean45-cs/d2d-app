@@ -5,7 +5,15 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Map as LeafletMap, LayerGroup } from "leaflet";
 import { areaSqKm, circleToArea, type LatLng } from "@/lib/geo/area";
 import { cssColor } from "@/components/map-colors";
-import { plural } from "@/components/ui";
+import { plural, Segmented } from "@/components/ui";
+import {
+  IconCircleArea,
+  IconCrosshair,
+  IconInfo,
+  IconPin,
+  IconPolygonArea,
+  IconSearch,
+} from "@/components/icons";
 
 export interface ExistingArea {
   id: number;
@@ -106,7 +114,9 @@ export function AreaPicker({
       const map = L.map(containerRef.current, {
         center: [start?.lat ?? DEFAULT_START.lat, start?.lng ?? DEFAULT_START.lng],
         zoom: start?.zoom ?? DEFAULT_START.zoom,
-        zoomControl: true,
+        // Oben liegen die Kennzahl der Auswahl und "Neu setzen" - die
+        // Zoom-Knoepfe gehen deshalb nach unten links.
+        zoomControl: false,
         scrollWheelZoom: true,
         // Tausende Adresspunkte zeichnet die Leinwand deutlich fluessiger als SVG.
         preferCanvas: true,
@@ -115,6 +125,7 @@ export function AreaPicker({
         maxZoom: 19,
         attribution: "&copy; OpenStreetMap-Mitwirkende",
       }).addTo(map);
+      L.control.zoom({ position: "bottomleft" }).addTo(map);
 
       existingLayerRef.current = L.layerGroup().addTo(map);
       overlayLayerRef.current = L.layerGroup().addTo(map);
@@ -371,28 +382,33 @@ export function AreaPicker({
   }
 
   const size = area ? areaSqKm(area) : 0;
+  const sizeLabel = `${size.toFixed(2).replace(".", ",")} km²`;
 
   return (
-    <div className="space-y-2">
+    <div className="space-y-2.5">
+      {/* ------------------------------ Ortssuche ----------------------------- */}
       <div className="flex gap-2">
-        <input
-          className="input"
-          placeholder="Ort oder PLZ suchen"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          onKeyDown={(e) => {
-            // Enter sucht - und darf auf keinen Fall das Gebiet anlegen.
-            if (e.key === "Enter") {
-              e.preventDefault();
-              void search();
-            }
-          }}
-          enterKeyHint="search"
-          aria-label="Ort oder PLZ suchen"
-        />
+        <div className="relative min-w-0 flex-1">
+          <IconSearch className="muted pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2" />
+          <input
+            className="input pl-9"
+            placeholder="Ort oder PLZ suchen"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            onKeyDown={(e) => {
+              // Enter sucht - und darf auf keinen Fall das Gebiet anlegen.
+              if (e.key === "Enter") {
+                e.preventDefault();
+                void search();
+              }
+            }}
+            enterKeyHint="search"
+            aria-label="Ort oder PLZ suchen"
+          />
+        </div>
         <button
           type="button"
-          className="btn btn-ghost shrink-0"
+          className="btn btn-ghost shrink-0 px-3.5"
           onClick={() => void search()}
           disabled={searching}
         >
@@ -400,99 +416,132 @@ export function AreaPicker({
         </button>
         <button
           type="button"
-          className="btn btn-ghost shrink-0"
+          className="btn btn-ghost shrink-0 px-3"
           onClick={locate}
           title="Mein Standort"
           aria-label="Karte auf meinen Standort setzen"
         >
-          📍
+          <IconCrosshair className="h-[18px] w-[18px]" />
         </button>
       </div>
 
       {hits.length > 1 && (
-        <ul className="max-h-32 overflow-y-auto rounded-xl border text-sm hairline">
+        <ul className="list max-h-40 overflow-y-auto">
           {hits.map((hit, index) => (
             <li key={`${hit.lat}-${hit.lng}-${index}`}>
               <button
                 type="button"
-                className="block w-full px-3 py-2 text-left hover:bg-brand-500/8"
+                className="list-row text-sm"
                 onClick={() => {
                   flyTo(hit.lat, hit.lng, 15);
                   if (modeRef.current === "circle") setCenter([hit.lat, hit.lng]);
                   setHits([]);
                 }}
               >
-                {hit.label}
+                <IconPin className="muted h-4 w-4 shrink-0" />
+                <span className="min-w-0 flex-1 truncate">{hit.label}</span>
               </button>
             </li>
           ))}
         </ul>
       )}
 
-      <div className="flex flex-wrap items-center gap-2">
-        <div className="flex overflow-hidden rounded-xl border hairline">
-          {(
-            [
-              { value: "circle", label: "Umkreis" },
-              { value: "polygon", label: "Fläche zeichnen" },
-            ] as Array<{ value: Mode; label: string }>
-          ).map((option) => (
-            <button
-              key={option.value}
-              type="button"
-              onClick={() => {
-                setMode(option.value);
-                setHint(null);
-              }}
-              aria-pressed={mode === option.value}
-              className={`px-3 py-1.5 text-sm font-semibold ${
-                mode === option.value ? "bg-brand-600 text-white" : ""
-              }`}
-            >
-              {option.label}
-            </button>
-          ))}
-        </div>
-
-        {mode === "polygon" && points.length > 0 && (
-          <button
-            type="button"
-            className="btn btn-ghost px-3 py-1.5 text-sm"
-            onClick={() => setPoints((prev) => prev.slice(0, -1))}
-          >
-            Punkt zurück
-          </button>
-        )}
-        {(center || points.length > 0) && (
-          <button type="button" className="btn btn-ghost px-3 py-1.5 text-sm" onClick={reset}>
-            Neu setzen
-          </button>
-        )}
-      </div>
+      {/* ---------------------------- Art der Auswahl ------------------------- */}
+      <Segmented
+        options={[
+          { value: "circle", label: "Umkreis", icon: <IconCircleArea className="h-4 w-4" /> },
+          { value: "polygon", label: "Fläche zeichnen", icon: <IconPolygonArea className="h-4 w-4" /> },
+        ]}
+        value={mode}
+        onChange={(next: Mode) => {
+          setMode(next);
+          setHint(null);
+        }}
+        ariaLabel="Wie soll das Gebiet abgesteckt werden?"
+      />
 
       {mode === "circle" && (
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 px-0.5">
           <label className="muted shrink-0 text-xs font-semibold" htmlFor="radius">
             Umkreis
           </label>
           <input
             id="radius"
             type="range"
-            className="flex-1 accent-[var(--brand-600)]"
+            className="slider flex-1"
             min={0}
             max={RADIUS_STEPS.length - 1}
             step={1}
             value={Math.max(0, RADIUS_STEPS.indexOf(radius))}
             onChange={(e) => setRadius(RADIUS_STEPS[Number(e.target.value)])}
           />
-          <span className="w-16 shrink-0 text-right text-sm font-semibold tabular-nums">
+          <span
+            className="w-[4.25rem] shrink-0 rounded-full py-1 text-center text-[13px] font-bold tabular-nums"
+            style={{
+              background: "color-mix(in srgb, var(--brand-500) 12%, transparent)",
+              color: "var(--brand-600)",
+            }}
+          >
             {radius < 1000 ? `${radius} m` : `${(radius / 1000).toLocaleString("de-DE")} km`}
           </span>
         </div>
       )}
 
-      <div className="relative overflow-hidden rounded-xl border hairline">
-        <div ref={containerRef} className="h-[44vh] min-h-[260px] w-full" />
+      {/* -------------------------------- Karte ------------------------------- */}
+      <div
+        className="relative overflow-hidden rounded-[var(--r-lg)] border"
+        style={{ borderColor: "var(--line)" }}
+      >
+        <div ref={containerRef} className="h-[46vh] min-h-[280px] w-full" />
+
+        {/* Die Kennzahl der Auswahl liegt auf der Karte - dort schaut man hin. */}
+        <div className="pointer-events-none absolute inset-x-2 top-2 flex items-start justify-between gap-2">
+          <span
+            className="glass pointer-events-auto flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[12px] font-semibold shadow-sm"
+            style={{ borderColor: "var(--line)" }}
+          >
+            {area ? (
+              <>
+                <span
+                  className="h-2 w-2 rounded-full"
+                  style={{ background: "var(--brand-600)" }}
+                  aria-hidden
+                />
+                {sizeLabel}
+                {mode === "polygon" && ` · ${plural(points.length, "Ecke", "Ecken")}`}
+              </>
+            ) : (
+              <>
+                <IconInfo className="h-3.5 w-3.5" />
+                {mode === "circle" ? "Auf die Karte tippen" : "Ecken antippen"}
+              </>
+            )}
+          </span>
+
+          <span className="pointer-events-auto flex gap-1.5">
+            {mode === "polygon" && points.length > 0 && (
+              <button
+                type="button"
+                className="glass rounded-full border px-3 py-1.5 text-[12px] font-semibold shadow-sm"
+                style={{ borderColor: "var(--line)" }}
+                onClick={() => setPoints((prev) => prev.slice(0, -1))}
+              >
+                Punkt zurück
+              </button>
+            )}
+            {(center || points.length > 0) && (
+              <button
+                type="button"
+                className="glass rounded-full border px-3 py-1.5 text-[12px] font-semibold shadow-sm"
+                style={{ borderColor: "var(--line)" }}
+                onClick={reset}
+              >
+                Neu setzen
+              </button>
+            )}
+          </span>
+        </div>
+
         {!ready && (
           <div className="absolute inset-0 grid place-items-center bg-[var(--card)]">
             <p className="muted animate-pulse text-sm">Karte wird geladen …</p>
@@ -500,17 +549,15 @@ export function AreaPicker({
         )}
       </div>
 
-      <p className="muted text-xs">
-        {area
-          ? `Gebiet markiert · ${size.toFixed(2).replace(".", ",")} km²${
-              mode === "polygon" ? ` · ${plural(points.length, "Eckpunkt", "Eckpunkte")}` : ""
-            }`
-          : mode === "circle"
-            ? "Auf die Karte tippen – der Umkreis ist das Gebiet."
-            : "Ecken nacheinander antippen (mindestens drei), Punkte lassen sich verschieben."}
+      <p className="muted px-0.5 text-[11px] leading-snug">
+        {mode === "circle"
+          ? "Auf die Karte tippen – der Umkreis ist das Gebiet. Der Mittelpunkt lässt sich ziehen."
+          : "Ecken nacheinander antippen (mindestens drei). Jeder Punkt lässt sich verschieben."}
       </p>
 
-      {hint && <p className="text-xs font-semibold text-signal-600">{hint}</p>}
+      {hint && (
+        <p className="text-[12px] font-semibold text-signal-600">{hint}</p>
+      )}
     </div>
   );
 }

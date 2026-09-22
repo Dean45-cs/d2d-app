@@ -12,7 +12,15 @@ import {
 } from "@/lib/queries";
 import { readArea } from "@/lib/geo/area";
 import { mapTileUrl } from "@/lib/map";
-import { PageHeader, ProgressBar, StatusBadge, percent } from "@/components/ui";
+import { Note, PageHeader, ProgressBar, StatusBadge, percent } from "@/components/ui";
+import {
+  IconCalendar,
+  IconCheck,
+  IconChevronLeft,
+  IconDoor,
+  IconInfo,
+  IconPerson,
+} from "@/components/icons";
 import { TerritoryControls } from "./TerritoryControls";
 import { TerritoryAreaCard } from "./TerritoryAreaCard";
 import { StreetList } from "./StreetList";
@@ -77,8 +85,12 @@ export default async function TerritoryDetailPage({
 
   return (
     <div className="mx-auto max-w-4xl">
-      <Link href="/gebiete" className="muted mb-2 inline-block text-sm font-semibold">
-        ← Alle Gebiete
+      <Link
+        href="/gebiete"
+        className="muted mb-2 inline-flex items-center gap-1 text-[13px] font-semibold hover:text-brand-600"
+      >
+        <IconChevronLeft className="h-3.5 w-3.5" />
+        Alle Gebiete
       </Link>
 
       <PageHeader
@@ -91,29 +103,38 @@ export default async function TerritoryDetailPage({
       />
 
       <div className="card mb-4 p-4">
-        <div className="mb-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
           <Metric label="Straßen" value={territory.street_count} />
           <Metric label="Türen erfasst" value={territory.visit_count} />
           <Metric label="Angetroffen" value={territory.met_count} />
           <Metric
             label="Abschlüsse"
             value={territory.sale_count}
-            hint={percent(territory.sale_count, territory.met_count)}
+            hint={territory.met_count > 0 ? percent(territory.sale_count, territory.met_count) : undefined}
+            tone="success"
           />
         </div>
         {territory.unit_count > 0 && (
-          <>
-            <ProgressBar value={territory.visit_count} max={territory.unit_count} />
-            <p className="muted mt-1 text-xs">
-              {territory.visit_count} von {territory.unit_count} Wohneinheiten bearbeitet
-            </p>
-          </>
+          <div className="mt-3.5">
+            <div className="mb-1.5 flex items-baseline justify-between gap-2 text-[11px]">
+              <span className="muted font-semibold">Fortschritt</span>
+              <span className="font-semibold tabular-nums">
+                {territory.visit_count} von {territory.unit_count} Wohneinheiten
+              </span>
+            </div>
+            <ProgressBar
+              value={territory.visit_count}
+              max={territory.unit_count}
+              tone={territory.status === "DONE" ? "success" : "brand"}
+            />
+          </div>
         )}
         {territory.note && (
-          <p className="mt-3 rounded-xl bg-brand-500/8 px-3 py-2 text-sm">
-            <span className="font-semibold">Hinweis: </span>
-            {territory.note}
-          </p>
+          <div className="mt-3">
+            <Note icon={<IconInfo className="h-4 w-4" />} tone="brand">
+              {territory.note}
+            </Note>
+          </div>
         )}
       </div>
 
@@ -147,27 +168,42 @@ export default async function TerritoryDetailPage({
       />
 
       {visits.length > 0 && (
-        <div className="card mt-4 p-4">
-          <p className="mb-3 text-sm font-semibold">Letzte Kontakte</p>
-          <ul className="space-y-2">
+        <div className="card mt-4 overflow-hidden">
+          <p className="px-4 pb-1.5 pt-3.5 text-[13px] font-semibold">Letzte Kontakte</p>
+          <ul>
             {visits.map((v) => (
-              <li key={v.id} className="flex items-start gap-2 text-sm">
-                <span className="w-6 shrink-0 text-center">
-                  {v.outcome === "SALE"
-                    ? "✅"
-                    : v.outcome === "APPOINTMENT"
-                      ? "📅"
-                      : v.outcome === "NOT_HOME"
-                        ? "🚪"
-                        : (v.reason_emoji || "🙋")}
+              <li
+                key={v.id}
+                className="flex items-start gap-2.5 border-t px-4 py-2.5"
+                style={{ borderColor: "var(--line)" }}
+              >
+                <span
+                  className="tile-icon mt-0.5 h-7 w-7 shrink-0"
+                  style={{
+                    background: `color-mix(in srgb, ${outcomeColor(v.outcome)} 14%, transparent)`,
+                    color: outcomeColor(v.outcome),
+                  }}
+                  aria-hidden
+                >
+                  {v.outcome === "SALE" ? (
+                    <IconCheck className="h-4 w-4" />
+                  ) : v.outcome === "APPOINTMENT" ? (
+                    <IconCalendar className="h-4 w-4" />
+                  ) : v.outcome === "NOT_HOME" ? (
+                    <IconDoor className="h-4 w-4" />
+                  ) : v.reason_emoji ? (
+                    <span className="text-[13px] leading-none">{v.reason_emoji}</span>
+                  ) : (
+                    <IconPerson className="h-4 w-4" />
+                  )}
                 </span>
-                <span className="min-w-0 flex-1">
+                <span className="min-w-0 flex-1 text-[13px]">
                   <span className="font-medium">
                     {v.street_name ?? "–"} {v.house_number}
                   </span>
                   {v.reason_label && <span className="muted"> · {v.reason_label}</span>}
                   {v.reason_note && <span className="muted"> · „{v.reason_note}“</span>}
-                  <span className="muted block text-xs">
+                  <span className="muted block text-[11px]">
                     {v.user_name} · {formatDateTime(v.created_at)}
                   </span>
                 </span>
@@ -184,20 +220,36 @@ function Metric({
   label,
   value,
   hint,
+  tone = "neutral",
 }: {
   label: string;
   value: number;
   hint?: string;
+  tone?: "neutral" | "success";
 }) {
   return (
     <div>
-      <p className="muted text-[11px] font-semibold uppercase tracking-wider">{label}</p>
-      <p className="text-xl font-bold tabular-nums">
+      <p className="muted text-[10px] font-bold uppercase tracking-[0.07em]">{label}</p>
+      <p
+        className="mt-0.5 text-[22px] font-bold leading-none tabular-nums"
+        style={{
+          color: tone === "success" ? "var(--energy-600)" : "var(--ink)",
+          letterSpacing: "-0.02em",
+        }}
+      >
         {value}
-        {hint && <span className="muted ml-1 text-xs font-semibold">{hint}</span>}
+        {hint && <span className="muted ml-1 text-[12px] font-semibold">{hint}</span>}
       </p>
     </div>
   );
+}
+
+/** Farbe eines Ergebnisses - dieselbe wie an der Tuer. */
+function outcomeColor(outcome: string): string {
+  if (outcome === "SALE") return "var(--energy-600)";
+  if (outcome === "APPOINTMENT") return "var(--brand-600)";
+  if (outcome === "NOT_HOME") return "var(--ink-muted)";
+  return "var(--signal-600)";
 }
 
 /** Fertig, sobald die Strasse abgehakt oder rechnerisch durchgearbeitet ist. */
