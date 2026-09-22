@@ -5,8 +5,8 @@ import { usePathname, useRouter } from "next/navigation";
 import {
   IconBolt,
   IconChart,
+  IconCalendar,
   IconCog,
-  IconDoc,
   IconDoor,
   IconHome,
   IconLogout,
@@ -23,7 +23,7 @@ const ICONS: Record<IconName, (props: { className?: string }) => React.ReactElem
   bolt: IconBolt,
   chart: IconChart,
   users: IconUsers,
-  doc: IconDoc,
+  calendar: IconCalendar,
   cog: IconCog,
 };
 
