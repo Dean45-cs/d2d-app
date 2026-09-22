@@ -6,6 +6,8 @@ import type {
   BuildingType,
   Doorbell,
   EnergyPrice,
+  Order,
+  OrderStatus,
   RejectionReason,
   Street,
   Territory,
@@ -752,6 +754,8 @@ export function createVisit(input: {
   reasonNote: string;
   energyType: "" | "STROM" | "GAS" | "BEIDES";
   followUpAt: string | null;
+  contactName?: string;
+  contactPhone?: string;
   lat: number | null;
   lng: number | null;
 }): number {
@@ -760,8 +764,9 @@ export function createVisit(input: {
     .prepare(
       `INSERT INTO visits
          (team_id, user_id, territory_id, street_id, house_number, doorbell_id, outcome,
-          reason_id, reason_note, energy_type, follow_up_at, lat, lng)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          reason_id, reason_note, energy_type, follow_up_at, contact_name, contact_phone,
+          lat, lng)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .run(
       input.teamId,
@@ -775,6 +780,8 @@ export function createVisit(input: {
       input.reasonNote,
       input.energyType,
       input.followUpAt,
+      input.contactName ?? "",
+      input.contactPhone ?? "",
       input.lat,
       input.lng,
     );
@@ -847,6 +854,346 @@ export function listVisits(
         LIMIT ?`,
     )
     .all(...params) as VisitRow[];
+}
+
+/* =============================== Auftraege ============================== */
+
+export interface OrderInput {
+  teamId: number;
+  userId: number;
+  /** Vom Geraet vergeben - macht das Nachsenden gefahrlos wiederholbar. */
+  clientRef: string;
+  visitId: number | null;
+  territoryId: number | null;
+  streetId: number | null;
+  streetName: string;
+  houseNumber: string;
+  doorbellLabel: string;
+  postalCode: string;
+  city: string;
+  customerName: string;
+  customerPhone: string;
+  customerEmail: string;
+  energyType: "STROM" | "GAS" | "BEIDES";
+  tariff: string;
+  previousProvider: string;
+  meterStrom: string;
+  meterGas: string;
+  usageStrom: number;
+  usageGas: number;
+  startDate: string | null;
+  note: string;
+  signature: string;
+  withdrawalGiven: boolean;
+  privacyGiven: boolean;
+}
+
+export interface OrderRow extends Order {
+  user_name: string;
+  territory_name: string | null;
+  status_by_name: string | null;
+}
+
+/**
+ * Auftrag anlegen - und zwar hoechstens einmal je client_ref.
+ *
+ * Ein Auftrag, der ohne Netz entstanden ist, wird spaeter nachgesendet;
+ * kommt er dabei doppelt an (z. B. weil die Antwort verloren ging), darf
+ * daraus kein zweiter Vertrag werden.
+ */
+export function createOrder(input: OrderInput): { id: number; created: boolean } {
+  const db = getDb();
+  const existing = db
+    .prepare("SELECT id FROM orders WHERE team_id = ? AND client_ref = ?")
+    .get(input.teamId, input.clientRef) as { id: number } | undefined;
+  if (existing) return { id: existing.id, created: false };
+
+  try {
+    const result = db
+      .prepare(
+        `INSERT INTO orders
+           (team_id, user_id, client_ref, visit_id, territory_id, street_id,
+            street_name, house_number, doorbell_label, postal_code, city,
+            customer_name, customer_phone, customer_email, energy_type, tariff,
+            previous_provider, meter_strom, meter_gas, usage_strom, usage_gas,
+            start_date, note, signature, signed_at, withdrawal_given, privacy_given)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+                 CASE WHEN ? <> '' THEN datetime('now') END, ?, ?)`,
+      )
+      .run(
+        input.teamId,
+        input.userId,
+        input.clientRef,
+        input.visitId,
+        input.territoryId,
+        input.streetId,
+        input.streetName,
+        input.houseNumber,
+        input.doorbellLabel,
+        input.postalCode,
+        input.city,
+        input.customerName,
+        input.customerPhone,
+        input.customerEmail,
+        input.energyType,
+        input.tariff,
+        input.previousProvider,
+        input.meterStrom,
+        input.meterGas,
+        input.usageStrom,
+        input.usageGas,
+        input.startDate,
+        input.note,
+        input.signature,
+        input.signature,
+        input.withdrawalGiven ? 1 : 0,
+        input.privacyGiven ? 1 : 0,
+      );
+    return { id: result.lastInsertRowid as number, created: true };
+  } catch (error) {
+    // Zwei Prozesse gleichzeitig: dann gewinnt der erste, und wir nehmen
+    // seinen Auftrag - doppelt anlegen waere hier das Schlimmste.
+    const race = db
+      .prepare("SELECT id FROM orders WHERE team_id = ? AND client_ref = ?")
+      .get(input.teamId, input.clientRef) as { id: number } | undefined;
+    if (race) return { id: race.id, created: false };
+    throw error;
+  }
+}
+
+const ORDER_SELECT = `SELECT o.*,
+              u.name AS user_name,
+              t.name AS territory_name,
+              (SELECT x.name FROM users x WHERE x.id = o.status_by) AS status_by_name
+         FROM orders o
+         JOIN users u ON u.id = o.user_id
+         LEFT JOIN territories t ON t.id = o.territory_id`;
+
+export function listOrders(
+  teamId: number,
+  opts: { userId?: number; limit?: number } = {},
+): OrderRow[] {
+  const where: string[] = ["o.team_id = ?"];
+  const params: (string | number)[] = [teamId];
+  if (opts.userId) {
+    where.push("o.user_id = ?");
+    params.push(opts.userId);
+  }
+  params.push(opts.limit ?? 100);
+
+  return getDb()
+    .prepare(
+      `${ORDER_SELECT}
+        WHERE ${where.join(" AND ")}
+        ORDER BY o.created_at DESC, o.id DESC
+        LIMIT ?`,
+    )
+    .all(...params) as OrderRow[];
+}
+
+/**
+ * Auftrag zu einer Geraetekennung suchen.
+ *
+ * Damit erkennt der Server einen nachgesendeten Abschluss wieder - und legt
+ * weder den Auftrag noch den Tuereintrag ein zweites Mal an.
+ */
+export function findOrderByRef(
+  teamId: number,
+  clientRef: string,
+): { id: number; visit_id: number | null } | null {
+  const row = getDb()
+    .prepare("SELECT id, visit_id FROM orders WHERE team_id = ? AND client_ref = ?")
+    .get(teamId, clientRef) as { id: number; visit_id: number | null } | undefined;
+  return row ?? null;
+}
+
+export function getOrder(orderId: number, teamId: number): OrderRow | null {
+  const row = getDb()
+    .prepare(`${ORDER_SELECT} WHERE o.id = ? AND o.team_id = ?`)
+    .get(orderId, teamId) as OrderRow | undefined;
+  return row ?? null;
+}
+
+/** Schritt in der Nachbearbeitung setzen - mit Spur, wer das war. */
+export function setOrderStatus(
+  orderId: number,
+  status: OrderStatus,
+  userId: number,
+  note = "",
+): void {
+  getDb()
+    .prepare(
+      `UPDATE orders
+          SET status = ?, status_note = ?, status_by = ?, status_at = datetime('now')
+        WHERE id = ?`,
+    )
+    .run(status, note, userId, orderId);
+}
+
+export interface OrderTotals {
+  orders: number;
+  /** Noch in Arbeit: erfasst, Anruf erledigt oder eingereicht. */
+  open: number;
+  /** Wartet auf den Bestaetigungsanruf. */
+  waiting_call: number;
+  confirmed: number;
+  lost: number;
+}
+
+export function orderTotals(
+  teamId: number,
+  opts: { userId?: number; since?: string } = {},
+): OrderTotals {
+  const where: string[] = ["team_id = ?"];
+  const params: (string | number)[] = [teamId];
+  if (opts.userId) {
+    where.push("user_id = ?");
+    params.push(opts.userId);
+  }
+  if (opts.since) {
+    where.push("created_at >= ?");
+    params.push(opts.since);
+  }
+  return getDb()
+    .prepare(
+      `SELECT COUNT(*) AS orders,
+              SUM(status IN ('ERFASST','QUALITY_CALL','EINGEREICHT')) AS open,
+              SUM(status = 'ERFASST')                                 AS waiting_call,
+              SUM(status = 'BESTAETIGT')                              AS confirmed,
+              SUM(status IN ('STORNIERT','WIDERRUFEN'))               AS lost
+         FROM orders WHERE ${where.join(" AND ")}`,
+    )
+    .get(...params) as OrderTotals;
+}
+
+/**
+ * Abschluesse, zu denen kein Auftrag erfasst wurde.
+ *
+ * An der Tuer darf man den Abschluss auch ohne Auftragsdaten zaehlen - dann
+ * fehlen sie aber, und die Teamleitung soll das sehen.
+ */
+export function salesWithoutOrder(
+  teamId: number,
+  opts: { userId?: number; since?: string } = {},
+): number {
+  const where: string[] = ["v.team_id = ?", "v.outcome = 'SALE'"];
+  const params: (string | number)[] = [teamId];
+  if (opts.userId) {
+    where.push("v.user_id = ?");
+    params.push(opts.userId);
+  }
+  if (opts.since) {
+    where.push("v.created_at >= ?");
+    params.push(opts.since);
+  }
+  const row = getDb()
+    .prepare(
+      `SELECT COUNT(*) AS c FROM visits v
+        WHERE ${where.join(" AND ")}
+          AND NOT EXISTS (SELECT 1 FROM orders o WHERE o.visit_id = v.id)`,
+    )
+    .get(...params) as { c: number };
+  return row.c;
+}
+
+/* ================================ Termine =============================== */
+
+export interface AppointmentRow {
+  id: number;
+  created_at: string;
+  follow_up_at: string;
+  follow_up_done_at: string | null;
+  contact_name: string;
+  contact_phone: string;
+  reason_note: string;
+  energy_type: string;
+  house_number: string;
+  user_id: number;
+  user_name: string;
+  street_id: number | null;
+  street_name: string | null;
+  lat: number | null;
+  lng: number | null;
+  territory_name: string | null;
+  doorbell_label: string | null;
+}
+
+/**
+ * Vereinbarte Termine, der naechste zuerst.
+ *
+ * Sortiert wird ueber den Text der Ortszeit - "2026-09-21 18:00" laesst sich
+ * genauso vergleichen wie ein Datum, und die Reihenfolge bleibt dieselbe.
+ */
+export function listAppointments(
+  teamId: number,
+  opts: { userId?: number; includeDone?: boolean; limit?: number } = {},
+): AppointmentRow[] {
+  const where: string[] = [
+    "v.team_id = ?",
+    "v.outcome = 'APPOINTMENT'",
+    "v.follow_up_at IS NOT NULL",
+  ];
+  const params: (string | number)[] = [teamId];
+  if (opts.userId) {
+    where.push("v.user_id = ?");
+    params.push(opts.userId);
+  }
+  if (!opts.includeDone) where.push("v.follow_up_done_at IS NULL");
+  params.push(opts.limit ?? 100);
+
+  return getDb()
+    .prepare(
+      `SELECT v.id, v.created_at, v.follow_up_at, v.follow_up_done_at,
+              v.contact_name, v.contact_phone, v.reason_note, v.energy_type,
+              v.house_number, v.user_id,
+              u.name AS user_name,
+              s.id   AS street_id,
+              s.name AS street_name,
+              COALESCE(v.lat, s.lat) AS lat,
+              COALESCE(v.lng, s.lng) AS lng,
+              t.name AS territory_name,
+              d.label AS doorbell_label
+         FROM visits v
+         JOIN users u ON u.id = v.user_id
+         LEFT JOIN streets s ON s.id = v.street_id
+         LEFT JOIN territories t ON t.id = v.territory_id
+         LEFT JOIN doorbells d ON d.id = v.doorbell_id
+        WHERE ${where.join(" AND ")}
+        ORDER BY v.follow_up_at
+        LIMIT ?`,
+    )
+    .all(...params) as AppointmentRow[];
+}
+
+/** Termin abhaken oder wieder oeffnen. */
+export function setAppointmentDone(visitId: number, done: boolean): void {
+  getDb()
+    .prepare(
+      `UPDATE visits SET follow_up_done_at = ${done ? "datetime('now')" : "NULL"}
+        WHERE id = ?`,
+    )
+    .run(visitId);
+}
+
+/** Termin umlegen - der Kunde hat eine andere Zeit genannt. */
+export function setAppointmentSlot(visitId: number, slot: string): void {
+  getDb()
+    .prepare("UPDATE visits SET follow_up_at = ?, follow_up_done_at = NULL WHERE id = ?")
+    .run(slot, visitId);
+}
+
+/** Prueft, dass der Eintrag zum Team gehoert - und wem er gehoert. */
+export function requireTeamVisit(
+  visitId: number,
+  teamId: number,
+): { id: number; user_id: number; outcome: VisitOutcome } {
+  const row = getDb()
+    .prepare("SELECT id, user_id, outcome FROM visits WHERE id = ? AND team_id = ?")
+    .get(visitId, teamId) as
+    | { id: number; user_id: number; outcome: VisitOutcome }
+    | undefined;
+  if (!row) throw new Error("Eintrag nicht gefunden.");
+  return row;
 }
 
 /* ============================== Auswertung ============================== */

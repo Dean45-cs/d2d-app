@@ -146,6 +146,62 @@ function migrate(db: Database.Database) {
     CREATE INDEX IF NOT EXISTS idx_doorbells_house     ON doorbells (house_number_id, sort_order);
     CREATE INDEX IF NOT EXISTS idx_territories_team    ON territories (team_id);
 
+    /* Auftraege, die an der Tuer entstehen.
+
+       Im Door-to-Door-Vertrieb endet das Gespraech nicht mit dem Haken
+       "Abschluss": der Auftrag wird vor Ort aufgenommen, vom Kunden auf dem
+       Geraet unterschrieben und danach nachbearbeitet (Bestaetigungsanruf,
+       Uebergabe an den Partner, 14 Tage Widerrufsfrist). Genau diese Kette
+       bildet die Tabelle ab.
+
+       client_ref kommt vom Geraet: ein Auftrag, der ohne Netz entstanden und
+       spaeter nachgesendet wird, darf kein zweites Mal angelegt werden. */
+    CREATE TABLE IF NOT EXISTS orders (
+      id                INTEGER PRIMARY KEY AUTOINCREMENT,
+      team_id           INTEGER NOT NULL REFERENCES teams(id) ON DELETE CASCADE,
+      user_id           INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      client_ref        TEXT NOT NULL,
+      visit_id          INTEGER REFERENCES visits(id) ON DELETE SET NULL,
+      territory_id      INTEGER REFERENCES territories(id) ON DELETE SET NULL,
+      street_id         INTEGER REFERENCES streets(id) ON DELETE SET NULL,
+      /* Adresse zusaetzlich im Klartext: ein Auftrag muss auch dann noch
+         lesbar sein, wenn das Gebiet spaeter umgebaut oder geloescht wird. */
+      street_name       TEXT NOT NULL DEFAULT '',
+      house_number      TEXT NOT NULL DEFAULT '',
+      doorbell_label    TEXT NOT NULL DEFAULT '',
+      postal_code       TEXT NOT NULL DEFAULT '',
+      city              TEXT NOT NULL DEFAULT '',
+      customer_name     TEXT NOT NULL,
+      customer_phone    TEXT NOT NULL DEFAULT '',
+      customer_email    TEXT NOT NULL DEFAULT '',
+      energy_type       TEXT NOT NULL DEFAULT 'BEIDES'
+                        CHECK (energy_type IN ('STROM','GAS','BEIDES')),
+      tariff            TEXT NOT NULL DEFAULT '',
+      previous_provider TEXT NOT NULL DEFAULT '',
+      meter_strom       TEXT NOT NULL DEFAULT '',
+      meter_gas         TEXT NOT NULL DEFAULT '',
+      usage_strom       INTEGER NOT NULL DEFAULT 0,
+      usage_gas         INTEGER NOT NULL DEFAULT 0,
+      start_date        TEXT,
+      note              TEXT NOT NULL DEFAULT '',
+      /* Nachweise vom Tuergespraech */
+      signature         TEXT NOT NULL DEFAULT '',
+      signed_at         TEXT,
+      withdrawal_given  INTEGER NOT NULL DEFAULT 0,
+      privacy_given     INTEGER NOT NULL DEFAULT 0,
+      status            TEXT NOT NULL DEFAULT 'ERFASST'
+                        CHECK (status IN ('ERFASST','QUALITY_CALL','EINGEREICHT',
+                                          'BESTAETIGT','STORNIERT','WIDERRUFEN')),
+      status_note       TEXT NOT NULL DEFAULT '',
+      status_by         INTEGER REFERENCES users(id) ON DELETE SET NULL,
+      status_at         TEXT,
+      created_at        TEXT NOT NULL DEFAULT (datetime('now')),
+      UNIQUE (team_id, client_ref)
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_orders_team_created ON orders (team_id, created_at);
+    CREATE INDEX IF NOT EXISTS idx_orders_status      ON orders (team_id, status);
+
     CREATE TABLE IF NOT EXISTS energy_prices (
       id                INTEGER PRIMARY KEY AUTOINCREMENT,
       postal_code       TEXT NOT NULL,
@@ -195,6 +251,13 @@ function migrate(db: Database.Database) {
   );
   addColumn(db, "visits", "doorbell_id", "INTEGER REFERENCES doorbells(id) ON DELETE SET NULL");
 
+  // Termine: wer wann nochmal aufmacht, steht am Eintrag selbst. Die Uhrzeit
+  // ist bewusst Ortszeit ("2026-09-21 18:00") - vor der Tuer zaehlt die Uhr an
+  // der Wand, nicht die Zeitzone des Servers.
+  addColumn(db, "visits", "contact_name", "TEXT NOT NULL DEFAULT ''");
+  addColumn(db, "visits", "contact_phone", "TEXT NOT NULL DEFAULT ''");
+  addColumn(db, "visits", "follow_up_done_at", "TEXT");
+
   // Gesperrte Tueren: hier wurde ausdruecklich widersprochen. Gilt fuers ganze
   // Team - wer nach uns in die Strasse geht, soll dort nicht mehr klingeln.
   for (const table of ["house_numbers", "doorbells"]) {
@@ -205,6 +268,9 @@ function migrate(db: Database.Database) {
 
   // Erst hier, denn vor addColumn gibt es die Spalte in alten Datenbanken nicht.
   db.exec("CREATE INDEX IF NOT EXISTS idx_visits_doorbell ON visits (doorbell_id)");
+  db.exec(
+    "CREATE INDEX IF NOT EXISTS idx_visits_follow_up ON visits (team_id, follow_up_at)",
+  );
 }
 
 /** Fuegt eine Spalte hinzu, falls sie noch fehlt. */

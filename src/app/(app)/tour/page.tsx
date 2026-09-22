@@ -1,6 +1,7 @@
 import { requireUser } from "@/lib/auth";
 import { getDb } from "@/lib/db";
 import {
+  listAppointments,
   listDoorbells,
   listHouseNumbers,
   listReasons,
@@ -49,6 +50,12 @@ export default async function TourPage() {
   const todayTotals = totals(user.team_id, { userId: user.id, since: today });
   const recent = listVisits(user.team_id, { userId: user.id, limit: 8 });
 
+  /*
+   * Die naechsten eigenen Termine. Was davon "heute" ist, entscheidet das
+   * Geraet: an der Tuer zaehlt die Uhr des Verkaeufers, nicht die des Servers.
+   */
+  const appointments = listAppointments(user.team_id, { userId: user.id, limit: 20 });
+
   return (
     <TourClient
       territories={territories.map((t) => ({
@@ -64,6 +71,7 @@ export default async function TourPage() {
       reasons={listReasons(user.team_id)}
       todayTotals={todayTotals}
       recent={recent}
+      appointments={appointments}
       tarifrechnerUrl={
         process.env.NEXT_PUBLIC_TARIFRECHNER_URL ??
         "https://portal-ep24.de/menues/tarifrechner/"
