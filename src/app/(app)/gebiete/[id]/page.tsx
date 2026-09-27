@@ -190,6 +190,7 @@ export default async function TerritoryDetailPage({
       <TerritoryControls
         territory={{
           id: territory.id,
+          name: territory.name,
           status: territory.status,
           assigned_user_id: territory.assigned_user_id,
           assignee_name: territory.assignee_name,

@@ -4,11 +4,13 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import type { User } from "@/lib/types";
 import { Pill } from "@/components/ui";
-import { IconCheck, IconClock } from "@/components/icons";
+import { useConfirm } from "@/components/useConfirm";
+import { IconCheck, IconClock, IconTrash } from "@/components/icons";
 
 interface Props {
   territory: {
     id: number;
+    name: string;
     status: string;
     assigned_user_id: number | null;
     assignee_name: string | null;
@@ -29,6 +31,34 @@ export function TerritoryControls({ territory, members, isLeader }: Props) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const { confirm, dialog } = useConfirm();
+
+  async function remove() {
+    const ok = await confirm({
+      title: `„${territory.name}“ löschen?`,
+      text: "Das Gebiet verschwindet samt Straßen und Fläche – die Fläche ist danach wieder frei. Bereits erfasste Türen und Abschlüsse bleiben in der Auswertung.",
+      confirmLabel: "Gebiet löschen",
+      danger: true,
+    });
+    if (!ok) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const response = await fetch(`/api/territories/${territory.id}`, { method: "DELETE" });
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}));
+        setError(data.error ?? "Das Gebiet konnte nicht gelöscht werden.");
+        return;
+      }
+      router.replace("/gebiete");
+      router.refresh();
+    } catch {
+      setError("Keine Verbindung – bitte noch einmal versuchen.");
+    } finally {
+      setBusy(false);
+    }
+  }
 
   async function patch(body: Record<string, unknown>, note: string) {
     setBusy(true);
@@ -100,7 +130,6 @@ export function TerritoryControls({ territory, members, isLeader }: Props) {
         </div>
       </div>
 
-      {(territory.due_date || !isLeader || message) && (
       <div className="mt-3 flex flex-wrap items-center gap-2">
         {territory.due_date && (
           <Pill tone="neutral">
@@ -114,6 +143,18 @@ export function TerritoryControls({ territory, members, isLeader }: Props) {
           </p>
         )}
         <span className="flex-1" />
+        {error && <span className="text-[12px] font-semibold text-danger">{error}</span>}
+        {isLeader && (
+          <button
+            type="button"
+            className="btn btn-ghost btn-sm btn-pill text-danger"
+            onClick={() => void remove()}
+            disabled={busy}
+          >
+            <IconTrash className="h-4 w-4" />
+            Gebiet löschen
+          </button>
+        )}
         {message && (
           <span className="badge rise" style={{
             background: "color-mix(in srgb, var(--energy-500) 16%, transparent)",
@@ -124,7 +165,7 @@ export function TerritoryControls({ territory, members, isLeader }: Props) {
           </span>
         )}
       </div>
-      )}
+      {dialog}
     </div>
   );
 }
