@@ -2,154 +2,229 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import {
-  IconBolt,
-  IconChart,
-  IconCalendar,
-  IconCog,
-  IconDoor,
-  IconHome,
-  IconLogout,
-  IconMap,
-  IconUsers,
-} from "./icons";
+import { useCallback, useState } from "react";
+import { IconLogout } from "./icons";
 import { Logo } from "./Logo";
-import type { IconName, NavItem } from "@/lib/nav";
+import { Sheet } from "./Sheet";
+import { Avatar } from "./ui";
+import { NAV_ICONS } from "./nav-icons";
+import { MORE_HREF, type NavItem, type Navigation } from "@/lib/nav";
 
-const ICONS: Record<IconName, (props: { className?: string }) => React.ReactElement> = {
-  home: IconHome,
-  door: IconDoor,
-  map: IconMap,
-  bolt: IconBolt,
-  chart: IconChart,
-  users: IconUsers,
-  calendar: IconCalendar,
-  cog: IconCog,
-};
+export interface NavUser {
+  name: string;
+  email: string;
+  roleLabel: string;
+  avatar: string | null;
+}
 
 function isActive(pathname: string, href: string) {
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 
-export function Sidebar({
-  items,
-  userName,
-  roleLabel,
-}: {
-  items: NavItem[];
-  userName: string;
-  roleLabel: string;
-}) {
-  const pathname = usePathname();
+/** Abmelden und zurueck zur Anmeldung - von ueberall gleich. */
+export function useLogout() {
   const router = useRouter();
+  const [busy, setBusy] = useState(false);
+  const logout = useCallback(async () => {
+    setBusy(true);
+    try {
+      await fetch("/api/auth/logout", { method: "POST" });
+    } finally {
+      router.push("/login");
+      router.refresh();
+    }
+  }, [router]);
+  return { logout, busy };
+}
 
-  async function logout() {
-    await fetch("/api/auth/logout", { method: "POST" });
-    router.push("/login");
-    router.refresh();
+/* ------------------------------------------------------------------------ */
+/*                          Seitenleiste am Rechner                          */
+/* ------------------------------------------------------------------------ */
+
+export function Sidebar({ nav, user }: { nav: Navigation; user: NavUser }) {
+  const pathname = usePathname();
+  const { logout, busy } = useLogout();
+
+  // Punkte nach Gruppe zusammenfassen, Reihenfolge wie in der Liste.
+  const groups: Array<{ name: string; items: NavItem[] }> = [];
+  for (const item of nav.items) {
+    const group = groups.find((g) => g.name === item.group);
+    if (group) group.items.push(item);
+    else groups.push({ name: item.group, items: [item] });
   }
 
   return (
-    <aside className="sticky top-0 hidden h-dvh w-64 shrink-0 flex-col bg-brand-900 px-4 py-5 text-white md:flex">
-      <div className="px-2 pb-6">
-        <Logo />
+    <aside className="sticky top-0 hidden h-dvh w-60 shrink-0 flex-col bg-brand-900 text-white md:flex">
+      <div className="px-5 pb-5 pt-6">
+        <Logo size={34} />
       </div>
 
-      <nav className="flex-1 space-y-1">
-        {items.map((item) => {
-          const Icon = ICONS[item.icon];
-          const active = isActive(pathname, item.href);
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              className={`flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold transition ${
-                active
-                  ? "bg-white/15 text-white"
-                  : "text-white/70 hover:bg-white/8 hover:text-white"
-              }`}
-            >
-              <Icon />
-              {item.label}
-            </Link>
-          );
-        })}
+      <nav className="flex-1 space-y-5 overflow-y-auto px-3 pb-4" aria-label="Hauptnavigation">
+        {groups.map((group) => (
+          <div key={group.name}>
+            <p className="mb-1 px-3 text-[11px] font-semibold uppercase tracking-[0.08em] text-white/40">
+              {group.name}
+            </p>
+            <ul className="space-y-0.5">
+              {group.items.map((item) => {
+                const Icon = NAV_ICONS[item.icon];
+                const active = isActive(pathname, item.href);
+                return (
+                  <li key={item.href}>
+                    <Link
+                      href={item.href}
+                      aria-current={active ? "page" : undefined}
+                      className={`flex h-9 items-center gap-3 rounded-[var(--r-sm)] px-3 text-[14px] font-medium transition-colors ${
+                        active
+                          ? "bg-white/[0.13] text-white"
+                          : "text-white/70 hover:bg-white/[0.06] hover:text-white"
+                      }`}
+                    >
+                      <Icon className={`h-[18px] w-[18px] shrink-0 ${active ? "text-energy-300" : ""}`} />
+                      {item.label}
+                    </Link>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        ))}
       </nav>
 
-      <div className="mt-4 border-t border-white/10 pt-4">
-        <p className="px-3 text-sm font-semibold">{userName}</p>
-        <p className="px-3 pb-2 text-xs text-white/55">{roleLabel}</p>
-        <button
-          onClick={logout}
-          className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold text-white/70 transition hover:bg-white/8 hover:text-white"
-        >
-          <IconLogout />
-          Abmelden
-        </button>
+      <div className="border-t border-white/10 p-3">
+        <div className="flex items-center gap-3 rounded-[var(--r-sm)] px-2 py-2">
+          <Avatar name={user.name} src={user.avatar} size={34} tone="light" />
+          <div className="min-w-0 flex-1 leading-tight">
+            <p className="truncate text-[13.5px] font-semibold">{user.name}</p>
+            <p className="truncate text-[12px] text-white/55">{user.roleLabel}</p>
+          </div>
+          <button
+            type="button"
+            onClick={() => void logout()}
+            disabled={busy}
+            className="grid h-8 w-8 shrink-0 place-items-center rounded-full text-white/60 transition hover:bg-white/10 hover:text-white"
+            aria-label="Abmelden"
+            title="Abmelden"
+          >
+            <IconLogout className="h-[18px] w-[18px]" />
+          </button>
+        </div>
       </div>
     </aside>
   );
 }
 
-export function MobileTopBar({ userName }: { userName: string }) {
-  const router = useRouter();
-  async function logout() {
-    await fetch("/api/auth/logout", { method: "POST" });
-    router.push("/login");
-    router.refresh();
-  }
+/* ------------------------------------------------------------------------ */
+/*                              Kopfzeile Handy                              */
+/* ------------------------------------------------------------------------ */
+
+export function MobileTopBar({ user }: { user: NavUser }) {
+  const [open, setOpen] = useState(false);
+  const close = useCallback(() => setOpen(false), []);
   return (
-    <header className="sticky top-0 z-20 flex items-center justify-between bg-brand-900 px-4 py-3 pt-[max(0.75rem,env(safe-area-inset-top))] text-white shadow-sm md:hidden">
-      <Logo size={30} />
-      <button
-        onClick={logout}
-        aria-label={`${userName} abmelden`}
-        className="rounded-lg p-2 text-white/70 active:bg-white/10"
-      >
-        <IconLogout />
-      </button>
-    </header>
+    <>
+      <header className="sticky top-0 z-20 flex items-center justify-between bg-brand-900 px-4 pb-2.5 pt-[max(0.625rem,env(safe-area-inset-top))] text-white md:hidden">
+        <Logo size={30} tagline="" />
+        <button
+          type="button"
+          onClick={() => setOpen(true)}
+          className="rounded-full ring-2 ring-white/15 transition active:scale-95"
+          aria-label={`Konto von ${user.name}`}
+        >
+          <Avatar name={user.name} src={user.avatar} size={32} tone="light" />
+        </button>
+      </header>
+      {open && <AccountSheet user={user} onClose={close} />}
+    </>
   );
 }
 
-export function MobileTabBar({ items }: { items: NavItem[] }) {
+/** Wer angemeldet ist - und der Weg hinaus. */
+export function AccountSheet({ user, onClose }: { user: NavUser; onClose: () => void }) {
+  const { logout, busy } = useLogout();
+  return (
+    <Sheet title="Konto" onClose={onClose}>
+      <AccountCard user={user} />
+      <button
+        type="button"
+        className="btn btn-ghost mt-4 w-full"
+        style={{ color: "var(--danger-ink)" }}
+        onClick={() => void logout()}
+        disabled={busy}
+      >
+        <IconLogout className="h-[18px] w-[18px]" />
+        {busy ? "Abmelden …" : "Abmelden"}
+      </button>
+    </Sheet>
+  );
+}
+
+export function AccountCard({ user }: { user: NavUser }) {
+  return (
+    <div className="inset flex items-center gap-3.5 p-3.5">
+      <Avatar name={user.name} src={user.avatar} size={52} />
+      <div className="min-w-0 leading-snug">
+        <p className="truncate text-[16px] font-semibold">{user.name}</p>
+        <p className="muted truncate text-[13px]">{user.email}</p>
+        <p className="muted truncate text-[12px]">{user.roleLabel}</p>
+      </div>
+    </div>
+  );
+}
+
+/** Abmelde-Zeile fuer Listen, etwa auf der Seite "Mehr". */
+export function LogoutRow() {
+  const { logout, busy } = useLogout();
+  return (
+    <button
+      type="button"
+      className="list-row font-medium"
+      style={{ color: "var(--danger-ink)" }}
+      onClick={() => void logout()}
+      disabled={busy}
+    >
+      <span
+        className="tile-icon h-8 w-8"
+        style={{ background: "color-mix(in srgb, var(--signal-500) 12%, transparent)" }}
+        aria-hidden
+      >
+        <IconLogout className="h-[18px] w-[18px]" />
+      </span>
+      {busy ? "Abmelden …" : "Abmelden"}
+    </button>
+  );
+}
+
+/* ------------------------------------------------------------------------ */
+/*                            Reiterleiste Handy                             */
+/* ------------------------------------------------------------------------ */
+
+export function MobileTabBar({ nav }: { nav: Navigation }) {
   const pathname = usePathname();
-  // Ab sieben Punkten wird die Spalte auf schmalen Geraeten zu eng fuer
-  // "Gebiete" - dann rueckt die Schrift eine Stufe herunter.
-  const dense = items.length > 6;
+  const inMore =
+    isActive(pathname, MORE_HREF) || nav.more.some((item) => isActive(pathname, item.href));
   return (
     <nav
       className="glass fixed inset-x-0 bottom-0 z-20 grid border-t pb-[max(0.25rem,env(safe-area-inset-bottom))] md:hidden"
       style={{
-        gridTemplateColumns: `repeat(${items.length}, minmax(0, 1fr))`,
+        gridTemplateColumns: `repeat(${nav.tabs.length}, minmax(0, 1fr))`,
         borderColor: "var(--line)",
       }}
+      aria-label="Hauptnavigation"
     >
-      {items.map((item) => {
-        const Icon = ICONS[item.icon];
-        const active = isActive(pathname, item.href);
+      {nav.tabs.map((item) => {
+        const Icon = NAV_ICONS[item.icon];
+        const active = item.href === MORE_HREF ? inMore : isActive(pathname, item.href);
         return (
           <Link
             key={item.href}
             href={item.href}
             aria-current={active ? "page" : undefined}
-            className={`relative flex flex-col items-center gap-0.5 pb-2 pt-2.5 font-semibold transition-colors ${
-              dense ? "text-[9px]" : "text-[10px]"
-            } ${active ? "text-brand-600" : "muted"}`}
+            className={`flex flex-col items-center gap-[3px] pb-1.5 pt-2 text-[10.5px] font-medium transition-colors ${
+              active ? "text-tint" : "muted"
+            }`}
           >
-            {/* Ein kurzer Strich ueber dem aktiven Punkt - er sagt auf einen
-                Blick, wo man gerade ist, ohne die Zeile zu verbreitern. */}
-            <span
-              className="absolute inset-x-0 top-0 mx-auto h-[2.5px] w-7 rounded-full transition-opacity"
-              style={{
-                background: "var(--brand-600)",
-                opacity: active ? 1 : 0,
-              }}
-              aria-hidden
-            />
-            <Icon className="h-5 w-5" />
-            {/* Bei vielen Punkten wird die Spalte schmal - der Text darf dann
-                kuerzen, aber nie ueberlaufen. */}
+            <Icon className="h-6 w-6" />
             <span className="w-full truncate px-0.5 text-center">{item.short}</span>
           </Link>
         );

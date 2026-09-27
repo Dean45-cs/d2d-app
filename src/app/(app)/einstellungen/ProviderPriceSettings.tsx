@@ -3,8 +3,9 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Sheet } from "@/components/Sheet";
-import { Note } from "@/components/ui";
-import { IconBolt, IconInfo, IconPencil, IconPlus, IconSearch, IconX } from "@/components/icons";
+import { Note, SectionHeader } from "@/components/ui";
+import { IconInfo, IconPencil, IconPlus, IconSearch, IconTrash } from "@/components/icons";
+import { useConfirm } from "@/components/useConfirm";
 
 export interface PriceRow {
   id: number;
@@ -120,6 +121,7 @@ export function ProviderPriceSettings({
     gasBaseMonth: show(reference.gasBaseMonth),
   });
   const [refMessage, setRefMessage] = useState<string | null>(null);
+  const { confirm, dialog } = useConfirm();
 
   function open(next: Draft) {
     setError(null);
@@ -178,7 +180,13 @@ export function ProviderPriceSettings({
   }
 
   async function remove(row: PriceRow) {
-    if (!window.confirm(`Preis für ${row.postal_code} ${row.city} löschen?`)) return;
+    const ok = await confirm({
+      title: `Preis für ${row.postal_code} ${row.city} löschen?`,
+      text: "Für diesen Ort gelten danach wieder die Werte der Tagesquelle.",
+      confirmLabel: "Löschen",
+      danger: true,
+    });
+    if (!ok) return;
     await fetch(`/api/provider-prices/${row.id}`, { method: "DELETE" });
     router.refresh();
   }
@@ -225,27 +233,26 @@ export function ProviderPriceSettings({
   });
 
   return (
-    <section className="card mt-4 p-4">
-      <div className="mb-1 flex items-center justify-between gap-2">
-        <h2 className="flex items-center gap-2 text-sm font-semibold">
-          <IconBolt className="h-4 w-4 text-gas-500" />
-          Grundversorger-Preise
-        </h2>
-        <button type="button" className="btn btn-ghost btn-sm btn-pill" onClick={() => open(EMPTY)}>
-          <IconPlus className="h-4 w-4" />
-          Ort
-        </button>
-      </div>
-      <p className="muted mb-3 text-sm">
-        Echte Preise für eure Orte – vom Preisblatt des Grundversorgers abgetippt. Jeder
-        Grundversorger muss es auf seiner Website veröffentlichen. Eingetragene Werte gehen den
-        Demo-Werten vor und erscheinen in Übersicht, Gebieten und beim Klinken.
+    <section className="card p-5">
+      <SectionHeader
+        title="Grundversorger-Preise"
+        className="mb-1"
+        action={
+          <button type="button" className="btn btn-ghost btn-sm btn-pill" onClick={() => open(EMPTY)}>
+            <IconPlus className="h-4 w-4" />
+            Ort hinzufügen
+          </button>
+        }
+      />
+      <p className="muted mb-4 text-[13px] leading-snug">
+        Preise vom Preisblatt des Grundversorgers. Sie ersetzen die Beispielwerte in Übersicht,
+        Gebieten und beim Klinken.
       </p>
 
       {missing.length > 0 && (
         <div className="mb-4">
-          <p className="muted mb-1.5 text-[11px] font-semibold uppercase tracking-wider">
-            Eure Gebiete ohne echten Preis
+          <p className="mb-2 text-[12.5px] font-semibold text-warn">
+            Gebiete ohne echten Preis
           </p>
           <ul className="divide-y divide-[var(--line)] rounded-[var(--r-md)] border border-[var(--line)]">
             {missing.map((place) => (
@@ -307,7 +314,7 @@ export function ProviderPriceSettings({
                         href={row.source_url}
                         target="_blank"
                         rel="noreferrer"
-                        className="font-semibold text-brand-600"
+                        className="font-semibold text-tint"
                       >
                         Preisblatt
                       </a>
@@ -315,16 +322,22 @@ export function ProviderPriceSettings({
                   )}
                 </p>
                 {row.stale && (
-                  <p className="mt-1 text-[11px] font-semibold text-gas-600">
+                  <p className="mt-1 text-[11px] font-semibold text-warn">
                     Älter als ein halbes Jahr – bitte mit dem aktuellen Preisblatt prüfen.
                   </p>
                 )}
               </div>
-              <button type="button" className="icon-btn shrink-0" onClick={() => edit(row)} aria-label="Bearbeiten">
+              <button type="button" className="icon-btn shrink-0" onClick={() => edit(row)} aria-label="Bearbeiten" title="Bearbeiten">
                 <IconPencil className="h-4 w-4" />
               </button>
-              <button type="button" className="icon-btn shrink-0" onClick={() => remove(row)} aria-label="Löschen">
-                <IconX className="h-4 w-4" />
+              <button
+                type="button"
+                className="icon-btn shrink-0 hover:text-danger"
+                onClick={() => void remove(row)}
+                aria-label="Löschen"
+                title="Löschen"
+              >
+                <IconTrash className="h-4 w-4" />
               </button>
             </li>
           ))}
@@ -337,7 +350,7 @@ export function ProviderPriceSettings({
       <div className="mt-4 border-t pt-3 hairline">
         <button
           type="button"
-          className="text-[12px] font-semibold text-brand-600"
+          className="link"
           onClick={() => setRefOpen((v) => !v)}
           aria-expanded={refOpen}
         >
@@ -369,6 +382,8 @@ export function ProviderPriceSettings({
         )}
       </div>
 
+      {dialog}
+
       {/* ------------------------------ Formular ------------------------------- */}
       {draft && (
         <Sheet
@@ -377,7 +392,7 @@ export function ProviderPriceSettings({
           onClose={() => setDraft(null)}
           footer={
             <div className="space-y-2">
-              {error && <p className="text-[12px] font-semibold text-signal-600">{error}</p>}
+              {error && <p className="text-[12px] font-semibold text-danger">{error}</p>}
               <button type="button" className="btn btn-primary w-full" onClick={save} disabled={busy}>
                 {busy ? "Speichern …" : "Speichern"}
               </button>
@@ -405,7 +420,7 @@ export function ProviderPriceSettings({
               <Note icon={<IconSearch className="h-4 w-4" />}>
                 Preisblatt suchen:{" "}
                 <a
-                  className="font-semibold text-brand-600"
+                  className="font-semibold text-tint"
                   href={sheetSearch(draft.provider, draft.city, "Strom")}
                   target="_blank"
                   rel="noreferrer"
@@ -414,7 +429,7 @@ export function ProviderPriceSettings({
                 </a>
                 {" · "}
                 <a
-                  className="font-semibold text-brand-600"
+                  className="font-semibold text-tint"
                   href={sheetSearch(draft.gasProvider || draft.provider, draft.city, "Gas")}
                   target="_blank"
                   rel="noreferrer"

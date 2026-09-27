@@ -1,39 +1,115 @@
 import type { CSSProperties, ReactNode } from "react";
+import Link from "next/link";
+import {
+  IconCalendar,
+  IconChat,
+  IconCheck,
+  IconChevronLeft,
+  IconChevronRight,
+  IconDoor,
+} from "./icons";
 
+/**
+ * Kopf einer Seite: grosser Titel, darunter eine Zeile mit dem, was gerade
+ * gilt (Datum, Anzahl, Zeitraum) - keine Erklaerung, was die Seite kann.
+ */
 export function PageHeader({
   title,
   subtitle,
   action,
+  back,
 }: {
   title: string;
-  subtitle?: string;
+  subtitle?: ReactNode;
   action?: ReactNode;
+  /** Ruecksprung ueber dem Titel, etwa "Alle Gebiete". */
+  back?: { href: string; label: string };
 }) {
   return (
-    <div className="mb-5 flex flex-wrap items-start justify-between gap-3">
-      <div className="min-w-0">
-        <h1 className="text-[26px] font-bold leading-tight md:text-[32px]">{title}</h1>
-        {subtitle && (
-          <p className="muted mt-1 max-w-xl text-[13px] leading-snug md:text-sm">
-            {subtitle}
-          </p>
-        )}
+    <header className="mb-6">
+      {back && (
+        <Link href={back.href} className="link -ml-1 mb-2 px-1 py-0.5">
+          <IconChevronLeft className="h-4 w-4" />
+          {back.label}
+        </Link>
+      )}
+      <div className="flex flex-wrap items-end justify-between gap-x-4 gap-y-3">
+        <div className="min-w-0">
+          <h1 className="text-[28px] font-bold leading-[1.15] tracking-[-0.025em] md:text-[30px]">
+            {title}
+          </h1>
+          {subtitle && (
+            <p className="muted mt-1 text-[14px] leading-snug">{subtitle}</p>
+          )}
+        </div>
+        {action && <div className="flex shrink-0 flex-wrap items-center gap-2">{action}</div>}
       </div>
-      {action}
+    </header>
+  );
+}
+
+/**
+ * Kopf eines Abschnitts: Titel, auf Wunsch mit Anzahl, rechts ein Verweis
+ * oder eine eigene Aktion.
+ */
+export function SectionHeader({
+  title,
+  count,
+  href,
+  linkLabel = "Alle anzeigen",
+  action,
+  className = "mb-3",
+}: {
+  title: ReactNode;
+  count?: number;
+  href?: string;
+  linkLabel?: string;
+  action?: ReactNode;
+  className?: string;
+}) {
+  return (
+    <div className={`section-head ${className}`}>
+      <h2 className="section-title min-w-0 truncate">
+        {title}
+        {count !== undefined && (
+          <span className="muted ml-1.5 font-medium tabular-nums">{count}</span>
+        )}
+      </h2>
+      {href ? (
+        <Link href={href} className="link shrink-0">
+          {linkLabel}
+          <IconChevronRight className="h-3.5 w-3.5" />
+        </Link>
+      ) : (
+        action
+      )}
     </div>
   );
 }
 
 const TONE_INK: Record<string, string> = {
   neutral: "var(--ink)",
-  brand: "var(--brand-600)",
-  success: "var(--energy-600)",
-  warn: "var(--gas-600)",
-  danger: "var(--signal-600)",
+  brand: "var(--tint)",
+  success: "var(--ok-ink)",
+  warn: "var(--warn-ink)",
+  danger: "var(--danger-ink)",
+};
+
+const TONE_DOT: Record<string, string> = {
+  neutral: "var(--ink-muted)",
+  brand: "var(--brand-500)",
+  success: "var(--energy-500)",
+  warn: "var(--gas-500)",
+  danger: "var(--signal-500)",
 };
 
 export type Tone = keyof typeof TONE_INK;
 
+/**
+ * Eine Kennzahl. Die Zahl bleibt dunkel - Farbe traegt nur, was gut oder
+ * schlecht ist (Abschluss, ueberfaellig). Der Punkt vor der Beschriftung
+ * verbindet die Kachel mit derselben Farbe in Diagrammen und Listen.
+ */
 export function StatTile({
   label,
   value,
@@ -45,16 +121,26 @@ export function StatTile({
   hint?: string;
   tone?: Tone;
 }) {
+  const colored = tone === "success" || tone === "danger";
   return (
-    <div className="card px-3.5 py-3">
-      <p className="muted text-[10px] font-bold uppercase tracking-[0.07em]">{label}</p>
+    <div className="card min-w-0 px-4 py-3.5">
+      <p className="muted flex items-center gap-1.5 truncate text-[12.5px] font-medium">
+        {tone !== "neutral" && (
+          <span
+            className="h-1.5 w-1.5 shrink-0 rounded-full"
+            style={{ background: TONE_DOT[tone] }}
+            aria-hidden
+          />
+        )}
+        {label}
+      </p>
       <p
-        className="mt-0.5 text-[26px] font-bold leading-none tabular-nums"
-        style={{ color: TONE_INK[tone], letterSpacing: "-0.02em" }}
+        className="mt-1.5 truncate text-[26px] font-bold leading-none tabular-nums md:text-[28px]"
+        style={{ color: colored ? TONE_INK[tone] : "var(--ink)", letterSpacing: "-0.025em" }}
       >
         {value}
       </p>
-      {hint && <p className="muted mt-1 text-[11px] leading-tight">{hint}</p>}
+      {hint && <p className="muted mt-1.5 truncate text-[12px]">{hint}</p>}
     </div>
   );
 }
@@ -184,9 +270,9 @@ export function ProgressRing({
 
 const STATUS_STYLES: Record<string, { label: string; bg: string; fg: string }> = {
   OPEN: { label: "Offen", bg: "color-mix(in srgb, var(--ink) 9%, transparent)", fg: "var(--ink-muted)" },
-  ACTIVE: { label: "In Arbeit", bg: "color-mix(in srgb, var(--brand-500) 15%, transparent)", fg: "var(--brand-600)" },
-  DONE: { label: "Fertig", bg: "color-mix(in srgb, var(--energy-500) 18%, transparent)", fg: "var(--energy-700)" },
-  PAUSED: { label: "Pausiert", bg: "color-mix(in srgb, var(--gas-500) 20%, transparent)", fg: "var(--gas-600)" },
+  ACTIVE: { label: "In Arbeit", bg: "color-mix(in srgb, var(--brand-500) 15%, transparent)", fg: "var(--tint)" },
+  DONE: { label: "Fertig", bg: "color-mix(in srgb, var(--energy-500) 18%, transparent)", fg: "var(--ok-ink)" },
+  PAUSED: { label: "Pausiert", bg: "color-mix(in srgb, var(--gas-500) 20%, transparent)", fg: "var(--warn-ink)" },
 };
 
 export function StatusBadge({ status }: { status: string }) {
@@ -215,10 +301,10 @@ export function Pill({
 }) {
   const base: Record<string, { bg: string; fg: string }> = {
     neutral: { bg: "color-mix(in srgb, var(--ink) 8%, transparent)", fg: "var(--ink-muted)" },
-    brand: { bg: "color-mix(in srgb, var(--brand-500) 14%, transparent)", fg: "var(--brand-600)" },
-    success: { bg: "color-mix(in srgb, var(--energy-500) 17%, transparent)", fg: "var(--energy-700)" },
-    warn: { bg: "color-mix(in srgb, var(--gas-500) 20%, transparent)", fg: "var(--gas-600)" },
-    danger: { bg: "color-mix(in srgb, var(--signal-500) 15%, transparent)", fg: "var(--signal-600)" },
+    brand: { bg: "color-mix(in srgb, var(--brand-500) 14%, transparent)", fg: "var(--tint)" },
+    success: { bg: "color-mix(in srgb, var(--energy-500) 17%, transparent)", fg: "var(--ok-ink)" },
+    warn: { bg: "color-mix(in srgb, var(--gas-500) 20%, transparent)", fg: "var(--warn-ink)" },
+    danger: { bg: "color-mix(in srgb, var(--signal-500) 15%, transparent)", fg: "var(--danger-ink)" },
   };
   const t = base[tone];
   return (
@@ -278,7 +364,8 @@ export function Avatar({
   /** Profilbild als Data-URL; ohne Bild erscheint das Kuerzel. */
   src?: string | null;
   size?: number;
-  tone?: "brand" | "muted";
+  /** "light" fuer dunkle Flaechen wie die Seitenleiste. */
+  tone?: "brand" | "muted" | "light";
   /** Zeigt einen Platzhalter, solange das Bild noch entsteht. */
   loading?: boolean;
 }) {
@@ -328,8 +415,11 @@ export function Avatar({
         background:
           tone === "brand"
             ? "color-mix(in srgb, var(--brand-500) 16%, transparent)"
-            : "color-mix(in srgb, var(--ink) 9%, transparent)",
-        color: tone === "brand" ? "var(--brand-600)" : "var(--ink-muted)",
+            : tone === "light"
+              ? "rgb(255 255 255 / 0.16)"
+              : "color-mix(in srgb, var(--ink) 9%, transparent)",
+        color:
+          tone === "brand" ? "var(--tint)" : tone === "light" ? "#fff" : "var(--ink-muted)",
       }}
       title={name ?? "nicht zugeteilt"}
       aria-hidden
@@ -370,7 +460,7 @@ export function Note({
 /** Ueberschrift einer Gruppe - klein, in Grossbuchstaben, wie in iOS-Listen. */
 export function GroupLabel({ children }: { children: ReactNode }) {
   return (
-    <p className="muted mb-1.5 ml-1 text-[11px] font-bold uppercase tracking-[0.06em]">
+    <p className="muted mb-2 ml-1 text-[12px] font-semibold uppercase tracking-[0.05em]">
       {children}
     </p>
   );
@@ -381,12 +471,35 @@ export function EmptyState({
   text,
   icon,
   action,
+  bare = false,
 }: {
   title: string;
-  text: string;
+  text?: string;
   icon?: ReactNode;
   action?: ReactNode;
+  /** Ohne eigene Karte - fuer leere Abschnitte innerhalb einer Karte. */
+  bare?: boolean;
 }) {
+  if (bare) {
+    return (
+      <div className="flex flex-col items-center gap-1.5 px-4 py-8 text-center">
+        {icon && (
+          <span
+            className="mb-1 grid h-11 w-11 place-items-center rounded-full"
+            style={{
+              background: "color-mix(in srgb, var(--ink) 6%, transparent)",
+              color: "var(--ink-muted)",
+            }}
+          >
+            {icon}
+          </span>
+        )}
+        <p className="text-[14px] font-semibold">{title}</p>
+        {text && <p className="muted max-w-xs text-[13px] leading-snug">{text}</p>}
+        {action && <div className="mt-2">{action}</div>}
+      </div>
+    );
+  }
   return (
     <div className="card flex flex-col items-center gap-2 px-6 py-14 text-center">
       {icon && (
@@ -394,14 +507,14 @@ export function EmptyState({
           className="mb-1 grid h-14 w-14 place-items-center rounded-full"
           style={{
             background: "color-mix(in srgb, var(--brand-500) 10%, transparent)",
-            color: "var(--brand-600)",
+            color: "var(--tint)",
           }}
         >
           {icon}
         </span>
       )}
       <p className="text-[17px] font-semibold">{title}</p>
-      <p className="muted max-w-sm text-sm leading-relaxed">{text}</p>
+      {text && <p className="muted max-w-sm text-sm leading-relaxed">{text}</p>}
       {action && <div className="mt-3">{action}</div>}
     </div>
   );
@@ -473,6 +586,77 @@ export function SkeletonRows({ rows = 4 }: { rows?: number }) {
         </div>
       ))}
     </div>
+  );
+}
+
+/* ------------------------------ Ergebnisse ------------------------------ */
+
+export const OUTCOME_LABEL: Record<string, string> = {
+  SALE: "Abschluss",
+  APPOINTMENT: "Termin",
+  MET_NO_SALE: "Kein Abschluss",
+  NOT_HOME: "Nicht angetroffen",
+};
+
+/** Farbe eines Ergebnisses - dieselbe in Listen, Klingelbrett und Verlauf. */
+export function outcomeColor(outcome: string): string {
+  if (outcome === "SALE") return "var(--ok-ink)";
+  if (outcome === "APPOINTMENT") return "var(--tint)";
+  if (outcome === "NOT_HOME") return "var(--ink-muted)";
+  return "var(--danger-ink)";
+}
+
+/** Das Ergebnis eines Besuchs als farbiger Kreis mit Zeichen. */
+export function OutcomeIcon({ outcome, size = 30 }: { outcome: string; size?: number }) {
+  const color = outcomeColor(outcome);
+  const glyph = size >= 30 ? "h-4 w-4" : "h-3.5 w-3.5";
+  return (
+    <span
+      className="tile-icon shrink-0"
+      style={{
+        width: size,
+        height: size,
+        background: `color-mix(in srgb, ${color} 13%, transparent)`,
+        color,
+      }}
+      title={OUTCOME_LABEL[outcome]}
+      aria-hidden
+    >
+      {outcome === "SALE" ? (
+        <IconCheck className={glyph} />
+      ) : outcome === "APPOINTMENT" ? (
+        <IconCalendar className={glyph} />
+      ) : outcome === "NOT_HOME" ? (
+        <IconDoor className={glyph} />
+      ) : (
+        <IconChat className={glyph} />
+      )}
+    </span>
+  );
+}
+
+/** Kippschalter wie in den iOS-Einstellungen. */
+export function Switch({
+  checked,
+  onChange,
+  label,
+  disabled,
+}: {
+  checked: boolean;
+  onChange: (checked: boolean) => void;
+  label: string;
+  disabled?: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={checked}
+      aria-label={label}
+      disabled={disabled}
+      className="switch"
+      onClick={() => onChange(!checked)}
+    />
   );
 }
 

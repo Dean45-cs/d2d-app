@@ -336,7 +336,7 @@ export function NewTerritoryButton({
           footer={
             <>
               {error && (
-                <p className="mb-2 text-[12px] font-semibold text-signal-600">{error}</p>
+                <p className="mb-2 text-[12px] font-semibold text-danger">{error}</p>
               )}
               <div className="flex gap-2">
                 {step > 1 ? (

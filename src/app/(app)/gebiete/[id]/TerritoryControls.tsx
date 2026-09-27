@@ -48,7 +48,7 @@ export function TerritoryControls({ territory, members, isLeader }: Props) {
   }
 
   return (
-    <div className="card mb-4 p-4">
+    <div className="card mb-4 p-5">
       <div className="grid gap-3 sm:grid-cols-2">
         {isLeader && (
           <div>
@@ -67,7 +67,7 @@ export function TerritoryControls({ territory, members, isLeader }: Props) {
                 )
               }
             >
-              <option value="">– niemandem zugeteilt –</option>
+              <option value="">Niemandem zugeteilt</option>
               {members
                 .filter((m) => m.active)
                 .map((m) => (
@@ -100,6 +100,7 @@ export function TerritoryControls({ territory, members, isLeader }: Props) {
         </div>
       </div>
 
+      {(territory.due_date || !isLeader || message) && (
       <div className="mt-3 flex flex-wrap items-center gap-2">
         {territory.due_date && (
           <Pill tone="neutral">
@@ -116,13 +117,14 @@ export function TerritoryControls({ territory, members, isLeader }: Props) {
         {message && (
           <span className="badge rise" style={{
             background: "color-mix(in srgb, var(--energy-500) 16%, transparent)",
-            color: "var(--energy-700)",
+            color: "var(--ok-ink)",
           }}>
             <IconCheck className="h-3.5 w-3.5" />
             {message}
           </span>
         )}
       </div>
+      )}
     </div>
   );
 }

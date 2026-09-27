@@ -4,21 +4,21 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { RANGES, type RangeKey } from "./ranges";
 
+/** Zeitraum als Schalterleiste - dieselbe Form wie jede andere Wahl in der App. */
 export function RangePicker({ current }: { current: RangeKey }) {
   const pathname = usePathname();
   return (
-    <div className="flex overflow-hidden rounded-xl border hairline">
+    <nav className="seg" aria-label="Zeitraum">
       {RANGES.map((range) => (
         <Link
           key={range.key}
           href={`${pathname}?range=${range.key}`}
-          className={`px-3 py-2 text-sm font-semibold ${
-            current === range.key ? "bg-brand-600 text-white" : ""
-          }`}
+          aria-current={current === range.key ? "page" : undefined}
+          scroll={false}
         >
           {range.label}
         </Link>
       ))}
-    </div>
+    </nav>
   );
 }

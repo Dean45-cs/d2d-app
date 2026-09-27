@@ -1,7 +1,6 @@
 import { redirect } from "next/navigation";
 import { requireUser } from "@/lib/auth";
 import { listMembers, listTerritories, memberStats } from "@/lib/queries";
-import { PageHeader } from "@/components/ui";
 import { TeamTable } from "./TeamTable";
 
 export const dynamic = "force-dynamic";
@@ -29,10 +28,6 @@ export default async function TeamPage() {
 
   return (
     <div className="mx-auto max-w-4xl">
-      <PageHeader
-        title="Team"
-        subtitle="Mitarbeiter anlegen, Zugänge verwalten und Gebiete im Blick behalten"
-      />
       <TeamTable rows={rows} currentUserId={user.id} />
     </div>
   );

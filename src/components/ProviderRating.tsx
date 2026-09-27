@@ -2,7 +2,7 @@ import type { PriceInfo, ProviderInfo } from "@/lib/energy/provider";
 import { PRICE_LEVELS, PRICE_SCALE, type PriceStep } from "@/lib/energy/rating";
 import Link from "next/link";
 import { euro } from "./ui";
-import { IconBolt } from "./icons";
+import { IconBolt, IconChevronRight } from "./icons";
 
 /*
  * Grundversorger eines Gebiets samt Preis und Bewertung. Ohne Hooks und ohne
@@ -84,7 +84,7 @@ function originNote(info: ProviderInfo): string {
   if (info.manual) {
     return info.validFrom ? `Preisblatt, gültig ab ${dateLabel(info.validFrom)}` : "vom Preisblatt eingetragen";
   }
-  return info.isDemo ? "Demo-Preise" : "Tagesquelle";
+  return info.isDemo ? "Beispielwerte" : "Tagesquelle";
 }
 
 /**
@@ -112,8 +112,8 @@ export function ProviderLine({ info, className = "" }: { info: ProviderInfo | nu
             {ctLabel(price.ct)}
           </span>
         )}
-        {info.isDemo && <span className="muted"> · Demo</span>}
-        {info.stale && <span className="font-semibold text-gas-600"> · prüfen</span>}
+        {info.isDemo && <span className="muted"> · Beispiel</span>}
+        {info.stale && <span className="font-semibold text-warn"> · prüfen</span>}
       </span>
       {price && <PriceBadge step={price.step} size="sm" />}
     </div>
@@ -142,7 +142,7 @@ function PriceRow({ label, price }: { label: string; price: PriceInfo | null }) 
         <PriceBadge step={price.step} />
         <span
           className="text-[11px] font-semibold tabular-nums"
-          style={{ color: price.delta > 0 ? "var(--signal-600)" : "var(--energy-600)" }}
+          style={{ color: price.delta > 0 ? "var(--danger-ink)" : "var(--ok-ink)" }}
         >
           {price.delta > 0 ? "+" : ""}
           {euro(price.delta)} {basis}
@@ -186,14 +186,14 @@ export function ProviderCard({
           className="tile-icon h-10 w-10 shrink-0"
           style={{
             background: "color-mix(in srgb, var(--gas-500) 16%, transparent)",
-            color: "var(--gas-600)",
+            color: "var(--warn-ink)",
           }}
           aria-hidden
         >
           <IconBolt className="h-5 w-5" />
         </span>
         <div className="min-w-0 flex-1">
-          <p className="muted text-[11px] font-semibold uppercase tracking-wider">{title}</p>
+          <p className="muted truncate text-[12px] font-medium">{title}</p>
           <p className="truncate text-[16px] font-bold">
             {info ? info.provider || "Name unbekannt" : "Nicht zugeordnet"}
           </p>
@@ -203,7 +203,7 @@ export function ProviderCard({
               {info.manual && info.sourceUrl && (
                 <>
                   {" · "}
-                  <a href={info.sourceUrl} target="_blank" rel="noreferrer" className="font-semibold text-brand-600">
+                  <a href={info.sourceUrl} target="_blank" rel="noreferrer" className="font-semibold text-tint">
                     Preisblatt
                   </a>
                 </>
@@ -236,22 +236,28 @@ export function ProviderCard({
       {lead && (
         <p
           className="border-t px-4 py-2.5 text-[12px] font-medium"
-          style={{ borderColor: "var(--line)", color: inkOf(lead.step) }}
+          style={{
+            borderColor: "var(--line)",
+            color: info?.isDemo ? "var(--ink-muted)" : inkOf(lead.step),
+          }}
         >
-          {info?.isDemo ? "Beispielwerte – noch kein Verkaufsargument" : PRICE_LEVELS[lead.step].pitch}
+          {info?.isDemo
+            ? "Beispielwerte, kein echter Tarif – nicht als Verkaufsargument nutzen."
+            : PRICE_LEVELS[lead.step].pitch}
         </p>
       )}
       {info?.stale && (
-        <p className="border-t px-4 py-2 text-[12px] font-semibold text-gas-600 [border-color:var(--line)]">
+        <p className="border-t px-4 py-2 text-[12px] font-semibold text-warn [border-color:var(--line)]">
           Preis ist älter als ein halbes Jahr – bitte mit dem aktuellen Preisblatt prüfen.
         </p>
       )}
       {editHref && (!info || !info.manual || info.match === "nearby" || info.match === "region") && (
         <Link
           href={editHref}
-          className="block border-t px-4 py-2.5 text-[12px] font-semibold text-brand-600 [border-color:var(--line)]"
+          className="flex items-center justify-between gap-2 border-t px-4 py-2.5 text-[13px] font-semibold text-tint transition-colors hover:bg-[var(--hover)] [border-color:var(--line)]"
         >
-          {info?.manual ? "Preis für diesen Ort eintragen →" : "Echten Preis vom Preisblatt eintragen →"}
+          {info?.manual ? "Preis für diesen Ort eintragen" : "Echten Preis vom Preisblatt eintragen"}
+          <IconChevronRight className="h-4 w-4 shrink-0" />
         </Link>
       )}
     </section>

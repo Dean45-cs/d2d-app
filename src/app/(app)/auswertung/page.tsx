@@ -1,17 +1,36 @@
 import { requireUser } from "@/lib/auth";
 import {
   dailySeries,
+  listMembers,
   listVisits,
   memberStats,
   reasonStats,
   totals,
 } from "@/lib/queries";
-import { DailyBars, ReasonBars } from "@/components/charts";
-import { PageHeader, StatTile, percent } from "@/components/ui";
+import { DailyBars, ReasonBars, fillDays } from "@/components/charts";
+import {
+  Avatar,
+  EmptyState,
+  OutcomeIcon,
+  PageHeader,
+  SectionHeader,
+  StatTile,
+  percent,
+} from "@/components/ui";
+import { ShowMore } from "@/components/ShowMore";
+import { IconChart } from "@/components/icons";
+import { sqlDateTime } from "@/lib/format";
 import { RangePicker } from "./RangePicker";
 import { RANGES, rangeToSince, type RangeKey } from "./ranges";
 
 export const dynamic = "force-dynamic";
+
+const RANGE_TITLE: Record<RangeKey, string> = {
+  "1": "Heute",
+  "7": "Letzte 7 Tage",
+  "30": "Letzte 30 Tage",
+  all: "Gesamter Zeitraum",
+};
 
 export default async function StatsPage({
   searchParams,
@@ -26,123 +45,144 @@ export default async function StatsPage({
 
   const scope = isLeader ? {} : { userId: user.id };
   const sum = totals(user.team_id, { ...scope, since });
-  const series = dailySeries(user.team_id, key === "1" ? 1 : Number(key) || 90, isLeader ? undefined : user.id);
+  // "Gesamt" zeigt im Verlauf die letzten 90 Tage, zu Wochen gebuendelt.
+  const days = key === "all" ? 90 : Number(key);
+  const series = fillDays(dailySeries(user.team_id, days, isLeader ? undefined : user.id), days);
   const reasons = reasonStats(user.team_id, since);
-  const members = isLeader ? memberStats(user.team_id, since) : [];
+  const members = isLeader
+    ? memberStats(user.team_id, since).sort((a, b) => b.sales - a.sales || b.doors - a.doors)
+    : [];
+  const faces = new Map(isLeader ? listMembers(user.team_id).map((m) => [m.id, m.avatar]) : []);
   const recent = listVisits(user.team_id, { ...scope, since, limit: 40 });
+
+  const doors = sum.doors ?? 0;
+  const met = sum.met ?? 0;
+  const sales = sum.sales ?? 0;
 
   return (
     <div className="mx-auto max-w-5xl">
       <PageHeader
         title={isLeader ? "Auswertung" : "Meine Zahlen"}
-        subtitle="Türen, Antreffquote und Abschlüsse im Zeitraum"
+        subtitle={RANGE_TITLE[key]}
         action={<RangePicker current={key} />}
       />
 
-      <div className="mb-5 grid grid-cols-2 gap-2 md:grid-cols-5">
-        <StatTile label="Türen" value={sum.doors ?? 0} />
+      <div className="mb-6 grid grid-cols-2 gap-3 md:grid-cols-4">
         <StatTile
-          label="Angetroffen"
-          value={sum.met ?? 0}
+          label="Türen"
+          value={doors}
           tone="brand"
-          hint={percent(sum.met ?? 0, sum.doors ?? 0)}
+          hint={`${sum.not_home ?? 0} nicht angetroffen`}
         />
-        <StatTile label="Nicht angetroffen" value={sum.not_home ?? 0} />
-        <StatTile label="Termine" value={sum.appointments ?? 0} tone="warn" />
+        <StatTile label="Angetroffen" value={met} hint={`${percent(met, doors)} Antreffquote`} />
+        <StatTile
+          label="Termine"
+          value={sum.appointments ?? 0}
+          tone="warn"
+          hint={`${percent(sum.appointments ?? 0, met)} der Gespräche`}
+        />
         <StatTile
           label="Abschlüsse"
-          value={sum.sales ?? 0}
+          value={sales}
           tone="success"
-          hint={`${percent(sum.sales ?? 0, sum.met ?? 0)} auf Kontakt`}
+          hint={`${percent(sales, met)} der Gespräche`}
         />
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-2">
-        <section className="card flex flex-col p-4">
-          <h2 className="mb-1 text-sm font-semibold">Verlauf</h2>
-          <DailyBars data={series} />
+      <div className="grid gap-4 lg:grid-cols-3">
+        <section className="card p-5 lg:col-span-2">
+          <SectionHeader title={key === "all" ? "Verlauf · 90 Tage nach Wochen" : "Verlauf"} />
+          <DailyBars data={series} height={220} />
         </section>
 
-        <section className="card p-4">
-          <h2 className="mb-3 text-sm font-semibold">Ablehnungsgründe</h2>
-          <ReasonBars data={reasons} />
+        <section className="card p-5">
+          <SectionHeader title="Ablehnungsgründe" />
+          <ReasonBars data={reasons} limit={7} />
         </section>
       </div>
 
       {isLeader && members.length > 0 && (
-        <section className="card mt-4 overflow-x-auto p-4">
-          <h2 className="mb-3 text-sm font-semibold">Nach Mitarbeiter</h2>
-          <table className="w-full min-w-[34rem] text-sm">
-            <thead>
-              <tr className="muted text-left text-[11px] uppercase tracking-wider">
-                <th className="pb-2 font-semibold">Name</th>
-                <th className="pb-2 text-right font-semibold">Türen</th>
-                <th className="pb-2 text-right font-semibold">Angetroffen</th>
-                <th className="pb-2 text-right font-semibold">Quote</th>
-                <th className="pb-2 text-right font-semibold">Termine</th>
-                <th className="pb-2 text-right font-semibold">Abschlüsse</th>
-                <th className="pb-2 text-right font-semibold">Abschlussquote</th>
-              </tr>
-            </thead>
-            <tbody>
-              {members.map((m) => (
-                <tr key={m.user_id} className="border-t hairline">
-                  <td className="py-2 font-medium">{m.user_name}</td>
-                  <td className="py-2 text-right tabular-nums">{m.doors}</td>
-                  <td className="py-2 text-right tabular-nums">{m.met}</td>
-                  <td className="py-2 text-right tabular-nums">{percent(m.met, m.doors)}</td>
-                  <td className="py-2 text-right tabular-nums">{m.appointments}</td>
-                  <td className="py-2 text-right font-semibold tabular-nums text-energy-600">
-                    {m.sales}
-                  </td>
-                  <td className="py-2 text-right tabular-nums">{percent(m.sales, m.met)}</td>
+        <section className="card mt-4 p-5">
+          <SectionHeader title="Nach Mitarbeiter" />
+          <div className="-mx-1 overflow-x-auto px-1">
+            <table className="data-table min-w-[36rem]">
+              <thead>
+                <tr>
+                  <th>Name</th>
+                  <th className="num">Türen</th>
+                  <th className="num">Angetroffen</th>
+                  <th className="num">Antreffquote</th>
+                  <th className="num">Termine</th>
+                  <th className="num">Abschlüsse</th>
+                  <th className="num">Abschlussquote</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {members.map((m) => (
+                  <tr key={m.user_id}>
+                    <td>
+                      <span className="flex items-center gap-2.5">
+                        <Avatar name={m.user_name} src={faces.get(m.user_id)} size={28} />
+                        <span className="truncate font-medium">{m.user_name}</span>
+                      </span>
+                    </td>
+                    <td className="num">{m.doors}</td>
+                    <td className="num">{m.met}</td>
+                    <td className="num muted">{percent(m.met, m.doors)}</td>
+                    <td className="num">{m.appointments}</td>
+                    <td
+                      className="num font-semibold"
+                      style={{ color: m.sales ? "var(--ok-ink)" : undefined }}
+                    >
+                      {m.sales}
+                    </td>
+                    <td className="num muted">{percent(m.sales, m.met)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </section>
       )}
 
-      <section className="card mt-4 p-4">
-        <h2 className="mb-3 text-sm font-semibold">Einzelne Kontakte</h2>
+      <section className="card mt-4 p-5">
+        <SectionHeader title="Kontakte" count={recent.length || undefined} className="mb-1" />
         {recent.length === 0 ? (
-          <p className="muted text-sm">Im gewählten Zeitraum wurde nichts erfasst.</p>
+          <EmptyState
+            bare
+            icon={<IconChart className="h-5 w-5" />}
+            title="Keine Kontakte im Zeitraum"
+          />
         ) : (
-          <ul className="space-y-2">
+          <ShowMore initial={10}>
             {recent.map((v) => (
-              <li key={v.id} className="flex items-start gap-2 text-sm">
-                <span className="w-6 shrink-0 text-center">
-                  {v.outcome === "SALE"
-                    ? "✅"
-                    : v.outcome === "APPOINTMENT"
-                      ? "📅"
-                      : v.outcome === "NOT_HOME"
-                        ? "🚪"
-                        : (v.reason_emoji || "🙋")}
+              <li
+                key={v.id}
+                className="flex items-center gap-3 border-t py-2.5 first:border-t-0"
+                style={{ borderColor: "var(--line)" }}
+              >
+                <OutcomeIcon outcome={v.outcome} />
+                <span className="min-w-0 flex-1 text-[13.5px]">
+                  <span className="block truncate">
+                    <span className="font-medium">
+                      {v.street_name ?? "–"} {v.house_number}
+                    </span>
+                    {v.reason_label && <span className="muted"> · {v.reason_label}</span>}
+                    {v.energy_type && (
+                      <span className="muted"> · {productLabel(v.energy_type)}</span>
+                    )}
+                    {v.reason_note && <span className="muted"> · „{v.reason_note}“</span>}
+                  </span>
+                  <span className="muted block truncate text-[12px]">
+                    {[isLeader ? v.user_name : null, v.territory_name].filter(Boolean).join(" · ")}
+                  </span>
                 </span>
-                <span className="min-w-0 flex-1">
-                  <span className="font-medium">
-                    {v.street_name ?? "–"} {v.house_number}
-                  </span>
-                  {v.reason_label && <span className="muted"> · {v.reason_label}</span>}
-                  {v.reason_note && <span className="muted"> · „{v.reason_note}“</span>}
-                  {v.energy_type && (
-                    <span className="muted"> · {productLabel(v.energy_type)}</span>
-                  )}
-                  <span className="muted block text-xs">
-                    {v.user_name}
-                    {v.territory_name ? ` · ${v.territory_name}` : ""} ·{" "}
-                    {new Date(`${v.created_at.replace(" ", "T")}Z`).toLocaleString("de-DE", {
-                      day: "2-digit",
-                      month: "2-digit",
-                      hour: "2-digit",
-                      minute: "2-digit",
-                    })}
-                  </span>
+                <span className="muted shrink-0 text-[12px] tabular-nums">
+                  {sqlDateTime(v.created_at)}
                 </span>
               </li>
             ))}
-          </ul>
+          </ShowMore>
         )}
       </section>
     </div>
