@@ -71,7 +71,7 @@ export default async function TourPage() {
   }));
 
   // Grundversorger je Gebiet: an der Tuer das wichtigste Argument.
-  const providers = providerLookup();
+  const providers = providerLookup(user.team_id);
 
   return (
     <TourClient

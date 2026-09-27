@@ -1,20 +1,38 @@
 /**
  * Welcher Grundversorger ist fuer ein Gebiet zustaendig, und wie teuer ist er?
  *
- * Die Preisquelle kennt Orte ueber ihre Postleitzahl. Ein Gebiet wird in
- * dieser Reihenfolge zugeordnet:
- *   1. gleiche Postleitzahl
- *   2. gleicher Ortsname
- *   3. naechster Ort der Preisquelle zur Gebietsmitte (hoechstens 30 km)
- *   4. gleiche PLZ-Region (die ersten drei Ziffern)
- * Bei 3. und 4. zeigt die Oberflaeche den Ort, von dem der Preis stammt -
+ * Zwei Quellen: selbst gepflegte Preise des Teams (vom Preisblatt des
+ * Versorgers abgetippt) und die Tagesquelle (Feed oder Demo-Werte). Ein
+ * Gebiet wird in dieser Reihenfolge zugeordnet:
+ *   1. gepflegter Preis mit gleicher PLZ oder gleichem Ort
+ *   2. Tagesquelle mit gleicher PLZ oder gleichem Ort
+ *   3. naechster gepflegter Ort zur Gebietsmitte (hoechstens 30 km)
+ *   4. naechster Ort der Tagesquelle (hoechstens 30 km)
+ *   5. gleiche PLZ-Region (die ersten drei Ziffern)
+ * Bei 3. bis 5. zeigt die Oberflaeche den Ort, von dem der Preis stammt -
  * ein Nachbarort kann einen anderen Grundversorger haben.
+ *
+ * Bewertet wird die Tagesquelle untereinander (Rangfolge aller Orte), ein
+ * gepflegter Preis dagegen am Bundesdurchschnitt der Grundversorgung.
  */
 import { listEnergyPrices } from "../queries";
 import type { EnergyPrice } from "../types";
 import { centerOf, type LatLng } from "../geo/area";
 import { annualCost, CONSUMPTION_GAS_KWH, CONSUMPTION_STROM_KWH } from "./refresh";
-import { priceScale, priceStep, type PriceScale, type PriceStep } from "./rating";
+import {
+  getReference,
+  listManualPrices,
+  referenceYear,
+  STALE_AFTER_DAYS,
+  type ManualPrice,
+} from "./manual";
+import {
+  priceScale,
+  priceStep,
+  referenceStep,
+  type PriceScale,
+  type PriceStep,
+} from "./rating";
 
 const NEARBY_KM = 30;
 
@@ -24,84 +42,194 @@ export interface PriceInfo {
   /** Jahreskosten des Musterhaushalts in Euro */
   year: number;
   step: PriceStep;
-  /** Abstand zum Median aller Orte, Euro pro Jahr (+ = teurer) */
+  /** Abstand zum Vergleichswert, Euro pro Jahr (+ = teurer) */
   delta: number;
+  /** Womit verglichen wurde: Median aller Orte oder Bundesdurchschnitt */
+  basis: "median" | "average";
 }
 
 export interface ProviderInfo {
   provider: string;
+  /** Gasversorger, wenn er ein anderer ist als beim Strom */
+  gasProvider: string;
   /** Ort, aus dem der Preis stammt */
   city: string;
   plz: string;
   match: "plz" | "city" | "nearby" | "region";
   distanceKm: number | null;
   isDemo: boolean;
+  /** Vom Team selbst eingetragen */
+  manual: boolean;
+  /** "gueltig ab" laut Preisblatt (JJJJ-MM-TT) */
+  validFrom: string;
+  sourceUrl: string;
+  /** Gepflegter Preis aelter als ein halbes Jahr - sollte geprueft werden */
+  stale: boolean;
   strom: PriceInfo | null;
   gas: PriceInfo | null;
 }
 
+export interface Place {
+  postal_code?: string;
+  city?: string;
+  area?: LatLng[] | null;
+}
+
 export interface ProviderLookup {
-  find(place: { postal_code?: string; city?: string; area?: LatLng[] | null }): ProviderInfo | null;
-  /** Wie viele Orte die Preisquelle kennt - 0 = noch nichts geladen. */
+  find(place: Place): ProviderInfo | null;
+  /** Wie viele Orte bekannt sind - 0 = noch nichts geladen. */
   size: number;
 }
 
-/** Laedt die Preise einmal und ordnet danach beliebig viele Gebiete zu. */
-export function providerLookup(rows: EnergyPrice[] = listEnergyPrices()): ProviderLookup {
-  const strom = scaleOf(rows, "strom");
-  const gas = scaleOf(rows, "gas");
-  const byPlz = new Map(rows.map((row) => [row.postal_code, row]));
-  const byCity = new Map<string, EnergyPrice>();
-  for (const row of rows) {
-    const key = normalizeCity(row.city);
-    if (key && !byCity.has(key)) byCity.set(key, row);
-  }
+/**
+ * Laedt die Preise einmal und ordnet danach beliebig viele Gebiete zu.
+ * Mit teamId kommen die selbst gepflegten Preise des Teams dazu.
+ */
+export function providerLookup(teamId?: number): ProviderLookup {
+  const rows = listEnergyPrices();
+  const manual = teamId ? listManualPrices(teamId) : [];
+  const reference = referenceYear(getReference(teamId ?? 0));
 
-  function info(row: EnergyPrice, match: ProviderInfo["match"], distanceKm: number | null) {
+  const scale = { strom: scaleOf(rows, "strom"), gas: scaleOf(rows, "gas") };
+
+  function fromFeed(row: EnergyPrice, match: ProviderInfo["match"], km: number | null): ProviderInfo {
+    const strom = annualCost(row.strom_ct_kwh, row.strom_base_eur, CONSUMPTION_STROM_KWH);
+    const gas = annualCost(row.gas_ct_kwh, row.gas_base_eur, CONSUMPTION_GAS_KWH);
     return {
       provider: row.provider,
+      gasProvider: "",
       city: row.city,
       plz: row.postal_code,
       match,
-      distanceKm,
+      distanceKm: km,
       isDemo: row.is_demo === 1,
-      strom: priceInfo(row.strom_ct_kwh, row.strom_base_eur, CONSUMPTION_STROM_KWH, strom),
-      gas: priceInfo(row.gas_ct_kwh, row.gas_base_eur, CONSUMPTION_GAS_KWH, gas),
-    } satisfies ProviderInfo;
+      manual: false,
+      validFrom: row.valid_from ?? "",
+      sourceUrl: "",
+      stale: false,
+      strom:
+        row.strom_ct_kwh !== null && strom !== null
+          ? {
+              ct: row.strom_ct_kwh,
+              year: strom,
+              step: priceStep(strom, scale.strom),
+              delta: Math.round(strom - scale.strom.median),
+              basis: "median",
+            }
+          : null,
+      gas:
+        row.gas_ct_kwh !== null && gas !== null
+          ? {
+              ct: row.gas_ct_kwh,
+              year: gas,
+              step: priceStep(gas, scale.gas),
+              delta: Math.round(gas - scale.gas.median),
+              basis: "median",
+            }
+          : null,
+    };
   }
 
-  function find(place: { postal_code?: string; city?: string; area?: LatLng[] | null }) {
-    if (rows.length === 0) return null;
+  function fromManual(row: ManualPrice, match: ProviderInfo["match"], km: number | null): ProviderInfo {
+    const strom = annualCost(row.strom_ct_kwh, row.strom_base_eur, CONSUMPTION_STROM_KWH);
+    const gas = annualCost(row.gas_ct_kwh, row.gas_base_eur, CONSUMPTION_GAS_KWH);
+    const updated = Date.parse(`${row.updated_at.replace(" ", "T")}Z`);
+    return {
+      provider: row.provider,
+      gasProvider: row.gas_provider,
+      city: row.city,
+      plz: row.postal_code,
+      match,
+      distanceKm: km,
+      isDemo: false,
+      manual: true,
+      validFrom: row.valid_from,
+      sourceUrl: row.source_url,
+      stale: Number.isFinite(updated) && Date.now() - updated > STALE_AFTER_DAYS * 86_400_000,
+      strom:
+        row.strom_ct_kwh !== null && strom !== null
+          ? {
+              ct: row.strom_ct_kwh,
+              year: strom,
+              step: referenceStep(strom, reference.strom),
+              delta: Math.round(strom - reference.strom),
+              basis: "average",
+            }
+          : null,
+      gas:
+        row.gas_ct_kwh !== null && gas !== null
+          ? {
+              ct: row.gas_ct_kwh,
+              year: gas,
+              step: referenceStep(gas, reference.gas),
+              delta: Math.round(gas - reference.gas),
+              basis: "average",
+            }
+          : null,
+    };
+  }
 
+  const feedIndex = index(rows);
+  const manualIndex = index(manual);
+
+  function find(place: Place): ProviderInfo | null {
     const plz = (place.postal_code ?? "").trim();
-    const exact = plz ? byPlz.get(plz) : undefined;
-    if (exact) return info(exact, "plz", null);
+    const city = normalizeCity(place.city ?? "");
 
-    const sameCity = byCity.get(normalizeCity(place.city ?? ""));
-    if (sameCity) return info(sameCity, "city", null);
+    const own = (plz && manualIndex.byPlz.get(plz)) || (city && manualIndex.byCity.get(city));
+    if (own) return fromManual(own, own.postal_code === plz ? "plz" : "city", null);
+
+    const feed = (plz && feedIndex.byPlz.get(plz)) || (city && feedIndex.byCity.get(city));
+    if (feed) return fromFeed(feed, feed.postal_code === plz ? "plz" : "city", null);
 
     if (place.area && place.area.length >= 3) {
       const [lat, lng] = centerOf(place.area);
-      let best: EnergyPrice | null = null;
-      let bestKm = Infinity;
-      for (const row of rows) {
-        const km = distanceKm(lat, lng, row.lat, row.lng);
-        if (km < bestKm) {
-          best = row;
-          bestKm = km;
-        }
-      }
-      if (best && bestKm <= NEARBY_KM) return info(best, "nearby", Math.round(bestKm));
+      const nearOwn = nearest(manual, lat, lng);
+      if (nearOwn) return fromManual(nearOwn.row, "nearby", nearOwn.km);
+      const nearFeed = nearest(rows, lat, lng);
+      if (nearFeed) return fromFeed(nearFeed.row, "nearby", nearFeed.km);
     }
 
     if (/^\d{5}$/.test(plz)) {
-      const region = rows.find((row) => row.postal_code.slice(0, 3) === plz.slice(0, 3));
-      if (region) return info(region, "region", null);
+      const prefix = plz.slice(0, 3);
+      const ownRegion = manual.find((row) => row.postal_code.slice(0, 3) === prefix);
+      if (ownRegion) return fromManual(ownRegion, "region", null);
+      const region = rows.find((row) => row.postal_code.slice(0, 3) === prefix);
+      if (region) return fromFeed(region, "region", null);
     }
     return null;
   }
 
-  return { find, size: rows.length };
+  return { find, size: rows.length + manual.length };
+}
+
+function index<T extends { postal_code: string; city: string }>(rows: T[]) {
+  const byPlz = new Map<string, T>();
+  const byCity = new Map<string, T>();
+  for (const row of rows) {
+    if (row.postal_code && !byPlz.has(row.postal_code)) byPlz.set(row.postal_code, row);
+    const key = normalizeCity(row.city);
+    if (key && !byCity.has(key)) byCity.set(key, row);
+  }
+  return { byPlz, byCity };
+}
+
+function nearest<T extends { lat: number | null; lng: number | null }>(
+  rows: T[],
+  lat: number,
+  lng: number,
+): { row: T; km: number } | null {
+  let best: T | null = null;
+  let bestKm = Infinity;
+  for (const row of rows) {
+    if (row.lat === null || row.lng === null) continue;
+    const km = distanceKm(lat, lng, row.lat, row.lng);
+    if (km < bestKm) {
+      best = row;
+      bestKm = km;
+    }
+  }
+  return best && bestKm <= NEARBY_KM ? { row: best, km: Math.round(bestKm) } : null;
 }
 
 function scaleOf(rows: EnergyPrice[], energy: "strom" | "gas"): PriceScale {
@@ -115,18 +243,7 @@ function scaleOf(rows: EnergyPrice[], energy: "strom" | "gas"): PriceScale {
   return priceScale(values);
 }
 
-function priceInfo(
-  ct: number | null,
-  base: number | null,
-  kwh: number,
-  scale: PriceScale,
-): PriceInfo | null {
-  const year = annualCost(ct, base, kwh);
-  if (ct === null || year === null) return null;
-  return { ct, year, step: priceStep(year, scale), delta: Math.round(year - scale.median) };
-}
-
-function normalizeCity(city: string): string {
+export function normalizeCity(city: string): string {
   return city
     .toLocaleLowerCase("de-DE")
     .replace(/\(.*?\)/g, "")

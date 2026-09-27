@@ -66,7 +66,8 @@ export function EnergyMapClient({
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
 
-  const isDemo = points.length > 0 && points.every((p) => p.isDemo);
+  const isDemo = points.some((p) => p.isDemo);
+  const ownCount = points.filter((p) => !p.isDemo).length;
 
   /* ----------------------------- Kennzahlen ----------------------------- */
 
@@ -175,9 +176,12 @@ export function EnergyMapClient({
                 color: "var(--gas-600)",
               }}
             >
-              <strong>Demo-Daten.</strong> Die angezeigten Preise sind Beispielwerte,
-              keine echten Grundversorgertarife. Echte Tagespreise erscheinen, sobald in{" "}
-              <code>.env.local</code> eine Quelle unter <code>ENERGY_FEED_URL</code> hinterlegt ist.
+              <strong>Demo-Daten.</strong>{" "}
+              {ownCount > 0
+                ? `Echt sind nur die ${ownCount} Orte, deren Preis vom Preisblatt eingetragen wurde – alle übrigen sind Beispielwerte.`
+                : "Die angezeigten Preise sind Beispielwerte, keine echten Grundversorgertarife."}{" "}
+              Echte Preise für eure Orte trägt die Teamleitung unter Einstellungen →
+              Grundversorger-Preise ein.
             </div>
           )}
 

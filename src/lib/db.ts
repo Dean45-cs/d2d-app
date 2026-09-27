@@ -186,6 +186,28 @@ function migrate(db: Database.Database) {
       key   TEXT PRIMARY KEY,
       value TEXT NOT NULL
     );
+
+    /* Selbst gepflegte Grundversorger-Preise, abgetippt vom Preisblatt des
+       Versorgers. Gehen fuer das Team allen Werten aus der Tagesquelle vor. */
+    CREATE TABLE IF NOT EXISTS provider_prices (
+      id             INTEGER PRIMARY KEY AUTOINCREMENT,
+      team_id        INTEGER NOT NULL REFERENCES teams(id) ON DELETE CASCADE,
+      postal_code    TEXT NOT NULL,
+      city           TEXT NOT NULL DEFAULT '',
+      provider       TEXT NOT NULL,
+      gas_provider   TEXT NOT NULL DEFAULT '',
+      lat            REAL,
+      lng            REAL,
+      strom_ct_kwh   REAL,
+      strom_base_eur REAL,
+      gas_ct_kwh     REAL,
+      gas_base_eur   REAL,
+      valid_from     TEXT NOT NULL DEFAULT '',
+      source_url     TEXT NOT NULL DEFAULT '',
+      updated_at     TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_by     INTEGER REFERENCES users(id) ON DELETE SET NULL,
+      UNIQUE (team_id, postal_code)
+    );
   `);
 
   // Nachtraeglich ergaenzte Spalten: aeltere Datenbanken kennen sie noch nicht,

@@ -70,3 +70,18 @@ export function priceColor(value: number | null, scale: PriceScale): string {
   if (value === null) return "#94a3b8";
   return PRICE_SCALE[priceStep(value, scale)];
 }
+
+/**
+ * Stufe gegen einen festen Vergleichswert (Bundesdurchschnitt der
+ * Grundversorgung). Fuer selbst gepflegte Preise: bei wenigen Orten waere
+ * eine Rangfolge untereinander nichtssagend - einer waere immer "sehr teuer".
+ */
+export function referenceStep(value: number, reference: number): PriceStep {
+  if (reference <= 0) return 2;
+  const deviation = (value - reference) / reference;
+  if (deviation <= -0.08) return 0;
+  if (deviation <= -0.03) return 1;
+  if (deviation < 0.03) return 2;
+  if (deviation < 0.08) return 3;
+  return 4;
+}

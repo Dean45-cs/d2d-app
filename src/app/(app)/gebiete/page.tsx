@@ -27,7 +27,7 @@ export default async function TerritoriesPage() {
     userId: isLeader ? undefined : user.id,
   });
   const members = isLeader ? listMembers(user.team_id) : [];
-  const providers = providerLookup();
+  const providers = providerLookup(user.team_id);
 
   // Nur Gebiete mit gezeichneter Flaeche kommen auf die Uebersichtskarte.
   const mapped: OverviewTerritory[] = territories.flatMap((t) => {

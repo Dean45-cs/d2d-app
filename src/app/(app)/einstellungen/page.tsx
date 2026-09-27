@@ -1,8 +1,17 @@
 import { redirect } from "next/navigation";
 import { requireUser } from "@/lib/auth";
-import { lastRefresh, listReasons } from "@/lib/queries";
+import { lastRefresh, listReasons, listTerritories } from "@/lib/queries";
 import { PageHeader } from "@/components/ui";
+import { centerOf, readArea } from "@/lib/geo/area";
+import { providerLookup } from "@/lib/energy/provider";
+import {
+  DEFAULT_REFERENCE,
+  getReference,
+  listManualPrices,
+  STALE_AFTER_DAYS,
+} from "@/lib/energy/manual";
 import { ReasonSettings } from "./ReasonSettings";
+import { ProviderPriceSettings, type Missing, type PriceRow } from "./ProviderPriceSettings";
 
 export const dynamic = "force-dynamic";
 
@@ -13,6 +22,52 @@ export default async function SettingsPage() {
   const reasons = listReasons(user.team_id, false);
   const refresh = lastRefresh();
   const feedMode = process.env.ENERGY_FEED_MODE ?? "seed";
+  // Grundversorger-Preise: was schon eingetragen ist, und welche Orte der
+  // eigenen Gebiete noch ohne echten Preis dastehen.
+  const now = Date.now();
+  const prices: PriceRow[] = listManualPrices(user.team_id).map((row) => ({
+    id: row.id,
+    postal_code: row.postal_code,
+    city: row.city,
+    provider: row.provider,
+    gas_provider: row.gas_provider,
+    lat: row.lat,
+    lng: row.lng,
+    strom_ct_kwh: row.strom_ct_kwh,
+    strom_base_month: row.strom_base_eur === null ? null : Math.round((row.strom_base_eur / 12) * 100) / 100,
+    gas_ct_kwh: row.gas_ct_kwh,
+    gas_base_month: row.gas_base_eur === null ? null : Math.round((row.gas_base_eur / 12) * 100) / 100,
+    valid_from: row.valid_from,
+    source_url: row.source_url,
+    updated_at: row.updated_at,
+    stale: now - Date.parse(`${row.updated_at.replace(" ", "T")}Z`) > STALE_AFTER_DAYS * 86_400_000,
+  }));
+
+  const lookup = providerLookup(user.team_id);
+  const missingByPlace = new Map<string, Missing>();
+  for (const territory of listTerritories(user.team_id)) {
+    if (territory.status === "DONE") continue;
+    const area = readArea(territory.area_json);
+    const info = lookup.find({ postal_code: territory.postal_code, city: territory.city, area });
+    if (info?.manual && (info.match === "plz" || info.match === "city")) continue;
+    const key = territory.postal_code || territory.city.toLowerCase();
+    const known = missingByPlace.get(key);
+    if (known) {
+      known.territories.push(territory.name);
+      continue;
+    }
+    const center = area ? centerOf(area) : null;
+    missingByPlace.set(key, {
+      postal_code: territory.postal_code,
+      city: territory.city,
+      territories: [territory.name],
+      lat: center?.[0] ?? null,
+      lng: center?.[1] ?? null,
+      // Name aus der Staedteliste nur, wenn der Ort wirklich passt.
+      provider: info && (info.match === "plz" || info.match === "city") ? info.provider : "",
+    });
+  }
+
   const tarifrechner =
     process.env.NEXT_PUBLIC_TARIFRECHNER_URL ??
     "https://portal-ep24.de/menues/tarifrechner/";
@@ -21,10 +76,21 @@ export default async function SettingsPage() {
     <div className="mx-auto max-w-3xl">
       <PageHeader
         title="Einstellungen"
-        subtitle="Ablehnungsgründe, Partner-Link und Datenquelle der Energiekarte"
+        subtitle="Grundversorger-Preise, Ablehnungsgründe, Partner-Link und Datenquelle"
       />
 
-      <ReasonSettings reasons={reasons} />
+      <div id="grundversorger" className="-mt-4 scroll-mt-20">
+        <ProviderPriceSettings
+          prices={prices}
+          missing={[...missingByPlace.values()]}
+          reference={getReference(user.team_id)}
+          referenceDefault={DEFAULT_REFERENCE}
+        />
+      </div>
+
+      <div className="mt-4">
+        <ReasonSettings reasons={reasons} />
+      </div>
 
       <section className="card mt-4 p-4">
         <h2 className="mb-1 text-sm font-semibold">Auftragserfassung des Partners</h2>
