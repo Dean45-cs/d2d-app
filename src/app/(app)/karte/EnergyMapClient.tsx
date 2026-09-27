@@ -2,7 +2,17 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { PageHeader, StatTile, euro } from "@/components/ui";
+import Link from "next/link";
+import {
+  EmptyState,
+  Note,
+  PageHeader,
+  SectionHeader,
+  Segmented,
+  StatTile,
+  euro,
+} from "@/components/ui";
+import { IconBolt, IconInfo, IconRefresh } from "@/components/icons";
 import { PriceBadge } from "@/components/ProviderRating";
 import { MapView } from "@/components/map/MapView";
 import { priceMarker } from "@/components/map/markers";
@@ -128,7 +138,7 @@ export function EnergyMapClient({
       const data = await response.json();
       setMessage(
         response.ok
-          ? `Aktualisiert: ${data.rowCount} Postleitzahlen (${data.source})`
+          ? `Preise aktualisiert – ${data.rowCount} Orte.`
           : (data.error ?? data.message ?? "Aktualisierung fehlgeschlagen"),
       );
       if (response.ok) router.refresh();
@@ -143,72 +153,100 @@ export function EnergyMapClient({
   const delta = selectedValue !== null ? Math.round(selectedValue - stats.med) : null;
   const selectedStep = selectedValue !== null ? priceStep(selectedValue, stats.scale) : null;
 
+  const stand = refresh?.finished_at
+    ? `Stand ${new Date(refresh.finished_at).toLocaleDateString("de-DE", {
+        day: "2-digit",
+        month: "2-digit",
+        year: "numeric",
+      })}`
+    : null;
+
   return (
     <div className="mx-auto max-w-6xl">
       <PageHeader
         title="Energiekarte"
-        subtitle="Wo der Grundversorger besonders teuer ist, ist das Wechselargument am stärksten."
+        subtitle={[
+          points.length > 0 && `${points.length} Orte`,
+          `Musterhaushalt ${
+            energy === "strom"
+              ? `${consumption.strom.toLocaleString("de-DE")} kWh Strom`
+              : `${consumption.gas.toLocaleString("de-DE")} kWh Gas`
+          }`,
+          stand,
+        ]
+          .filter(Boolean)
+          .join(" · ")}
         action={
-          isLeader ? (
-            <button className="btn btn-ghost" onClick={refreshNow} disabled={busy}>
-              {busy ? "Aktualisiere …" : "Jetzt aktualisieren"}
-            </button>
-          ) : undefined
+          <>
+            {points.length > 0 && (
+              <Segmented<Energy>
+                ariaLabel="Energieart"
+                value={energy}
+                onChange={setEnergy}
+                options={[
+                  { value: "strom", label: "Strom" },
+                  { value: "gas", label: "Gas" },
+                ]}
+              />
+            )}
+            {isLeader && (
+              <button
+                className="icon-btn icon-btn-outline h-10 w-10"
+                onClick={refreshNow}
+                disabled={busy}
+                aria-label="Preise jetzt aktualisieren"
+                title="Preise jetzt aktualisieren"
+              >
+                <IconRefresh className={`h-[18px] w-[18px] ${busy ? "animate-spin" : ""}`} />
+              </button>
+            )}
+          </>
         }
       />
 
-      {points.length === 0 ? (
-        <div className="card px-6 py-12 text-center">
-          <p className="font-semibold">Noch keine Preisdaten geladen</p>
-          <p className="muted mx-auto mt-2 max-w-md text-sm">
-            {isLeader
-              ? "Klicke auf „Jetzt aktualisieren“ oder richte den täglichen Abruf ein (siehe README, Abschnitt Energiekarte)."
-              : "Die Teamleitung muss die Preisquelle noch einmal laden."}
-          </p>
+      {message && (
+        <div className="mb-4">
+          <Note tone="brand" icon={<IconInfo className="h-4 w-4" />}>
+            {message}
+          </Note>
         </div>
+      )}
+      {refresh && refresh.status !== "ok" && (
+        <div className="mb-4">
+          <Note tone="danger" icon={<IconInfo className="h-4 w-4" />}>
+            Letzter Abruf fehlgeschlagen: {refresh.message}
+          </Note>
+        </div>
+      )}
+
+      {points.length === 0 ? (
+        <EmptyState
+          icon={<IconBolt className="h-7 w-7" />}
+          title="Noch keine Preisdaten"
+          text={
+            isLeader
+              ? "Über den Knopf oben rechts lädt die App die Preise der Grundversorger."
+              : "Sobald die Teamleitung Preise geladen hat, erscheinen sie hier."
+          }
+        />
       ) : (
         <>
           {isDemo && (
-            <div
-              className="mb-4 rounded-xl px-4 py-3 text-sm"
-              style={{
-                background: "color-mix(in srgb, var(--gas-500) 14%, transparent)",
-                color: "var(--gas-600)",
-              }}
-            >
-              <strong>Demo-Daten.</strong>{" "}
-              {ownCount > 0
-                ? `Echt sind nur die ${ownCount} Orte, deren Preis vom Preisblatt eingetragen wurde – alle übrigen sind Beispielwerte.`
-                : "Die angezeigten Preise sind Beispielwerte, keine echten Grundversorgertarife."}{" "}
-              Echte Preise für eure Orte trägt die Teamleitung unter Einstellungen →
-              Grundversorger-Preise ein.
+            <div className="mb-4">
+              <Note tone="warn" icon={<IconInfo className="h-4 w-4" />}>
+                {ownCount > 0
+                  ? `Echt sind nur die ${ownCount} Orte mit eingetragenem Preisblatt – alle übrigen Preise sind Beispielwerte.`
+                  : "Die Preise sind Beispielwerte, keine echten Grundversorgertarife."}{" "}
+                {isLeader && (
+                  <Link href="/einstellungen#grundversorger" className="font-semibold underline">
+                    Echte Preise eintragen
+                  </Link>
+                )}
+              </Note>
             </div>
           )}
 
-          <div className="mb-4 flex flex-wrap items-center gap-2">
-            <div className="flex overflow-hidden rounded-xl border hairline">
-              {(["strom", "gas"] as Energy[]).map((option) => (
-                <button
-                  key={option}
-                  onClick={() => setEnergy(option)}
-                  className={`px-4 py-2 text-sm font-semibold ${
-                    energy === option ? "bg-brand-600 text-white" : ""
-                  }`}
-                >
-                  {option === "strom" ? "Strom" : "Gas"}
-                </button>
-              ))}
-            </div>
-            <p className="muted text-xs">
-              Musterhaushalt:{" "}
-              {energy === "strom"
-                ? `${consumption.strom.toLocaleString("de-DE")} kWh Strom`
-                : `${consumption.gas.toLocaleString("de-DE")} kWh Gas`}{" "}
-              pro Jahr
-            </p>
-          </div>
-
-          <div className="mb-4 grid grid-cols-2 gap-2 md:grid-cols-4">
+          <div className="mb-4 grid grid-cols-2 gap-3 md:grid-cols-4">
             <StatTile label="Orte in der Karte" value={points.length} />
             <StatTile label="Median Jahreskosten" value={euro(stats.med)} />
             <StatTile
@@ -225,34 +263,34 @@ export function EnergyMapClient({
             />
           </div>
 
-          <div className="grid gap-4 lg:grid-cols-[1fr_20rem]">
+          <div className="grid items-start gap-4 lg:grid-cols-[1fr_20rem]">
             <div className="card overflow-hidden">
               <MapView
                 className="h-[62vh] min-h-[380px] w-full"
                 onEngine={setEngine}
                 onFit={() => engine?.fit(GERMANY_POINTS, { padding: 8, animate: true })}
               />
-              <div className="border-t px-4 pb-3 pt-2.5 hairline">
+              <div className="border-t px-4 pb-3 pt-3 hairline">
                 <div className="flex h-2 overflow-hidden rounded-full">
                   {PRICE_SCALE.map((color) => (
                     <span key={color} className="flex-1" style={{ background: color }} />
                   ))}
                 </div>
-                <div className="muted mt-1.5 grid grid-cols-5 text-center text-[10px] font-semibold">
+                <div className="muted mt-1.5 grid grid-cols-5 text-center text-[11px] font-medium">
                   {PRICE_LEVELS.map((level) => (
                     <span key={level.step}>{level.label}</span>
                   ))}
                 </div>
-                <p className="muted mt-1 text-center text-[10px]">
-                  Je größer der Punkt, desto weiter liegt der Ort vom Median entfernt.
+                <p className="muted mt-1 text-center text-[11px]">
+                  Größere Punkte liegen weiter vom Median entfernt.
                 </p>
               </div>
             </div>
 
             <div className="space-y-4">
               {selected && (
-                <div className="card p-4">
-                  <p className="text-xs font-semibold uppercase tracking-wider muted">
+                <div className="card p-5">
+                  <p className="muted text-[12.5px] font-medium">
                     {selected.plz} · {selected.state}
                   </p>
                   <div className="flex items-start justify-between gap-2">
@@ -286,32 +324,30 @@ export function EnergyMapClient({
                   </dl>
 
                   {delta !== null && delta > 0 && (
-                    <p
-                      className="mt-3 rounded-xl px-3 py-2 text-xs font-medium"
-                      style={{
-                        background: "color-mix(in srgb, var(--energy-500) 12%, transparent)",
-                        color: "var(--energy-700)",
-                      }}
-                    >
-                      Guter Ort zum Klingeln: Der Grundversorger liegt {euro(delta)} pro Jahr
-                      über dem Median.
-                    </p>
+                    <div className="mt-3">
+                      <Note tone="success">
+                        Guter Ort zum Klingeln: Der Grundversorger liegt {euro(delta)} pro Jahr
+                        über dem Median.
+                      </Note>
+                    </div>
                   )}
                 </div>
               )}
 
-              <div className="card p-4">
-                <p className="mb-2 text-sm font-semibold">
-                  Teuerste Grundversorger {energy === "strom" ? "(Strom)" : "(Gas)"}
-                </p>
-                <ol className="space-y-1">
+              <div className="card p-5">
+                <SectionHeader
+                  title={`Teuerste Orte · ${energy === "strom" ? "Strom" : "Gas"}`}
+                  className="mb-2"
+                />
+                <ol className="-mx-2 space-y-0.5">
                   {stats.ranked.slice(0, 12).map((point, index) => (
                     <li key={point.plz}>
                       <button
                         onClick={() => focus(point)}
-                        className="flex w-full items-center gap-2 rounded-lg px-1.5 py-1.5 text-left text-sm hover:bg-brand-500/8"
+                        className="flex w-full items-center gap-2.5 rounded-[var(--r-xs)] px-2 py-1.5 text-left text-[13.5px] transition-colors hover:bg-[var(--hover)]"
+                        aria-current={selected?.plz === point.plz ? "true" : undefined}
                       >
-                        <span className="muted w-4 text-xs tabular-nums">{index + 1}</span>
+                        <span className="muted w-5 text-right text-[12px] tabular-nums">{index + 1}</span>
                         <span
                           className="h-2.5 w-2.5 shrink-0 rounded-full"
                           style={{ background: colorFor(point) }}
@@ -326,25 +362,6 @@ export function EnergyMapClient({
                 </ol>
               </div>
 
-              <div className="card p-4 text-xs">
-                <p className="font-semibold">Datenstand</p>
-                {refresh?.finished_at ? (
-                  <p className="muted mt-1">
-                    {new Date(refresh.finished_at).toLocaleString("de-DE")} ·{" "}
-                    {refresh.source || "unbekannte Quelle"} · {refresh.row_count} PLZ
-                    {refresh.status !== "ok" && (
-                      <span className="block font-semibold text-signal-600">
-                        Letzter Abruf fehlgeschlagen: {refresh.message}
-                      </span>
-                    )}
-                  </p>
-                ) : (
-                  <p className="muted mt-1">Noch kein Abruf protokolliert.</p>
-                )}
-                {message && (
-                  <p className="mt-2 font-semibold text-brand-600">{message}</p>
-                )}
-              </div>
             </div>
           </div>
         </>
@@ -363,7 +380,7 @@ function Row({
   tone?: "danger" | "success";
 }) {
   const color =
-    tone === "danger" ? "var(--signal-600)" : tone === "success" ? "var(--energy-600)" : undefined;
+    tone === "danger" ? "var(--danger-ink)" : tone === "success" ? "var(--ok-ink)" : undefined;
   return (
     <div className="flex items-baseline justify-between gap-3">
       <dt className="muted">{label}</dt>

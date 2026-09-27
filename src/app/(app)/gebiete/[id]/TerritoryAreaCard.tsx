@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { AreaMap } from "@/components/AreaMap";
-import { Note, plural } from "@/components/ui";
+import { EmptyState, Note, plural } from "@/components/ui";
 import { IconInfo, IconMap } from "@/components/icons";
 import { AreaPicker } from "../AreaPicker";
 import { centerOf, type LatLng } from "@/lib/geo/area";
@@ -119,12 +119,9 @@ export function TerritoryAreaCard({
   if (!area && !isLeader) return null;
 
   return (
-    <div className="card mb-4 p-4">
-      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-        <p className="flex items-center gap-2 text-[13px] font-semibold">
-          <IconMap className="h-4 w-4 text-brand-600" />
-          Gebiet auf der Karte
-        </p>
+    <div className="card mb-4 p-5">
+      <div className="section-head mb-3 flex-wrap">
+        <h2 className="section-title">Karte</h2>
         {isLeader && (
           <div className="flex flex-wrap gap-2">
             {area && !editing && (
@@ -205,16 +202,22 @@ export function TerritoryAreaCard({
           />
         </div>
       ) : (
-        <Note icon={<IconInfo className="h-4 w-4" />}>
-          Für dieses Gebiet ist noch keine Fläche hinterlegt. Mit „Fläche festlegen“ lässt sie
-          sich auf der Karte nachtragen – danach können die Straßen automatisch geladen werden.
-        </Note>
+        <EmptyState
+          bare
+          icon={<IconMap className="h-5 w-5" />}
+          title="Noch keine Fläche"
+          text={
+            isLeader
+              ? "Mit einer Fläche auf der Karte lädt die App die Straßen und Hausnummern selbst."
+              : undefined
+          }
+        />
       )}
 
       {message && (
-        <p className="mt-2 text-[12px] font-semibold text-brand-600">{message}</p>
+        <p className="mt-2 text-[12px] font-semibold text-tint">{message}</p>
       )}
-      {error && <p className="mt-2 text-[12px] font-semibold text-signal-600">{error}</p>}
+      {error && <p className="mt-2 text-[12px] font-semibold text-danger">{error}</p>}
     </div>
   );
 }

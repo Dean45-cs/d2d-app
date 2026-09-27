@@ -90,7 +90,7 @@ export function StreetResult({
           className="tile-icon h-10 w-10 shrink-0"
           style={{
             background: "color-mix(in srgb, var(--brand-500) 13%, transparent)",
-            color: "var(--brand-600)",
+            color: "var(--tint)",
           }}
           aria-hidden
         >

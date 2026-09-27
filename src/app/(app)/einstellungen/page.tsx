@@ -1,7 +1,8 @@
 import { redirect } from "next/navigation";
 import { requireUser } from "@/lib/auth";
 import { lastRefresh, listReasons, listTerritories } from "@/lib/queries";
-import { PageHeader } from "@/components/ui";
+import { PageHeader, SectionHeader } from "@/components/ui";
+import { IconExternal } from "@/components/icons";
 import { centerOf, readArea } from "@/lib/geo/area";
 import { providerLookup } from "@/lib/energy/provider";
 import {
@@ -72,80 +73,112 @@ export default async function SettingsPage() {
     process.env.NEXT_PUBLIC_TARIFRECHNER_URL ??
     "https://portal-ep24.de/menues/tarifrechner/";
 
+  const tarifrechnerHost = hostOf(tarifrechner);
+  const lastRun = refresh?.finished_at
+    ? new Date(refresh.finished_at).toLocaleString("de-DE", {
+        timeZone: "Europe/Berlin",
+        day: "2-digit",
+        month: "2-digit",
+        year: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+      })
+    : "Noch nie";
+
   return (
     <div className="mx-auto max-w-3xl">
-      <PageHeader
-        title="Einstellungen"
-        subtitle="Grundversorger-Preise, Ablehnungsgründe, Partner-Link und Datenquelle"
-      />
+      <PageHeader title="Einstellungen" />
 
-      <div id="grundversorger" className="-mt-4 scroll-mt-20">
-        <ProviderPriceSettings
-          prices={prices}
-          missing={[...missingByPlace.values()]}
-          reference={getReference(user.team_id)}
-          referenceDefault={DEFAULT_REFERENCE}
-        />
-      </div>
+      <div className="space-y-4">
+        <div id="grundversorger" className="scroll-mt-20">
+          <ProviderPriceSettings
+            prices={prices}
+            missing={[...missingByPlace.values()]}
+            reference={getReference(user.team_id)}
+            referenceDefault={DEFAULT_REFERENCE}
+          />
+        </div>
 
-      <div className="mt-4">
         <ReasonSettings reasons={reasons} />
+
+        <section className="card p-5">
+          <SectionHeader title="Abschluss" className="mb-1" />
+          <p className="muted mb-4 text-[13px] leading-snug">
+            Der Abschluss-Knopf an der Tür öffnet den Tarifrechner des Partners, in dem der
+            Auftrag aufgenommen und unterschrieben wird.
+          </p>
+          <div className="list">
+            <a
+              href={tarifrechner}
+              target="_blank"
+              rel="noreferrer"
+              className="list-row"
+            >
+              <span className="min-w-0 flex-1">
+                <span className="block text-[14px] font-medium">Tarifrechner</span>
+                <span className="muted block truncate text-[12.5px]">{tarifrechnerHost}</span>
+              </span>
+              <IconExternal className="muted h-4 w-4 shrink-0" />
+            </a>
+          </div>
+        </section>
+
+        <section className="card p-5">
+          <SectionHeader title="Preisdaten der Energiekarte" className="mb-3" />
+          <dl className="list">
+            <InfoRow
+              label="Quelle"
+              value={
+                feedMode === "seed"
+                  ? "Beispieldaten"
+                  : refresh?.source || feedMode.toUpperCase()
+              }
+            />
+            <InfoRow label="Letzter Abruf" value={lastRun} />
+            <InfoRow
+              label="Status"
+              value={
+                !refresh
+                  ? "–"
+                  : refresh.status === "ok"
+                    ? `Aktuell · ${refresh.row_count} Orte`
+                    : "Fehlgeschlagen"
+              }
+              tone={refresh && refresh.status !== "ok" ? "danger" : undefined}
+            />
+          </dl>
+          {feedMode === "seed" && (
+            <p className="muted mt-3 text-[12.5px] leading-snug">
+              Die Energiekarte zeigt Beispielwerte, bis eine Tagesquelle angebunden ist. Echte
+              Preise für eure Orte lassen sich oben unter Grundversorger-Preise eintragen.
+            </p>
+          )}
+        </section>
       </div>
-
-      <section className="card mt-4 p-4">
-        <h2 className="mb-1 text-sm font-semibold">Auftragserfassung des Partners</h2>
-        <p className="muted mb-2 text-sm">
-          Der Abschluss-Button im Tür-Tracking öffnet diese Adresse:
-        </p>
-        <code className="block overflow-x-auto rounded-xl bg-black/5 px-3 py-2 text-xs">
-          {tarifrechner}
-        </code>
-        <p className="muted mt-2 text-xs">
-          Änderbar über <code>NEXT_PUBLIC_TARIFRECHNER_URL</code> in der Datei{" "}
-          <code>.env.local</code>.
-        </p>
-      </section>
-
-      <section className="card mt-4 p-4">
-        <h2 className="mb-1 text-sm font-semibold">Energiekarte – Datenquelle</h2>
-        <dl className="mt-2 space-y-1.5 text-sm">
-          <div className="flex justify-between gap-3">
-            <dt className="muted">Modus</dt>
-            <dd className="font-semibold">
-              {feedMode === "seed" ? "Demo-Daten (keine echten Tarife)" : feedMode.toUpperCase()}
-            </dd>
-          </div>
-          <div className="flex justify-between gap-3">
-            <dt className="muted">Letzter Abruf</dt>
-            <dd className="font-semibold">
-              {refresh?.finished_at
-                ? new Date(refresh.finished_at).toLocaleString("de-DE")
-                : "noch nie"}
-            </dd>
-          </div>
-          <div className="flex justify-between gap-3">
-            <dt className="muted">Ergebnis</dt>
-            <dd className="font-semibold">
-              {refresh ? `${refresh.status} · ${refresh.row_count} PLZ` : "–"}
-            </dd>
-          </div>
-        </dl>
-        <p className="muted mt-3 text-xs">
-          Für echte Tagespreise <code>ENERGY_FEED_MODE=csv</code> (oder <code>json</code>)
-          und <code>ENERGY_FEED_URL</code> in <code>.env.local</code> setzen. Das erwartete
-          Format steht im README unter „Energiekarte“.
-        </p>
-      </section>
-
-      <section className="card mt-4 p-4">
-        <h2 className="mb-1 text-sm font-semibold">Farben &amp; Logo</h2>
-        <p className="muted text-sm">
-          Alle Farben der App stehen in <code>src/app/brand.css</code>. Dort die
-          Hex-Werte von Energie Partner 24 eintragen, dann übernimmt die gesamte
-          Oberfläche sie. Ein eigenes Logo als <code>public/logo.svg</code> ablegen
-          und in <code>src/components/Logo.tsx</code> einbinden.
-        </p>
-      </section>
     </div>
   );
+}
+
+function InfoRow({ label, value, tone }: { label: string; value: string; tone?: "danger" }) {
+  return (
+    <div className="flex items-center justify-between gap-4 px-3.5 py-3 text-[14px]">
+      <dt className="muted">{label}</dt>
+      <dd
+        className="min-w-0 truncate text-right font-medium"
+        style={{ color: tone === "danger" ? "var(--danger-ink)" : undefined }}
+      >
+        {value}
+      </dd>
+    </div>
+  );
+}
+
+/** "portal-ep24.de" aus der vollen Adresse - lesbarer als der ganze Pfad. */
+function hostOf(url: string): string {
+  try {
+    const parsed = new URL(url);
+    return `${parsed.host}${parsed.pathname === "/" ? "" : parsed.pathname}`.replace(/\/$/, "");
+  } catch {
+    return url;
+  }
 }

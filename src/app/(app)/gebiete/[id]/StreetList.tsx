@@ -4,13 +4,15 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import type { HouseNumberWithStats, StreetWithStats } from "@/lib/queries";
 import {
+  IconBan,
+  IconBell,
   IconChevronDown,
-  IconList,
   IconNavigate,
   IconPlus,
-  IconX,
+  IconTrash,
 } from "@/components/icons";
-import { ProgressBar } from "@/components/ui";
+import { EmptyState, ProgressBar, SectionHeader } from "@/components/ui";
+import { useConfirm } from "@/components/useConfirm";
 import { routeUrl } from "@/lib/map";
 import { doorStatus, MAX_NOT_HOME_ATTEMPTS, whenLabel } from "@/lib/doors";
 
@@ -32,6 +34,7 @@ export function StreetList({
   const [raw, setRaw] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { confirm, dialog } = useConfirm();
 
   async function addStreets(event: React.FormEvent) {
     event.preventDefault();
@@ -65,30 +68,35 @@ export function StreetList({
     router.refresh();
   }
 
-  async function remove(streetId: number) {
-    if (!confirm("Diese Straße wirklich aus dem Gebiet entfernen?")) return;
+  async function remove(streetId: number, name: string) {
+    const ok = await confirm({
+      title: `${name} entfernen?`,
+      text: "Die Straße verschwindet aus dem Gebiet. Bereits erfasste Türen bleiben in der Auswertung.",
+      confirmLabel: "Entfernen",
+      danger: true,
+    });
+    if (!ok) return;
     await fetch(`/api/streets/${streetId}`, { method: "DELETE" });
     router.refresh();
   }
 
   return (
-    <div className="card p-4">
-      <div className="mb-3 flex items-center justify-between gap-3">
-        <p className="flex items-center gap-2 text-[13px] font-semibold">
-          <IconList className="h-4 w-4 text-brand-600" />
-          Straßen
-          <span className="muted font-normal tabular-nums">({streets.length})</span>
-        </p>
-        {isLeader && (
-          <button
-            className="btn btn-ghost btn-sm btn-pill"
-            onClick={() => setAdding((v) => !v)}
-          >
-            <IconPlus className="h-4 w-4" />
-            Hinzufügen
-          </button>
-        )}
-      </div>
+    <div className="card p-5">
+      <SectionHeader
+        title="Straßen"
+        count={streets.length}
+        action={
+          isLeader ? (
+            <button
+              className="btn btn-ghost btn-sm btn-pill"
+              onClick={() => setAdding((v) => !v)}
+            >
+              <IconPlus className="h-4 w-4" />
+              Hinzufügen
+            </button>
+          ) : undefined
+        }
+      />
 
       {adding && (
         <form onSubmit={addStreets} className="inset mb-4 p-3">
@@ -104,7 +112,7 @@ export function StreetList({
             onChange={(e) => setRaw(e.target.value)}
             required
           />
-          {error && <p className="mt-2 text-[12px] font-semibold text-signal-600">{error}</p>}
+          {error && <p className="mt-2 text-[12px] font-semibold text-danger">{error}</p>}
           <div className="mt-3 flex gap-2">
             <button type="button" className="btn btn-ghost flex-1" onClick={() => setAdding(false)}>
               Abbrechen
@@ -117,9 +125,7 @@ export function StreetList({
       )}
 
       {streets.length === 0 ? (
-        <p className="muted py-6 text-center text-sm">
-          Noch keine Straßen in diesem Gebiet.
-        </p>
+        <EmptyState bare title="Noch keine Straßen" />
       ) : (
         <ul>
           {streets.map((s) => {
@@ -129,7 +135,7 @@ export function StreetList({
             return (
               <li
                 key={s.id}
-                className="border-t py-2.5 first:border-t-0"
+                className="border-t py-3 first:border-t-0"
                 style={{ borderColor: "var(--line)" }}
               >
                 <div className="flex items-center gap-2">
@@ -140,7 +146,7 @@ export function StreetList({
                         <span className="muted font-normal">{s.house_numbers}</span>
                       )}
                     </p>
-                    <p className="muted text-[11px] tabular-nums">
+                    <p className="muted text-[12px] tabular-nums">
                       {/* Kurz halten: der Fortschritt ist die wichtigste Zahl. */}
                       {s.units > 0
                         ? `${s.visit_count} von ${s.units} Türen`
@@ -163,7 +169,7 @@ export function StreetList({
                     <button
                       type="button"
                       onClick={() => setOpenStreet(expanded ? null : s.id)}
-                      className="muted shrink-0 rounded-lg px-2 py-1 text-[11px] font-semibold hover:bg-brand-500/8"
+                      className="muted shrink-0 rounded-full px-2.5 py-1.5 text-[12px] font-semibold hover:bg-[var(--hover)]"
                       aria-expanded={expanded}
                     >
                       {houses.length} Nr.
@@ -181,7 +187,7 @@ export function StreetList({
                       target="_blank"
                       rel="noreferrer"
                       className="icon-btn h-8 w-8 shrink-0"
-                      style={{ color: "var(--brand-600)" }}
+                      style={{ color: "var(--tint)" }}
                       title={`Route zur ${s.name}`}
                       aria-label={`Route zur ${s.name}`}
                     >
@@ -192,7 +198,7 @@ export function StreetList({
                   {/* Das Auswahlfeld zeigt den Status schon an - eine zusaetzliche
                       Plakette daneben waere doppelt und kostet auf dem Handy Platz. */}
                   <select
-                    className="select w-auto shrink-0 px-2 py-1 text-[11px]"
+                    className="select select-sm shrink-0"
                     value={s.status}
                     onChange={(e) => setStatus(s.id, e.target.value)}
                     aria-label={`Status von ${s.name}`}
@@ -204,19 +210,25 @@ export function StreetList({
 
                   {isLeader && (
                     <button
-                      onClick={() => remove(s.id)}
-                      className="icon-btn h-8 w-8 shrink-0 hover:text-signal-600"
+                      onClick={() => void remove(s.id, s.name)}
+                      className="icon-btn h-8 w-8 shrink-0 hover:text-danger"
                       aria-label={`${s.name} entfernen`}
+                      title="Entfernen"
                     >
-                      <IconX className="h-4 w-4" />
+                      <IconTrash className="h-4 w-4" />
                     </button>
                   )}
                 </div>
 
                 {expanded && (
                   <div className="mt-2 rise">
-                    <p className="muted mb-1.5 text-[11px]">
-                      {doneHouses} von {houses.length} Häusern erfasst · grün = Abschluss
+                    <p className="muted mb-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[12px]">
+                      <span>
+                        {doneHouses} von {houses.length} Häusern erfasst
+                      </span>
+                      <ChipLegend color="var(--brand-500)" label="erfasst" />
+                      <ChipLegend color="var(--energy-500)" label="Abschluss" />
+                      <ChipLegend color="var(--gas-500)" label="nochmal" />
                     </p>
                     <ul className="flex flex-wrap gap-1">
                       {houses.map((house) => (
@@ -232,7 +244,17 @@ export function StreetList({
           })}
         </ul>
       )}
+      {dialog}
     </div>
+  );
+}
+
+function ChipLegend({ color, label }: { color: string; label: string }) {
+  return (
+    <span className="inline-flex items-center gap-1">
+      <span className="h-2 w-2 rounded-[3px]" style={{ background: color }} aria-hidden />
+      {label}
+    </span>
   );
 }
 
@@ -270,13 +292,13 @@ function HouseChip({ house }: { house: HouseNumberWithStats }) {
                 ? "color-mix(in srgb, var(--brand-500) 16%, transparent)"
                 : "color-mix(in srgb, var(--ink) 7%, transparent)",
         color: blocked
-          ? "var(--signal-600)"
+          ? "var(--danger-ink)"
           : retry
-            ? "var(--gas-600)"
+            ? "var(--warn-ink)"
             : sale
-              ? "var(--energy-700)"
+              ? "var(--ok-ink)"
               : done
-                ? "var(--brand-600)"
+                ? "var(--tint)"
                 : "var(--ink-muted)",
       }}
       title={[
@@ -300,11 +322,15 @@ function HouseChip({ house }: { house: HouseNumberWithStats }) {
     >
       {house.number}
       {blocked ? (
-        <span className="ml-1 text-[10px] font-medium">🚫</span>
+        <IconBan className="ml-1 h-3 w-3" />
       ) : mfh ? (
-        <span className="ml-1 text-[10px] font-medium opacity-70">
-          {house.bell_count > 0 ? `${house.bell_done_count}/${house.bell_count}` : "🔔"}
-        </span>
+        house.bell_count > 0 ? (
+          <span className="ml-1 text-[10px] font-medium opacity-70">
+            {house.bell_done_count}/{house.bell_count}
+          </span>
+        ) : (
+          <IconBell className="ml-1 h-3 w-3 opacity-70" />
+        )
       ) : retry ? (
         <span className="ml-1 text-[10px] font-medium opacity-70">
           {house.not_home_count}/{MAX_NOT_HOME_ATTEMPTS}

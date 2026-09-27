@@ -419,7 +419,7 @@ export function AreaPicker({
             className="w-[4.25rem] shrink-0 rounded-full py-1 text-center text-[13px] font-bold tabular-nums"
             style={{
               background: "color-mix(in srgb, var(--brand-500) 12%, transparent)",
-              color: "var(--brand-600)",
+              color: "var(--tint)",
             }}
           >
             {radius < 1000 ? `${radius} m` : `${(radius / 1000).toLocaleString("de-DE")} km`}
@@ -485,7 +485,7 @@ export function AreaPicker({
       </p>
 
       {hint && (
-        <p className="text-[12px] font-semibold text-signal-600">{hint}</p>
+        <p className="text-[12px] font-semibold text-danger">{hint}</p>
       )}
     </div>
   );

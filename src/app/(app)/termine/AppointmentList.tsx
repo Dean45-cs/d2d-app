@@ -3,9 +3,20 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { AppointmentRow } from "@/lib/queries";
-import { StatTile } from "@/components/ui";
+import {
+  Avatar,
+  EmptyState,
+  Note,
+  PageHeader,
+  Segmented,
+  SkeletonRows,
+  plural,
+} from "@/components/ui";
+import { IconCalendar, IconCheck, IconNavigate, IconPhone, IconUndo } from "@/components/icons";
 import { routeUrl } from "@/lib/map";
-import { slotLabel, slotOverdue, slotToday } from "@/lib/appointments";
+import { parseSlot, slotDate, slotOverdue, toSlot } from "@/lib/appointments";
+
+type View = "open" | "done";
 
 /**
  * Vereinbarte Termine - der Rückweg des Tages.
@@ -17,14 +28,17 @@ import { slotLabel, slotOverdue, slotToday } from "@/lib/appointments";
 export function AppointmentList({
   appointments,
   isLeader,
+  faces,
 }: {
   appointments: AppointmentRow[];
   isLeader: boolean;
+  /** Profilbilder je Mitarbeiter-ID - nur fuer die Teamleitung. */
+  faces: Record<number, string>;
 }) {
   const router = useRouter();
   const [busy, setBusy] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [showDone, setShowDone] = useState(false);
+  const [view, setView] = useState<View>("open");
   /* Was "heute" ist, entscheidet die Uhr des Geräts - nicht die des Servers. */
   const [now, setNow] = useState<Date | null>(null);
   useEffect(() => setNow(new Date()), []);
@@ -45,7 +59,7 @@ export function AppointmentList({
       }
       router.refresh();
     } catch {
-      setError("Keine Verbindung.");
+      setError("Keine Verbindung – bitte gleich noch einmal versuchen.");
     } finally {
       setBusy(null);
     }
@@ -54,141 +68,262 @@ export function AppointmentList({
   const open = appointments.filter((item) => !item.follow_up_done_at);
   const done = appointments.filter((item) => item.follow_up_done_at);
   const overdue = now ? open.filter((item) => slotOverdue(item.follow_up_at, now)) : [];
-  const today = now
-    ? open.filter(
-        (item) => slotToday(item.follow_up_at, now) && !slotOverdue(item.follow_up_at, now),
-      )
-    : [];
+
+  const summary = [
+    plural(open.length, "offener Termin", "offene Termine"),
+    overdue.length > 0 && `${overdue.length} überfällig`,
+  ]
+    .filter(Boolean)
+    .join(" · ");
+
+  /* Offene Termine nach Tag - überfällige zuerst, egal von wann. */
+  const groups: Array<{ key: string; title: string; late: boolean; items: AppointmentRow[] }> = [];
+  if (now) {
+    const today = toSlot(now).slice(0, 10);
+    const tomorrow = toSlot(new Date(now.getTime() + 86_400_000)).slice(0, 10);
+    if (overdue.length > 0) {
+      groups.push({ key: "late", title: "Überfällig", late: true, items: overdue });
+    }
+    for (const item of open) {
+      if (slotOverdue(item.follow_up_at, now)) continue;
+      const day = slotDate(item.follow_up_at) || "ohne";
+      let group = groups.find((g) => g.key === day);
+      if (!group) {
+        group = {
+          key: day,
+          title: day === today ? "Heute" : day === tomorrow ? "Morgen" : dayTitle(item.follow_up_at),
+          late: false,
+          items: [],
+        };
+        groups.push(group);
+      }
+      group.items.push(item);
+    }
+  }
 
   return (
     <div>
-      <div className="mb-5 grid grid-cols-3 gap-2">
-        <StatTile label="Offen" value={open.length} />
-        <StatTile label="Heute" value={now ? today.length : "–"} tone="brand" />
-        <StatTile label="Überfällig" value={now ? overdue.length : "–"} tone="danger" />
-      </div>
+      <PageHeader
+        title={isLeader ? "Termine" : "Meine Termine"}
+        subtitle={summary}
+        action={
+          <Segmented<View>
+            ariaLabel="Termine filtern"
+            value={view}
+            onChange={setView}
+            options={[
+              { value: "open", label: "Offen" },
+              { value: "done", label: `Erledigt${done.length ? ` · ${done.length}` : ""}` },
+            ]}
+          />
+        }
+      />
 
       {error && (
-        <p className="mb-3 text-sm font-medium text-signal-600" role="alert">
-          {error}
-        </p>
+        <div className="mb-4" role="alert">
+          <Note tone="danger">{error}</Note>
+        </div>
       )}
 
-      <section className="card p-4">
-        <div className="mb-3 flex items-baseline justify-between gap-3">
-          <h2 className="text-sm font-semibold">
-            {isLeader ? "Termine des Teams" : "Meine Termine"} ({open.length})
-          </h2>
-          {done.length > 0 && (
-            <button
-              type="button"
-              onClick={() => setShowDone((v) => !v)}
-              className="muted shrink-0 text-xs font-semibold underline"
-            >
-              {showDone ? "erledigte ausblenden" : `${done.length} erledigt`}
-            </button>
-          )}
-        </div>
-
-        {open.length === 0 ? (
-          <p className="muted text-sm">
-            Kein offener Termin. Termine entstehen an der Tür über „Termin vereinbart“.
-          </p>
+      {view === "open" ? (
+        open.length === 0 ? (
+          <EmptyState
+            icon={<IconCalendar className="h-7 w-7" />}
+            title="Keine offenen Termine"
+            text="Termine entstehen an der Tür über „Termin vereinbart“ und erscheinen dann hier."
+          />
+        ) : !now ? (
+          <SkeletonRows rows={5} />
         ) : (
-          <ul className="space-y-2">
-            {open.map((item) => {
-              const late = slotOverdue(item.follow_up_at, now ?? undefined);
-              return (
-                <li
-                  key={item.id}
-                  className="rounded-xl border p-2.5 hairline"
-                  style={late ? { borderColor: "var(--signal-400)" } : undefined}
+          <div className="space-y-6">
+            {groups.map((group) => (
+              <section key={group.key}>
+                <h2
+                  className="mb-2 ml-1 flex items-center gap-2 text-[13px] font-semibold"
+                  style={{ color: group.late ? "var(--danger-ink)" : "var(--ink-2)" }}
                 >
-                  <div className="flex items-center gap-2">
-                    <span
-                      className="shrink-0 rounded-lg px-2 py-1 text-xs font-bold tabular-nums"
-                      style={{
-                        background: late
-                          ? "color-mix(in srgb, var(--signal-500) 15%, transparent)"
-                          : "color-mix(in srgb, var(--brand-500) 14%, transparent)",
-                        color: late ? "var(--signal-600)" : "var(--brand-600)",
-                      }}
-                    >
-                      {now ? slotLabel(item.follow_up_at, now) : item.follow_up_at}
-                    </span>
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-medium">
-                        {item.contact_name || "Ohne Namen"}
-                        <span className="muted font-normal">
-                          {" · "}
-                          {item.street_name ?? ""} {item.house_number}
-                          {item.doorbell_label ? ` · ${item.doorbell_label}` : ""}
-                        </span>
-                      </p>
-                      <p className="muted truncate text-xs">
-                        {item.user_name}
-                        {item.reason_note ? ` · ${item.reason_note}` : ""}
-                      </p>
-                    </div>
-                  </div>
-                  {/* Eigene Zeile: auf dem Handy quetschen Knöpfe sonst den Namen weg. */}
-                  <div className="mt-2 flex flex-wrap justify-end gap-2">
-                    {item.contact_phone && (
-                      <a
-                        href={`tel:${item.contact_phone.replace(/[^+\d]/g, "")}`}
-                        className="rounded-lg border px-2.5 py-1.5 text-xs font-semibold hairline"
-                      >
-                        📞 anrufen
-                      </a>
-                    )}
-                    {item.lat !== null && item.lng !== null && (
-                      <a
-                        href={routeUrl(item.lat, item.lng)}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="rounded-lg border px-2.5 py-1.5 text-xs font-semibold hairline"
-                      >
-                        ➤ Route
-                      </a>
-                    )}
-                    <button
-                      type="button"
-                      disabled={busy === item.id}
-                      onClick={() => void setDone(item.id, true)}
-                      className="btn btn-ghost px-3 py-1.5 text-xs"
-                    >
-                      erledigt
-                    </button>
-                  </div>
-                </li>
-              );
-            })}
-          </ul>
-        )}
-
-        {showDone && done.length > 0 && (
-          <ul className="mt-3 space-y-1 border-t pt-3 hairline">
-            {done.map((item) => (
-              <li key={item.id} className="flex items-center gap-2 text-sm">
-                <span className="muted w-24 shrink-0 text-xs tabular-nums">
-                  {now ? slotLabel(item.follow_up_at, now) : item.follow_up_at}
-                </span>
-                <span className="muted min-w-0 flex-1 truncate line-through">
-                  {item.contact_name || "Ohne Namen"} · {item.street_name ?? ""}{" "}
-                  {item.house_number}
-                </span>
-                <button
-                  type="button"
-                  onClick={() => void setDone(item.id, false)}
-                  className="muted shrink-0 text-xs underline"
-                >
-                  wieder öffnen
-                </button>
-              </li>
+                  {group.title}
+                  <span className="muted font-medium tabular-nums">{group.items.length}</span>
+                </h2>
+                <ul className="list">
+                  {group.items.map((item) => (
+                    <AppointmentItem
+                      key={item.id}
+                      item={item}
+                      late={group.late}
+                      isLeader={isLeader}
+                      face={faces[item.user_id]}
+                      busy={busy === item.id}
+                      onDone={() => void setDone(item.id, true)}
+                    />
+                  ))}
+                </ul>
+              </section>
             ))}
-          </ul>
-        )}
-      </section>
+          </div>
+        )
+      ) : done.length === 0 ? (
+        <EmptyState
+          icon={<IconCheck className="h-7 w-7" />}
+          title="Noch nichts erledigt"
+          text="Abgehakte Termine landen hier und lassen sich jederzeit wieder öffnen."
+        />
+      ) : (
+        <ul className="list">
+          {done.map((item) => (
+            <li key={item.id} className="list-row">
+              <SlotBlock slot={item.follow_up_at} showDay muted />
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-[14px] font-medium line-through decoration-[var(--line-strong)]">
+                  {item.contact_name || "Ohne Namen"}
+                </span>
+                <span className="muted block truncate text-[12.5px]">
+                  {address(item)}
+                  {isLeader && ` · ${item.user_name}`}
+                </span>
+              </span>
+              <button
+                type="button"
+                className="icon-btn icon-btn-outline shrink-0"
+                disabled={busy === item.id}
+                onClick={() => void setDone(item.id, false)}
+                aria-label="Wieder öffnen"
+                title="Wieder öffnen"
+              >
+                <IconUndo className="h-4 w-4" />
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   );
+}
+
+function AppointmentItem({
+  item,
+  late,
+  isLeader,
+  face,
+  busy,
+  onDone,
+}: {
+  item: AppointmentRow;
+  late: boolean;
+  isLeader: boolean;
+  face: string | undefined;
+  busy: boolean;
+  onDone: () => void;
+}) {
+  const phone = item.contact_phone.replace(/[^+\d]/g, "");
+  return (
+    <li className="list-row items-start py-3 sm:items-center">
+      <SlotBlock slot={item.follow_up_at} showDay={late} late={late} />
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-[14.5px] font-semibold">{item.contact_name || "Ohne Namen"}</p>
+        <p className="muted truncate text-[12.5px]">{address(item)}</p>
+        {(isLeader || item.reason_note) && (
+          <p className="muted mt-1 flex min-w-0 items-center gap-1.5 text-[12px]">
+            {isLeader && (
+              <>
+                <Avatar name={item.user_name} src={face} size={18} />
+                <span className="shrink-0">{item.user_name}</span>
+              </>
+            )}
+            {isLeader && item.reason_note && <span aria-hidden>·</span>}
+            {item.reason_note && <span className="truncate">„{item.reason_note}“</span>}
+          </p>
+        )}
+      </div>
+      <div className="flex shrink-0 items-center gap-1.5 self-center">
+        {phone && (
+          <a
+            href={`tel:${phone}`}
+            className="icon-btn icon-btn-outline"
+            aria-label={`${item.contact_name || "Kontakt"} anrufen`}
+            title={item.contact_phone}
+          >
+            <IconPhone className="h-4 w-4" />
+          </a>
+        )}
+        {item.lat !== null && item.lng !== null && (
+          <a
+            href={routeUrl(item.lat, item.lng)}
+            target="_blank"
+            rel="noreferrer"
+            className="icon-btn icon-btn-outline"
+            aria-label="Route öffnen"
+            title="Route"
+          >
+            <IconNavigate className="h-4 w-4" />
+          </a>
+        )}
+        <button
+          type="button"
+          disabled={busy}
+          onClick={onDone}
+          className="icon-btn"
+          style={{
+            background: "color-mix(in srgb, var(--energy-500) 14%, transparent)",
+            color: "var(--ok-ink)",
+          }}
+          aria-label="Als erledigt abhaken"
+          title="Erledigt"
+        >
+          <IconCheck className="h-4 w-4" />
+        </button>
+      </div>
+    </li>
+  );
+}
+
+/** Uhrzeit als Block links in der Zeile, auf Wunsch mit Tag darüber. */
+function SlotBlock({
+  slot,
+  showDay = false,
+  late = false,
+  muted = false,
+}: {
+  slot: string;
+  showDay?: boolean;
+  late?: boolean;
+  muted?: boolean;
+}) {
+  const date = parseSlot(slot);
+  const time = date
+    ? `${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`
+    : "–";
+  const day = date
+    ? `${date.toLocaleDateString("de-DE", { weekday: "short" }).replace(".", "")} ${date.toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit" })}`
+    : "";
+  return (
+    <span
+      className="grid w-[3.75rem] shrink-0 place-items-center rounded-[var(--r-sm)] py-1.5 leading-tight"
+      style={{
+        background: late
+          ? "color-mix(in srgb, var(--signal-500) 11%, transparent)"
+          : "var(--card-inset)",
+        color: late ? "var(--danger-ink)" : muted ? "var(--ink-muted)" : "var(--ink)",
+      }}
+    >
+      {showDay && <span className="text-[10.5px] font-semibold opacity-80">{day}</span>}
+      <span className="text-[14px] font-bold tabular-nums">{time}</span>
+    </span>
+  );
+}
+
+function address(item: AppointmentRow): string {
+  return [
+    `${item.street_name ?? ""} ${item.house_number}`.trim(),
+    item.doorbell_label,
+  ]
+    .filter(Boolean)
+    .join(" · ");
+}
+
+/** "Dienstag, 29. September" */
+function dayTitle(slot: string): string {
+  const date = parseSlot(slot);
+  if (!date) return "Ohne Datum";
+  return date.toLocaleDateString("de-DE", { weekday: "long", day: "numeric", month: "long" });
 }

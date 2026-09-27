@@ -1,5 +1,4 @@
 import { notFound } from "next/navigation";
-import Link from "next/link";
 import { requireUser } from "@/lib/auth";
 import {
   getTerritory,
@@ -13,15 +12,18 @@ import {
 import { readArea } from "@/lib/geo/area";
 import { providerLookup } from "@/lib/energy/provider";
 import { ProviderCard } from "@/components/ProviderRating";
-import { Note, PageHeader, ProgressBar, StatusBadge, percent } from "@/components/ui";
 import {
-  IconCalendar,
-  IconCheck,
-  IconChevronLeft,
-  IconDoor,
-  IconInfo,
-  IconPerson,
-} from "@/components/icons";
+  Note,
+  OutcomeIcon,
+  PageHeader,
+  ProgressBar,
+  SectionHeader,
+  StatusBadge,
+  percent,
+} from "@/components/ui";
+import { IconInfo } from "@/components/icons";
+import { sqlDateTime } from "@/lib/format";
+import { ShowMore } from "@/components/ShowMore";
 import { TerritoryControls } from "./TerritoryControls";
 import { TerritoryAreaCard } from "./TerritoryAreaCard";
 import { StreetList } from "./StreetList";
@@ -91,15 +93,8 @@ export default async function TerritoryDetailPage({
 
   return (
     <div className="mx-auto max-w-4xl">
-      <Link
-        href="/gebiete"
-        className="muted mb-2 inline-flex items-center gap-1 text-[13px] font-semibold hover:text-brand-600"
-      >
-        <IconChevronLeft className="h-3.5 w-3.5" />
-        Alle Gebiete
-      </Link>
-
       <PageHeader
+        back={{ href: "/gebiete", label: isLeader ? "Gebiete" : "Meine Gebiete" }}
         title={territory.name}
         subtitle={
           [territory.postal_code, territory.city].filter(Boolean).join(" ") ||
@@ -108,8 +103,8 @@ export default async function TerritoryDetailPage({
         action={<StatusBadge status={territory.status} />}
       />
 
-      <div className="card mb-4 p-4">
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+      <div className="card mb-4 p-5">
+        <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
           <Metric label="Straßen" value={territory.street_count} />
           <Metric label="Türen erfasst" value={territory.visit_count} />
           <Metric label="Angetroffen" value={territory.met_count} />
@@ -121,9 +116,9 @@ export default async function TerritoryDetailPage({
           />
         </div>
         {territory.unit_count > 0 && (
-          <div className="mt-3.5">
-            <div className="mb-1.5 flex items-baseline justify-between gap-2 text-[11px]">
-              <span className="muted font-semibold">Fortschritt</span>
+          <div className="mt-4 border-t pt-4" style={{ borderColor: "var(--line)" }}>
+            <div className="mb-2 flex items-baseline justify-between gap-2 text-[12.5px]">
+              <span className="muted font-medium">Fortschritt</span>
               <span className="font-semibold tabular-nums">
                 {territory.visit_count} von {territory.unit_count} Wohneinheiten
               </span>
@@ -179,49 +174,32 @@ export default async function TerritoryDetailPage({
       />
 
       {visits.length > 0 && (
-        <div className="card mt-4 overflow-hidden">
-          <p className="px-4 pb-1.5 pt-3.5 text-[13px] font-semibold">Letzte Kontakte</p>
-          <ul>
+        <section className="card mt-4 p-5">
+          <SectionHeader title="Letzte Kontakte" className="mb-1" />
+          <ShowMore initial={8}>
             {visits.map((v) => (
               <li
                 key={v.id}
-                className="flex items-start gap-2.5 border-t px-4 py-2.5"
+                className="flex items-center gap-3 border-t py-2.5 first:border-t-0"
                 style={{ borderColor: "var(--line)" }}
               >
-                <span
-                  className="tile-icon mt-0.5 h-7 w-7 shrink-0"
-                  style={{
-                    background: `color-mix(in srgb, ${outcomeColor(v.outcome)} 14%, transparent)`,
-                    color: outcomeColor(v.outcome),
-                  }}
-                  aria-hidden
-                >
-                  {v.outcome === "SALE" ? (
-                    <IconCheck className="h-4 w-4" />
-                  ) : v.outcome === "APPOINTMENT" ? (
-                    <IconCalendar className="h-4 w-4" />
-                  ) : v.outcome === "NOT_HOME" ? (
-                    <IconDoor className="h-4 w-4" />
-                  ) : v.reason_emoji ? (
-                    <span className="text-[13px] leading-none">{v.reason_emoji}</span>
-                  ) : (
-                    <IconPerson className="h-4 w-4" />
-                  )}
-                </span>
-                <span className="min-w-0 flex-1 text-[13px]">
-                  <span className="font-medium">
-                    {v.street_name ?? "–"} {v.house_number}
+                <OutcomeIcon outcome={v.outcome} />
+                <span className="min-w-0 flex-1 text-[13.5px]">
+                  <span className="block truncate">
+                    <span className="font-medium">
+                      {v.street_name ?? "–"} {v.house_number}
+                    </span>
+                    {v.reason_label && <span className="muted"> · {v.reason_label}</span>}
+                    {v.reason_note && <span className="muted"> · „{v.reason_note}“</span>}
                   </span>
-                  {v.reason_label && <span className="muted"> · {v.reason_label}</span>}
-                  {v.reason_note && <span className="muted"> · „{v.reason_note}“</span>}
-                  <span className="muted block text-[11px]">
-                    {v.user_name} · {formatDateTime(v.created_at)}
+                  <span className="muted block truncate text-[12px]">
+                    {v.user_name} · {sqlDateTime(v.created_at)}
                   </span>
                 </span>
               </li>
             ))}
-          </ul>
-        </div>
+          </ShowMore>
+        </section>
       )}
     </div>
   );
@@ -240,11 +218,11 @@ function Metric({
 }) {
   return (
     <div>
-      <p className="muted text-[10px] font-bold uppercase tracking-[0.07em]">{label}</p>
+      <p className="muted text-[12.5px] font-medium">{label}</p>
       <p
-        className="mt-0.5 text-[22px] font-bold leading-none tabular-nums"
+        className="mt-1 text-[24px] font-bold leading-none tabular-nums"
         style={{
-          color: tone === "success" ? "var(--energy-600)" : "var(--ink)",
+          color: tone === "success" ? "var(--ok-ink)" : "var(--ink)",
           letterSpacing: "-0.02em",
         }}
       >
@@ -255,26 +233,9 @@ function Metric({
   );
 }
 
-/** Farbe eines Ergebnisses - dieselbe wie an der Tuer. */
-function outcomeColor(outcome: string): string {
-  if (outcome === "SALE") return "var(--energy-600)";
-  if (outcome === "APPOINTMENT") return "var(--brand-600)";
-  if (outcome === "NOT_HOME") return "var(--ink-muted)";
-  return "var(--signal-600)";
-}
-
 /** Fertig, sobald die Strasse abgehakt oder rechnerisch durchgearbeitet ist. */
 function streetState(street: StreetWithStats): "open" | "active" | "done" {
   if (street.status === "DONE") return "done";
   if (street.units > 0 && street.visit_count >= street.units) return "done";
   return street.visit_count > 0 ? "active" : "open";
-}
-
-function formatDateTime(value: string): string {
-  return new Date(`${value.replace(" ", "T")}Z`).toLocaleString("de-DE", {
-    day: "2-digit",
-    month: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
 }

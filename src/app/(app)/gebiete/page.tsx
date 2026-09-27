@@ -12,6 +12,7 @@ import {
   ProgressRing,
   StatusBadge,
   percent,
+  plural,
 } from "@/components/ui";
 import { IconChevronRight, IconMap } from "@/components/icons";
 import { NewTerritoryButton } from "./NewTerritory";
@@ -48,15 +49,24 @@ export default async function TerritoriesPage() {
       : [];
   });
 
+  const inWork = territories.filter((t) => t.status === "ACTIVE").length;
+  const unassigned = territories.filter((t) => !t.assigned_user_id).length;
+  const summary =
+    territories.length === 0
+      ? undefined
+      : [
+          plural(territories.length, "Gebiet", "Gebiete"),
+          inWork > 0 && `${inWork} in Arbeit`,
+          isLeader && unassigned > 0 && `${unassigned} ohne Zuteilung`,
+        ]
+          .filter(Boolean)
+          .join(" · ");
+
   return (
     <div className="mx-auto max-w-5xl">
       <PageHeader
         title={isLeader ? "Gebiete" : "Meine Gebiete"}
-        subtitle={
-          isLeader
-            ? "Gebiet auf der Karte abstecken, Straßen automatisch laden und zuteilen"
-            : "Deine zugeteilten Straßen und dein Fortschritt"
-        }
+        subtitle={summary}
         action={
           isLeader ? (
             <NewTerritoryButton
@@ -88,11 +98,7 @@ export default async function TerritoriesPage() {
             const share =
               t.unit_count > 0 ? Math.min(100, Math.round((t.visit_count / t.unit_count) * 100)) : null;
             return (
-              <Link
-                key={t.id}
-                href={`/gebiete/${t.id}`}
-                className="card block p-4 transition hover:shadow-lg active:scale-[0.99]"
-              >
+              <Link key={t.id} href={`/gebiete/${t.id}`} className="card block p-4">
                 <div className="mb-3 flex items-start gap-3">
                   {share !== null ? (
                     <ProgressRing
@@ -108,7 +114,7 @@ export default async function TerritoriesPage() {
                       className="tile-icon h-[46px] w-[46px] shrink-0"
                       style={{
                         background: "color-mix(in srgb, var(--brand-500) 12%, transparent)",
-                        color: "var(--brand-600)",
+                        color: "var(--tint)",
                       }}
                       aria-hidden
                     >
@@ -116,17 +122,17 @@ export default async function TerritoriesPage() {
                     </span>
                   )}
                   <div className="min-w-0 flex-1">
-                    <p className="truncate text-[16px] font-semibold">{t.name}</p>
-                    <p className="muted truncate text-[12px]">
+                    <p className="truncate text-[16px] font-semibold tracking-[-0.01em]">{t.name}</p>
+                    <p className="muted truncate text-[12.5px]">
                       {[t.postal_code, t.city].filter(Boolean).join(" ") || "Ohne Ortsangabe"}
                       {" · "}
-                      {t.street_count} Straßen
+                      {plural(t.street_count, "Straße", "Straßen")}
                     </p>
                     <div className="mt-1.5">
                       <StatusBadge status={t.status} />
                     </div>
                   </div>
-                  <IconChevronRight className="mt-3 h-4 w-4 shrink-0 opacity-25" />
+                  <IconChevronRight className="muted mt-3 h-4 w-4 shrink-0 opacity-50" />
                 </div>
 
                 <ProviderLine
@@ -145,32 +151,12 @@ export default async function TerritoriesPage() {
                   tone={t.status === "DONE" ? "success" : "brand"}
                 />
 
-                <div className="muted mt-2.5 grid grid-cols-4 gap-2 text-[11px]">
-                  <div>
-                    <span className="block text-[15px] font-bold tabular-nums text-[var(--ink)]">
-                      {t.visit_count}
-                    </span>
-                    Türen
-                  </div>
-                  <div>
-                    <span className="block text-[15px] font-bold tabular-nums text-[var(--ink)]">
-                      {t.met_count}
-                    </span>
-                    angetroffen
-                  </div>
-                  <div>
-                    <span className="block text-[15px] font-bold tabular-nums text-energy-600">
-                      {t.sale_count}
-                    </span>
-                    Abschlüsse
-                  </div>
-                  <div>
-                    <span className="block text-[15px] font-bold tabular-nums text-[var(--ink)]">
-                      {percent(t.sale_count, t.met_count)}
-                    </span>
-                    Quote
-                  </div>
-                </div>
+                <dl className="mt-3 grid grid-cols-4 gap-2">
+                  <Figure label="Türen" value={t.visit_count} />
+                  <Figure label="Angetroffen" value={t.met_count} />
+                  <Figure label="Abschlüsse" value={t.sale_count} tone="success" />
+                  <Figure label="Quote" value={percent(t.sale_count, t.met_count)} />
+                </dl>
 
                 {isLeader && (
                   <div
@@ -178,7 +164,9 @@ export default async function TerritoriesPage() {
                     style={{ borderColor: "var(--line)" }}
                   >
                     <Avatar name={t.assignee_name} size={26} tone={t.assignee_name ? "brand" : "muted"} />
-                    <span className="muted truncate text-[12px]">
+                    <span
+                      className={`truncate text-[12.5px] ${t.assignee_name ? "muted" : "font-medium text-warn"}`}
+                    >
                       {t.assignee_name ? t.assignee_name : "Noch niemandem zugeteilt"}
                     </span>
                   </div>
@@ -188,6 +176,29 @@ export default async function TerritoriesPage() {
           })}
         </div>
       )}
+    </div>
+  );
+}
+
+function Figure({
+  label,
+  value,
+  tone,
+}: {
+  label: string;
+  value: string | number;
+  tone?: "success";
+}) {
+  return (
+    // Beschriftung zuerst im Quelltext (so will es <dl>), die Zahl steht optisch oben.
+    <div className="flex min-w-0 flex-col-reverse">
+      <dt className="muted truncate text-[11.5px]">{label}</dt>
+      <dd
+        className="text-[16px] font-bold leading-tight tabular-nums"
+        style={{ color: tone === "success" && value ? "var(--ok-ink)" : "var(--ink)" }}
+      >
+        {value}
+      </dd>
     </div>
   );
 }

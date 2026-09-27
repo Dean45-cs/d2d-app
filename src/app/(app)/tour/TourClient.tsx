@@ -36,6 +36,7 @@ import {
   IconBell,
   IconBuilding,
   IconCalendar,
+  IconChat,
   IconCheck,
   IconChevronDown,
   IconChevronLeft,
@@ -1294,7 +1295,7 @@ export function TourClient({
                           </span>
                         </span>
                         {chosen ? (
-                          <IconCheck className="h-5 w-5 shrink-0 text-brand-600" />
+                          <IconCheck className="h-5 w-5 shrink-0 text-tint" />
                         ) : (
                           <IconChevronRight className="h-4 w-4 shrink-0 opacity-30" />
                         )}
@@ -1524,7 +1525,7 @@ export function TourClient({
                   style={{ background: "color-mix(in srgb, var(--ink) 6%, transparent)" }}
                   aria-hidden
                 >
-                  {reason.emoji || "💬"}
+                  {reason.emoji || <IconChat className="h-4 w-4" />}
                 </span>
                 <span className="min-w-0 flex-1">{reason.label}</span>
               </button>
@@ -1793,7 +1794,7 @@ export function TourClient({
             {currentType === "MFH" && (
               <div className="card overflow-hidden">
                 <div className="flex items-center gap-2 px-4 pb-2 pt-3">
-                  <IconBell className="h-4 w-4 shrink-0 text-brand-600" />
+                  <IconBell className="h-4 w-4 shrink-0 text-tint" />
                   <p className="min-w-0 flex-1 text-[13px] font-semibold">
                     Klingelschilder{" "}
                     <span className="muted font-normal tabular-nums">
@@ -1924,7 +1925,7 @@ export function TourClient({
                                       ? "color-mix(in srgb, var(--signal-500) 14%, transparent)"
                                       : "color-mix(in srgb, var(--ink) 7%, transparent)",
                                     color: bellBlocked
-                                      ? "var(--signal-600)"
+                                      ? "var(--danger-ink)"
                                       : "var(--ink-muted)",
                                   }}
                                 >
@@ -1965,7 +1966,7 @@ export function TourClient({
                                   textDecoration:
                                     bellDone && !bellBlocked ? "line-through" : undefined,
                                   color: bellBlocked
-                                    ? "var(--signal-600)"
+                                    ? "var(--danger-ink)"
                                     : bellDone && !chosen
                                       ? "var(--ink-muted)"
                                       : undefined,
@@ -1997,7 +1998,7 @@ export function TourClient({
                             )}
                             {isNext && <Pill tone="brand">weiter</Pill>}
                             {chosen ? (
-                              <IconCheck className="h-5 w-5 shrink-0 text-brand-600" />
+                              <IconCheck className="h-5 w-5 shrink-0 text-tint" />
                             ) : (
                               <IconChevronRight className="h-4 w-4 shrink-0 opacity-25" />
                             )}
@@ -2067,7 +2068,7 @@ export function TourClient({
                     type="button"
                     onClick={() => setAddBellsOpen((value) => !value)}
                     aria-expanded={addBellsOpen}
-                    className="list-row w-full px-4 py-2.5 text-[13px] font-semibold text-brand-600"
+                    className="list-row w-full px-4 py-2.5 text-[13px] font-semibold text-tint"
                   >
                     <IconPlus className="h-4 w-4" />
                     <span className="flex-1">Schilder anlegen</span>
@@ -2397,14 +2398,14 @@ export function TourClient({
       {dueAppointments.length > 0 && (
         <div className="card overflow-hidden">
           <div className="flex items-center gap-2 px-4 pb-2 pt-3">
-            <IconCalendar className="h-4 w-4 text-brand-600" />
+            <IconCalendar className="h-4 w-4 text-tint" />
             <p className="flex-1 text-[13px] font-semibold">
               {dueAppointments.length === 1 ? "1 Termin" : `${dueAppointments.length} Termine`}{" "}
               heute
             </p>
             <Link
               href="/termine"
-              className="shrink-0 text-[12px] font-semibold text-brand-600 hover:underline"
+              className="shrink-0 text-[12px] font-semibold text-tint hover:underline"
             >
               Alle Termine
             </Link>
@@ -2429,7 +2430,7 @@ export function TourClient({
                         background: late
                           ? "color-mix(in srgb, var(--signal-500) 15%, transparent)"
                           : "color-mix(in srgb, var(--brand-500) 14%, transparent)",
-                        color: late ? "var(--signal-600)" : "var(--brand-600)",
+                        color: late ? "var(--danger-ink)" : "var(--tint)",
                       }}
                     >
                       {slotLabel(item.follow_up_at, now ?? undefined)}
@@ -2599,7 +2600,7 @@ export function TourClient({
                     background: onlyOpen
                       ? "color-mix(in srgb, var(--brand-500) 14%, transparent)"
                       : "color-mix(in srgb, var(--ink) 7%, transparent)",
-                    color: onlyOpen ? "var(--brand-600)" : "var(--ink-muted)",
+                    color: onlyOpen ? "var(--tint)" : "var(--ink-muted)",
                   }}
                 >
                   nur offene
@@ -2617,15 +2618,19 @@ export function TourClient({
                   const blocked = Boolean(facts.blocked_at);
                   // Gelb heisst: hier war schon jemand, aber es ist noch offen.
                   const retry = !blocked && !mfh && doorStatus(facts) === "RETRY";
-                  const badge = blocked
-                    ? "🚫"
-                    : mfh
-                      ? bells.length > 0
-                        ? `${bellsDone}/${bells.length}`
-                        : "🔔"
-                      : retry
-                        ? `${facts.not_home_count}/${MAX_NOT_HOME_ATTEMPTS}`
-                        : "";
+                  const badge: ReactNode = blocked ? (
+                    <IconBan className="inline h-3 w-3 align-[-1px]" />
+                  ) : mfh ? (
+                    bells.length > 0 ? (
+                      `${bellsDone}/${bells.length}`
+                    ) : (
+                      <IconBell className="inline h-3 w-3 align-[-1px]" />
+                    )
+                  ) : retry ? (
+                    `${facts.not_home_count}/${MAX_NOT_HOME_ATTEMPTS}`
+                  ) : (
+                    ""
+                  );
                   const wasHere = house.last_visit_user
                     ? `${house.last_visit_user}, ${whenLabel(house.last_visit_at)}`
                     : "";
@@ -2790,9 +2795,9 @@ function OutcomeTile({
 }) {
   const color =
     tone === "brand"
-      ? "var(--brand-600)"
+      ? "var(--tint)"
       : tone === "danger"
-        ? "var(--signal-600)"
+        ? "var(--danger-ink)"
         : "var(--ink-2)";
   return (
     <button

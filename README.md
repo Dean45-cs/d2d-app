@@ -66,6 +66,10 @@ angelegt – praktisch zum Ausprobieren, für den Echtbetrieb weglassen.
 | Auswertung | ganzes Team | nur eigene Zahlen |
 | Energiekarte | ✅ | ✅ |
 
+Auf dem Handy stehen unten höchstens fünf Reiter. Bei der Teamleitung liegen Energiekarte,
+Auswertung, Team und Einstellungen unter **Mehr**; abgemeldet wird dort oder über das
+Profilbild oben rechts. Am Rechner steht alles gruppiert in der Seitenleiste.
+
 ---
 
 ## Der Ablauf an der Tür
@@ -116,8 +120,9 @@ frei änderbar: umbenennen, ausblenden, sortieren, eigene ergänzen.
 ## Termine
 
 Unter **Termine** (Teamleitung: alle, Außendienst: die eigenen) steht, was an der Tür
-vereinbart wurde – der nächste zuerst, überfällige rot umrandet. Von dort aus lässt sich
-anrufen, die Route öffnen oder der Termin abhaken. Termine von heute erscheinen zusätzlich
+vereinbart wurde – nach Tagen geordnet, überfällige ganz oben und rot markiert. Von dort
+aus lässt sich anrufen, die Route öffnen oder der Termin abhaken; abgehakte stehen unter
+„Erledigt“ und lassen sich wieder öffnen. Termine von heute erscheinen zusätzlich
 am Kopf der Tour; ein Tipp darauf stellt Straße, Hausnummer und Klingel ein.
 
 Gespeichert wird die **Ortszeit** (`2026-09-21 18:00`). Ob ein Termin „heute“ ist,
@@ -375,7 +380,7 @@ Drei Wege, je nach Betrieb:
 curl -X POST https://deine-app.de/api/energy/refresh \
      -H "Authorization: Bearer $ENERGY_REFRESH_TOKEN"
 
-# 3) Von Hand: in der App auf „Jetzt aktualisieren“ (nur Teamleitung)
+# 3) Von Hand: auf der Energiekarte über den Aktualisieren-Knopf oben rechts (nur Teamleitung)
 ```
 
 Für Vercel Cron genügt eine `vercel.json`:
@@ -384,8 +389,8 @@ Für Vercel Cron genügt eine `vercel.json`:
 { "crons": [{ "path": "/api/energy/refresh", "schedule": "0 5 * * *" }] }
 ```
 
-Jeder Lauf wird protokolliert; Zeitpunkt, Quelle und Ergebnis stehen in der Karte unter
-„Datenstand“ und unter Einstellungen.
+Jeder Lauf wird protokolliert; der Stand steht im Kopf der Energiekarte, Quelle, Zeitpunkt
+und Ergebnis unter Einstellungen → „Preisdaten der Energiekarte“.
 
 ---
 
@@ -406,6 +411,10 @@ automatisch, inklusive Dunkelmodus.
 
 Eigenes Logo: Datei als `public/logo.svg` ablegen und in `src/components/Logo.tsx`
 einbinden (der Platzhalter ist dort kommentiert).
+
+Für Schrift und Symbole in den Tonfarben gibt es eigene Stufen (`--tint`, `--ok-ink`,
+`--danger-ink`, `--warn-ink` in `globals.css`): hell entsprechen sie den 600er-Stufen, im
+Dunkelmodus werden sie aufgehellt, damit Verweise und Plaketten lesbar bleiben.
 
 Die Diagrammfarben (`--chart-doors`, `--chart-sales`) und die Farben der Teilgebiete
 (`--plot-1` bis `--plot-4`) sind auf Farbfehlsichtigkeit geprüft – jedes Paar gegen jedes,

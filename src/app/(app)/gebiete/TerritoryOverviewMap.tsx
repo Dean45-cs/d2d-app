@@ -81,9 +81,9 @@ export function TerritoryOverviewMap({
   return (
     <div className="card mb-4 overflow-hidden">
       <div className="flex flex-wrap items-center gap-2 px-4 py-3">
-        <IconMap className="h-4 w-4 shrink-0 text-brand-600" />
-        <p className="flex-1 text-[13px] font-semibold">
-          Gebietskarte{" "}
+        <IconMap className="h-4 w-4 shrink-0 text-tint" />
+        <p className="flex-1 text-[14px] font-semibold">
+          Karte{" "}
           <span className="muted font-normal tabular-nums">
             ({shown.length}
             {shown.length !== territories.length && ` von ${territories.length}`})
@@ -138,9 +138,6 @@ export function TerritoryOverviewMap({
               onSelect={(id) => router.push(`/gebiete/${id}`)}
             />
           </div>
-          <p className="muted mt-2 px-1 text-[11px]">
-            Auf eine Fläche tippen, um das Gebiet zu öffnen. Das Kürzel zeigt, wer dran ist.
-          </p>
         </div>
       )}
     </div>

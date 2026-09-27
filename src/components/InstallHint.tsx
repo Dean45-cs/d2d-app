@@ -73,7 +73,7 @@ export function InstallHint() {
   if (!show) return null;
 
   return (
-    <div className="card mb-4 border-brand-300 p-4">
+    <div className="card mb-5 p-4">
       <div className="flex items-start gap-3">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
@@ -84,7 +84,7 @@ export function InstallHint() {
           className="shrink-0 rounded-xl"
         />
         <div className="min-w-0 flex-1">
-          <p className="text-sm font-semibold">Als App auf den Home-Bildschirm</p>
+          <p className="text-[15px] font-semibold">Als App auf den Home-Bildschirm</p>
           {isIos ? (
             <ol className="muted mt-1.5 space-y-1 text-sm">
               <li>
@@ -107,11 +107,11 @@ export function InstallHint() {
 
           <div className="mt-3 flex gap-2">
             {promptEvent && (
-              <button className="btn btn-primary px-3 py-1.5 text-sm" onClick={install}>
+              <button className="btn btn-primary btn-sm" onClick={install}>
                 Installieren
               </button>
             )}
-            <button className="btn btn-ghost px-3 py-1.5 text-sm" onClick={dismiss}>
+            <button className="btn btn-ghost btn-sm" onClick={dismiss}>
               Verstanden
             </button>
           </div>
@@ -133,7 +133,7 @@ function ShareIcon() {
       strokeWidth="1.9"
       strokeLinecap="round"
       strokeLinejoin="round"
-      className="inline-block -mt-0.5 align-middle text-brand-500"
+      className="inline-block -mt-0.5 align-middle text-tint"
       aria-label="Teilen"
       role="img"
     >

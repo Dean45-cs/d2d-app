@@ -4,17 +4,29 @@ import { requireUser } from "@/lib/auth";
 import {
   dailySeries,
   listAppointments,
+  listMembers,
   listTerritories,
   memberStats,
   reasonStats,
   totals,
 } from "@/lib/queries";
-import { DailyBars, ReasonBars } from "@/components/charts";
+import { DailyBars, ReasonBars, fillDays } from "@/components/charts";
 import { parseSlot } from "@/lib/appointments";
-import { PageHeader, StatTile, StatusBadge, percent } from "@/components/ui";
-import { ProviderCard, ProviderLine } from "@/components/ProviderRating";
+import {
+  Avatar,
+  EmptyState,
+  PageHeader,
+  ProgressBar,
+  SectionHeader,
+  StatTile,
+  StatusBadge,
+  percent,
+} from "@/components/ui";
+import { PriceBadge, ProviderCard } from "@/components/ProviderRating";
 import { providerLookup, type ProviderInfo } from "@/lib/energy/provider";
 import { readArea } from "@/lib/geo/area";
+import { greeting, todayLong } from "@/lib/format";
+import { IconCalendar, IconMap } from "@/components/icons";
 
 export const dynamic = "force-dynamic";
 
@@ -27,17 +39,17 @@ export default async function StartPage() {
   const weekAgo = new Date(Date.now() - 6 * 86_400_000).toISOString().slice(0, 10);
   const weekTotals = totals(user.team_id, { since: weekAgo });
 
-  const series = dailySeries(user.team_id, 14);
-  const members = memberStats(user.team_id, weekAgo);
+  const series = fillDays(dailySeries(user.team_id, 14), 14);
+  const faces = new Map(listMembers(user.team_id).map((m) => [m.id, m.avatar]));
+  const members = memberStats(user.team_id, weekAgo).sort(
+    (a, b) => b.sales - a.sales || b.doors - a.doors,
+  );
   const reasons = reasonStats(user.team_id, weekAgo);
   const territories = listTerritories(user.team_id);
 
   // Termine gehoeren ins Dashboard: ein Termin, den niemand mehr sieht,
   // verfaellt - und mit ihm die beste Tuer der Woche.
   const appointments = listAppointments(user.team_id, { limit: 100 });
-
-  const open = territories.filter((t) => t.status === "OPEN");
-  const unassigned = territories.filter((t) => !t.assigned_user_id);
 
   // Grundversorger je Gebiet - teuerster zuerst: dort ist das Wechselargument am staerksten.
   const providers = providerLookup(user.team_id);
@@ -52,205 +64,228 @@ export default async function StartPage() {
     (a, b) => leadYear(providerOf.get(b.id)) - leadYear(providerOf.get(a.id)),
   );
   const top = byPrice.find((t) => providerOf.get(t.id)) ?? null;
+  const unassigned = territories.filter((t) => !t.assigned_user_id).length;
 
   return (
     <div className="mx-auto max-w-6xl">
       <PageHeader
-        title={`Hallo ${user.name.split(" ")[0]}`}
-        subtitle="Der Stand deines Teams auf einen Blick"
+        title={`${greeting()}, ${user.name.split(" ")[0]}`}
+        subtitle={todayLong()}
+        action={
+          <Link href="/tour" className="btn btn-primary hidden md:inline-flex">
+            Klinken starten
+          </Link>
+        }
       />
 
-      <div className="mb-5 grid grid-cols-2 gap-2 md:grid-cols-4">
-        <StatTile label="Türen heute" value={todayTotals.doors ?? 0} />
+      <div className="mb-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <StatTile
+          label="Türen heute"
+          value={todayTotals.doors ?? 0}
+          tone="brand"
+          hint={`${weekTotals.doors ?? 0} in 7 Tagen`}
+        />
         <StatTile
           label="Angetroffen heute"
           value={todayTotals.met ?? 0}
-          tone="brand"
           hint={`${percent(todayTotals.met ?? 0, todayTotals.doors ?? 0)} Antreffquote`}
         />
         <StatTile
           label="Abschlüsse heute"
           value={todayTotals.sales ?? 0}
           tone="success"
-          hint={`${percent(todayTotals.sales ?? 0, todayTotals.met ?? 0)} auf Kontakt`}
+          hint={`${percent(todayTotals.sales ?? 0, todayTotals.met ?? 0)} der Gespräche`}
         />
         <StatTile
           label="Abschlüsse 7 Tage"
           value={weekTotals.sales ?? 0}
           tone="success"
-          hint={`aus ${weekTotals.doors ?? 0} Türen`}
+          hint={`${percent(weekTotals.sales ?? 0, weekTotals.met ?? 0)} der Gespräche`}
         />
       </div>
 
-      {territories.length > 0 && (
-        <section className="mb-5">
-          <div className="mb-2 flex items-baseline justify-between gap-2 px-0.5">
-            <h2 className="text-sm font-semibold">Grundversorger in deinen Gebieten</h2>
-            <Link href="/karte" className="text-xs font-semibold text-brand-600">
-              Energiekarte →
-            </Link>
-          </div>
-          <div className="grid gap-3 lg:grid-cols-[minmax(0,22rem)_1fr]">
-            {top ? (
-              <ProviderCard
-                info={providerOf.get(top.id) ?? null}
-                title={`Größtes Potenzial · ${top.name}`}
-                editHref="/einstellungen#grundversorger"
-              />
-            ) : (
-              <ProviderCard info={null} editHref="/einstellungen#grundversorger" />
-            )}
-            <div className="card p-2">
-              {providers.size === 0 ? (
-                <p className="muted p-2 text-sm">
-                  Noch keine Preisdaten geladen – auf der Energiekarte „Jetzt aktualisieren“.
-                </p>
-              ) : (
-                <ul className="divide-y divide-[var(--line)]">
-                  {byPrice.slice(0, 8).map((t) => (
-                    <li key={t.id}>
-                      <Link
-                        href={`/gebiete/${t.id}`}
-                        className="block rounded-lg px-2 py-2 hover:bg-brand-500/8"
-                      >
-                        <span className="flex items-baseline justify-between gap-2">
-                          <span className="min-w-0 truncate text-[13px] font-semibold">
-                            {t.name}
-                          </span>
-                          <span className="muted shrink-0 text-[11px]">
-                            {[t.postal_code, t.city].filter(Boolean).join(" ")}
-                          </span>
-                        </span>
-                        <ProviderLine info={providerOf.get(t.id) ?? null} className="mt-1" />
-                      </Link>
-                    </li>
-                  ))}
-                  {byPrice.length === 0 && (
-                    <li className="muted p-2 text-sm">Alle Gebiete sind abgeschlossen.</li>
-                  )}
-                </ul>
-              )}
-            </div>
-          </div>
-        </section>
-      )}
-
-      <div className="grid gap-4 lg:grid-cols-2">
-        <section className="card flex flex-col p-4">
-          <h2 className="mb-1 text-sm font-semibold">Letzte 14 Tage</h2>
-          <DailyBars data={series} />
+      <div className="grid gap-4 lg:grid-cols-3">
+        {/* ------------------------------ Verlauf ------------------------------ */}
+        <section className="card p-5 lg:col-span-2">
+          <SectionHeader title="Letzte 14 Tage" href="/auswertung" linkLabel="Auswertung" />
+          <DailyBars data={series} height={250} />
         </section>
 
-        <section className="card p-4">
-          <h2 className="mb-3 text-sm font-semibold">
-            Warum abgelehnt wurde (7 Tage)
-          </h2>
-          <ReasonBars data={reasons} />
-        </section>
-
-        <section className="card p-4">
-          <div className="mb-3 flex items-center justify-between">
-            <h2 className="text-sm font-semibold">Team (7 Tage)</h2>
-            <Link href="/auswertung" className="text-xs font-semibold text-brand-600">
-              Alle Zahlen →
-            </Link>
-          </div>
-          {members.length === 0 ? (
-            <p className="muted text-sm">Noch keine Mitarbeiter angelegt.</p>
-          ) : (
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="muted text-left text-[11px] uppercase tracking-wider">
-                  <th className="pb-2 font-semibold">Name</th>
-                  <th className="pb-2 text-right font-semibold">Türen</th>
-                  <th className="pb-2 text-right font-semibold">Angetr.</th>
-                  <th className="pb-2 text-right font-semibold">Abschl.</th>
-                </tr>
-              </thead>
-              <tbody>
-                {members.map((m) => (
-                  <tr key={m.user_id} className="border-t hairline">
-                    <td className="py-2 font-medium">{m.user_name}</td>
-                    <td className="py-2 text-right tabular-nums">{m.doors}</td>
-                    <td className="py-2 text-right tabular-nums">{m.met}</td>
-                    <td className="py-2 text-right font-semibold tabular-nums text-energy-600">
-                      {m.sales}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-        </section>
-
-        <section className="card p-4">
-          <div className="mb-3 flex items-center justify-between">
-            <h2 className="text-sm font-semibold">Offene Termine ({appointments.length})</h2>
-            <Link href="/termine" className="text-xs font-semibold text-brand-600">
-              Alle Termine →
-            </Link>
-          </div>
+        {/* ------------------------------ Termine ------------------------------ */}
+        <section className="card flex flex-col p-5">
+          <SectionHeader
+            title="Offene Termine"
+            count={appointments.length}
+            href="/termine"
+            linkLabel="Alle"
+          />
           {appointments.length === 0 ? (
-            <p className="muted text-sm">
-              Kein offener Termin. Termine entstehen an der Tür über „Termin vereinbart“.
-            </p>
+            <EmptyState
+              bare
+              icon={<IconCalendar className="h-5 w-5" />}
+              title="Keine offenen Termine"
+            />
           ) : (
-            <ul className="space-y-1.5">
-              {appointments.slice(0, 6).map((item) => (
-                <li key={item.id} className="flex items-center gap-2 text-sm">
-                  <span className="muted w-28 shrink-0 text-xs tabular-nums">
-                    {slotStamp(item.follow_up_at)}
-                  </span>
-                  <span className="min-w-0 flex-1 truncate">
-                    {item.contact_name || "Ohne Namen"}
-                    <span className="muted">
-                      {" · "}
-                      {item.street_name ?? ""} {item.house_number}
+            <ul className="-mx-1 space-y-0.5">
+              {appointments.slice(0, 6).map((item) => {
+                const slot = slotParts(item.follow_up_at);
+                return (
+                  <li key={item.id} className="flex items-center gap-3 rounded-[var(--r-sm)] px-1 py-1.5">
+                    <span
+                      className="grid w-12 shrink-0 place-items-center rounded-[var(--r-xs)] py-1 leading-tight"
+                      style={{ background: "var(--card-inset)" }}
+                    >
+                      <span className="muted text-[10.5px] font-semibold">{slot.day}</span>
+                      <span className="text-[13px] font-bold tabular-nums">{slot.time}</span>
                     </span>
-                  </span>
-                  <span className="muted shrink-0 truncate text-xs">{item.user_name}</span>
-                </li>
-              ))}
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-[13.5px] font-medium">
+                        {item.contact_name || "Ohne Namen"}
+                      </span>
+                      <span className="muted block truncate text-[12px]">
+                        {item.street_name ?? ""} {item.house_number}
+                      </span>
+                    </span>
+                    <Avatar name={item.user_name} src={faces.get(item.user_id)} size={24} />
+                  </li>
+                );
+              })}
             </ul>
           )}
         </section>
 
-        <section className="card p-4">
-          <div className="mb-3 flex items-center justify-between">
-            <h2 className="text-sm font-semibold">Gebiete</h2>
-            <Link href="/gebiete" className="text-xs font-semibold text-brand-600">
-              Verwalten →
-            </Link>
-          </div>
+        {/* ------------------------------- Team -------------------------------- */}
+        <section className="card p-5 lg:col-span-2">
+          <SectionHeader title="Team · 7 Tage" href="/team" linkLabel="Team" />
+          {members.length === 0 ? (
+            <EmptyState bare title="Noch keine Mitarbeiter" />
+          ) : (
+            <div className="-mx-1 overflow-x-auto px-1">
+              <table className="data-table min-w-[26rem]">
+                <thead>
+                  <tr>
+                    <th>Name</th>
+                    <th className="num">Türen</th>
+                    <th className="num">Angetroffen</th>
+                    <th className="num">Abschlüsse</th>
+                    <th className="num">Quote</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {members.map((m) => (
+                    <tr key={m.user_id}>
+                      <td>
+                        <span className="flex items-center gap-2.5">
+                          <Avatar name={m.user_name} src={faces.get(m.user_id)} size={28} />
+                          <span className="truncate font-medium">{m.user_name}</span>
+                        </span>
+                      </td>
+                      <td className="num">{m.doors}</td>
+                      <td className="num">{m.met}</td>
+                      <td className="num font-semibold" style={{ color: m.sales ? "var(--ok-ink)" : undefined }}>
+                        {m.sales}
+                      </td>
+                      <td className="num muted">{percent(m.sales, m.met)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </section>
+
+        {/* ------------------------- Ablehnungsgruende ------------------------- */}
+        <section className="card p-5">
+          <SectionHeader title="Ablehnungsgründe · 7 Tage" />
+          <ReasonBars data={reasons} limit={6} />
+        </section>
+
+        {/* ------------------------------ Gebiete ------------------------------ */}
+        <section className="card p-5 lg:col-span-2">
+          <SectionHeader
+            title="Gebiete"
+            count={territories.length}
+            href="/gebiete"
+            linkLabel="Verwalten"
+          />
           {territories.length === 0 ? (
-            <p className="muted text-sm">
-              Noch keine Gebiete angelegt. Lege das erste Gebiet an und teile es zu.
-            </p>
+            <EmptyState
+              bare
+              icon={<IconMap className="h-5 w-5" />}
+              title="Noch keine Gebiete"
+              action={
+                <Link href="/gebiete" className="btn btn-tinted btn-sm">
+                  Gebiet anlegen
+                </Link>
+              }
+            />
           ) : (
             <>
-              <p className="muted mb-3 text-xs">
-                {territories.length} Gebiete · {open.length} offen ·{" "}
-                {unassigned.length} ohne Zuteilung
-              </p>
-              <ul className="space-y-1.5">
-                {territories.slice(0, 6).map((t) => (
-                  <li key={t.id}>
-                    <Link
-                      href={`/gebiete/${t.id}`}
-                      className="flex items-center gap-2 rounded-lg px-1.5 py-1.5 text-sm hover:bg-brand-500/8"
-                    >
-                      <span className="min-w-0 flex-1 truncate">{t.name}</span>
-                      <span className="muted shrink-0 text-xs">
-                        {t.assignee_name ?? "frei"}
-                      </span>
-                      <StatusBadge status={t.status} />
-                    </Link>
-                  </li>
-                ))}
+              {unassigned > 0 && (
+                <p className="mb-2 text-[12.5px] font-medium text-warn">
+                  {unassigned === 1 ? "1 Gebiet ist" : `${unassigned} Gebiete sind`} noch niemandem
+                  zugeteilt.
+                </p>
+              )}
+              <ul className="-mx-2">
+                {[...byPrice, ...territories.filter((t) => t.status === "DONE")]
+                  .slice(0, 6)
+                  .map((t) => {
+                    const info = providerOf.get(t.id);
+                    const lead = info?.strom ?? info?.gas ?? null;
+                    return (
+                      <li key={t.id}>
+                        <Link
+                          href={`/gebiete/${t.id}`}
+                          className="flex items-center gap-3 rounded-[var(--r-sm)] px-2 py-2.5 transition-colors hover:bg-[var(--hover)]"
+                        >
+                          <Avatar
+                            name={t.assignee_name}
+                            size={32}
+                            tone={t.assignee_name ? "brand" : "muted"}
+                          />
+                          <span className="min-w-0 flex-1">
+                            <span className="flex items-center gap-2">
+                              <span className="truncate text-[14px] font-medium">{t.name}</span>
+                              <StatusBadge status={t.status} />
+                            </span>
+                            <span className="muted mt-0.5 block truncate text-[12px]">
+                              {[t.postal_code, t.city].filter(Boolean).join(" ") || "Ohne Ort"} ·{" "}
+                              {t.assignee_name ?? "nicht zugeteilt"}
+                            </span>
+                            {t.unit_count > 0 && (
+                              <span className="mt-1.5 block max-w-48">
+                                <ProgressBar
+                                  value={t.visit_count}
+                                  max={t.unit_count}
+                                  size="sm"
+                                  tone={t.status === "DONE" ? "success" : "brand"}
+                                />
+                              </span>
+                            )}
+                          </span>
+                          {lead && (
+                            <span className="hidden shrink-0 sm:block">
+                              <PriceBadge step={lead.step} size="sm" />
+                            </span>
+                          )}
+                        </Link>
+                      </li>
+                    );
+                  })}
               </ul>
             </>
           )}
         </section>
+
+        {/* ---------------------------- Grundversorger ------------------------- */}
+        <div>
+          <ProviderCard
+            info={top ? (providerOf.get(top.id) ?? null) : null}
+            title={top ? `Größtes Potenzial · ${top.name}` : "Grundversorger"}
+            editHref="/einstellungen#grundversorger"
+          />
+        </div>
       </div>
     </div>
   );
@@ -262,19 +297,17 @@ function leadYear(info: ProviderInfo | null | undefined): number {
 }
 
 /**
- * "Di, 22.09. · 18:00" aus der gespeicherten Ortszeit.
+ * "Di 22.09." und "18:00" aus der gespeicherten Ortszeit.
  *
  * Bewusst ohne "heute"/"morgen": auf dem Server ist nicht sicher, welcher Tag
  * beim Team gerade ist - an der Tuer und auf der Terminseite macht das die
  * Uhr des Geraets.
  */
-function slotStamp(slot: string): string {
+function slotParts(slot: string): { day: string; time: string } {
   const date = parseSlot(slot);
-  if (!date) return slot;
-  const weekday = date.toLocaleDateString("de-DE", { weekday: "short" });
+  if (!date) return { day: "", time: slot };
+  const weekday = date.toLocaleDateString("de-DE", { weekday: "short" }).replace(".", "");
   const day = date.toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit" });
-  const time = `${String(date.getHours()).padStart(2, "0")}:${String(
-    date.getMinutes(),
-  ).padStart(2, "0")}`;
-  return `${weekday}, ${day} · ${time}`;
+  const time = `${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
+  return { day: `${weekday} ${day}`, time };
 }
