@@ -11,6 +11,8 @@ import {
   totals,
 } from "@/lib/queries";
 import { TourClient } from "./TourClient";
+import { providerLookup } from "@/lib/energy/provider";
+import { readArea } from "@/lib/geo/area";
 import type { StreetWithStats } from "@/lib/queries";
 
 export const dynamic = "force-dynamic";
@@ -68,6 +70,9 @@ export default async function TourPage() {
     avatar: member.avatar,
   }));
 
+  // Grundversorger je Gebiet: an der Tuer das wichtigste Argument.
+  const providers = providerLookup();
+
   return (
     <TourClient
       territories={territories.map((t) => ({
@@ -75,6 +80,11 @@ export default async function TourPage() {
         name: t.name,
         city: t.city,
         postal_code: t.postal_code,
+        provider: providers.find({
+          postal_code: t.postal_code,
+          city: t.city,
+          area: readArea(t.area_json),
+        }),
       }))}
       streets={streets}
       houseNumbers={houseNumbers}

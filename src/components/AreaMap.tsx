@@ -1,9 +1,10 @@
 "use client";
 
-import "leaflet/dist/leaflet.css";
-import { useEffect, useRef, useState } from "react";
-import type { Map as LeafletMap, LayerGroup } from "leaflet";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { LatLng } from "@/lib/geo/area";
+import { MapView } from "./map/MapView";
+import { badgeMarker } from "./map/markers";
+import type { MapEngine } from "./map/types";
 import { cssColor, progressColor } from "./map-colors";
 
 export type AreaTone = "brand" | "success" | "warn" | "muted";
@@ -33,7 +34,6 @@ export interface LegendEntry {
 }
 
 interface Props {
-  tileUrl: string;
   areas: MapArea[];
   pins?: MapPin[];
   legend?: LegendEntry[];
@@ -50,127 +50,82 @@ const TONE_VARS: Record<AreaTone, [string, string]> = {
 };
 
 /** Zeigt gezeichnete Gebiete und ihre Strassen auf einer Karte. */
-export function AreaMap({ tileUrl, areas, pins = [], legend, className, onSelect }: Props) {
-  const containerRef = useRef<HTMLDivElement | null>(null);
-  const mapRef = useRef<LeafletMap | null>(null);
-  const layerRef = useRef<LayerGroup | null>(null);
-  const leafletRef = useRef<typeof import("leaflet") | null>(null);
+export function AreaMap({ areas, pins = [], legend, className, onSelect }: Props) {
+  const [engine, setEngine] = useState<MapEngine | null>(null);
   const selectRef = useRef(onSelect);
   selectRef.current = onSelect;
-  const [ready, setReady] = useState(false);
+
+  const allPoints = useMemo<LatLng[]>(
+    () => [
+      ...areas.flatMap((item) => (item.area.length >= 3 ? item.area : [])),
+      ...pins.map((pin) => [pin.lat, pin.lng] as LatLng),
+    ],
+    [areas, pins],
+  );
+
+  const fitAll = useCallback(
+    (animate: boolean) => engine?.fit(allPoints, { padding: 28, maxZoom: 17, animate }),
+    [engine, allPoints],
+  );
 
   useEffect(() => {
-    let cancelled = false;
-    let sizeTimer: ReturnType<typeof setTimeout> | undefined;
-    (async () => {
-      const L = await import("leaflet");
-      if (cancelled || !containerRef.current || mapRef.current) return;
-      leafletRef.current = L;
-      const map = L.map(containerRef.current, {
-        center: [51.2, 10.4],
-        zoom: 6,
-        preferCanvas: true,
-      });
-      L.tileLayer(tileUrl, {
-        maxZoom: 19,
-        attribution: "&copy; OpenStreetMap-Mitwirkende",
-      }).addTo(map);
-      layerRef.current = L.layerGroup().addTo(map);
-      mapRef.current = map;
-      setReady(true);
-      sizeTimer = setTimeout(() => map.invalidateSize(), 150);
-    })();
-    return () => {
-      cancelled = true;
-      clearTimeout(sizeTimer);
-      // Laufende Flug-/Zoom-Animation zuerst stoppen.
-      mapRef.current?.stop();
-      mapRef.current?.remove();
-      mapRef.current = null;
-      layerRef.current = null;
-    };
-  }, [tileUrl]);
-
-  useEffect(() => {
-    if (!ready || !containerRef.current) return;
-    const observer = new ResizeObserver(() => mapRef.current?.invalidateSize());
-    observer.observe(containerRef.current);
-    return () => observer.disconnect();
-  }, [ready]);
-
-  useEffect(() => {
-    const L = leafletRef.current;
-    const map = mapRef.current;
-    const layer = layerRef.current;
-    if (!ready || !L || !map || !layer) return;
-
-    layer.clearLayers();
-    const bounds = L.latLngBounds([]);
+    if (!engine) return;
+    const layer = engine.layer();
+    const clickable = Boolean(selectRef.current);
 
     for (const item of areas) {
       if (item.area.length < 3) continue;
       const [variable, fallback] = TONE_VARS[item.tone ?? "brand"];
       const color = cssColor(variable, fallback);
-      const polygon = L.polygon(item.area, {
+      const open = clickable ? () => selectRef.current?.(item.id) : undefined;
+      layer.polygon(item.area, {
         color,
-        weight: 2,
-        fillOpacity: 0.16,
-      })
-        .bindTooltip(item.hint ? `<strong>${item.name}</strong><br>${item.hint}` : item.name, {
-          direction: "top",
-        })
-        .addTo(layer);
-      if (selectRef.current) {
-        polygon.on("click", () => selectRef.current?.(item.id));
-        polygon.getElement()?.setAttribute("role", "button");
-      }
+        weight: 2.5,
+        fillOpacity: 0.18,
+        title: item.name,
+        subtitle: item.hint,
+        onClick: open,
+      });
       if (item.badge) {
-        L.marker(polygon.getBounds().getCenter(), {
-          icon: badgeIcon(L, color, item.badge),
-          interactive: false,
-          keyboard: false,
-        }).addTo(layer);
+        layer.marker(middleOf(item.area), {
+          ...badgeMarker(color, item.badge),
+          title: item.name,
+          subtitle: item.hint,
+          onClick: open,
+          priority: 2,
+        });
       }
-      bounds.extend(polygon.getBounds());
     }
 
     for (const pin of pins) {
-      const color = progressColor(pin.state ?? "open");
-      const marker = L.circleMarker([pin.lat, pin.lng], {
+      layer.dot([pin.lat, pin.lng], {
+        color: progressColor(pin.state ?? "open"),
         radius: 6,
-        color: "#ffffff",
-        weight: 1.5,
-        fillColor: color,
-        fillOpacity: 0.95,
-      })
-        .bindTooltip(pin.hint ? `<strong>${pin.label}</strong><br>${pin.hint}` : pin.label, {
-          direction: "top",
-        })
-        .addTo(layer);
-      bounds.extend(marker.getLatLng());
+        ring: true,
+        title: pin.label,
+        subtitle: pin.hint,
+      });
     }
 
-    if (bounds.isValid()) {
-      map.fitBounds(bounds, { padding: [24, 24], maxZoom: 17, animate: false });
-    }
-  }, [ready, areas, pins]);
+    fitAll(false);
+    return () => layer.clear();
+    // fitAll haengt an denselben Daten; nur bei neuen Daten neu zeichnen.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [engine, areas, pins]);
 
   return (
     <div className="overflow-hidden rounded-xl border hairline">
-      <div className="relative">
-        <div ref={containerRef} className={className ?? "h-[45vh] min-h-[260px] w-full"} />
-        {!ready && (
-          <div className="absolute inset-0 grid place-items-center bg-[var(--card)]">
-            <p className="muted animate-pulse text-sm">Karte wird geladen …</p>
-          </div>
-        )}
-      </div>
+      <MapView
+        className={className ?? "h-[45vh] min-h-[260px] w-full"}
+        onEngine={setEngine}
+        onFit={allPoints.length > 0 ? () => fitAll(true) : undefined}
+      />
       {legend && legend.length > 0 && (
         <ul className="flex flex-wrap items-center gap-x-4 gap-y-1 border-t px-3 py-2 hairline">
           {legend.map((entry) => (
             <li key={entry.label} className="muted flex items-center gap-1.5 text-xs">
               <span
-                className="h-2.5 w-2.5 rounded-full"
+                className="h-2.5 w-2.5 rounded-full ring-2 ring-white/80"
                 style={{ background: entry.color }}
                 aria-hidden
               />
@@ -183,15 +138,17 @@ export function AreaMap({ tileUrl, areas, pins = [], legend, className, onSelect
   );
 }
 
-/** Nummernschild auf einer Flaeche - Farbe allein soll nie die Kennzeichnung sein. */
-function badgeIcon(L: typeof import("leaflet"), color: string, label: string) {
-  return L.divIcon({
-    className: "",
-    iconSize: [26, 26],
-    iconAnchor: [13, 13],
-    html:
-      `<span style="display:grid;place-items:center;width:26px;height:26px;border-radius:999px;` +
-      `background:${color};color:#fff;border:2px solid #fff;font:700 12px/1 system-ui;` +
-      `box-shadow:0 1px 5px rgb(15 23 42 / .5)">${label}</span>`,
-  });
+/** Mitte der Flaeche (Mittel der Eckpunkte) - dort sitzt das Schild. */
+function middleOf(area: LatLng[]): LatLng {
+  let south = 90;
+  let north = -90;
+  let west = 180;
+  let east = -180;
+  for (const [lat, lng] of area) {
+    south = Math.min(south, lat);
+    north = Math.max(north, lat);
+    west = Math.min(west, lng);
+    east = Math.max(east, lng);
+  }
+  return [(south + north) / 2, (west + east) / 2];
 }

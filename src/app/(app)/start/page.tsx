@@ -12,6 +12,9 @@ import {
 import { DailyBars, ReasonBars } from "@/components/charts";
 import { parseSlot } from "@/lib/appointments";
 import { PageHeader, StatTile, StatusBadge, percent } from "@/components/ui";
+import { ProviderCard, ProviderLine } from "@/components/ProviderRating";
+import { providerLookup, type ProviderInfo } from "@/lib/energy/provider";
+import { readArea } from "@/lib/geo/area";
 
 export const dynamic = "force-dynamic";
 
@@ -35,6 +38,20 @@ export default async function StartPage() {
 
   const open = territories.filter((t) => t.status === "OPEN");
   const unassigned = territories.filter((t) => !t.assigned_user_id);
+
+  // Grundversorger je Gebiet - teuerster zuerst: dort ist das Wechselargument am staerksten.
+  const providers = providerLookup();
+  const providerOf = new Map<number, ProviderInfo | null>(
+    territories.map((t) => [
+      t.id,
+      providers.find({ postal_code: t.postal_code, city: t.city, area: readArea(t.area_json) }),
+    ]),
+  );
+  const active = territories.filter((t) => t.status !== "DONE");
+  const byPrice = [...active].sort(
+    (a, b) => leadYear(providerOf.get(b.id)) - leadYear(providerOf.get(a.id)),
+  );
+  const top = byPrice.find((t) => providerOf.get(t.id)) ?? null;
 
   return (
     <div className="mx-auto max-w-6xl">
@@ -64,6 +81,58 @@ export default async function StartPage() {
           hint={`aus ${weekTotals.doors ?? 0} Türen`}
         />
       </div>
+
+      {territories.length > 0 && (
+        <section className="mb-5">
+          <div className="mb-2 flex items-baseline justify-between gap-2 px-0.5">
+            <h2 className="text-sm font-semibold">Grundversorger in deinen Gebieten</h2>
+            <Link href="/karte" className="text-xs font-semibold text-brand-600">
+              Energiekarte →
+            </Link>
+          </div>
+          <div className="grid gap-3 lg:grid-cols-[minmax(0,22rem)_1fr]">
+            {top ? (
+              <ProviderCard
+                info={providerOf.get(top.id) ?? null}
+                title={`Größtes Potenzial · ${top.name}`}
+              />
+            ) : (
+              <ProviderCard info={null} />
+            )}
+            <div className="card p-2">
+              {providers.size === 0 ? (
+                <p className="muted p-2 text-sm">
+                  Noch keine Preisdaten geladen – auf der Energiekarte „Jetzt aktualisieren“.
+                </p>
+              ) : (
+                <ul className="divide-y divide-[var(--line)]">
+                  {byPrice.slice(0, 8).map((t) => (
+                    <li key={t.id}>
+                      <Link
+                        href={`/gebiete/${t.id}`}
+                        className="block rounded-lg px-2 py-2 hover:bg-brand-500/8"
+                      >
+                        <span className="flex items-baseline justify-between gap-2">
+                          <span className="min-w-0 truncate text-[13px] font-semibold">
+                            {t.name}
+                          </span>
+                          <span className="muted shrink-0 text-[11px]">
+                            {[t.postal_code, t.city].filter(Boolean).join(" ")}
+                          </span>
+                        </span>
+                        <ProviderLine info={providerOf.get(t.id) ?? null} className="mt-1" />
+                      </Link>
+                    </li>
+                  ))}
+                  {byPrice.length === 0 && (
+                    <li className="muted p-2 text-sm">Alle Gebiete sind abgeschlossen.</li>
+                  )}
+                </ul>
+              )}
+            </div>
+          </div>
+        </section>
+      )}
 
       <div className="grid gap-4 lg:grid-cols-2">
         <section className="card flex flex-col p-4">
@@ -184,6 +253,11 @@ export default async function StartPage() {
       </div>
     </div>
   );
+}
+
+/** Jahreskosten Strom (sonst Gas) - zum Sortieren; unbekannt landet hinten. */
+function leadYear(info: ProviderInfo | null | undefined): number {
+  return info?.strom?.year ?? info?.gas?.year ?? -1;
 }
 
 /**

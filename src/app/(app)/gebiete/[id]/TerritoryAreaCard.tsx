@@ -3,7 +3,6 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { AreaMap } from "@/components/AreaMap";
-import { progressColor } from "@/components/map-colors";
 import { Note, plural } from "@/components/ui";
 import { IconInfo, IconMap } from "@/components/icons";
 import { AreaPicker } from "../AreaPicker";
@@ -23,7 +22,6 @@ interface Props {
   area: LatLng[] | null;
   pins: StreetPin[];
   isLeader: boolean;
-  tileUrl: string;
   otherAreas: Array<{ id: number; name: string; area: LatLng[] }>;
 }
 
@@ -37,7 +35,6 @@ export function TerritoryAreaCard({
   area,
   pins,
   isLeader,
-  tileUrl,
   otherAreas,
 }: Props) {
   const router = useRouter();
@@ -164,7 +161,6 @@ export function TerritoryAreaCard({
               : "Fläche für dieses Gebiet abstecken."}
           </Note>
           <AreaPicker
-            tileUrl={tileUrl}
             onAreaChange={setDraft}
             existing={
               area
@@ -188,7 +184,6 @@ export function TerritoryAreaCard({
           style={{ borderColor: "var(--line)" }}
         >
           <AreaMap
-            tileUrl={tileUrl}
             areas={[{ id: territoryId, name, area, tone: "brand" }]}
             pins={pins.map((p) => ({
               lat: p.lat,
@@ -200,9 +195,9 @@ export function TerritoryAreaCard({
             legend={
               pins.length > 0
                 ? [
-                    { color: progressColor("open"), label: "offen" },
-                    { color: progressColor("active"), label: "in Arbeit" },
-                    { color: progressColor("done"), label: "fertig" },
+                    { color: "var(--ink-muted)", label: "offen" },
+                    { color: "var(--brand-600)", label: "in Arbeit" },
+                    { color: "var(--energy-600)", label: "fertig" },
                   ]
                 : undefined
             }

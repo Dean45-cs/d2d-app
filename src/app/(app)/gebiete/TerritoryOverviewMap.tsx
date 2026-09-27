@@ -3,7 +3,6 @@
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 import { AreaMap, type AreaTone, type MapArea } from "@/components/AreaMap";
-import { cssColor } from "@/components/map-colors";
 import { plural } from "@/components/ui";
 import { IconChevronDown, IconMap } from "@/components/icons";
 
@@ -37,10 +36,8 @@ const STATUS_LABEL: Record<string, string> = {
  * dran ist. Zeigt sofort, was noch frei ist und wo jemand zwei Gebiete hat.
  */
 export function TerritoryOverviewMap({
-  tileUrl,
   territories,
 }: {
-  tileUrl: string;
   territories: OverviewTerritory[];
 }) {
   const router = useRouter();
@@ -128,13 +125,14 @@ export function TerritoryOverviewMap({
             style={{ borderColor: "var(--line)" }}
           >
             <AreaMap
-              tileUrl={tileUrl}
               areas={areas}
               legend={[
-                { color: cssColor("--brand-600", "#0f5cab"), label: "in Arbeit" },
-                { color: cssColor("--energy-600", "#059450"), label: "fertig" },
-                { color: cssColor("--gas-500", "#f59e0b"), label: "pausiert" },
-                { color: cssColor("--ink-muted", "#5b6b82"), label: "offen" },
+                // Die Legende ist HTML - CSS-Variablen genuegen und stimmen
+                // schon beim ersten Zeichnen auf dem Server.
+                { color: "var(--brand-600)", label: "in Arbeit" },
+                { color: "var(--energy-600)", label: "fertig" },
+                { color: "var(--gas-500)", label: "pausiert" },
+                { color: "var(--ink-muted)", label: "offen" },
               ]}
               className="h-[40vh] min-h-[240px] w-full"
               onSelect={(id) => router.push(`/gebiete/${id}`)}

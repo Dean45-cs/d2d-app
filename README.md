@@ -196,8 +196,35 @@ lässt sich nicht halbieren. Angestrebt sind höchstens 12 % Unterschied.
   Bearbeitungsstand (offen / in Arbeit / fertig). Die Fläche lässt sich neu ziehen
   („Fläche ändern“), die Straßenliste nachladen („Straßen nachladen“) – vorhandene
   Straßen bleiben unberührt.
-- Der Pfeil **➤** neben einer Straße öffnet die Navigation – in der Gebietsliste und
-  an der Tür in der Türerfassung.
+- Der Pfeil **➤** neben einer Straße öffnet die Navigation in **Apple Karten** – in der
+  Gebietsliste und an der Tür in der Türerfassung (am Rechner die Web-Version).
+- Auf jeder Karte schaltet der Ebenen-Knopf zwischen Karte und **Satellit** um (nur mit
+  Apple Karten); der Rahmen-Knopf holt alle Gebiete zurück ins Bild.
+
+### Karten: Apple Karten einrichten
+
+Alle Karten der App laufen über **Apple Karten (MapKit JS)**. Dafür braucht es ein
+Apple-Developer-Konto (das gleiche wie für den App Store):
+
+1. developer.apple.com → Certificates, IDs & Profiles → **Identifiers** → „Maps IDs“
+   anlegen, dann unter **Keys** einen Schlüssel mit „MapKit JS“ erzeugen und die
+   `.p8`-Datei herunterladen.
+2. In `.env.local` bzw. als Secret beim Hoster eintragen:
+
+   ```bash
+   APPLE_MAPKIT_TEAM_ID=ABCDE12345          # Team-ID (oben rechts im Developer-Konto)
+   APPLE_MAPKIT_KEY_ID=XYZ9876543           # ID des Schlüssels
+   APPLE_MAPKIT_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\n…\n-----END PRIVATE KEY-----"
+   APPLE_MAPKIT_ORIGIN=https://d2d-app.fly.dev   # optional: Token nur für diese Adresse
+   ```
+
+   Der Server stellt damit stündlich neue, kurzlebige Tokens aus; der Schlüssel verlässt
+   den Server nie. Alternativ ein im Developer-Konto erzeugtes Token direkt eintragen:
+   `APPLE_MAPKIT_TOKEN=eyJ…`.
+
+Solange nichts eingetragen ist – oder falls Apple das Token ablehnt –, zeigt die App
+dieselben Karten mit OpenStreetMap-Kacheln und einem kleinen Hinweis. Mit
+`MAP_PROVIDER=osm` lässt sich das auch erzwingen.
 
 ### Straßenliste einfügen (der klassische Weg)
 
@@ -255,6 +282,22 @@ Die Karte zeigt je Postleitzahl die Jahreskosten eines Musterhaushalts beim ört
 **Grundversorger** (Strom: 3.500 kWh, Gas: 15.000 kWh). Rot = teuer = größtes
 Wechselargument. Die Liste „Teuerste Grundversorger“ führt direkt zu den lohnendsten
 Gebieten.
+
+### Grundversorger je Gebiet
+
+Überall, wo ein Gebiet auftaucht, stehen Name und Preis des Grundversorgers mit einer
+**Bewertung in fünf Stufen** (sehr günstig · günstig · mittel · teuer · sehr teuer):
+
+- **Übersicht:** eigener Abschnitt „Grundversorger in deinen Gebieten“ – das Gebiet mit
+  dem teuersten Grundversorger ganz oben, daneben alle offenen Gebiete nach Preis sortiert
+- **Gebietsliste** und **Gebietsseite** (dort mit Strom und Gas, Jahreskosten und
+  Abstand zum Median)
+- **Klinken:** unter der Straßenauswahl, damit das Argument an der Tür parat ist
+
+Die Stufe richtet sich nach allen Orten der Preisquelle: die teuersten 20 % sind „sehr
+teuer“, die günstigsten 20 % „sehr günstig“. Zugeordnet wird über die PLZ des Gebiets,
+sonst über den Ortsnamen, sonst über den nächsten bekannten Ort (bis 30 km) oder die
+PLZ-Region – dann steht dabei, aus welchem Ort der Preis stammt.
 
 ### Datenquelle einrichten
 
@@ -404,7 +447,7 @@ entstehen zwei getrennte Datenbestände.
 | Styling | Tailwind CSS v4 mit eigenen Marken-Tokens |
 | Datenbank | SQLite über `better-sqlite3` – kein Datenbankserver nötig |
 | Hausnummern | eigene Tabelle je Straße, aus OpenStreetMap übernommen |
-| Karte | Leaflet mit OpenStreetMap-Kacheln |
+| Karte | Apple Karten (MapKit JS), Rückfall Leaflet mit OpenStreetMap-Kacheln |
 | Gebietszuschnitt | Overpass (Straßen in der Fläche), Nominatim (Ortssuche) |
 | Aufteilung | k-Means auf den Straßenmitten, danach Ausgleich nach Türen |
 | Login | Signiertes Session-Cookie (HMAC), Passwörter als scrypt-Hash |
@@ -436,6 +479,7 @@ src/
     geo/              Flächenberechnung, Aufteilung, OpenStreetMap-Abfragen
     offline-queue.ts  Puffer für Türeinträge ohne Netz
   components/         UI-Bausteine, Diagramme, Navigation
+    map/              Kartenschicht: Apple Karten (MapKit JS) und OSM-Rückfall
 public/
   manifest.webmanifest, sw.js, offline.html, App-Icons
 docs/

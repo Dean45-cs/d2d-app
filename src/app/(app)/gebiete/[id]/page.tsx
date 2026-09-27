@@ -11,7 +11,8 @@ import {
   type StreetWithStats,
 } from "@/lib/queries";
 import { readArea } from "@/lib/geo/area";
-import { mapTileUrl } from "@/lib/map";
+import { providerLookup } from "@/lib/energy/provider";
+import { ProviderCard } from "@/components/ProviderRating";
 import { Note, PageHeader, ProgressBar, StatusBadge, percent } from "@/components/ui";
 import {
   IconCalendar,
@@ -52,6 +53,11 @@ export default async function TerritoryDetailPage({
   }
 
   const area = readArea(territory.area_json);
+  const provider = providerLookup().find({
+    postal_code: territory.postal_code,
+    city: territory.city,
+    area,
+  });
   // Beim Nachziehen der Flaeche sollen die Nachbargebiete sichtbar sein.
   const otherAreas = isLeader
     ? listTerritories(user.team_id).flatMap((t) => {
@@ -138,13 +144,14 @@ export default async function TerritoryDetailPage({
         )}
       </div>
 
+      <ProviderCard info={provider} className="mb-4" />
+
       <TerritoryAreaCard
         territoryId={territory.id}
         name={territory.name}
         area={area}
         pins={pins}
         isLeader={isLeader}
-        tileUrl={mapTileUrl()}
         otherAreas={otherAreas}
       />
 

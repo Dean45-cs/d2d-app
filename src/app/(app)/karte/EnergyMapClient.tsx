@@ -1,10 +1,20 @@
 "use client";
 
-import "leaflet/dist/leaflet.css";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import type { Map as LeafletMap, CircleMarker } from "leaflet";
 import { PageHeader, StatTile, euro } from "@/components/ui";
+import { PriceBadge } from "@/components/ProviderRating";
+import { MapView } from "@/components/map/MapView";
+import { priceMarker } from "@/components/map/markers";
+import type { LatLng, MapEngine } from "@/components/map/types";
+import {
+  PRICE_LEVELS,
+  PRICE_SCALE,
+  priceColor,
+  priceScale,
+  priceStep,
+  type Energy,
+} from "@/lib/energy/rating";
 
 export interface MapPoint {
   plz: string;
@@ -20,8 +30,6 @@ export interface MapPoint {
   isDemo: boolean;
 }
 
-type Energy = "strom" | "gas";
-
 interface Props {
   points: MapPoint[];
   refresh: {
@@ -33,21 +41,15 @@ interface Props {
   } | null;
   isLeader: boolean;
   consumption: { strom: number; gas: number };
-  tileUrl: string;
 }
 
-/** Farbskala: grün = günstig, rot = teuer (= bestes Potenzial für den Vertrieb). */
-const SCALE = ["#16a34a", "#84cc16", "#facc15", "#f97316", "#dc2626"];
+const GERMANY_POINTS: LatLng[] = [
+  [47.3, 5.9],
+  [55.05, 15.0],
+];
 
 function valueOf(point: MapPoint, energy: Energy): number | null {
   return energy === "strom" ? point.stromYear : point.gasYear;
-}
-
-function median(values: number[]): number {
-  if (values.length === 0) return 0;
-  const sorted = [...values].sort((a, b) => a - b);
-  const middle = Math.floor(sorted.length / 2);
-  return sorted.length % 2 ? sorted[middle] : (sorted[middle - 1] + sorted[middle]) / 2;
 }
 
 export function EnergyMapClient({
@@ -55,12 +57,9 @@ export function EnergyMapClient({
   refresh,
   isLeader,
   consumption,
-  tileUrl,
 }: Props) {
   const router = useRouter();
-  const containerRef = useRef<HTMLDivElement | null>(null);
-  const mapRef = useRef<LeafletMap | null>(null);
-  const markersRef = useRef<CircleMarker[]>([]);
+  const [engine, setEngine] = useState<MapEngine | null>(null);
 
   const [energy, setEnergy] = useState<Energy>("strom");
   const [selected, setSelected] = useState<MapPoint | null>(null);
@@ -75,96 +74,49 @@ export function EnergyMapClient({
     const values = points
       .map((p) => valueOf(p, energy))
       .filter((v): v is number => v !== null);
-    const med = median(values);
-    const thresholds = quantiles(values);
+    const scale = priceScale(values);
     const ranked = [...points]
       .filter((p) => valueOf(p, energy) !== null)
       .sort((a, b) => (valueOf(b, energy) ?? 0) - (valueOf(a, energy) ?? 0));
-    return { values, med, thresholds, ranked };
+    return { values, med: scale.median, scale, ranked };
   }, [points, energy]);
 
   function colorFor(point: MapPoint): string {
-    const value = valueOf(point, energy);
-    if (value === null) return "#94a3b8";
-    const index = stats.thresholds.findIndex((t) => value <= t);
-    return SCALE[index === -1 ? SCALE.length - 1 : index];
+    return priceColor(valueOf(point, energy), stats.scale);
   }
 
   /* -------------------------------- Karte -------------------------------- */
 
+  // Anfangs ganz Deutschland zeigen - egal wie gross die Karte gerade ist.
   useEffect(() => {
-    let cancelled = false;
-    let sizeTimer: ReturnType<typeof setTimeout> | undefined;
+    engine?.fit(GERMANY_POINTS, { padding: 8 });
+  }, [engine]);
 
-    (async () => {
-      const L = await import("leaflet");
-      if (cancelled || !containerRef.current || mapRef.current) return;
-
-      const map = L.map(containerRef.current, {
-        center: [51.2, 10.4],
-        zoom: 6,
-        scrollWheelZoom: true,
-        attributionControl: true,
+  // Pins bei Wechsel Strom/Gas oder Auswahl neu zeichnen
+  useEffect(() => {
+    if (!engine) return;
+    const layer = engine.layer();
+    for (const point of points) {
+      const value = valueOf(point, energy);
+      const diameter = value === null ? 10 : 14 + Math.min(12, Math.abs(value - stats.med) / 30);
+      const isSelected = selected?.plz === point.plz;
+      layer.marker([point.lat, point.lng], {
+        ...priceMarker(colorFor(point), Math.round(diameter), isSelected),
+        title: point.city,
+        subtitle: `${point.provider || "Grundversorger unbekannt"} · ${
+          value !== null ? `${euro(value)} / Jahr` : "keine Daten"
+        }`,
+        priority: isSelected ? 5 : 1,
+        onClick: () => setSelected(point),
       });
-      L.tileLayer(tileUrl, {
-        maxZoom: 18,
-        attribution: "&copy; OpenStreetMap-Mitwirkende",
-      }).addTo(map);
-      mapRef.current = map;
-      // Nach dem Einblenden neu vermessen, sonst bleiben Kacheln grau.
-      sizeTimer = setTimeout(() => map.invalidateSize(), 150);
-    })();
-
-    return () => {
-      cancelled = true;
-      clearTimeout(sizeTimer);
-      // Laufende Flug-/Zoom-Animation zuerst stoppen.
-      mapRef.current?.stop();
-      mapRef.current?.remove();
-      mapRef.current = null;
-    };
-  }, [tileUrl]);
-
-  // Marker bei Wechsel Strom/Gas neu zeichnen
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      const L = await import("leaflet");
-      const map = mapRef.current;
-      if (cancelled || !map) return;
-
-      markersRef.current.forEach((m) => m.remove());
-      markersRef.current = [];
-
-      for (const point of points) {
-        const value = valueOf(point, energy);
-        const marker = L.circleMarker([point.lat, point.lng], {
-          radius: value === null ? 5 : 7 + Math.min(7, Math.abs(value - stats.med) / 45),
-          color: "#ffffff",
-          weight: 1.5,
-          fillColor: colorFor(point),
-          fillOpacity: 0.85,
-        })
-          .addTo(map)
-          .bindTooltip(
-            `<strong>${point.city}</strong><br>${point.provider || "Grundversorger unbekannt"}<br>${
-              value !== null ? `${euro(value)} / Jahr` : "keine Daten"
-            }`,
-            { direction: "top" },
-          )
-          .on("click", () => setSelected(point));
-        markersRef.current.push(marker);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
+    }
+    return () => layer.clear();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [points, energy, stats.med, stats.thresholds]);
+  }, [engine, points, energy, stats, selected]);
 
   function focus(point: MapPoint) {
     setSelected(point);
-    mapRef.current?.flyTo([point.lat, point.lng], 10, { duration: 0.8 });
+    engine?.setView([point.lat, point.lng], 10);
   }
 
   async function refreshNow() {
@@ -188,6 +140,7 @@ export function EnergyMapClient({
 
   const selectedValue = selected ? valueOf(selected, energy) : null;
   const delta = selectedValue !== null ? Math.round(selectedValue - stats.med) : null;
+  const selectedStep = selectedValue !== null ? priceStep(selectedValue, stats.scale) : null;
 
   return (
     <div className="mx-auto max-w-6xl">
@@ -270,15 +223,25 @@ export function EnergyMapClient({
 
           <div className="grid gap-4 lg:grid-cols-[1fr_20rem]">
             <div className="card overflow-hidden">
-              <div ref={containerRef} className="h-[62vh] min-h-[380px] w-full" />
-              <div className="flex flex-wrap items-center gap-3 border-t px-4 py-2.5 hairline">
-                <span className="muted text-xs font-semibold">günstig</span>
-                <div className="flex h-2.5 flex-1 overflow-hidden rounded-full">
-                  {SCALE.map((color) => (
+              <MapView
+                className="h-[62vh] min-h-[380px] w-full"
+                onEngine={setEngine}
+                onFit={() => engine?.fit(GERMANY_POINTS, { padding: 8, animate: true })}
+              />
+              <div className="border-t px-4 pb-3 pt-2.5 hairline">
+                <div className="flex h-2 overflow-hidden rounded-full">
+                  {PRICE_SCALE.map((color) => (
                     <span key={color} className="flex-1" style={{ background: color }} />
                   ))}
                 </div>
-                <span className="muted text-xs font-semibold">teuer</span>
+                <div className="muted mt-1.5 grid grid-cols-5 text-center text-[10px] font-semibold">
+                  {PRICE_LEVELS.map((level) => (
+                    <span key={level.step}>{level.label}</span>
+                  ))}
+                </div>
+                <p className="muted mt-1 text-center text-[10px]">
+                  Je größer der Punkt, desto weiter liegt der Ort vom Median entfernt.
+                </p>
               </div>
             </div>
 
@@ -288,7 +251,10 @@ export function EnergyMapClient({
                   <p className="text-xs font-semibold uppercase tracking-wider muted">
                     {selected.plz} · {selected.state}
                   </p>
-                  <p className="text-lg font-bold">{selected.city}</p>
+                  <div className="flex items-start justify-between gap-2">
+                    <p className="text-lg font-bold">{selected.city}</p>
+                    {selectedStep !== null && <PriceBadge step={selectedStep} />}
+                  </div>
                   <p className="muted mb-3 text-sm">
                     {selected.provider || "Grundversorger unbekannt"}
                   </p>
@@ -401,14 +367,5 @@ function Row({
         {value}
       </dd>
     </div>
-  );
-}
-
-/** Vier Grenzwerte, die die Werte in fünf gleich grosse Gruppen teilen. */
-function quantiles(values: number[]): number[] {
-  if (values.length === 0) return [0, 0, 0, 0];
-  const sorted = [...values].sort((a, b) => a - b);
-  return [0.2, 0.4, 0.6, 0.8].map(
-    (q) => sorted[Math.min(sorted.length - 1, Math.floor(q * sorted.length))],
   );
 }
