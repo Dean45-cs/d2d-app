@@ -46,11 +46,9 @@ type Tab = "map" | "list";
  */
 export function NewTerritoryButton({
   members,
-  tileUrl,
   existingAreas = [],
 }: {
   members: User[];
-  tileUrl: string;
   existingAreas?: ExistingArea[];
 }) {
   const router = useRouter();
@@ -440,7 +438,6 @@ export function NewTerritoryButton({
 
               {tab === "map" ? (
                 <AreaPicker
-                  tileUrl={tileUrl}
                   onAreaChange={(next) => {
                     setArea(next);
                     // Nach dem Verschieben passt die alte Straßenliste nicht mehr.

@@ -2,7 +2,8 @@ import Link from "next/link";
 import { requireUser } from "@/lib/auth";
 import { listMembers, listTerritories } from "@/lib/queries";
 import { readArea } from "@/lib/geo/area";
-import { mapTileUrl } from "@/lib/map";
+import { providerLookup } from "@/lib/energy/provider";
+import { ProviderLine } from "@/components/ProviderRating";
 import {
   Avatar,
   EmptyState,
@@ -26,7 +27,7 @@ export default async function TerritoriesPage() {
     userId: isLeader ? undefined : user.id,
   });
   const members = isLeader ? listMembers(user.team_id) : [];
-  const tileUrl = mapTileUrl();
+  const providers = providerLookup();
 
   // Nur Gebiete mit gezeichneter Flaeche kommen auf die Uebersichtskarte.
   const mapped: OverviewTerritory[] = territories.flatMap((t) => {
@@ -60,14 +61,13 @@ export default async function TerritoriesPage() {
           isLeader ? (
             <NewTerritoryButton
               members={members}
-              tileUrl={tileUrl}
               existingAreas={mapped.map((t) => ({ id: t.id, name: t.name, area: t.area }))}
             />
           ) : undefined
         }
       />
 
-      <TerritoryOverviewMap tileUrl={tileUrl} territories={mapped} />
+      <TerritoryOverviewMap territories={mapped} />
 
       {territories.length === 0 ? (
         <EmptyState
@@ -128,6 +128,15 @@ export default async function TerritoriesPage() {
                   </div>
                   <IconChevronRight className="mt-3 h-4 w-4 shrink-0 opacity-25" />
                 </div>
+
+                <ProviderLine
+                  info={providers.find({
+                    postal_code: t.postal_code,
+                    city: t.city,
+                    area: readArea(t.area_json),
+                  })}
+                  className="mb-3 rounded-[var(--r-sm)] bg-[var(--card-inset)] px-2.5 py-2"
+                />
 
                 <ProgressBar
                   value={t.visit_count}

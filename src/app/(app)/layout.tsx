@@ -3,6 +3,8 @@ import { getCurrentUser } from "@/lib/auth";
 import { MobileTabBar, MobileTopBar, Sidebar } from "@/components/AppNav";
 import { InstallHint } from "@/components/InstallHint";
 import { navItems } from "@/lib/nav";
+import { mapConfig } from "@/lib/map";
+import { MapConfigProvider } from "@/components/map/MapConfig";
 
 export const dynamic = "force-dynamic";
 
@@ -16,6 +18,7 @@ export default async function AppLayout({
   const roleLabel = user.role === "LEADER" ? "Teamleitung" : "Vertrieb";
 
   return (
+    <MapConfigProvider value={mapConfig()}>
     <div className="flex min-h-dvh">
       <Sidebar items={items} userName={user.name} roleLabel={roleLabel} />
       <div className="flex min-w-0 flex-1 flex-col">
@@ -33,5 +36,6 @@ export default async function AppLayout({
         <MobileTabBar items={items} />
       </div>
     </div>
+    </MapConfigProvider>
   );
 }

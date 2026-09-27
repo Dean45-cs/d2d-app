@@ -4,6 +4,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { routeUrl } from "@/lib/map";
+import type { ProviderInfo } from "@/lib/energy/provider";
+import { ProviderLine } from "@/components/ProviderRating";
 import type {
   AppointmentRow,
   DoorbellWithStats,
@@ -91,6 +93,7 @@ type TerritoryLite = {
   name: string;
   city: string;
   postal_code: string;
+  provider: ProviderInfo | null;
 };
 
 type EnergyType = "STROM" | "GAS" | "BEIDES";
@@ -2516,6 +2519,14 @@ export function TourClient({
             </a>
           )}
         </div>
+
+        {/* Grundversorger des Gebiets: Preis und Einstufung gleich im Blick. */}
+        {territory && (
+          <ProviderLine
+            info={territory.provider}
+            className="border-t px-4 py-2.5 [border-color:var(--line)]"
+          />
+        )}
 
         {/* Hausnummer eintippen und öffnen */}
         <div className="border-t px-4 py-3.5" style={{ borderColor: "var(--line)" }}>

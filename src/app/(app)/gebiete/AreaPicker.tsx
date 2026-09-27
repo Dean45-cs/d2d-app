@@ -1,10 +1,11 @@
 "use client";
 
-import "leaflet/dist/leaflet.css";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { Map as LeafletMap, LayerGroup } from "leaflet";
 import { areaSqKm, circleToArea, type LatLng } from "@/lib/geo/area";
 import { cssColor } from "@/components/map-colors";
+import { MapView } from "@/components/map/MapView";
+import { badgeMarker, handleMarker, labelMarker } from "@/components/map/markers";
+import type { MapEngine, MapLayer } from "@/components/map/types";
 import { plural, Segmented } from "@/components/ui";
 import {
   IconCircleArea,
@@ -38,7 +39,6 @@ export interface OverlayPlot {
 }
 
 interface Props {
-  tileUrl: string;
   /** Meldet die gezeichnete Flaeche nach oben, null solange nichts markiert ist. */
   onAreaChange: (area: LatLng[] | null) => void;
   /** Schon vergebene Gebiete - damit sich nichts ueberschneidet. */
@@ -69,7 +69,6 @@ const RADIUS_STEPS = [150, 250, 400, 600, 800, 1200, 1600, 2000];
  * der Karte - man sieht also vor dem Speichern, wie viel Substanz das Gebiet hat.
  */
 export function AreaPicker({
-  tileUrl,
   onAreaChange,
   existing = [],
   overlay = [],
@@ -77,18 +76,18 @@ export function AreaPicker({
   focus = null,
   start,
 }: Props) {
-  const containerRef = useRef<HTMLDivElement | null>(null);
-  const mapRef = useRef<LeafletMap | null>(null);
-  const drawLayerRef = useRef<LayerGroup | null>(null);
-  const existingLayerRef = useRef<LayerGroup | null>(null);
-  const overlayLayerRef = useRef<LayerGroup | null>(null);
-  const leafletRef = useRef<typeof import("leaflet") | null>(null);
+  const [engine, setEngine] = useState<MapEngine | null>(null);
+  // Drei Ebenen uebereinander: vergebene Gebiete, Vorschau, eigene Auswahl.
+  const [layers, setLayers] = useState<{
+    existing: MapLayer;
+    overlay: MapLayer;
+    draw: MapLayer;
+  } | null>(null);
 
   const [mode, setMode] = useState<Mode>("circle");
   const [center, setCenter] = useState<LatLng | null>(null);
   const [radius, setRadius] = useState(600);
   const [points, setPoints] = useState<LatLng[]>([]);
-  const [ready, setReady] = useState(false);
 
   const [query, setQuery] = useState("");
   const [hits, setHits] = useState<Array<{ label: string; lat: number; lng: number }>>([]);
@@ -103,72 +102,33 @@ export function AreaPicker({
 
   /* ------------------------------ Karte bauen ----------------------------- */
 
-  useEffect(() => {
-    let cancelled = false;
-    let sizeTimer: ReturnType<typeof setTimeout> | undefined;
-    (async () => {
-      const L = await import("leaflet");
-      if (cancelled || !containerRef.current || mapRef.current) return;
-      leafletRef.current = L;
-
-      const map = L.map(containerRef.current, {
-        center: [start?.lat ?? DEFAULT_START.lat, start?.lng ?? DEFAULT_START.lng],
-        zoom: start?.zoom ?? DEFAULT_START.zoom,
-        // Oben liegen die Kennzahl der Auswahl und "Neu setzen" - die
-        // Zoom-Knoepfe gehen deshalb nach unten links.
-        zoomControl: false,
-        scrollWheelZoom: true,
-        // Tausende Adresspunkte zeichnet die Leinwand deutlich fluessiger als SVG.
-        preferCanvas: true,
-      });
-      L.tileLayer(tileUrl, {
-        maxZoom: 19,
-        attribution: "&copy; OpenStreetMap-Mitwirkende",
-      }).addTo(map);
-      L.control.zoom({ position: "bottomleft" }).addTo(map);
-
-      existingLayerRef.current = L.layerGroup().addTo(map);
-      overlayLayerRef.current = L.layerGroup().addTo(map);
-      drawLayerRef.current = L.layerGroup().addTo(map);
-
-      map.on("click", (event: { latlng: { lat: number; lng: number } }) => {
-        const point: LatLng = [event.latlng.lat, event.latlng.lng];
-        if (modeRef.current === "circle") {
-          setCenter(point);
-          // Aus der Uebersichtshoehe heraus waere der Umkreis reine Glueckssache.
-          if (map.getZoom() < 13) map.flyTo(point, 15, { duration: 0.6 });
-        } else {
-          setPoints((prev) => (prev.length >= 60 ? prev : [...prev, point]));
-        }
-      });
-
-      mapRef.current = map;
-      setReady(true);
-      // Im Dialog wird die Karte erst nach dem Einblenden vermessen.
-      sizeTimer = setTimeout(() => map.invalidateSize(), 150);
-    })();
-
-    return () => {
-      cancelled = true;
-      clearTimeout(sizeTimer);
-      // Laufende Flug-/Zoom-Animation zuerst stoppen.
-      mapRef.current?.stop();
-      mapRef.current?.remove();
-      mapRef.current = null;
-      drawLayerRef.current = null;
-      existingLayerRef.current = null;
-      overlayLayerRef.current = null;
-    };
+  const mapStart = useMemo(
+    () => ({
+      center: [start?.lat ?? DEFAULT_START.lat, start?.lng ?? DEFAULT_START.lng] as LatLng,
+      zoom: start?.zoom ?? DEFAULT_START.zoom,
+    }),
+    // Nur der erste Ausschnitt zaehlt - danach bewegt sich die Karte selbst.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tileUrl]);
+    [],
+  );
 
-  // Karte an Groessenaenderungen anpassen (Dialog, Drehen des Handys).
   useEffect(() => {
-    if (!ready || !containerRef.current) return;
-    const observer = new ResizeObserver(() => mapRef.current?.invalidateSize());
-    observer.observe(containerRef.current);
-    return () => observer.disconnect();
-  }, [ready]);
+    if (!engine) {
+      setLayers(null);
+      return;
+    }
+    setLayers({ existing: engine.layer(), overlay: engine.layer(), draw: engine.layer() });
+    engine.onTap((point) => {
+      if (modeRef.current === "circle") {
+        setCenter(point);
+        // Aus der Uebersichtshoehe heraus waere der Umkreis reine Glueckssache.
+        if (engine.zoom() < 13) engine.setView(point, 15);
+      } else {
+        setPoints((prev) => (prev.length >= 60 ? prev : [...prev, point]));
+      }
+    });
+    return () => engine.onTap(null);
+  }, [engine]);
 
   /* -------------------- Flaeche aus der Eingabe ableiten ------------------- */
 
@@ -190,59 +150,51 @@ export function AreaPicker({
 
   /* ------------------------------- Zeichnen ------------------------------- */
 
-  // Bereits vergebene Gebiete als Hintergrund
+  // Bereits vergebene Gebiete als Hintergrund - mit Namen, damit klar ist, wem sie gehoeren.
   useEffect(() => {
-    const L = leafletRef.current;
-    const layer = existingLayerRef.current;
-    if (!ready || !L || !layer) return;
-    layer.clearLayers();
+    const layer = layers?.existing;
+    if (!layer) return;
+    const muted = cssColor("--ink-muted", "#5b6b82");
     for (const item of existing) {
       if (item.area.length < 3) continue;
-      L.polygon(item.area, {
-        color: cssColor("--ink-muted", "#5b6b82"),
+      layer.polygon(item.area, {
+        color: muted,
         weight: 1.5,
-        dashArray: "5 4",
+        dashed: true,
         fillOpacity: 0.08,
-        interactive: true,
-        bubblingMouseEvents: true,
-      })
-        .bindTooltip(`Schon vergeben: ${item.name}`, { direction: "top" })
-        .addTo(layer);
+        title: `Schon vergeben: ${item.name}`,
+      });
+      layer.marker(middleOf(item.area), labelMarker(item.name));
     }
-  }, [ready, existing]);
+    return () => layer.clear();
+  }, [layers, existing]);
 
   // Gefundene Hausnummern und Teilgebiete
   useEffect(() => {
-    const L = leafletRef.current;
-    const layer = overlayLayerRef.current;
-    if (!ready || !L || !layer) return;
-    layer.clearLayers();
-
+    const layer = layers?.overlay;
+    if (!layer) return;
     const muted = cssColor("--ink-muted", "#5b6b82");
 
     // Der Umriss ist nur eine Andeutung - welche Strassen zu welchem Paket
     // gehoeren, sagen die farbigen Punkte. Deshalb bleibt er zurueckhaltend.
     for (const plot of plots) {
       if (plot.area.length < 3) continue;
-      L.polygon(plot.area, {
+      layer.polygon(plot.area, {
         color: plot.color,
         weight: 1.5,
-        dashArray: "6 5",
-        fillOpacity: 0.05,
-        bubblingMouseEvents: true,
-      }).addTo(layer);
+        dashed: true,
+        fillOpacity: 0.06,
+      });
     }
 
     for (const street of overlay) {
       const chosen = street.color !== null;
       for (const point of street.points) {
-        L.circleMarker(point, {
+        layer.dot(point, {
+          color: chosen ? street.color! : muted,
           radius: chosen ? 3.5 : 2.5,
-          stroke: false,
-          fillColor: chosen ? street.color! : muted,
-          fillOpacity: chosen ? 0.9 : 0.3,
-          bubblingMouseEvents: true,
-        }).addTo(layer);
+          opacity: chosen ? 0.9 : 0.3,
+        });
       }
     }
 
@@ -254,76 +206,64 @@ export function AreaPicker({
         (acc, [lat, lng]) => [acc[0] + lat / plot.area.length, acc[1] + lng / plot.area.length],
         [0, 0],
       ) as LatLng;
-      L.marker(middle, {
-        icon: badgeIcon(L, plot.color, plot.label),
-        interactive: false,
-        keyboard: false,
-      }).addTo(layer);
+      layer.marker(middle, { ...badgeMarker(plot.color, plot.label), priority: 2 });
     }
-  }, [ready, overlay, plots]);
+    return () => layer.clear();
+  }, [layers, overlay, plots]);
 
   // Auf eine Strasse springen, wenn sie in der Liste angetippt wird
   useEffect(() => {
-    const map = mapRef.current;
-    if (!ready || !map || !focus) return;
+    if (!engine || !focus) return;
     const street = overlay.find((s) => s.name === focus);
     const target = street?.center ?? street?.points[0] ?? null;
     if (!target) return;
-    map.flyTo(target, Math.max(map.getZoom(), 16), { duration: 0.6 });
-  }, [ready, focus, overlay]);
+    engine.setView(target, Math.max(engine.zoom(), 16));
+  }, [engine, focus, overlay]);
 
   // Aktuelle Auswahl samt Eckpunkten
   useEffect(() => {
-    const L = leafletRef.current;
-    const layer = drawLayerRef.current;
-    if (!ready || !L || !layer) return;
-    layer.clearLayers();
+    const layer = layers?.draw;
+    if (!layer) return;
 
     const brand = cssColor("--brand-600", "#0f5cab");
 
     if (mode === "circle" && center) {
-      L.polygon(circleToArea(center, radius, 48), {
+      layer.polygon(circleToArea(center, radius, 64), {
         color: brand,
-        weight: 2,
+        weight: 2.5,
         fillOpacity: 0.12,
-        bubblingMouseEvents: true,
-      }).addTo(layer);
-      L.marker(center, { icon: dotIcon(L, brand, 14), draggable: true, keyboard: false })
-        .on("dragend", (event: { target: { getLatLng: () => { lat: number; lng: number } } }) => {
-          const p = event.target.getLatLng();
-          setCenter([p.lat, p.lng]);
-        })
-        .addTo(layer);
-      return;
-    }
-
-    if (mode === "polygon" && points.length > 0) {
+      });
+      layer.marker(center, {
+        ...handleMarker(brand, 18),
+        draggable: true,
+        priority: 3,
+        onDragEnd: (point) => setCenter(point),
+      });
+    } else if (mode === "polygon" && points.length > 0) {
       if (points.length >= 3) {
-        L.polygon(points, {
-          color: brand,
-          weight: 2,
-          fillOpacity: 0.12,
-          bubblingMouseEvents: true,
-        }).addTo(layer);
+        layer.polygon(points, { color: brand, weight: 2.5, fillOpacity: 0.12 });
       } else {
-        L.polyline(points, { color: brand, weight: 2, dashArray: "6 5" }).addTo(layer);
+        layer.line(points, { color: brand, weight: 2.5, dashed: true });
       }
       points.forEach((point, index) => {
-        L.marker(point, { icon: dotIcon(L, brand, 12), draggable: true, keyboard: false })
-          .on("dragend", (event: { target: { getLatLng: () => { lat: number; lng: number } } }) => {
-            const p = event.target.getLatLng();
-            setPoints((prev) => prev.map((old, i) => (i === index ? [p.lat, p.lng] : old)));
-          })
-          .addTo(layer);
+        layer.marker(point, {
+          ...handleMarker(brand, 14),
+          draggable: true,
+          priority: 3,
+          onDragEnd: (moved) =>
+            setPoints((prev) => prev.map((old, i) => (i === index ? moved : old))),
+        });
       });
     }
-  }, [ready, mode, center, radius, points]);
+    return () => layer.clear();
+  }, [layers, mode, center, radius, points]);
 
   /* ------------------------------- Aktionen ------------------------------- */
 
-  const flyTo = useCallback((lat: number, lng: number, zoom: number) => {
-    mapRef.current?.flyTo([lat, lng], zoom, { duration: 0.8 });
-  }, []);
+  const flyTo = useCallback(
+    (lat: number, lng: number, zoom: number) => engine?.setView([lat, lng], zoom),
+    [engine],
+  );
 
   async function search() {
     if (query.trim().length < 3) {
@@ -492,14 +432,10 @@ export function AreaPicker({
         className="relative overflow-hidden rounded-[var(--r-lg)] border"
         style={{ borderColor: "var(--line)" }}
       >
-        <div ref={containerRef} className="h-[46vh] min-h-[280px] w-full" />
-
+        <MapView start={mapStart} className="h-[46vh] min-h-[280px] w-full" onEngine={setEngine}>
         {/* Die Kennzahl der Auswahl liegt auf der Karte - dort schaut man hin. */}
-        <div className="pointer-events-none absolute inset-x-2 top-2 flex items-start justify-between gap-2">
-          <span
-            className="glass pointer-events-auto flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[12px] font-semibold shadow-sm"
-            style={{ borderColor: "var(--line)" }}
-          >
+        <div className="pointer-events-none absolute inset-x-2 top-2 z-[500] flex items-start justify-between gap-2">
+          <span className="map-chip pointer-events-auto flex items-center gap-1.5 px-3 py-1.5 text-[12px] text-[var(--ink)]">
             {area ? (
               <>
                 <span
@@ -522,8 +458,7 @@ export function AreaPicker({
             {mode === "polygon" && points.length > 0 && (
               <button
                 type="button"
-                className="glass rounded-full border px-3 py-1.5 text-[12px] font-semibold shadow-sm"
-                style={{ borderColor: "var(--line)" }}
+                className="map-chip px-3 py-1.5 text-[12px] text-[var(--ink)]"
                 onClick={() => setPoints((prev) => prev.slice(0, -1))}
               >
                 Punkt zurück
@@ -532,8 +467,7 @@ export function AreaPicker({
             {(center || points.length > 0) && (
               <button
                 type="button"
-                className="glass rounded-full border px-3 py-1.5 text-[12px] font-semibold shadow-sm"
-                style={{ borderColor: "var(--line)" }}
+                className="map-chip px-3 py-1.5 text-[12px] text-[var(--ink)]"
                 onClick={reset}
               >
                 Neu setzen
@@ -541,13 +475,7 @@ export function AreaPicker({
             )}
           </span>
         </div>
-
-        {!ready && (
-          <div className="absolute inset-0 bg-[var(--card)] p-3">
-            <div className="skeleton h-full w-full rounded-[var(--r-md)]" aria-hidden />
-            <p className="sr-only">Karte wird geladen</p>
-          </div>
-        )}
+        </MapView>
       </div>
 
       <p className="muted px-0.5 text-[11px] leading-snug">
@@ -563,25 +491,12 @@ export function AreaPicker({
   );
 }
 
-/** Kleiner runder Griff - kommt ohne die Leaflet-Bilddateien aus. */
-function dotIcon(L: typeof import("leaflet"), color: string, size: number) {
-  return L.divIcon({
-    className: "",
-    iconSize: [size, size],
-    iconAnchor: [size / 2, size / 2],
-    html: `<span style="display:block;width:${size}px;height:${size}px;border-radius:999px;background:${color};border:2px solid #fff;box-shadow:0 1px 4px rgb(15 23 42 / .45)"></span>`,
-  });
-}
-
-/** Nummernschild eines Teilgebiets. */
-function badgeIcon(L: typeof import("leaflet"), color: string, label: string) {
-  return L.divIcon({
-    className: "",
-    iconSize: [26, 26],
-    iconAnchor: [13, 13],
-    html:
-      `<span style="display:grid;place-items:center;width:26px;height:26px;border-radius:999px;` +
-      `background:${color};color:#fff;border:2px solid #fff;font:700 13px/1 system-ui;` +
-      `box-shadow:0 1px 5px rgb(15 23 42 / .5)">${label}</span>`,
-  });
+/** Mitte der Flaeche (Mittel der Ausdehnung) - dort steht der Name. */
+function middleOf(area: LatLng[]): LatLng {
+  const lats = area.map(([lat]) => lat);
+  const lngs = area.map(([, lng]) => lng);
+  return [
+    (Math.min(...lats) + Math.max(...lats)) / 2,
+    (Math.min(...lngs) + Math.max(...lngs)) / 2,
+  ];
 }

@@ -308,3 +308,21 @@ export function IconTarget({ className = base }: IconProps) {
     </svg>
   );
 }
+
+/** Kartenebenen - wechselt zwischen Karte und Satellit. */
+export function IconLayers({ className = base }: IconProps) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="m12 3 9 4.5-9 4.5-9-4.5L12 3Z" /><path d="m3 12 9 4.5 9-4.5" /><path d="m3 16.5 9 4.5 9-4.5" />
+    </svg>
+  );
+}
+
+/** Rahmen mit Pfeilen - holt den ganzen Inhalt zurueck ins Bild. */
+export function IconFit({ className = base }: IconProps) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M4 9V5a1 1 0 0 1 1-1h4" /><path d="M15 4h4a1 1 0 0 1 1 1v4" /><path d="M20 15v4a1 1 0 0 1-1 1h-4" /><path d="M9 20H5a1 1 0 0 1-1-1v-4" />
+    </svg>
+  );
+}
