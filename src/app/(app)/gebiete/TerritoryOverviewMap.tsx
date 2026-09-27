@@ -2,14 +2,15 @@
 
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
-import { AreaMap, type AreaTone, type MapArea } from "@/components/AreaMap";
+import { AreaMap, TONE_LEGEND, type AreaTone, type MapArea } from "@/components/AreaMap";
 import { plural } from "@/components/ui";
 import { IconChevronDown, IconMap } from "@/components/icons";
+import type { Shape } from "@/lib/geo/shape";
 
 export interface OverviewTerritory {
   id: number;
   name: string;
-  area: [number, number][];
+  area: Shape;
   status: string;
   assignee: string | null;
   streets: number;
@@ -62,21 +63,26 @@ export function TerritoryOverviewMap({
     [territories, person],
   );
 
-  if (territories.length === 0) return null;
+  // Stabil halten: die Karte loest bei neuen Daten Ueberschneidungen neu auf.
+  const areas: MapArea[] = useMemo(
+    () =>
+      shown.map((t) => ({
+        id: t.id,
+        name: t.name,
+        area: t.area,
+        tone: TONES[t.status] ?? "muted",
+        badge: initials(t.assignee),
+        hint: [
+          STATUS_LABEL[t.status] ?? t.status,
+          plural(t.streets, "Straße", "Straßen"),
+          t.units > 0 ? `${t.doors} von ${t.units} Türen` : `${t.doors} Türen erfasst`,
+          t.assignee ?? "nicht zugeteilt",
+        ].join(" · "),
+      })),
+    [shown],
+  );
 
-  const areas: MapArea[] = shown.map((t) => ({
-    id: t.id,
-    name: t.name,
-    area: t.area,
-    tone: TONES[t.status] ?? "muted",
-    badge: initials(t.assignee),
-    hint: [
-      STATUS_LABEL[t.status] ?? t.status,
-      plural(t.streets, "Straße", "Straßen"),
-      t.units > 0 ? `${t.doors} von ${t.units} Türen` : `${t.doors} Türen erfasst`,
-      t.assignee ?? "nicht zugeteilt",
-    ].join(" · "),
-  }));
+  if (territories.length === 0) return null;
 
   return (
     <div className="card mb-4 overflow-hidden">
@@ -127,12 +133,10 @@ export function TerritoryOverviewMap({
             <AreaMap
               areas={areas}
               legend={[
-                // Die Legende ist HTML - CSS-Variablen genuegen und stimmen
-                // schon beim ersten Zeichnen auf dem Server.
-                { color: "var(--brand-600)", label: "in Arbeit" },
-                { color: "var(--energy-600)", label: "fertig" },
-                { color: "var(--gas-500)", label: "pausiert" },
-                { color: "var(--ink-muted)", label: "offen" },
+                { color: TONE_LEGEND.brand, label: "in Arbeit" },
+                { color: TONE_LEGEND.success, label: "fertig" },
+                { color: TONE_LEGEND.warn, label: "pausiert" },
+                { color: TONE_LEGEND.muted, label: "offen" },
               ]}
               className="h-[40vh] min-h-[240px] w-full"
               onSelect={(id) => router.push(`/gebiete/${id}`)}

@@ -13,13 +13,13 @@
 
 import {
   MAX_AREA_SQKM,
-  areaSqKm,
   boundsOf,
   centerOf,
   contains,
   toOverpassPoly,
   type LatLng,
 } from "./area";
+import { mainRing, shapeContains, shapeSqm, type Shape } from "./shape";
 
 /**
  * Overpass-Server der Reihe nach. Der offizielle Server ist oft ausgelastet -
@@ -101,17 +101,27 @@ const STREET_CACHE_TTL_MS = 5 * 60 * 1000;
 const STREET_CACHE_MAX = 20;
 const streetCache = new Map<string, { at: number; value: AreaStreets }>();
 
-function areaKey(area: LatLng[]): string {
-  return area.map(([lat, lng]) => `${lat.toFixed(5)},${lng.toFixed(5)}`).join(";");
+function areaKey(area: Shape): string {
+  return area
+    .map((polygon) =>
+      polygon
+        .map((ring) => ring.map(([lat, lng]) => `${lat.toFixed(5)},${lng.toFixed(5)}`).join(";"))
+        .join("|"),
+    )
+    .join("/");
 }
 
-/** Alle Strassen samt Hausnummern innerhalb der gezeichneten Flaeche. */
-export async function streetsInArea(area: LatLng[]): Promise<AreaStreets> {
+/**
+ * Alle Strassen samt Hausnummern innerhalb der gezeichneten Flaeche. Die
+ * Flaeche darf aus mehreren Teilen bestehen und Loecher haben (ausgesparte
+ * Nachbargebiete) - deren Haeuser bleiben draussen.
+ */
+export async function streetsInArea(area: Shape): Promise<AreaStreets> {
   const key = areaKey(area);
   const cached = streetCache.get(key);
   if (cached && Date.now() - cached.at < STREET_CACHE_TTL_MS) return cached.value;
 
-  const size = areaSqKm(area);
+  const size = shapeSqm(area) / 1_000_000;
   if (size > MAX_AREA_SQKM) {
     throw new Error(
       `Das Gebiet ist mit ${size.toFixed(1)} km² zu groß (max. ${MAX_AREA_SQKM} km²). ` +
@@ -119,16 +129,22 @@ export async function streetsInArea(area: LatLng[]): Promise<AreaStreets> {
     );
   }
 
-  const poly = toOverpassPoly(area);
-  const query =
-    `[out:json][timeout:40];` +
-    `way["highway"~"^(${STREET_TYPES})$"]["name"](poly:"${poly}");out tags center;` +
-    `(node["addr:housenumber"](poly:"${poly}");way["addr:housenumber"](poly:"${poly}"););out tags center;`;
+  // Overpass fragt je Teil den Aussenumriss ab; Loecher filtert groupStreets.
+  const polys = area.map(([outer]) => toOverpassPoly(outer));
+  const roads = polys
+    .map((poly) => `way["highway"~"^(${STREET_TYPES})$"]["name"](poly:"${poly}");`)
+    .join("");
+  const houses = polys
+    .map(
+      (poly) => `node["addr:housenumber"](poly:"${poly}");way["addr:housenumber"](poly:"${poly}");`,
+    )
+    .join("");
+  const query = `[out:json][timeout:40];(${roads});out tags center;(${houses});out tags center;`;
 
   const elements = await overpass(query);
   const streets = groupStreets(elements, area);
   const addressCount = streets.reduce((sum, s) => sum + s.addresses, 0);
-  const place = await describePlace(centerOf(area));
+  const place = await describePlace(centerOf(mainRing(area) ?? area[0][0]));
 
   const result: AreaStreets = { streets, addressCount, place, areaSqKm: size };
   if (streetCache.size >= STREET_CACHE_MAX) streetCache.clear();
@@ -199,12 +215,14 @@ async function overpass(query: string): Promise<OverpassElement[]> {
 }
 
 /** Macht aus Overpass-Elementen je Strasse eine Zeile mit allen Hausnummern. */
-function groupStreets(elements: OverpassElement[], area: LatLng[]): FoundStreet[] {
+function groupStreets(elements: OverpassElement[], area: Shape): FoundStreet[] {
   interface Draft {
     name: string;
     /** Hausnummer (normalisiert) -> Haus. Doppelte Treffer fallen so weg. */
     houses: Map<string, FoundAddress>;
     addresses: number;
+    /** Haeuser in einem ausgesparten Nachbargebiet - die Strasse gehoert dann dorthin. */
+    elsewhere: number;
     latSum: number;
     lngSum: number;
     located: number;
@@ -221,6 +239,7 @@ function groupStreets(elements: OverpassElement[], area: LatLng[]): FoundStreet[
         name,
         houses: new Map(),
         addresses: 0,
+        elsewhere: 0,
         latSum: 0,
         lngSum: 0,
         located: 0,
@@ -242,7 +261,10 @@ function groupStreets(elements: OverpassElement[], area: LatLng[]): FoundStreet[
       if (!streetName) continue;
       // Overpass liefert auch Treffer knapp ausserhalb; hier bleibt nur, was
       // wirklich in der gezeichneten Flaeche liegt.
-      if (lat !== null && lng !== null && !contains(area, [lat, lng])) continue;
+      if (lat !== null && lng !== null && !shapeContains(area, [lat, lng])) {
+        if (inHole(area, [lat, lng])) draftFor(streetName).elsewhere += 1;
+        continue;
+      }
 
       const draft = draftFor(streetName);
       draft.addresses += 1;
@@ -287,6 +309,14 @@ function groupStreets(elements: OverpassElement[], area: LatLng[]): FoundStreet[
 
   const streets: FoundStreet[] = [];
   for (const draft of drafts.values()) {
+    // Liegt die Strasse ganz in einem ausgesparten Nachbargebiet, gehoert sie
+    // dorthin - auch wenn ihr Strassenzug die Flaeche streift.
+    if (draft.addresses === 0) {
+      if (draft.elsewhere > 0) continue;
+      const road: LatLng | null =
+        draft.roadLat !== null && draft.roadLng !== null ? [draft.roadLat, draft.roadLng] : null;
+      if (road && inHole(area, road)) continue;
+    }
     const numbers = [...draft.houses.values()].sort(byHouseNumber);
     streets.push({
       name: draft.name,
@@ -306,6 +336,14 @@ function groupStreets(elements: OverpassElement[], area: LatLng[]): FoundStreet[
     .sort((a, b) => a.name.localeCompare(b.name, "de-DE"));
 
   return capNumbers(ranked);
+}
+
+/** Liegt der Punkt in einem Loch der Flaeche, also in einem ausgesparten Gebiet? */
+function inHole(area: Shape, point: LatLng): boolean {
+  return area.some(
+    ([outer, ...holes]) =>
+      outer !== undefined && contains(outer, point) && holes.some((hole) => contains(hole, point)),
+  );
 }
 
 /**

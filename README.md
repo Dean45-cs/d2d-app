@@ -146,9 +146,17 @@ entscheidet das Gerät und nicht der Server: vor der Tür zählt die Uhr an der 
    eine Zeile in der Liste springt zur Straße, abgewählte Straßen werden blass.
 4. PLZ, Ort und ein Namensvorschlag sind schon ausgefüllt; nur noch zuteilen und speichern.
 
-Schon vergebene Gebiete liegen grau gestrichelt unter der Zeichnung – so entstehen keine
-Überschneidungen. Ein Gebiet ist auf **25 km²** begrenzt; ein Tagesgebiet sind meist ein
-bis zwei Quadratkilometer.
+Schon vergebene Gebiete liegen grau gestrichelt unter der Zeichnung und werden
+**automatisch ausgespart**: Man darf großzügig über sie hinweg zeichnen, das neue Gebiet
+endet trotzdem an ihrer Grenze (oben auf der Karte steht, wie viele ausgespart wurden).
+Auch der Server schneidet beim Speichern und beim Ändern einer Fläche vergebene Gebiete
+heraus – zwei Gebiete überschneiden sich also nie. Ein Gebiet ist auf **25 km²**
+begrenzt; ein Tagesgebiet sind meist ein bis zwei Quadratkilometer.
+
+Überschneiden sich Gebiete aus älteren Daten, zeigt die Übersichtskarte trotzdem jeden
+Fleck nur einmal: das kleinere Gebiet liegt obenauf, das größere bekommt dort ein Loch.
+Die Kürzel stehen immer mitten in der eigenen Fläche; decken sie sich beim aktuellen
+Zoom, tritt das kleinere zurück und erscheint beim Hineinzoomen wieder.
 
 ### Was mit den Hausnummern passiert
 
@@ -178,7 +186,10 @@ Mitarbeiter – **bis zu vier**:
   gleicht sie danach **nach Türen** aus. Wohneinheiten aus OpenStreetMap zählen, sonst
   jede Adresse als eine Tür.
 - Jedes Paket bekommt Farbe und Nummer auf der Karte, eine eigene Fläche und ein
-  eigenes Zuteilungsfeld.
+  eigenes Zuteilungsfeld. Die Flächen teilen die Zeichnung **lückenlos und ohne
+  Überschneidung** mit geraden Grenzen; jede Grenze liegt dort, wo sie die Häuser der
+  beiden Nachbarpakete am saubersten trennt. Eine Straße, die über eine Grenze läuft,
+  bleibt ganz bei ihrem Paket – ihre letzten Häuser können also knapp jenseits liegen.
 - Gespeichert wird in einem Zug: `Innenstadt-Nord – KW 38 (1/3)` bis `(3/3)`.
   Entweder entstehen alle Teilgebiete oder keines.
 

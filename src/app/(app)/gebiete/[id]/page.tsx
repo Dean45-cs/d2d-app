@@ -12,7 +12,7 @@ import {
   type HouseNumberWithStats,
   type StreetWithStats,
 } from "@/lib/queries";
-import { readArea } from "@/lib/geo/area";
+import { readArea, readShape } from "@/lib/geo/area";
 import { providerLookup } from "@/lib/energy/provider";
 import { ProviderCard } from "@/components/ProviderRating";
 import {
@@ -58,16 +58,16 @@ export default async function TerritoryDetailPage({
     (numbersByStreet[house.street_id] ??= []).push(house);
   }
 
-  const area = readArea(territory.area_json);
+  const area = readShape(territory.area_json);
   const provider = providerLookup(user.team_id).find({
     postal_code: territory.postal_code,
     city: territory.city,
-    area,
+    area: readArea(territory.area_json),
   });
   // Beim Nachziehen der Flaeche sollen die Nachbargebiete sichtbar sein.
   const otherAreas = isLeader
     ? listTerritories(user.team_id).flatMap((t) => {
-        const other = t.id === territory.id ? null : readArea(t.area_json);
+        const other = t.id === territory.id ? null : readShape(t.area_json);
         return other ? [{ id: t.id, name: t.name, area: other }] : [];
       })
     : [];

@@ -2,7 +2,9 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { LatLng } from "@/lib/geo/area";
+import { labelPoint, resolveOverlaps, shapePoints, type Shape } from "@/lib/geo/shape";
 import { MapView } from "./map/MapView";
+import { declutter, type Placeable } from "./map/declutter";
 import { badgeMarker } from "./map/markers";
 import type { MapEngine } from "./map/types";
 import { cssColor, progressColor } from "./map-colors";
@@ -13,7 +15,7 @@ export type PinState = "open" | "active" | "done";
 export interface MapArea {
   id: number;
   name: string;
-  area: LatLng[];
+  area: Shape;
   tone?: AreaTone;
   hint?: string;
   /** Zahl oder Kuerzel, das dauerhaft auf der Flaeche steht. */
@@ -42,22 +44,45 @@ interface Props {
   onSelect?: (id: number) => void;
 }
 
-const TONE_VARS: Record<AreaTone, [string, string]> = {
-  brand: ["--brand-600", "#0f5cab"],
-  success: ["--energy-600", "#059450"],
-  warn: ["--gas-500", "#f59e0b"],
-  muted: ["--ink-muted", "#5b6b82"],
+/**
+ * Je Ton zwei Farben: die Linie nimmt die helle Stufe (auf dunkler Karte
+ * sonst kaum zu sehen), das Schild die satte - darauf bleibt weisse Schrift lesbar.
+ */
+const TONE_VARS: Record<AreaTone, { line: [string, string]; badge: [string, string] }> = {
+  brand: { line: ["--tint", "#0f5cab"], badge: ["--brand-600", "#0f5cab"] },
+  success: { line: ["--ok-ink", "#059450"], badge: ["--energy-600", "#059450"] },
+  warn: { line: ["--warn-ink", "#d97706"], badge: ["--gas-500", "#f59e0b"] },
+  muted: { line: ["--ink-muted", "#66788f"], badge: ["--ink-muted", "#66788f"] },
 };
 
-/** Zeigt gezeichnete Gebiete und ihre Strassen auf einer Karte. */
+/** Legende passend zu den Linien - CSS-Variablen stimmen schon beim ersten Zeichnen. */
+export const TONE_LEGEND: Record<AreaTone, string> = {
+  brand: "var(--tint)",
+  success: "var(--ok-ink)",
+  warn: "var(--warn-ink)",
+  muted: "var(--ink-muted)",
+};
+
+const BADGE_SIZE = 28;
+
+/**
+ * Zeigt gezeichnete Gebiete und ihre Strassen auf einer Karte.
+ *
+ * Ueberschneiden sich Gebiete (aeltere Daten), gehoert jeder Fleck Boden auf
+ * der Karte trotzdem genau einem: das kleinere Gebiet liegt obenauf, das
+ * groessere bekommt dort ein Loch. So entstehen keine trueben Mischfarben, und
+ * jedes Schild steht mitten in seiner eigenen Flaeche.
+ */
 export function AreaMap({ areas, pins = [], legend, className, onSelect }: Props) {
   const [engine, setEngine] = useState<MapEngine | null>(null);
   const selectRef = useRef(onSelect);
   selectRef.current = onSelect;
 
+  const pieces = useMemo(() => resolveOverlaps(areas.map((item) => item.area)), [areas]);
+
   const allPoints = useMemo<LatLng[]>(
     () => [
-      ...areas.flatMap((item) => (item.area.length >= 3 ? item.area : [])),
+      ...areas.flatMap((item) => shapePoints(item.area)),
       ...pins.map((pin) => [pin.lat, pin.lng] as LatLng),
     ],
     [areas, pins],
@@ -72,30 +97,43 @@ export function AreaMap({ areas, pins = [], legend, className, onSelect }: Props
     if (!engine) return;
     const layer = engine.layer();
     const clickable = Boolean(selectRef.current);
+    const badges: Placeable[] = [];
 
-    for (const item of areas) {
-      if (item.area.length < 3) continue;
-      const [variable, fallback] = TONE_VARS[item.tone ?? "brand"];
-      const color = cssColor(variable, fallback);
+    areas.forEach((item, index) => {
+      const tone = TONE_VARS[item.tone ?? "brand"];
+      const line = cssColor(...tone.line);
       const open = clickable ? () => selectRef.current?.(item.id) : undefined;
-      layer.polygon(item.area, {
-        color,
-        weight: 2.5,
-        fillOpacity: 0.18,
-        title: item.name,
-        subtitle: item.hint,
-        onClick: open,
-      });
-      if (item.badge) {
-        layer.marker(middleOf(item.area), {
-          ...badgeMarker(color, item.badge),
+      const piece = pieces[index];
+      // Ganz von kleineren Gebieten bedeckt: nur der Umriss, gestrichelt.
+      const covered = piece.length === 0;
+      const visible = covered ? item.area : piece;
+
+      for (const polygon of visible) {
+        layer.polygon(polygon, {
+          color: line,
+          weight: covered ? 1.5 : 2,
+          fillOpacity: covered ? 0 : 0.16,
+          dashed: covered,
+          inset: !covered,
+          title: item.name,
+          subtitle: item.hint,
+          onClick: open,
+        });
+      }
+
+      const label = item.badge ? labelPoint(visible) : null;
+      if (item.badge && label) {
+        const handle = layer.marker(label.point, {
+          ...badgeMarker(cssColor(...tone.badge), item.badge, BADGE_SIZE),
           title: item.name,
           subtitle: item.hint,
           onClick: open,
           priority: 2,
         });
+        // Wer mehr Platz hat, behaelt sein Schild, wenn zwei sich decken.
+        badges.push({ point: label.point, size: [BADGE_SIZE, BADGE_SIZE], rank: label.room, handle });
       }
-    }
+    });
 
     for (const pin of pins) {
       layer.dot([pin.lat, pin.lng], {
@@ -108,10 +146,14 @@ export function AreaMap({ areas, pins = [], legend, className, onSelect }: Props
     }
 
     fitAll(false);
-    return () => layer.clear();
+    const stopWatching = declutter(engine, badges);
+    return () => {
+      stopWatching();
+      layer.clear();
+    };
     // fitAll haengt an denselben Daten; nur bei neuen Daten neu zeichnen.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [engine, areas, pins]);
+  }, [engine, areas, pieces, pins]);
 
   return (
     <div className="overflow-hidden rounded-xl border hairline">
@@ -136,19 +178,4 @@ export function AreaMap({ areas, pins = [], legend, className, onSelect }: Props
       )}
     </div>
   );
-}
-
-/** Mitte der Flaeche (Mittel der Eckpunkte) - dort sitzt das Schild. */
-function middleOf(area: LatLng[]): LatLng {
-  let south = 90;
-  let north = -90;
-  let west = 180;
-  let east = -180;
-  for (const [lat, lng] of area) {
-    south = Math.min(south, lat);
-    north = Math.max(north, lat);
-    west = Math.min(west, lng);
-    east = Math.max(east, lng);
-  }
-  return [(south + north) / 2, (west + east) / 2];
 }

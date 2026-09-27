@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { requireUser } from "@/lib/auth";
 import { listMembers, listTerritories } from "@/lib/queries";
-import { readArea } from "@/lib/geo/area";
+import { readArea, readShape } from "@/lib/geo/area";
 import { providerLookup } from "@/lib/energy/provider";
 import { ProviderLine } from "@/components/ProviderRating";
 import {
@@ -32,7 +32,7 @@ export default async function TerritoriesPage() {
 
   // Nur Gebiete mit gezeichneter Flaeche kommen auf die Uebersichtskarte.
   const mapped: OverviewTerritory[] = territories.flatMap((t) => {
-    const area = readArea(t.area_json);
+    const area = readShape(t.area_json);
     return area
       ? [
           {

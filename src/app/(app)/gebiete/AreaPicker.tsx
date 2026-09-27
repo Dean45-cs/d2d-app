@@ -1,9 +1,22 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { areaSqKm, circleToArea, type LatLng } from "@/lib/geo/area";
+import { circleToArea, type LatLng } from "@/lib/geo/area";
+import {
+  boundsOverlap,
+  intersect,
+  labelPoint,
+  normalize,
+  resolveOverlaps,
+  shapeBounds,
+  shapeSqm,
+  subtract,
+  toShape,
+  type Shape,
+} from "@/lib/geo/shape";
 import { cssColor } from "@/components/map-colors";
 import { MapView } from "@/components/map/MapView";
+import { declutter, type Placeable } from "@/components/map/declutter";
 import { badgeMarker, handleMarker, labelMarker } from "@/components/map/markers";
 import type { MapEngine, MapLayer } from "@/components/map/types";
 import { plural, Segmented } from "@/components/ui";
@@ -19,7 +32,7 @@ import {
 export interface ExistingArea {
   id: number;
   name: string;
-  area: LatLng[];
+  area: Shape;
 }
 
 /** Eine gefundene Strasse, wie sie in der Vorschau erscheint. */
@@ -34,15 +47,20 @@ export interface OverlayStreet {
 /** Umriss eines Teilgebiets mit seiner Nummer. */
 export interface OverlayPlot {
   label: string;
-  area: LatLng[];
+  area: Shape;
   color: string;
 }
 
 interface Props {
-  /** Meldet die gezeichnete Flaeche nach oben, null solange nichts markiert ist. */
-  onAreaChange: (area: LatLng[] | null) => void;
-  /** Schon vergebene Gebiete - damit sich nichts ueberschneidet. */
+  /**
+   * Meldet die Flaeche nach oben - schon ohne die vergebenen Gebiete.
+   * null, solange nichts markiert ist (oder alles schon vergeben ist).
+   */
+  onAreaChange: (area: Shape | null) => void;
+  /** Schon vergebene Gebiete: werden gezeigt und aus der Auswahl ausgespart. */
   existing?: ExistingArea[];
+  /** Bisherige Flaeche beim Neuzeichnen - nur zur Orientierung, wird nicht ausgespart. */
+  previous?: Shape | null;
   /** Gefundene Strassen samt Hausnummern als Vorschau. */
   overlay?: OverlayStreet[];
   /** Umrisse der Teilgebiete beim Aufteilen. */
@@ -57,6 +75,8 @@ type Mode = "circle" | "polygon";
 
 const DEFAULT_START = { lat: 51.2, lng: 10.4, zoom: 6 };
 const RADIUS_STEPS = [150, 250, 400, 600, 800, 1200, 1600, 2000];
+/** Ecken des Umkreises - rund genug fuers Auge, wenige genug fuer die Strassenabfrage. */
+const CIRCLE_STEPS = 48;
 
 /**
  * Karte zum Abstecken eines Gebiets.
@@ -67,10 +87,14 @@ const RADIUS_STEPS = [150, 250, 400, 600, 800, 1200, 1600, 2000];
  *
  * Sind die Strassen geladen, liegen die gefundenen Hausnummern als Punkte auf
  * der Karte - man sieht also vor dem Speichern, wie viel Substanz das Gebiet hat.
+ *
+ * Schon vergebene Gebiete werden aus der Auswahl ausgespart: Man darf grosszuegig
+ * ueber sie hinweg zeichnen, das neue Gebiet endet trotzdem an ihrer Grenze.
  */
 export function AreaPicker({
   onAreaChange,
   existing = [],
+  previous = null,
   overlay = [],
   plots = [],
   focus = null,
@@ -132,17 +156,30 @@ export function AreaPicker({
 
   /* -------------------- Flaeche aus der Eingabe ableiten ------------------- */
 
-  const area = useMemo(
-    () =>
-      mode === "circle"
-        ? center
-          ? circleToArea(center, radius)
-          : null
-        : points.length >= 3
-          ? points
-          : null,
-    [mode, center, radius, points],
-  );
+  /** So wie gezeichnet - Ueberkreuzungen schon aufgeloest. */
+  const drawn = useMemo<Shape | null>(() => {
+    if (mode === "circle") return center ? toShape(circleToArea(center, radius, CIRCLE_STEPS)) : null;
+    const shape = points.length >= 3 ? normalize(toShape(points)) : [];
+    return shape.length > 0 ? shape : null;
+  }, [mode, center, radius, points]);
+
+  const taken = useMemo(() => existing.map((item) => item.area), [existing]);
+
+  /** Was davon frei ist - das wird das Gebiet. */
+  const area = useMemo<Shape | null>(() => {
+    if (!drawn) return null;
+    const free = subtract(drawn, taken);
+    return free.length > 0 ? free : null;
+  }, [drawn, taken]);
+
+  /** Wie viele vergebene Gebiete die Zeichnung beruehrt. */
+  const spared = useMemo(() => {
+    if (!drawn) return 0;
+    const bounds = shapeBounds(drawn);
+    return taken.filter(
+      (other) => boundsOverlap(bounds, shapeBounds(other)) && intersect(drawn, other).length > 0,
+    ).length;
+  }, [drawn, taken]);
 
   useEffect(() => {
     changeRef.current(area);
@@ -150,24 +187,53 @@ export function AreaPicker({
 
   /* ------------------------------- Zeichnen ------------------------------- */
 
-  // Bereits vergebene Gebiete als Hintergrund - mit Namen, damit klar ist, wem sie gehoeren.
+  // Bereits vergebene Gebiete als Hintergrund - mit Namen, damit klar ist, wem
+  // sie gehoeren. Ueberschneiden sie sich (aeltere Daten), zeigt jede Stelle
+  // nur eines davon.
+  const existingPieces = useMemo(() => resolveOverlaps(taken), [taken]);
+
   useEffect(() => {
     const layer = layers?.existing;
-    if (!layer) return;
+    if (!engine || !layer) return;
     const muted = cssColor("--ink-muted", "#5b6b82");
-    for (const item of existing) {
-      if (item.area.length < 3) continue;
-      layer.polygon(item.area, {
-        color: muted,
-        weight: 1.5,
-        dashed: true,
-        fillOpacity: 0.08,
-        title: `Schon vergeben: ${item.name}`,
-      });
-      layer.marker(middleOf(item.area), labelMarker(item.name));
+    const labels: Placeable[] = [];
+
+    existing.forEach((item, index) => {
+      const piece = existingPieces[index].length > 0 ? existingPieces[index] : item.area;
+      for (const polygon of piece) {
+        layer.polygon(polygon, {
+          color: muted,
+          weight: 1.5,
+          dashed: true,
+          fillOpacity: 0.1,
+          title: `Schon vergeben: ${item.name}`,
+        });
+      }
+      const label = labelPoint(piece);
+      if (label) {
+        const marker = labelMarker(item.name);
+        labels.push({
+          point: label.point,
+          size: marker.size,
+          rank: label.room,
+          handle: layer.marker(label.point, marker),
+        });
+      }
+    });
+
+    if (previous) {
+      const brand = cssColor("--tint", "#0f5cab");
+      for (const polygon of previous) {
+        layer.polygon(polygon, { color: brand, weight: 1.5, dashed: true, fillOpacity: 0 });
+      }
     }
-    return () => layer.clear();
-  }, [layers, existing]);
+
+    const stopDeclutter = declutter(engine, labels);
+    return () => {
+      stopDeclutter();
+      layer.clear();
+    };
+  }, [engine, layers, existing, existingPieces, previous]);
 
   // Gefundene Hausnummern und Teilgebiete
   useEffect(() => {
@@ -175,16 +241,17 @@ export function AreaPicker({
     if (!layer) return;
     const muted = cssColor("--ink-muted", "#5b6b82");
 
-    // Der Umriss ist nur eine Andeutung - welche Strassen zu welchem Paket
-    // gehoeren, sagen die farbigen Punkte. Deshalb bleibt er zurueckhaltend.
+    // Die Teilflaechen stossen lueckenlos aneinander. Welche Strassen zu welchem
+    // Paket gehoeren, sagen die farbigen Punkte - der Umriss bleibt zurueckhaltend.
     for (const plot of plots) {
-      if (plot.area.length < 3) continue;
-      layer.polygon(plot.area, {
-        color: plot.color,
-        weight: 1.5,
-        dashed: true,
-        fillOpacity: 0.06,
-      });
+      for (const polygon of plot.area) {
+        layer.polygon(polygon, {
+          color: plot.color,
+          weight: 2,
+          inset: true,
+          fillOpacity: 0.08,
+        });
+      }
     }
 
     for (const street of overlay) {
@@ -201,12 +268,8 @@ export function AreaPicker({
     // Die Zahl im Kreis ist die eigentliche Kennzeichnung - Farbe allein
     // reicht nicht, wenn jemand Farben schlecht unterscheidet.
     for (const plot of plots) {
-      if (plot.area.length < 3) continue;
-      const middle = plot.area.reduce(
-        (acc, [lat, lng]) => [acc[0] + lat / plot.area.length, acc[1] + lng / plot.area.length],
-        [0, 0],
-      ) as LatLng;
-      layer.marker(middle, { ...badgeMarker(plot.color, plot.label), priority: 2 });
+      const label = labelPoint(plot.area);
+      if (label) layer.marker(label.point, { ...badgeMarker(plot.color, plot.label), priority: 2 });
     }
     return () => layer.clear();
   }, [layers, overlay, plots]);
@@ -226,13 +289,25 @@ export function AreaPicker({
     if (!layer) return;
 
     const brand = cssColor("--brand-600", "#0f5cab");
+    // Beim Aufteilen zeigen die Teilflaechen selbst, was dazugehoert.
+    const filled = plots.length === 0;
+
+    // Beruehrt die Zeichnung vergebene Gebiete, liegt sie nur noch als feine
+    // Linie da - gefuellt ist, was wirklich zum neuen Gebiet wird.
+    if (drawn && spared > 0) {
+      for (const polygon of drawn) {
+        layer.polygon(polygon, { color: brand, weight: 1.5, dashed: true, fillOpacity: 0 });
+      }
+    }
+    for (const polygon of area ?? []) {
+      layer.polygon(polygon, {
+        color: brand,
+        weight: filled ? 2.5 : 1.5,
+        fillOpacity: filled ? 0.14 : 0,
+      });
+    }
 
     if (mode === "circle" && center) {
-      layer.polygon(circleToArea(center, radius, 64), {
-        color: brand,
-        weight: 2.5,
-        fillOpacity: 0.12,
-      });
       layer.marker(center, {
         ...handleMarker(brand, 18),
         draggable: true,
@@ -240,9 +315,8 @@ export function AreaPicker({
         onDragEnd: (point) => setCenter(point),
       });
     } else if (mode === "polygon" && points.length > 0) {
-      if (points.length >= 3) {
-        layer.polygon(points, { color: brand, weight: 2.5, fillOpacity: 0.12 });
-      } else {
+      // Noch keine Flaeche (zu wenige Ecken): die bisherigen Ecken verbinden.
+      if (!drawn && points.length >= 2) {
         layer.line(points, { color: brand, weight: 2.5, dashed: true });
       }
       points.forEach((point, index) => {
@@ -256,7 +330,7 @@ export function AreaPicker({
       });
     }
     return () => layer.clear();
-  }, [layers, mode, center, radius, points]);
+  }, [layers, mode, center, points, drawn, area, spared, plots.length]);
 
   /* ------------------------------- Aktionen ------------------------------- */
 
@@ -321,7 +395,7 @@ export function AreaPicker({
     setHint(null);
   }
 
-  const size = area ? areaSqKm(area) : 0;
+  const size = area ? shapeSqm(area) / 1_000_000 : 0;
   const sizeLabel = `${size.toFixed(2).replace(".", ",")} km²`;
 
   return (
@@ -445,6 +519,12 @@ export function AreaPicker({
                 />
                 {sizeLabel}
                 {mode === "polygon" && ` · ${plural(points.length, "Ecke", "Ecken")}`}
+                {spared > 0 && ` · ${plural(spared, "Gebiet", "Gebiete")} ausgespart`}
+              </>
+            ) : drawn ? (
+              <>
+                <IconInfo className="h-3.5 w-3.5 text-danger" />
+                Liegt ganz in vergebenen Gebieten
               </>
             ) : (
               <>
@@ -482,6 +562,8 @@ export function AreaPicker({
         {mode === "circle"
           ? "Auf die Karte tippen – der Umkreis ist das Gebiet. Der Mittelpunkt lässt sich ziehen."
           : "Ecken nacheinander antippen (mindestens drei). Jeder Punkt lässt sich verschieben."}
+        {existing.length > 0 &&
+          " Vergebene Gebiete (gestrichelt) werden automatisch ausgespart."}
       </p>
 
       {hint && (
@@ -489,14 +571,4 @@ export function AreaPicker({
       )}
     </div>
   );
-}
-
-/** Mitte der Flaeche (Mittel der Ausdehnung) - dort steht der Name. */
-function middleOf(area: LatLng[]): LatLng {
-  const lats = area.map(([lat]) => lat);
-  const lngs = area.map(([, lng]) => lng);
-  return [
-    (Math.min(...lats) + Math.max(...lats)) / 2,
-    (Math.min(...lngs) + Math.max(...lngs)) / 2,
-  ];
 }

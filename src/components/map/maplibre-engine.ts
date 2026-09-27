@@ -12,9 +12,11 @@ import type {
   MapEngine,
   MapLayer,
   MapStart,
+  MarkerHandle,
   MarkerOptions,
   ShapeOptions,
 } from "./types";
+import { ringsOf } from "./types";
 
 /*
  * OpenFreeMap ueber MapLibre GL: Vektorkarten, kostenlos, ohne Schluessel
@@ -252,7 +254,11 @@ export async function createMapLibreEngine(
           source: id,
           filter: ["all", notPoint, ["!", ["get", "dashed"]]] as never,
           layout: { "line-join": "round", "line-cap": "round" },
-          paint: { "line-color": ["get", "color"], "line-width": ["get", "weight"] },
+          paint: {
+            "line-color": ["get", "color"],
+            "line-width": ["get", "weight"],
+            "line-offset": ["get", "offset"],
+          },
         });
         map.addLayer({
           id: `${id}-dash`,
@@ -292,11 +298,16 @@ export async function createMapLibreEngine(
       },
 
       polygon(points, options) {
+        const rings = ringsOf(points).filter((ring) => ring.length >= 3);
+        if (rings.length === 0) return;
         const key = register(shapeHandler(options));
         features.push({
           type: "Feature",
           properties: shapeProps(options, key, options.fillOpacity ?? 0.16),
-          geometry: { type: "Polygon", coordinates: [closeRing(points.map(toLngLat))] },
+          geometry: {
+            type: "Polygon",
+            coordinates: rings.map((ring, index) => closeRing(orient(ring.map(toLngLat), index === 0))),
+          },
         });
         schedule();
       },
@@ -332,8 +343,14 @@ export async function createMapLibreEngine(
         schedule();
       },
 
-      marker(point, options) {
-        markers.push(createMarker(point, options));
+      marker(point, options): MarkerHandle {
+        const marker = createMarker(point, options);
+        markers.push(marker);
+        return {
+          setVisible(visible) {
+            marker.getElement().style.visibility = visible ? "" : "hidden";
+          },
+        };
       },
     };
 
@@ -415,6 +432,16 @@ export async function createMapLibreEngine(
     onTap(handler) {
       tapHandler = handler;
     },
+    project(point) {
+      const { x, y } = map.project(toLngLat(point));
+      return [x, y];
+    },
+    onViewChange(handler) {
+      map.on("moveend", handler);
+      return () => {
+        if (!destroyed) map.off("moveend", handler);
+      };
+    },
     setMapType() {
       // OpenFreeMap hat keine Satellitenbilder.
     },
@@ -439,6 +466,19 @@ function toLngLat([lat, lng]: LatLng): [number, number] {
   return [lng, lat];
 }
 
+/**
+ * Aussenringe gegen den Uhrzeigersinn, Loecher mit ihm (wie GeoJSON es will).
+ * Erst dann zeigt ein positiver line-offset verlaesslich ins Innere.
+ */
+function orient(ring: [number, number][], outer: boolean): [number, number][] {
+  let sum = 0;
+  for (let i = 0, j = ring.length - 1; i < ring.length; j = i, i += 1) {
+    sum += (ring[j][0] - ring[i][0]) * (ring[j][1] + ring[i][1]);
+  }
+  const counterClockwise = sum > 0;
+  return counterClockwise === outer ? ring : [...ring].reverse();
+}
+
 function closeRing(ring: [number, number][]): [number, number][] {
   if (ring.length === 0) return ring;
   const [first, last] = [ring[0], ring[ring.length - 1]];
@@ -451,12 +491,14 @@ function shapeHandler(options: ShapeOptions): Handler | null {
 }
 
 function shapeProps(options: ShapeOptions, key: string, fillOpacity: number) {
+  const weight = options.weight ?? 2;
   return {
     key,
     color: options.color,
-    weight: options.weight ?? 2,
+    weight,
     fillOpacity,
     dashed: Boolean(options.dashed),
+    offset: options.inset ? weight / 2 : 0,
   };
 }
 

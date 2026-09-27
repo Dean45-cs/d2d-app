@@ -1,6 +1,8 @@
 import { getDb } from "./db";
 import { bellKey, MAX_BELLS_PER_HOUSE, normalizeFloor, normalizeLabel } from "./doorbells";
 import { MAX_NOT_HOME_ATTEMPTS } from "./doors";
+import { readShape } from "./geo/area";
+import { subtract, type Shape } from "./geo/shape";
 import type { DoorbellInput } from "./doorbells";
 import type {
   BuildingType,
@@ -135,6 +137,30 @@ export function createTerritory(input: {
       input.areaJson ?? "",
     );
   return result.lastInsertRowid as number;
+}
+
+/**
+ * Was von einer gezeichneten Flaeche frei ist: die Flaechen der anderen
+ * Gebiete des Teams (und alles in `avoid`) werden ausgespart. So koennen sich
+ * zwei Gebiete nicht ueberschneiden - egal, was die Oberflaeche schickt.
+ */
+export function freeArea(
+  teamId: number,
+  shape: Shape,
+  options: { exceptId?: number; avoid?: Shape[] } = {},
+): Shape {
+  const rows = getDb()
+    .prepare("SELECT id, area_json FROM territories WHERE team_id = ? AND area_json <> ''")
+    .all(teamId) as Array<{ id: number; area_json: string }>;
+  const taken = rows.flatMap((row) => {
+    const other = row.id === options.exceptId ? null : readShape(row.area_json);
+    return other ? [other] : [];
+  });
+  const free = subtract(shape, [...taken, ...(options.avoid ?? [])]);
+  if (free.length === 0) {
+    throw new Error("Die Fläche liegt komplett in bereits vergebenen Gebieten.");
+  }
+  return free;
 }
 
 /** Gezeichnete Flaeche eines bestehenden Gebiets ersetzen. */

@@ -9,6 +9,7 @@ import { plural } from "@/components/ui";
 import { IconNavigate } from "@/components/icons";
 import { whenLabel } from "@/lib/doors";
 import type { LatLng } from "@/lib/geo/area";
+import { shapePoints, type Shape } from "@/lib/geo/shape";
 import { distanceLabel, durationLabel, meters, planRoute } from "@/lib/geo/route";
 import { routeUrl } from "@/lib/map";
 
@@ -49,7 +50,7 @@ export interface HourBucket {
 }
 
 interface Props {
-  area: LatLng[] | null;
+  area: Shape | null;
   doors: WorkDoor[];
   streets: WorkStreet[];
   hours: HourBucket[];
@@ -163,7 +164,11 @@ export function TerritoryWorkspace({ area, doors, streets, hours }: Props) {
   /* -------------------------------- Karte -------------------------------- */
 
   const allPoints = useMemo<LatLng[]>(
-    () => [...(area ?? []), ...doors.map((d) => [d.lat, d.lng] as LatLng), ...streets.map((s) => [s.lat, s.lng] as LatLng)],
+    () => [
+      ...(area ? shapePoints(area) : []),
+      ...doors.map((d) => [d.lat, d.lng] as LatLng),
+      ...streets.map((s) => [s.lat, s.lng] as LatLng),
+    ],
     [area, doors, streets],
   );
 
@@ -192,8 +197,8 @@ export function TerritoryWorkspace({ area, doors, streets, hours }: Props) {
     const layer = layers?.base;
     if (!layer) return;
     const tint = cssColor("--tint", "#0a84ff");
-    if (area && area.length >= 3) {
-      layer.polygon(area, { color: tint, weight: 2.5, fillOpacity: 0.07 });
+    for (const polygon of area ?? []) {
+      layer.polygon(polygon, { color: tint, weight: 2.5, fillOpacity: 0.07 });
     }
     const colors = { open: stateColors().open, active: "#ff9f0a", done: stateColors().done };
     for (const street of streets) {

@@ -1,7 +1,7 @@
 import { requireRole, requireUser } from "@/lib/auth";
 import { getDb } from "@/lib/db";
-import { getTerritory } from "@/lib/queries";
-import { parseArea } from "@/lib/geo/area";
+import { freeArea, getTerritory } from "@/lib/queries";
+import { parseShape, shapeToJson } from "@/lib/geo/area";
 import { handle, optionalNumber, optionalText } from "@/lib/api";
 
 export const dynamic = "force-dynamic";
@@ -41,8 +41,14 @@ export async function PATCH(
     };
 
     // Die Flaeche laesst sich jederzeit neu auf der Karte zeichnen; null loescht sie.
+    // Nachbargebiete werden ausgespart, die eigene alte Flaeche natuerlich nicht.
     if (body.area !== undefined) {
-      set("area_json", body.area === null ? "" : JSON.stringify(parseArea(body.area)));
+      set(
+        "area_json",
+        body.area === null
+          ? ""
+          : shapeToJson(freeArea(user.team_id, parseShape(body.area), { exceptId: territoryId })),
+      );
     }
     if (body.name !== undefined) set("name", optionalText(body.name, 120));
     if (body.city !== undefined) set("city", optionalText(body.city, 120));

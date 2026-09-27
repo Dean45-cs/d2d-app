@@ -2,9 +2,13 @@
  * Rechnen mit gezeichneten Gebietsflaechen.
  *
  * Eine Flaeche ist eine einfache Liste von Eckpunkten [Breitengrad, Laengengrad].
- * Bewusst ohne Geo-Bibliothek: Gebiete sind wenige Quadratkilometer gross, da
- * genuegt eine ebene Naeherung (1 Grad Breite = 111,32 km).
+ * Gespeichert wird entweder so ein Ring oder - sobald vergebene Gebiete
+ * ausgespart wurden - eine Form aus mehreren Flaechen mit Loechern (shape.ts).
+ * Gebiete sind wenige Quadratkilometer gross, da genuegt eine ebene Naeherung
+ * (1 Grad Breite = 111,32 km).
  */
+
+import type { Shape } from "./shape";
 
 export type LatLng = [number, number];
 
@@ -12,7 +16,10 @@ export const METERS_PER_DEGREE = 111_320;
 
 /** Groesstes Gebiet, das sinnvoll an einem Stueck abgearbeitet wird. */
 export const MAX_AREA_SQKM = 25;
-export const MAX_POINTS = 80;
+/** Eckpunkte einer Flaeche, alle Ringe zusammen. Ausgesparte Nachbarn bringen ihre Ecken mit. */
+export const MAX_POINTS = 1500;
+/** Teile einer Form - mehr zerfallen Gebiete auch beim Aussparen nicht. */
+const MAX_PARTS = 40;
 
 export function isLatLng(value: unknown): value is LatLng {
   return (
@@ -27,26 +34,70 @@ export function isLatLng(value: unknown): value is LatLng {
   );
 }
 
-/** Liest eine Flaeche aus JSON/HTTP-Daten und wirft bei Unsinn. */
-export function parseArea(value: unknown): LatLng[] {
+/**
+ * Liest eine Flaeche aus JSON/HTTP-Daten und wirft bei Unsinn.
+ * Angenommen wird ein einzelner Ring (so wurde frueher gespeichert) oder eine
+ * Form [[Aussenring, ...Loecher], ...].
+ */
+export function parseShape(value: unknown): Shape {
   const raw = typeof value === "string" ? safeJson(value) : value;
-  if (!Array.isArray(raw)) throw new Error("Bitte zuerst ein Gebiet auf der Karte markieren.");
-  const points = raw.filter(isLatLng).map(([lat, lng]) => [round6(lat), round6(lng)] as LatLng);
-  if (points.length !== raw.length) throw new Error("Die Gebietsfläche ist fehlerhaft.");
-  if (points.length < 3) throw new Error("Ein Gebiet braucht mindestens drei Eckpunkte.");
-  if (points.length > MAX_POINTS) {
+  if (!Array.isArray(raw) || raw.length === 0) {
+    throw new Error("Bitte zuerst ein Gebiet auf der Karte markieren.");
+  }
+  const shape: Shape = isLatLng(raw[0])
+    ? [[parseRing(raw)]]
+    : raw.map((polygon) => {
+        if (!Array.isArray(polygon) || polygon.length === 0) {
+          throw new Error("Die Gebietsfläche ist fehlerhaft.");
+        }
+        return polygon.map(parseRing);
+      });
+  if (shape.length > MAX_PARTS) throw new Error("Die Fläche zerfällt in zu viele Teile.");
+  const corners = shape.reduce(
+    (sum, polygon) => sum + polygon.reduce((inner, ring) => inner + ring.length, 0),
+    0,
+  );
+  if (corners > MAX_POINTS) {
     throw new Error(`Die Fläche hat zu viele Eckpunkte (max. ${MAX_POINTS}).`);
   }
+  return shape;
+}
+
+function parseRing(value: unknown): LatLng[] {
+  if (!Array.isArray(value)) throw new Error("Die Gebietsfläche ist fehlerhaft.");
+  const points = value.filter(isLatLng).map(([lat, lng]) => [round6(lat), round6(lng)] as LatLng);
+  if (points.length !== value.length) throw new Error("Die Gebietsfläche ist fehlerhaft.");
+  if (points.length < 3) throw new Error("Ein Gebiet braucht mindestens drei Eckpunkte.");
   return points;
 }
 
-/** Wie parseArea, liefert aber null statt eines Fehlers (z. B. fuer gespeicherte Werte). */
-export function readArea(value: unknown): LatLng[] | null {
+/** Wie parseShape, liefert aber null statt eines Fehlers (z. B. fuer gespeicherte Werte). */
+export function readShape(value: unknown): Shape | null {
   try {
-    return value ? parseArea(value) : null;
+    return value ? parseShape(value) : null;
   } catch {
     return null;
   }
+}
+
+/**
+ * Nur der Umriss des groessten Teils - genug fuer alles, was bloss wissen
+ * will, wo ein Gebiet ungefaehr liegt (Mitte, Grundversorger, Startausschnitt).
+ */
+export function readArea(value: unknown): LatLng[] | null {
+  const shape = readShape(value);
+  if (!shape) return null;
+  let best: LatLng[] | null = null;
+  for (const [outer] of shape) {
+    if (outer && (!best || areaSqKm(outer) > areaSqKm(best))) best = outer;
+  }
+  return best;
+}
+
+/** Zum Speichern: ein schlichter Ring bleibt ein Ring, alles andere eine Form. */
+export function shapeToJson(shape: Shape): string {
+  if (shape.length === 0) return "";
+  return JSON.stringify(shape.length === 1 && shape[0].length === 1 ? shape[0][0] : shape);
 }
 
 function safeJson(value: string): unknown {
