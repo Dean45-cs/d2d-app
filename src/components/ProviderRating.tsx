@@ -1,5 +1,6 @@
 import type { PriceInfo, ProviderInfo } from "@/lib/energy/provider";
 import { PRICE_LEVELS, PRICE_SCALE, type PriceStep } from "@/lib/energy/rating";
+import Link from "next/link";
 import { euro } from "./ui";
 import { IconBolt } from "./icons";
 
@@ -73,6 +74,19 @@ function sourceNote(info: ProviderInfo): string | null {
   return null;
 }
 
+function dateLabel(value: string): string {
+  const [y, m, d] = value.slice(0, 10).split("-");
+  return d && m && y ? `${d}.${m}.${y}` : value;
+}
+
+/** Herkunft der Zahlen in einem Satz: eigene Eingabe mit Stand, Demo oder Quelle. */
+function originNote(info: ProviderInfo): string {
+  if (info.manual) {
+    return info.validFrom ? `Preisblatt, gültig ab ${dateLabel(info.validFrom)}` : "vom Preisblatt eingetragen";
+  }
+  return info.isDemo ? "Demo-Preise" : "Tagesquelle";
+}
+
 /**
  * Kompakte Zeile fuer Listen: Name, Strompreis, Bewertung.
  * `info === null` zeigt ehrlich, dass nichts bekannt ist.
@@ -98,6 +112,8 @@ export function ProviderLine({ info, className = "" }: { info: ProviderInfo | nu
             {ctLabel(price.ct)}
           </span>
         )}
+        {info.isDemo && <span className="muted"> · Demo</span>}
+        {info.stale && <span className="font-semibold text-gas-600"> · prüfen</span>}
       </span>
       {price && <PriceBadge step={price.step} size="sm" />}
     </div>
@@ -105,6 +121,7 @@ export function ProviderLine({ info, className = "" }: { info: ProviderInfo | nu
 }
 
 function PriceRow({ label, price }: { label: string; price: PriceInfo | null }) {
+  const basis = price?.basis === "average" ? "ggü. Bundesschnitt" : "ggü. Median";
   if (!price) {
     return (
       <div className="flex items-center justify-between gap-3 py-2">
@@ -128,7 +145,7 @@ function PriceRow({ label, price }: { label: string; price: PriceInfo | null }) 
           style={{ color: price.delta > 0 ? "var(--signal-600)" : "var(--energy-600)" }}
         >
           {price.delta > 0 ? "+" : ""}
-          {euro(price.delta)} ggü. Median
+          {euro(price.delta)} {basis}
         </span>
       </div>
     </div>
@@ -143,10 +160,13 @@ export function ProviderCard({
   info,
   title = "Grundversorger",
   className = "",
+  editHref,
 }: {
   info: ProviderInfo | null;
   title?: string;
   className?: string;
+  /** Nur fuer die Teamleitung: Link zum Eintragen echter Preise */
+  editHref?: string;
 }) {
   const lead = info?.strom ?? info?.gas ?? null;
   const note = info ? sourceNote(info) : null;
@@ -179,8 +199,15 @@ export function ProviderCard({
           </p>
           {info ? (
             <p className="muted text-[12px]">
-              {note ?? `${info.plz} ${info.city}`}
-              {info.isDemo && " · Demo-Preise"}
+              {note ?? `${info.plz} ${info.city}`} · {originNote(info)}
+              {info.manual && info.sourceUrl && (
+                <>
+                  {" · "}
+                  <a href={info.sourceUrl} target="_blank" rel="noreferrer" className="font-semibold text-brand-600">
+                    Preisblatt
+                  </a>
+                </>
+              )}
             </p>
           ) : (
             <p className="muted text-[12px]">
@@ -203,7 +230,7 @@ export function ProviderCard({
       {info && (
         <div className="divide-y divide-[var(--line)] px-4 pb-1">
           <PriceRow label="Strom" price={info.strom} />
-          <PriceRow label="Gas" price={info.gas} />
+          <PriceRow label={info.gasProvider ? `Gas · ${info.gasProvider}` : "Gas"} price={info.gas} />
         </div>
       )}
       {lead && (
@@ -211,8 +238,21 @@ export function ProviderCard({
           className="border-t px-4 py-2.5 text-[12px] font-medium"
           style={{ borderColor: "var(--line)", color: inkOf(lead.step) }}
         >
-          {PRICE_LEVELS[lead.step].pitch}
+          {info?.isDemo ? "Beispielwerte – noch kein Verkaufsargument" : PRICE_LEVELS[lead.step].pitch}
         </p>
+      )}
+      {info?.stale && (
+        <p className="border-t px-4 py-2 text-[12px] font-semibold text-gas-600 [border-color:var(--line)]">
+          Preis ist älter als ein halbes Jahr – bitte mit dem aktuellen Preisblatt prüfen.
+        </p>
+      )}
+      {editHref && (!info || !info.manual || info.match === "nearby" || info.match === "region") && (
+        <Link
+          href={editHref}
+          className="block border-t px-4 py-2.5 text-[12px] font-semibold text-brand-600 [border-color:var(--line)]"
+        >
+          {info?.manual ? "Preis für diesen Ort eintragen →" : "Echten Preis vom Preisblatt eintragen →"}
+        </Link>
       )}
     </section>
   );

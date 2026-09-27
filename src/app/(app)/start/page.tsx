@@ -40,7 +40,7 @@ export default async function StartPage() {
   const unassigned = territories.filter((t) => !t.assigned_user_id);
 
   // Grundversorger je Gebiet - teuerster zuerst: dort ist das Wechselargument am staerksten.
-  const providers = providerLookup();
+  const providers = providerLookup(user.team_id);
   const providerOf = new Map<number, ProviderInfo | null>(
     territories.map((t) => [
       t.id,
@@ -95,9 +95,10 @@ export default async function StartPage() {
               <ProviderCard
                 info={providerOf.get(top.id) ?? null}
                 title={`Größtes Potenzial · ${top.name}`}
+                editHref="/einstellungen#grundversorger"
               />
             ) : (
-              <ProviderCard info={null} />
+              <ProviderCard info={null} editHref="/einstellungen#grundversorger" />
             )}
             <div className="card p-2">
               {providers.size === 0 ? (

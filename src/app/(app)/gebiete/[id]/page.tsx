@@ -53,7 +53,7 @@ export default async function TerritoryDetailPage({
   }
 
   const area = readArea(territory.area_json);
-  const provider = providerLookup().find({
+  const provider = providerLookup(user.team_id).find({
     postal_code: territory.postal_code,
     city: territory.city,
     area,
@@ -144,7 +144,11 @@ export default async function TerritoryDetailPage({
         )}
       </div>
 
-      <ProviderCard info={provider} className="mb-4" />
+      <ProviderCard
+        info={provider}
+        className="mb-4"
+        editHref={isLeader ? "/einstellungen#grundversorger" : undefined}
+      />
 
       <TerritoryAreaCard
         territoryId={territory.id}

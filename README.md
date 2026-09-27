@@ -294,8 +294,34 @@ Gebieten.
   Abstand zum Median)
 - **Klinken:** unter der Straßenauswahl, damit das Argument an der Tür parat ist
 
-Die Stufe richtet sich nach allen Orten der Preisquelle: die teuersten 20 % sind „sehr
-teuer“, die günstigsten 20 % „sehr günstig“. Zugeordnet wird über die PLZ des Gebiets,
+### Echte Preise selbst eintragen
+
+Eine kostenlose Schnittstelle mit echten Grundversorgungstarifen gibt es nicht (Anbieter
+wie ene't oder Verivox verkaufen sie als Webservice). Jeder Grundversorger muss seine
+Preise aber gut auffindbar im Internet veröffentlichen (§ 36 EnWG). Deshalb:
+
+**Einstellungen → Grundversorger-Preise** (nur Teamleitung)
+
+- „Eure Gebiete ohne echten Preis“ listet die Orte der eigenen Gebiete, für die noch
+  Demo-Werte gelten – ein Tipp auf „Preis eintragen“ füllt PLZ, Ort und einen
+  Namensvorschlag vor, zwei Links suchen das Preisblatt für Strom und Gas.
+- Eintragen: Arbeitspreis (ct/kWh) und Grundpreis (€/Monat), brutto, für Strom und/oder
+  Gas; dazu „gültig ab“ und den Link zum Preisblatt als Beleg. Ist der Gasversorger ein
+  anderer als beim Strom, eigenes Feld.
+- Eingetragene Preise gehen den Demo-Werten vor – in Übersicht, Gebieten, beim Klinken
+  und auf der Energiekarte. Sie gelten für die PLZ, den gleichen Ort und (mit Hinweis)
+  für Gebiete bis 30 km entfernt.
+- Nach einem halben Jahr erscheint „bitte prüfen“ – Grundversorger ändern ihre Preise
+  meist ein- bis zweimal im Jahr.
+
+**Bewertung eingetragener Preise:** gemessen am Bundesdurchschnitt der Grundversorgung
+(voreingestellt Stand September 2026: Strom 37,3 ct/kWh + 13,76 €/Monat, Gas 13,6 ct/kWh;
+in den Einstellungen änderbar). Ab 3 % darüber „teuer“, ab 8 % „sehr teuer“, entsprechend
+nach unten. Eine Rangfolge der eigenen Orte untereinander wäre bei wenigen Orten
+nichtssagend.
+
+Für die Werte aus der Tagesquelle (Demo oder Feed) richtet sich die Stufe nach allen Orten
+der Quelle: die teuersten 20 % sind „sehr teuer“, die günstigsten 20 % „sehr günstig“. Zugeordnet wird über die PLZ des Gebiets,
 sonst über den Ortsnamen, sonst über den nächsten bekannten Ort (bis 30 km) oder die
 PLZ-Region – dann steht dabei, aus welchem Ort der Preis stammt.
 
