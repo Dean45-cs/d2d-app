@@ -5,7 +5,7 @@ import { useState } from "react";
 import { EmptyState, Note, plural } from "@/components/ui";
 import { IconInfo, IconMap } from "@/components/icons";
 import { AreaPicker } from "../AreaPicker";
-import { centerOf, type LatLng } from "@/lib/geo/area";
+import { labelPoint, type Shape } from "@/lib/geo/shape";
 import {
   TerritoryWorkspace,
   type HourBucket,
@@ -15,12 +15,12 @@ import {
 
 interface Props {
   territoryId: number;
-  area: LatLng[] | null;
+  area: Shape | null;
   doors: WorkDoor[];
   streets: WorkStreet[];
   hours: HourBucket[];
   isLeader: boolean;
-  otherAreas: Array<{ id: number; name: string; area: LatLng[] }>;
+  otherAreas: Array<{ id: number; name: string; area: Shape }>;
 }
 
 /**
@@ -37,10 +37,10 @@ export function TerritoryAreaCard({
   otherAreas,
 }: Props) {
   const router = useRouter();
-  const center = area ? centerOf(area) : null;
+  const center = area ? (labelPoint(area)?.point ?? null) : null;
   const start = center ? { lat: center[0], lng: center[1], zoom: 15 } : null;
   const [editing, setEditing] = useState(false);
-  const [draft, setDraft] = useState<LatLng[] | null>(null);
+  const [draft, setDraft] = useState<Shape | null>(null);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -154,16 +154,13 @@ export function TerritoryAreaCard({
         <div className="space-y-3">
           <Note icon={<IconInfo className="h-4 w-4" />}>
             {area
-              ? "Neue Fläche zeichnen – die bisherige liegt gestrichelt darunter und wird ersetzt."
-              : "Fläche für dieses Gebiet abstecken."}
+              ? "Neue Fläche zeichnen – die bisherige liegt gestrichelt darunter und wird ersetzt. Nachbargebiete werden ausgespart."
+              : "Fläche für dieses Gebiet abstecken. Nachbargebiete werden ausgespart."}
           </Note>
           <AreaPicker
             onAreaChange={setDraft}
-            existing={
-              area
-                ? [...otherAreas, { id: territoryId, name: "bisherige Fläche", area }]
-                : otherAreas
-            }
+            existing={otherAreas}
+            previous={area}
             start={start ?? undefined}
           />
           <button

@@ -1,6 +1,7 @@
 import { requireRole } from "@/lib/auth";
-import { createTerritories, type TerritoryDraft } from "@/lib/queries";
-import { parseArea } from "@/lib/geo/area";
+import { createTerritories, freeArea, type TerritoryDraft } from "@/lib/queries";
+import { parseShape, shapeToJson } from "@/lib/geo/area";
+import type { Shape } from "@/lib/geo/shape";
 import { MAX_PLOTS } from "@/lib/geo/split";
 import {
   handle,
@@ -38,6 +39,9 @@ export async function POST(request: Request) {
       .all(leader.team_id) as Array<{ id: number }>;
     const memberIds = new Set(members.map((m) => m.id));
 
+    // Die Teilgebiete teilen sich die Flaeche lueckenlos - keines darf in ein
+    // anderes oder in ein schon vergebenes Gebiet ragen.
+    const claimed: Shape[] = [];
     const drafts: TerritoryDraft[] = groups.map((group: Record<string, unknown>, index: number) => {
       const assignedUserId = optionalNumber(group.assignedUserId);
       if (assignedUserId !== null && !memberIds.has(assignedUserId)) {
@@ -47,6 +51,10 @@ export async function POST(request: Request) {
       if (streets.length === 0) {
         throw new Error(`Teilgebiet ${index + 1} enthält keine Straßen.`);
       }
+      const area = group.area
+        ? freeArea(leader.team_id, parseShape(group.area), { avoid: claimed })
+        : null;
+      if (area) claimed.push(area);
       return {
         name: requireText(group.name, `Name von Teilgebiet ${index + 1}`, 120),
         city,
@@ -54,7 +62,7 @@ export async function POST(request: Request) {
         assignedUserId,
         note,
         dueDate,
-        areaJson: group.area ? JSON.stringify(parseArea(group.area)) : "",
+        areaJson: area ? shapeToJson(area) : "",
         streets,
       };
     });

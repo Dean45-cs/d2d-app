@@ -1,6 +1,6 @@
 import { requireRole } from "@/lib/auth";
-import { addStreetEntries, addStreets, createTerritory } from "@/lib/queries";
-import { parseArea } from "@/lib/geo/area";
+import { addStreetEntries, addStreets, createTerritory, freeArea } from "@/lib/queries";
+import { parseShape, shapeToJson } from "@/lib/geo/area";
 import {
   handle,
   optionalNumber,
@@ -18,7 +18,8 @@ export async function POST(request: Request) {
 
     // Die Flaeche kommt aus der Kartenauswahl und ist optional: Gebiete lassen
     // sich weiterhin allein ueber die eingefuegte Strassenliste anlegen.
-    const area = body.area ? parseArea(body.area) : null;
+    // Schon vergebene Gebiete werden ausgespart.
+    const area = body.area ? freeArea(leader.team_id, parseShape(body.area)) : null;
 
     const id = createTerritory({
       teamId: leader.team_id,
@@ -28,7 +29,7 @@ export async function POST(request: Request) {
       assignedUserId: optionalNumber(body.assignedUserId),
       note: optionalText(body.note),
       dueDate: optionalText(body.dueDate, 10) || null,
-      areaJson: area ? JSON.stringify(area) : "",
+      areaJson: area ? shapeToJson(area) : "",
     });
 
     const fromMap = parseStreetList(body.streetList);

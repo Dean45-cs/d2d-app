@@ -14,8 +14,8 @@ import { Sheet } from "@/components/Sheet";
 import { GroupLabel, Note, Segmented } from "@/components/ui";
 import { plotColor } from "@/components/map-colors";
 import type { User } from "@/lib/types";
-import { centerOf, type LatLng } from "@/lib/geo/area";
-import { outlineOf, splitStreets } from "@/lib/geo/split";
+import { labelPoint, type Shape } from "@/lib/geo/shape";
+import { plotAreas, splitStreets } from "@/lib/geo/split";
 import { AreaPicker, type ExistingArea, type OverlayPlot, type OverlayStreet } from "./AreaPicker";
 import {
   StreetResult,
@@ -59,7 +59,7 @@ export function NewTerritoryButton({
   const [error, setError] = useState<string | null>(null);
 
   // Kartenauswahl
-  const [area, setArea] = useState<LatLng[] | null>(null);
+  const [area, setArea] = useState<Shape | null>(null);
   const [loadingStreets, setLoadingStreets] = useState(false);
   const [result, setResult] = useState<StreetResponse | null>(null);
   const [chosen, setChosen] = useState<Set<string>>(new Set());
@@ -174,17 +174,22 @@ export function NewTerritoryButton({
     [result, chosen, plotOf],
   );
 
-  const overlayPlots: OverlayPlot[] = useMemo(
-    () =>
-      plots
-        .map((plot) => ({
-          label: plot.label,
-          color: plot.color,
-          area: outlineOf(plot.streets.flatMap(pointsOf)),
-        }))
-        .filter((plot) => plot.area.length >= 3),
-    [plots],
-  );
+  // Die Teilgebiete teilen sich die Flaeche lueckenlos und ueberschneiden sich nicht.
+  const overlayPlots: OverlayPlot[] = useMemo(() => {
+    if (!area || plots.length === 0) return [];
+    const shapes = plotAreas(
+      area,
+      plots.map((plot) =>
+        plot.streets.flatMap((street) => {
+          // Ohne Hausnummern mit Lage zaehlt die Mitte der Strasse.
+          const houses = pointsOf(street);
+          if (houses.length > 0 || street.lat === null || street.lng === null) return houses;
+          return [[street.lat, street.lng] as [number, number]];
+        }),
+      ),
+    );
+    return plots.map((plot, index) => ({ label: plot.label, color: plot.color, area: shapes[index] }));
+  }, [area, plots]);
 
   /* ------------------------------ Schritte ------------------------------- */
 
@@ -257,7 +262,7 @@ export function NewTerritoryButton({
                 groups: plots.map((plot, index) => ({
                   name: `${form.name} (${plot.label}/${plots.length})`,
                   assignedUserId: assignees[index] ? Number(assignees[index]) : null,
-                  area: overlayPlots[index]?.area ?? area,
+                  area: overlayPlots[index]?.area.length ? overlayPlots[index].area : null,
                   streetList: plot.streets,
                 })),
               }),
@@ -294,7 +299,7 @@ export function NewTerritoryButton({
   }
 
   // Die Karte startet beim zuletzt angelegten Gebiet - Teams arbeiten in einer Region.
-  const start = existingAreas.length > 0 ? centerOf(existingAreas[0].area) : null;
+  const start = existingAreas.length > 0 ? (labelPoint(existingAreas[0].area)?.point ?? null) : null;
 
   const stepTitle =
     step === 1

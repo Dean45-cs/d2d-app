@@ -4,9 +4,11 @@ import type {
   MapEngine,
   MapLayer,
   MapStart,
+  MarkerHandle,
   MarkerOptions,
   ShapeOptions,
 } from "./types";
+import { ringsOf } from "./types";
 
 /*
  * Apple Karten ueber MapKit JS.
@@ -297,7 +299,10 @@ export function createMapKitEngine(
       },
 
       polygon(points, options) {
-        const item = new mapkit.PolygonOverlay([points.map(coordinate)], {
+        const rings = ringsOf(points).filter((ring) => ring.length >= 3);
+        if (rings.length === 0) return;
+        // Mehrere Ringe: MapKit fuellt nach der Gerade-Ungerade-Regel, Loecher bleiben frei.
+        const item = new mapkit.PolygonOverlay(rings.map((ring) => ring.map(coordinate)), {
           style: style(options, true),
           enabled: Boolean(options.onClick),
           data: { onClick: options.onClick },
@@ -340,8 +345,14 @@ export function createMapKitEngine(
         addOverlay(circle.overlay);
       },
 
-      marker(point, options) {
-        addAnnotation(annotation(point, options.element, options.size[1], options));
+      marker(point, options): MarkerHandle {
+        const item = annotation(point, options.element, options.size[1], options);
+        addAnnotation(item);
+        return {
+          setVisible(visible) {
+            item.visible = visible;
+          },
+        };
       },
     };
   }
@@ -386,6 +397,16 @@ export function createMapKitEngine(
     },
     onTap(handler) {
       tapHandler = handler;
+    },
+    project([lat, lng]) {
+      const point = map.convertCoordinateToPointOnPage(new mapkit.Coordinate(lat, lng));
+      return [point.x, point.y];
+    },
+    onViewChange(handler) {
+      map.addEventListener("region-change-end", handler);
+      return () => {
+        if (!destroyed) map.removeEventListener("region-change-end", handler);
+      };
     },
     setMapType(type) {
       map.mapType = type === "hybrid" ? MapTypes.Hybrid : (MapTypes.MutedStandard ?? MapTypes.Standard);

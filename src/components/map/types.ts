@@ -22,12 +22,26 @@ export interface MapAction {
   external?: boolean;
 }
 
+/** Ein einfacher Ring oder Aussenring samt Loechern ([aussen, loch, loch, ...]). */
+export type PolygonPoints = LatLng[] | LatLng[][];
+
+/** Macht aus beiden Schreibweisen eine Liste von Ringen. */
+export function ringsOf(points: PolygonPoints): LatLng[][] {
+  if (points.length === 0) return [];
+  return typeof points[0][0] === "number" ? [points as LatLng[]] : (points as LatLng[][]);
+}
+
 export interface ShapeOptions {
   color: string;
   /** Linienbreite in Pixeln */
   weight?: number;
   fillOpacity?: number;
   dashed?: boolean;
+  /**
+   * Rand ganz nach innen legen. Stossen zwei Gebiete aneinander, liegen ihre
+   * Raender dann nebeneinander statt uebereinander (nur OpenFreeMap).
+   */
+  inset?: boolean;
   /** Tipp auf die Flaeche */
   onClick?: () => void;
   /** Sprechblase (nur OSM; bei Apple uebernimmt das ein Schild in der Flaeche) */
@@ -63,12 +77,17 @@ export interface MarkerOptions {
   priority?: number;
 }
 
+export interface MarkerHandle {
+  /** Ein- und ausblenden, ohne den Marker neu zu bauen (z. B. wenn Schilder sich decken). */
+  setVisible(visible: boolean): void;
+}
+
 export interface MapLayer {
   clear(): void;
-  polygon(points: LatLng[], options: ShapeOptions): void;
+  polygon(points: PolygonPoints, options: ShapeOptions): void;
   line(points: LatLng[], options: ShapeOptions): void;
   dot(point: LatLng, options: DotOptions): void;
-  marker(point: LatLng, options: MarkerOptions): void;
+  marker(point: LatLng, options: MarkerOptions): MarkerHandle;
 }
 
 export interface FitOptions {
@@ -91,6 +110,13 @@ export interface MapEngine {
   zoomBy(delta: number): void;
   /** Tipp auf eine freie Stelle der Karte */
   onTap(handler: ((point: LatLng) => void) | null): void;
+  /**
+   * Bildschirmposition eines Punkts in Pixeln. Der Nullpunkt ist je Anbieter
+   * verschieden - taugt also fuer Abstaende, nicht fuer absolute Lagen.
+   */
+  project(point: LatLng): [number, number];
+  /** Meldet das Ende jeder Bewegung (Zoomen, Schieben). Liefert die Abmeldung. */
+  onViewChange(handler: () => void): () => void;
   setMapType(type: MapType): void;
   setDark(dark: boolean): void;
   resize(): void;

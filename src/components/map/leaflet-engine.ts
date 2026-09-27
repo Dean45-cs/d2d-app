@@ -1,4 +1,5 @@
 import type { LatLng, MapEngine, MapLayer, MapStart } from "./types";
+import { ringsOf } from "./types";
 
 /**
  * Rueckfall auf OpenStreetMap-Kacheln (Leaflet), solange Apple Karten nicht
@@ -47,7 +48,9 @@ export function createLeafletEngine(
       clear: () => group.clearLayers(),
 
       polygon(points, options) {
-        const shape = L.polygon(points, {
+        const rings = ringsOf(points).filter((ring) => ring.length >= 3);
+        if (rings.length === 0) return;
+        const shape = L.polygon(rings, {
           color: options.color,
           weight: options.weight ?? 2,
           fillOpacity: options.fillOpacity ?? 0.16,
@@ -132,6 +135,19 @@ export function createLeafletEngine(
           });
         }
         marker.addTo(group);
+        let visible = true;
+        const apply = () => {
+          const node = marker.getElement();
+          if (node) node.style.visibility = visible ? "" : "hidden";
+        };
+        // Leaflet baut das Element beim Wiedereinhaengen neu - dann erneut anwenden.
+        marker.on("add", apply);
+        return {
+          setVisible(next) {
+            visible = next;
+            apply();
+          },
+        };
       },
     };
   }
@@ -157,6 +173,16 @@ export function createLeafletEngine(
     zoomBy: (delta) => map.setZoom(map.getZoom() + delta),
     onTap(handler) {
       tapHandler = handler;
+    },
+    project(point) {
+      const { x, y } = map.latLngToContainerPoint(point);
+      return [x, y];
+    },
+    onViewChange(handler) {
+      map.on("moveend", handler);
+      return () => {
+        map.off("moveend", handler);
+      };
     },
     setMapType() {
       // Ohne eigenen Satelliten-Dienst gibt es nur die Kartenansicht.
