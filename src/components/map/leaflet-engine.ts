@@ -75,7 +75,7 @@ export function createLeafletEngine(
       },
 
       dot(point, options) {
-        const interactive = Boolean(options.onClick || options.title);
+        const interactive = Boolean(options.onClick || options.title || options.actions);
         const dot = L.circleMarker(point, {
           radius: options.radius,
           stroke: Boolean(options.ring),
@@ -86,8 +86,23 @@ export function createLeafletEngine(
           interactive,
           bubblingMouseEvents: !options.onClick,
         });
-        const text = tooltip(options.title, options.subtitle);
-        if (text) dot.bindTooltip(text, { direction: "top" });
+        const text = tooltip(options.title, options.subtitle?.replace(/\n/g, " · "));
+        if (options.actions?.length) {
+          // Mit Knoepfen: Sprechblase zum Antippen statt Hover-Hinweis.
+          const links = options.actions
+            .map(
+              (action) =>
+                `<a href="${escapeHtml(action.href)}" class="${action.primary ? "is-primary" : ""}"` +
+                `${action.external ? ' target="_blank" rel="noreferrer"' : ""}>${escapeHtml(action.label)}</a>`,
+            )
+            .join("");
+          dot.bindPopup(
+            `<div class="map-popup-body">${text ?? ""}<div class="map-popup-actions">${links}</div></div>`,
+            { closeButton: false },
+          );
+        } else if (text) {
+          dot.bindTooltip(text, { direction: "top" });
+        }
         if (options.onClick) dot.on("click", options.onClick);
         dot.addTo(group);
       },

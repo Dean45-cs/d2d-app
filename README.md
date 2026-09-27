@@ -206,10 +206,33 @@ lässt sich nicht halbieren. Angestrebt sind höchstens 12 % Unterschied.
 - Auf jeder Karte schaltet der Ebenen-Knopf zwischen Karte und **Satellit** um (nur mit
   Apple Karten); der Rahmen-Knopf holt alle Gebiete zurück ins Bild.
 
-### Karten: Apple Karten einrichten
+### Die Arbeitskarte im Gebiet
 
-Alle Karten der App laufen über **Apple Karten (MapKit JS)**. Dafür braucht es ein
-Apple-Developer-Konto (das gleiche wie für den App Store):
+Die Gebietsseite ist das Werkzeug für unterwegs:
+
+- **Jede Tür als Punkt**, eingefärbt nach Stand: blau = noch nicht besucht, orange =
+  nochmal versuchen, lila = Termin, grün = Abschluss, grau = erledigt, rot = gesperrt.
+  Die Filter über der Karte blenden den Rest aus (Standard: nur offene Türen).
+- **Eigener Standort** als blauer Punkt mit Genauigkeitskreis (Pfeil-Knopf auf jeder Karte).
+- **Nächste offene Tür** ab dem eigenen Standort, mit „Hier klingeln“ und „Route“.
+- **Laufroute planen:** eine günstige Reihenfolge durch alle offenen Türen, ab dem
+  eigenen Standort (sonst ab dem Rand des Gebiets), mit Strecke und geschätzter Dauer
+  (4,5 km/h plus 1,5 Minuten je Tür). Die Reihenfolge entsteht auf dem Gerät – ohne
+  Routing-Dienst, auch ohne Netz.
+- **Tipp auf eine Tür:** Stand, Versuche, wer zuletzt da war – „Hier klingeln“ öffnet
+  Klinken direkt an diesem Haus, „Route“ die Fußgänger-Navigation in Apple Karten.
+- **Wann trifft man hier jemanden an?** Antreffquote nach Tageszeit aus den bisherigen
+  Besuchen im Gebiet (ab 15 Besuchen).
+
+### Karten: OpenFreeMap und Apple Karten
+
+Standard ist **OpenFreeMap** – eine moderne Vektorkarte (Stil „Liberty“, im Dunkelmodus
+„Dark“), kostenlos, ohne Konto und ohne Limit. Es muss nichts eingerichtet werden.
+Eigene Stile lassen sich über `NEXT_PUBLIC_MAP_STYLE_URL` und
+`NEXT_PUBLIC_MAP_STYLE_URL_DARK` eintragen.
+
+**Apple Karten (MapKit JS)** übernimmt automatisch, sobald Zugangsdaten aus einem
+Apple-Developer-Konto hinterlegt sind (99 €/Jahr, dasselbe Konto wie für den App Store):
 
 1. developer.apple.com → Certificates, IDs & Profiles → **Identifiers** → „Maps IDs“
    anlegen, dann unter **Keys** einen Schlüssel mit „MapKit JS“ erzeugen und die
@@ -220,16 +243,16 @@ Apple-Developer-Konto (das gleiche wie für den App Store):
    APPLE_MAPKIT_TEAM_ID=ABCDE12345          # Team-ID (oben rechts im Developer-Konto)
    APPLE_MAPKIT_KEY_ID=XYZ9876543           # ID des Schlüssels
    APPLE_MAPKIT_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\n…\n-----END PRIVATE KEY-----"
-   APPLE_MAPKIT_ORIGIN=https://d2d-app.fly.dev   # optional: Token nur für diese Adresse
+   APPLE_MAPKIT_ORIGIN=https://ep24-vertrieb.fly.dev   # optional: Token nur für diese Adresse
    ```
 
    Der Server stellt damit stündlich neue, kurzlebige Tokens aus; der Schlüssel verlässt
    den Server nie. Alternativ ein im Developer-Konto erzeugtes Token direkt eintragen:
    `APPLE_MAPKIT_TOKEN=eyJ…`.
 
-Solange nichts eingetragen ist – oder falls Apple das Token ablehnt –, zeigt die App
-dieselben Karten mit OpenStreetMap-Kacheln und einem kleinen Hinweis. Mit
-`MAP_PROVIDER=osm` lässt sich das auch erzwingen.
+Lehnt Apple das Token ab, springt die Karte auf OpenFreeMap zurück; kann ein Gerät keine
+Vektorkarten (kein WebGL), auf einfache OpenStreetMap-Kacheln. `MAP_PROVIDER=openfreemap`
+(oder `osm`) erzwingt eine Karte.
 
 ### Straßenliste einfügen (der klassische Weg)
 
@@ -482,7 +505,7 @@ entstehen zwei getrennte Datenbestände.
 | Styling | Tailwind CSS v4 mit eigenen Marken-Tokens |
 | Datenbank | SQLite über `better-sqlite3` – kein Datenbankserver nötig |
 | Hausnummern | eigene Tabelle je Straße, aus OpenStreetMap übernommen |
-| Karte | Apple Karten (MapKit JS), Rückfall Leaflet mit OpenStreetMap-Kacheln |
+| Karte | OpenFreeMap über MapLibre GL; Apple Karten (MapKit JS), wenn eingerichtet; Rückfall Leaflet |
 | Gebietszuschnitt | Overpass (Straßen in der Fläche), Nominatim (Ortssuche) |
 | Aufteilung | k-Means auf den Straßenmitten, danach Ausgleich nach Türen |
 | Login | Signiertes Session-Cookie (HMAC), Passwörter als scrypt-Hash |
@@ -514,7 +537,7 @@ src/
     geo/              Flächenberechnung, Aufteilung, OpenStreetMap-Abfragen
     offline-queue.ts  Puffer für Türeinträge ohne Netz
   components/         UI-Bausteine, Diagramme, Navigation
-    map/              Kartenschicht: Apple Karten (MapKit JS) und OSM-Rückfall
+    map/              Kartenschicht: OpenFreeMap (MapLibre), Apple Karten, OSM-Rückfall
 public/
   manifest.webmanifest, sw.js, offline.html, App-Icons
 docs/

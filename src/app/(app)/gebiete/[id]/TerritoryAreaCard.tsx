@@ -2,25 +2,23 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { AreaMap } from "@/components/AreaMap";
 import { EmptyState, Note, plural } from "@/components/ui";
 import { IconInfo, IconMap } from "@/components/icons";
 import { AreaPicker } from "../AreaPicker";
 import { centerOf, type LatLng } from "@/lib/geo/area";
-
-interface StreetPin {
-  name: string;
-  lat: number;
-  lng: number;
-  state: "open" | "active" | "done";
-  hint: string;
-}
+import {
+  TerritoryWorkspace,
+  type HourBucket,
+  type WorkDoor,
+  type WorkStreet,
+} from "./TerritoryWorkspace";
 
 interface Props {
   territoryId: number;
-  name: string;
   area: LatLng[] | null;
-  pins: StreetPin[];
+  doors: WorkDoor[];
+  streets: WorkStreet[];
+  hours: HourBucket[];
   isLeader: boolean;
   otherAreas: Array<{ id: number; name: string; area: LatLng[] }>;
 }
@@ -31,9 +29,10 @@ interface Props {
  */
 export function TerritoryAreaCard({
   territoryId,
-  name,
   area,
-  pins,
+  doors,
+  streets,
+  hours,
   isLeader,
   otherAreas,
 }: Props) {
@@ -116,12 +115,13 @@ export function TerritoryAreaCard({
     }
   }
 
-  if (!area && !isLeader) return null;
+  const hasMap = Boolean(area) || doors.length > 0 || streets.length > 0;
+  if (!hasMap && !isLeader) return null;
 
   return (
     <div className="card mb-4 p-5">
       <div className="section-head mb-3 flex-wrap">
-        <h2 className="section-title">Karte</h2>
+        <h2 className="section-title">Arbeitskarte</h2>
         {isLeader && (
           <div className="flex flex-wrap gap-2">
             {area && !editing && (
@@ -175,32 +175,13 @@ export function TerritoryAreaCard({
             {busy ? "Speichern …" : "Fläche speichern"}
           </button>
         </div>
-      ) : area ? (
-        <div
-          className="overflow-hidden rounded-[var(--r-md)] border"
-          style={{ borderColor: "var(--line)" }}
-        >
-          <AreaMap
-            areas={[{ id: territoryId, name, area, tone: "brand" }]}
-            pins={pins.map((p) => ({
-              lat: p.lat,
-              lng: p.lng,
-              label: p.name,
-              hint: p.hint,
-              state: p.state,
-            }))}
-            legend={
-              pins.length > 0
-                ? [
-                    { color: "var(--ink-muted)", label: "offen" },
-                    { color: "var(--brand-600)", label: "in Arbeit" },
-                    { color: "var(--energy-600)", label: "fertig" },
-                  ]
-                : undefined
-            }
-            className="h-[40vh] min-h-[240px] w-full"
-          />
-        </div>
+      ) : hasMap ? (
+        <TerritoryWorkspace
+          area={area}
+          doors={doors}
+          streets={streets}
+          hours={hours}
+        />
       ) : (
         <EmptyState
           bare

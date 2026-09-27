@@ -8,10 +8,19 @@
  */
 
 export type LatLng = [number, number];
-export type MapProvider = "apple" | "osm";
+export type MapProvider = "apple" | "openfreemap" | "osm";
 
 /** "standard" = Karte, "hybrid" = Satellit mit Strassennamen */
 export type MapType = "standard" | "hybrid";
+
+/** Knopf in der Sprechblase, z. B. "Hier klingeln" oder "Route". */
+export interface MapAction {
+  label: string;
+  href: string;
+  primary?: boolean;
+  /** In neuem Fenster / in der Karten-App oeffnen */
+  external?: boolean;
+}
 
 export interface ShapeOptions {
   color: string;
@@ -35,6 +44,8 @@ export interface DotOptions {
   ring?: boolean;
   title?: string;
   subtitle?: string;
+  /** Knoepfe in der Sprechblase (nicht bei Apple Karten) */
+  actions?: MapAction[];
   onClick?: () => void;
 }
 

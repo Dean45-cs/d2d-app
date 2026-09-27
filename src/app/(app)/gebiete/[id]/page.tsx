@@ -1,5 +1,7 @@
 import { notFound } from "next/navigation";
 import { requireUser } from "@/lib/auth";
+import { getDb } from "@/lib/db";
+import { doorStatus } from "@/lib/doors";
 import {
   getTerritory,
   listMembers,
@@ -7,6 +9,7 @@ import {
   listHouseNumbers,
   listTerritories,
   listVisits,
+  type HouseNumberWithStats,
   type StreetWithStats,
 } from "@/lib/queries";
 import { readArea } from "@/lib/geo/area";
@@ -26,6 +29,7 @@ import { sqlDateTime } from "@/lib/format";
 import { ShowMore } from "@/components/ShowMore";
 import { TerritoryControls } from "./TerritoryControls";
 import { TerritoryAreaCard } from "./TerritoryAreaCard";
+import type { DoorState, HourBucket, WorkDoor, WorkStreet } from "./TerritoryWorkspace";
 import { StreetList } from "./StreetList";
 
 export const dynamic = "force-dynamic";
@@ -68,11 +72,37 @@ export default async function TerritoryDetailPage({
       })
     : [];
 
-  // Jede Strasse wird auf der Karte nach ihrem Stand eingefaerbt.
-  const pins = streets.flatMap((street) =>
-    street.lat !== null && street.lng !== null
+  // Jede Hausnummer mit Lage wird eine Tuer auf der Arbeitskarte.
+  const streetName = new Map(streets.map((street) => [street.id, street.name]));
+  const doors: WorkDoor[] = houseNumbers.flatMap((house) =>
+    house.lat !== null && house.lng !== null
       ? [
           {
+            id: house.id,
+            streetId: house.street_id,
+            street: streetName.get(house.street_id) ?? "",
+            number: house.number,
+            lat: house.lat,
+            lng: house.lng,
+            state: houseState(house),
+            units: house.units,
+            attempts: house.not_home_count,
+            bells: house.bell_count,
+            bellsDone: house.bell_done_count,
+            lastAt: house.last_visit_at,
+            lastBy: house.last_visit_user,
+          },
+        ]
+      : [],
+  );
+
+  // Strassen ohne Hausnummern mit Lage erscheinen als ein Punkt je Strasse.
+  const withDoors = new Set(doors.map((door) => door.streetId));
+  const workStreets: WorkStreet[] = streets.flatMap((street) =>
+    street.lat !== null && street.lng !== null && !withDoors.has(street.id)
+      ? [
+          {
+            id: street.id,
             name: street.name,
             lat: street.lat,
             lng: street.lng,
@@ -90,6 +120,8 @@ export default async function TerritoryDetailPage({
         ]
       : [],
   );
+
+  const hours = hourBuckets(territory.id);
 
   return (
     <div className="mx-auto max-w-4xl">
@@ -147,9 +179,10 @@ export default async function TerritoryDetailPage({
 
       <TerritoryAreaCard
         territoryId={territory.id}
-        name={territory.name}
         area={area}
-        pins={pins}
+        doors={doors}
+        streets={workStreets}
+        hours={hours}
         isLeader={isLeader}
         otherAreas={otherAreas}
       />
@@ -231,6 +264,56 @@ function Metric({
       </p>
     </div>
   );
+}
+
+/** Stand einer Hausnummer fuer die Karte - Abschluss und Termin zuerst. */
+function houseState(house: HouseNumberWithStats): DoorState {
+  if (house.blocked_at) return "blocked";
+  if (house.sale_count > 0) return "sale";
+  if (house.last_outcome === "APPOINTMENT") return "appointment";
+  if (house.bell_count > 0) {
+    // Mehrfamilienhaus: fertig, wenn jede Klingel durch ist.
+    if (house.bell_done_count >= house.bell_count) return "done";
+    return house.visit_count > 0 ? "retry" : "open";
+  }
+  const status = doorStatus({
+    blocked_at: house.blocked_at,
+    not_home_count: house.not_home_count,
+    met_count: house.met_count,
+  });
+  return status === "OPEN" ? "open" : status === "RETRY" ? "retry" : "done";
+}
+
+/**
+ * Antreffquote nach Tageszeit (deutsche Uhrzeit). Gespeichert wird in UTC,
+ * die Server-Uhr kann woanders stehen - deshalb die feste Zeitzone.
+ */
+function hourBuckets(territoryId: number): HourBucket[] {
+  const rows = getDb()
+    .prepare("SELECT created_at, outcome FROM visits WHERE territory_id = ?")
+    .all(territoryId) as Array<{ created_at: string; outcome: string }>;
+  const buckets: Array<HourBucket & { from: number; to: number }> = [
+    { label: "9–12", from: 9, to: 12, total: 0, met: 0 },
+    { label: "12–15", from: 12, to: 15, total: 0, met: 0 },
+    { label: "15–18", from: 15, to: 18, total: 0, met: 0 },
+    { label: "18–21", from: 18, to: 21, total: 0, met: 0 },
+  ];
+  const hourOf = new Intl.DateTimeFormat("de-DE", {
+    hour: "numeric",
+    hourCycle: "h23",
+    timeZone: "Europe/Berlin",
+  });
+  for (const row of rows) {
+    const date = new Date(`${row.created_at.replace(" ", "T")}Z`);
+    if (Number.isNaN(date.getTime())) continue;
+    // formatToParts statt format: auf Deutsch hiesse es sonst "10 Uhr".
+    const hour = Number(hourOf.formatToParts(date).find((part) => part.type === "hour")?.value);
+    const bucket = buckets.find((b) => hour >= b.from && hour < b.to);
+    if (!bucket) continue;
+    bucket.total++;
+    if (row.outcome !== "NOT_HOME") bucket.met++;
+  }
+  return buckets.map(({ label, total, met }) => ({ label, total, met }));
 }
 
 /** Fertig, sobald die Strasse abgehakt oder rechnerisch durchgearbeitet ist. */

@@ -76,3 +76,15 @@ export function priceMarker(color: string, diameter: number, selected: boolean) 
     },
   };
 }
+
+/** Der eigene Standort: blauer Punkt mit weissem Rand und sanftem Puls. */
+export function userMarker() {
+  return {
+    size: [22, 22] as [number, number],
+    element: () => {
+      const wrap = el("span", "map-me");
+      wrap.appendChild(el("span", "map-me-dot"));
+      return wrap;
+    },
+  };
+}

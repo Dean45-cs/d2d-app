@@ -1,8 +1,10 @@
 "use client";
 
 import "leaflet/dist/leaflet.css";
+import "maplibre-gl/dist/maplibre-gl.css";
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { IconFit, IconLayers, IconMinus, IconPlus } from "@/components/icons";
+import { circleToArea } from "@/lib/geo/area";
+import { IconFit, IconLayers, IconMinus, IconNavigate, IconPlus } from "@/components/icons";
 import { useMapConfig } from "./MapConfig";
 import { createLeafletEngine, loadLeaflet } from "./leaflet-engine";
 import {
@@ -11,7 +13,23 @@ import {
   mapKitFailure,
   onMapKitFailure,
 } from "./mapkit-engine";
-import { GERMANY, type MapEngine, type MapProvider, type MapStart, type MapType } from "./types";
+import { createMapLibreEngine, loadMapLibre } from "./maplibre-engine";
+import { userMarker } from "./markers";
+import {
+  GERMANY,
+  type LatLng,
+  type MapEngine,
+  type MapLayer,
+  type MapProvider,
+  type MapStart,
+  type MapType,
+} from "./types";
+
+/** Eigener Standort samt Genauigkeit in Metern. */
+export interface UserLocation {
+  point: LatLng;
+  accuracy: number;
+}
 
 interface Props {
   start?: MapStart;
@@ -25,6 +43,10 @@ interface Props {
   controls?: boolean;
   /** Eigene Bedienelemente, die ueber der Karte liegen */
   children?: ReactNode;
+  /** Standort gleich beim Oeffnen verfolgen (fragt nach der Freigabe). */
+  autoLocate?: boolean;
+  /** Meldet jede neue Position. */
+  onLocation?: (location: UserLocation | null) => void;
 }
 
 const TYPE_KEY = "d2d.mapType";
@@ -63,6 +85,8 @@ export function MapView({
   onFit,
   controls = true,
   children,
+  autoLocate = false,
+  onLocation,
 }: Props) {
   const config = useMapConfig();
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -73,19 +97,23 @@ export function MapView({
   startRef.current = start;
 
   const [provider, setProvider] = useState<MapProvider>(() =>
-    config.provider === "apple" && !mapKitFailure() ? "apple" : "osm",
+    config.provider === "apple"
+      ? mapKitFailure()
+        ? "openfreemap"
+        : "apple"
+      : config.provider,
   );
   const [engine, setEngine] = useState<MapEngine | null>(null);
   const [mapType, setMapType] = useState<MapType>("standard");
   const [fallbackNote, setFallbackNote] = useState<string | null>(null);
 
   // Faellt Apple Karten aus (Token abgelehnt, nicht erreichbar), wechselt die
-  // Karte still auf OpenStreetMap - arbeiten laesst sich trotzdem.
+  // Karte still auf OpenFreeMap - arbeiten laesst sich trotzdem.
   useEffect(() => {
     if (provider !== "apple") return;
     return onMapKitFailure((message) => {
       setFallbackNote(message);
-      setProvider("osm");
+      setProvider("openfreemap");
     });
   }, [provider]);
 
@@ -103,6 +131,14 @@ export function MapView({
           const mapkit = await loadMapKit();
           if (cancelled) return;
           created = createMapKitEngine(mapkit, element, startRef.current, isDark());
+        } else if (provider === "openfreemap") {
+          const ml = await loadMapLibre();
+          if (cancelled) return;
+          created = await createMapLibreEngine(ml, element, startRef.current, config.styles, isDark());
+          if (cancelled) {
+            created.destroy();
+            return;
+          }
         } else {
           const L = await loadLeaflet();
           if (cancelled) return;
@@ -112,6 +148,9 @@ export function MapView({
         console.error("[karte]", error);
         if (!cancelled && provider === "apple") {
           setFallbackNote(error instanceof Error ? error.message : "Apple Karten ist nicht erreichbar");
+          setProvider("openfreemap");
+        } else if (!cancelled && provider === "openfreemap") {
+          // Kein WebGL oder Kartendienst nicht erreichbar: einfache Kachelkarte.
           setProvider("osm");
         }
         return;
@@ -131,14 +170,95 @@ export function MapView({
       setEngine(null);
       onEngineRef.current(null);
       current?.destroy();
-      // Leaflet hinterlaesst Klassen am Container; fuer den naechsten Anlauf leeren.
+      // Leaflet und MapLibre hinterlassen Klassen am Container; fuer den
+      // naechsten Anlauf leeren.
       element.replaceChildren();
       element.className = element.className
         .split(" ")
-        .filter((name) => !name.startsWith("leaflet-"))
+        .filter((name) => !name.startsWith("leaflet-") && !name.startsWith("maplibregl-"))
         .join(" ");
     };
-  }, [provider, config.tileUrl]);
+    // Nur die Texte zaehlen: router.refresh() liefert ein neues Objekt mit
+    // denselben Werten, und die Karte soll dabei nicht neu aufgebaut werden.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [provider, config.tileUrl, config.styles.light, config.styles.dark]);
+
+  /* ---------------------------- Eigener Standort --------------------------- */
+
+  const [location, setLocation] = useState<UserLocation | null>(null);
+  const [watching, setWatching] = useState(false);
+  const [locateNote, setLocateNote] = useState<string | null>(null);
+  const centerOnNextFix = useRef(false);
+  const onLocationRef = useRef(onLocation);
+  onLocationRef.current = onLocation;
+  const meLayer = useRef<MapLayer | null>(null);
+
+  useEffect(() => {
+    if (autoLocate) setWatching(true);
+  }, [autoLocate]);
+
+  useEffect(() => {
+    if (!watching) return;
+    if (!navigator.geolocation) {
+      setLocateNote("Dieses Gerät gibt den Standort nicht frei.");
+      setWatching(false);
+      return;
+    }
+    const id = navigator.geolocation.watchPosition(
+      (position) => {
+        setLocateNote(null);
+        const next: UserLocation = {
+          point: [position.coords.latitude, position.coords.longitude],
+          accuracy: position.coords.accuracy,
+        };
+        setLocation(next);
+        onLocationRef.current?.(next);
+      },
+      (error) => {
+        setLocateNote(
+          error.code === error.PERMISSION_DENIED
+            ? "Standort nicht freigegeben – in den Einstellungen des Browsers erlauben."
+            : "Standort gerade nicht verfügbar.",
+        );
+        onLocationRef.current?.(null);
+      },
+      { enableHighAccuracy: true, maximumAge: 10_000, timeout: 20_000 },
+    );
+    return () => navigator.geolocation.clearWatch(id);
+  }, [watching]);
+
+  // Blauer Punkt mit Genauigkeitskreis - wie in jeder Karten-App.
+  useEffect(() => {
+    if (!engine) {
+      meLayer.current = null;
+      return;
+    }
+    if (!location) return;
+    meLayer.current ??= engine.layer();
+    const layer = meLayer.current;
+    layer.clear();
+    if (location.accuracy > 15 && location.accuracy < 2000) {
+      layer.polygon(circleToArea(location.point, location.accuracy, 40), {
+        color: "#0a84ff",
+        weight: 1,
+        fillOpacity: 0.12,
+      });
+    }
+    layer.marker(location.point, { ...userMarker(), priority: 10 });
+    if (centerOnNextFix.current) {
+      centerOnNextFix.current = false;
+      engine.setView(location.point, Math.max(engine.zoom(), 16));
+    }
+  }, [engine, location]);
+
+  function locate() {
+    if (location && engine) {
+      engine.setView(location.point, Math.max(engine.zoom(), 16));
+    } else {
+      centerOnNextFix.current = true;
+    }
+    setWatching(true);
+  }
 
   // Groesse nachfuehren (Dialog, Drehen des Handys, Seitenleiste).
   useEffect(() => {
@@ -194,6 +314,16 @@ export function MapView({
               <IconLayers className="h-[18px] w-[18px]" />
             </button>
           )}
+          <button
+            type="button"
+            className="map-ctrl pointer-events-auto"
+            onClick={locate}
+            aria-pressed={Boolean(location)}
+            title="Mein Standort"
+            aria-label="Karte auf meinen Standort setzen"
+          >
+            <IconNavigate className="h-[18px] w-[18px]" />
+          </button>
           {onFit && (
             <button
               type="button"
@@ -216,9 +346,9 @@ export function MapView({
         </div>
       )}
 
-      {fallbackNote && engine && (
-        <p className="map-chip pointer-events-none absolute bottom-2 left-1/2 z-[500] -translate-x-1/2 whitespace-nowrap text-[10px]">
-          {fallbackNote} – OpenStreetMap wird gezeigt
+      {(locateNote || (fallbackNote && engine)) && (
+        <p className="map-chip pointer-events-none absolute bottom-2 left-2 right-14 z-[500] mx-auto w-fit max-w-full text-center text-[10.5px]">
+          {locateNote ?? `${fallbackNote} – Ersatzkarte wird gezeigt`}
         </p>
       )}
 
