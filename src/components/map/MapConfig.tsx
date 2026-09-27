@@ -4,8 +4,12 @@ import { createContext, useContext, type ReactNode } from "react";
 import type { MapConfig } from "@/lib/map";
 
 const DEFAULT: MapConfig = {
-  provider: "osm",
+  provider: "openfreemap",
   tileUrl: "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
+  styles: {
+    light: "https://tiles.openfreemap.org/styles/liberty",
+    dark: "https://tiles.openfreemap.org/styles/dark",
+  },
 };
 
 const MapConfigContext = createContext<MapConfig>(DEFAULT);

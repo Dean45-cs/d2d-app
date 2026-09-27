@@ -258,6 +258,23 @@ export function TourClient({
       const street = streets.find((s) => s.id === storedStreet);
       if (street) setTerritoryId(street.territory_id);
     }
+
+    // "Hier klingeln" auf der Gebietskarte: /tour?street=12&house=7a oeffnet
+    // genau dieses Haus. Danach verschwindet der Zusatz aus der Adresse, damit
+    // ein Neuladen nicht wieder dorthin springt.
+    const params = new URLSearchParams(window.location.search);
+    const linked = streets.find((s) => s.id === Number(params.get("street")));
+    if (linked) {
+      setTerritoryId(linked.territory_id);
+      setStreetId(linked.id);
+      window.localStorage.setItem("d2d_street", String(linked.id));
+      const house = params.get("house");
+      if (house) {
+        setHouseNumber(house);
+        setHouseOpen(true);
+      }
+      window.history.replaceState(null, "", window.location.pathname);
+    }
   }, [streets]);
 
   useEffect(() => {
