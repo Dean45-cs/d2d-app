@@ -14,6 +14,8 @@ export interface User {
   active: number;
   /** Profilbild als Data-URL, "" wenn keines hinterlegt ist. */
   avatar: string;
+  /** Kurzer Text ueber sich selbst - steht im Profil unter dem Namen. */
+  bio: string;
   created_at: string;
 }
 

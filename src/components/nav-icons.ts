@@ -5,9 +5,11 @@ import {
   IconChart,
   IconCog,
   IconDoor,
+  IconFeed,
   IconGrid,
   IconHome,
   IconMap,
+  IconTrophy,
   IconUsers,
 } from "./icons";
 import type { IconName } from "@/lib/nav";
@@ -23,4 +25,6 @@ export const NAV_ICONS: Record<IconName, (props: { className?: string }) => Reac
   calendar: IconCalendar,
   cog: IconCog,
   grid: IconGrid,
+  feed: IconFeed,
+  trophy: IconTrophy,
 };

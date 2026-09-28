@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useCallback, useState } from "react";
-import { IconLogout } from "./icons";
+import { IconChevronRight, IconLogout } from "./icons";
 import { Logo } from "./Logo";
 import { Sheet } from "./Sheet";
 import { Avatar } from "./ui";
@@ -11,6 +11,7 @@ import { NAV_ICONS } from "./nav-icons";
 import { MORE_HREF, type NavItem, type Navigation } from "@/lib/nav";
 
 export interface NavUser {
+  id: number;
   name: string;
   email: string;
   roleLabel: string;
@@ -92,12 +93,19 @@ export function Sidebar({ nav, user }: { nav: Navigation; user: NavUser }) {
       </nav>
 
       <div className="border-t border-white/10 p-3">
-        <div className="flex items-center gap-3 rounded-[var(--r-sm)] px-2 py-2">
-          <Avatar name={user.name} src={user.avatar} size={34} tone="light" />
-          <div className="min-w-0 flex-1 leading-tight">
-            <p className="truncate text-[13.5px] font-semibold">{user.name}</p>
-            <p className="truncate text-[12px] text-white/55">{user.roleLabel}</p>
-          </div>
+        <div className="flex items-center gap-1 rounded-[var(--r-sm)]">
+          <Link
+            href={`/profil/${user.id}`}
+            aria-current={isActive(pathname, `/profil/${user.id}`) ? "page" : undefined}
+            className="flex min-w-0 flex-1 items-center gap-3 rounded-[var(--r-sm)] px-2 py-2 transition-colors hover:bg-white/[0.06]"
+            title="Mein Profil"
+          >
+            <Avatar name={user.name} src={user.avatar} size={34} tone="light" />
+            <div className="min-w-0 flex-1 leading-tight">
+              <p className="truncate text-[13.5px] font-semibold">{user.name}</p>
+              <p className="truncate text-[12px] text-white/55">Mein Profil</p>
+            </div>
+          </Link>
           <button
             type="button"
             onClick={() => void logout()}
@@ -139,12 +147,12 @@ export function MobileTopBar({ user }: { user: NavUser }) {
   );
 }
 
-/** Wer angemeldet ist - und der Weg hinaus. */
+/** Wer angemeldet ist, der Weg zum eigenen Profil - und der Weg hinaus. */
 export function AccountSheet({ user, onClose }: { user: NavUser; onClose: () => void }) {
   const { logout, busy } = useLogout();
   return (
     <Sheet title="Konto" onClose={onClose}>
-      <AccountCard user={user} />
+      <AccountCard user={user} href={`/profil/${user.id}`} onNavigate={onClose} />
       <button
         type="button"
         className="btn btn-ghost mt-4 w-full"
@@ -159,16 +167,38 @@ export function AccountSheet({ user, onClose }: { user: NavUser; onClose: () => 
   );
 }
 
-export function AccountCard({ user }: { user: NavUser }) {
-  return (
-    <div className="inset flex items-center gap-3.5 p-3.5">
+/** Die angemeldete Person - mit Verweis aufs eigene Profil, wenn `href` gesetzt ist. */
+export function AccountCard({
+  user,
+  href,
+  onNavigate,
+}: {
+  user: NavUser;
+  href?: string;
+  onNavigate?: () => void;
+}) {
+  const content = (
+    <>
       <Avatar name={user.name} src={user.avatar} size={52} />
-      <div className="min-w-0 leading-snug">
+      <div className="min-w-0 flex-1 leading-snug">
         <p className="truncate text-[16px] font-semibold">{user.name}</p>
         <p className="muted truncate text-[13px]">{user.email}</p>
-        <p className="muted truncate text-[12px]">{user.roleLabel}</p>
+        <p className="truncate text-[12.5px] font-semibold text-tint">
+          {href ? "Mein Profil ansehen" : user.roleLabel}
+        </p>
       </div>
-    </div>
+    </>
+  );
+  if (!href) return <div className="inset flex items-center gap-3.5 p-3.5">{content}</div>;
+  return (
+    <Link
+      href={href}
+      onClick={onNavigate}
+      className="inset flex items-center gap-3.5 p-3.5 transition-colors hover:bg-[var(--hover)]"
+    >
+      {content}
+      <IconChevronRight className="muted h-4 w-4 shrink-0 opacity-60" />
+    </Link>
   );
 }
 

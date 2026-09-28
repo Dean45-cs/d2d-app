@@ -16,6 +16,7 @@ export default async function AppLayout({
 
   const nav = navigation(user.role);
   const navUser: NavUser = {
+    id: user.id,
     name: user.name,
     email: user.email,
     roleLabel: user.role === "LEADER" ? "Teamleitung" : "Vertrieb",
