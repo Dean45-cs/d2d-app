@@ -71,28 +71,48 @@ export function parseNumber(value: unknown): number | null {
   return Number.isFinite(n) ? n : NaN;
 }
 
-/** "2026-01-01", "1.1.2026" oder "01.01.26" -> "2026-01-01". Leer bleibt leer, Unlesbares null. */
+function toIsoDate(year: number, month: number, day: number): string | null {
+  const y = year < 100 ? year + 2000 : year;
+  const date = new Date(Date.UTC(y, month - 1, day));
+  if (date.getUTCFullYear() !== y || date.getUTCMonth() !== month - 1 || date.getUTCDate() !== day) {
+    return null;
+  }
+  return `${y}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+}
+
+const ISO_DATE = /(\d{4})-(\d{1,2})-(\d{1,2})/g;
+const GERMAN_DATE = /(\d{1,2})\.(\d{1,2})\.(\d{4}|\d{2})/g;
+
+/**
+ * "2026-01-01", "1.1.2026" oder "01.01.26" -> "2026-01-01". Leer bleibt leer,
+ * Unlesbares null.
+ *
+ * Steht Strom und Gas mit je eigenem Stichtag im selben Feld ("Strom
+ * 01.02.2026 / Gas 01.07.2026" - Grundversorger aendern die Preise fuer
+ * beide oft getrennt), gilt der fruehere der beiden Tage: die App hat nur
+ * ein Feld je Ort, nicht je Energieart.
+ */
 export function parseDate(value: string): string | null {
   const text = value.trim();
   if (!text) return "";
-  let y: number;
-  let m: number;
-  let d: number;
-  const iso = text.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
-  const german = text.match(/^(\d{1,2})\.(\d{1,2})\.(\d{2}|\d{4})$/);
-  if (iso) {
-    [y, m, d] = [Number(iso[1]), Number(iso[2]), Number(iso[3])];
-  } else if (german) {
-    [d, m, y] = [Number(german[1]), Number(german[2]), Number(german[3])];
-    if (y < 100) y += 2000;
-  } else {
-    return null;
+
+  // Das ganze Feld ist ein Datum - der Regelfall.
+  const iso = text.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+  if (iso) return toIsoDate(Number(iso[1]), Number(iso[2]), Number(iso[3]));
+  const german = text.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4}|\d{2})$/);
+  if (german) return toIsoDate(Number(german[3]), Number(german[2]), Number(german[1]));
+
+  // Freitext mit mehreren Daten - das fruehste gilt.
+  const found: string[] = [];
+  for (const m of text.matchAll(GERMAN_DATE)) {
+    const parsed = toIsoDate(Number(m[3]), Number(m[2]), Number(m[1]));
+    if (parsed) found.push(parsed);
   }
-  const date = new Date(Date.UTC(y, m - 1, d));
-  if (date.getUTCFullYear() !== y || date.getUTCMonth() !== m - 1 || date.getUTCDate() !== d) {
-    return null;
+  for (const m of text.matchAll(ISO_DATE)) {
+    const parsed = toIsoDate(Number(m[1]), Number(m[2]), Number(m[3]));
+    if (parsed) found.push(parsed);
   }
-  return `${y}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+  return found.length > 0 ? found.sort()[0] : null;
 }
 
 /** Excel schneidet fuehrende Nullen ab: aus 01067 wird 1067. */
