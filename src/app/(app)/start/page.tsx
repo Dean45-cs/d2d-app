@@ -156,7 +156,7 @@ export default async function StartPage() {
 
         {/* ------------------------------- Team -------------------------------- */}
         <section className="card p-5 lg:col-span-2">
-          <SectionHeader title="Team · 7 Tage" href="/team" linkLabel="Team" />
+          <SectionHeader title="Team · 7 Tage" href="/vergleich" linkLabel="Vergleich" />
           {members.length === 0 ? (
             <EmptyState bare title="Noch keine Mitarbeiter" />
           ) : (
@@ -175,10 +175,13 @@ export default async function StartPage() {
                   {members.map((m) => (
                     <tr key={m.user_id}>
                       <td>
-                        <span className="flex items-center gap-2.5">
+                        <Link
+                          href={`/profil/${m.user_id}`}
+                          className="flex items-center gap-2.5 hover:underline"
+                        >
                           <Avatar name={m.user_name} src={faces.get(m.user_id)} size={28} />
                           <span className="truncate font-medium">{m.user_name}</span>
-                        </span>
+                        </Link>
                       </td>
                       <td className="num">{m.doors}</td>
                       <td className="num">{m.met}</td>

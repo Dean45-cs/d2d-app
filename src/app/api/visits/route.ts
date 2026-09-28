@@ -1,3 +1,4 @@
+import { after } from "next/server";
 import { requireUser } from "@/lib/auth";
 import { getDb } from "@/lib/db";
 import {
@@ -10,6 +11,7 @@ import {
 } from "@/lib/queries";
 import { handle, optionalNumber, optionalText } from "@/lib/api";
 import { normalizeSlot } from "@/lib/appointments";
+import { notifySale } from "@/lib/push";
 import type { VisitOutcome } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -97,6 +99,12 @@ export async function POST(request: Request) {
       lat: optionalNumber(body.lat),
       lng: optionalNumber(body.lng),
     });
+
+    // Wer diese Person abonniert hat, bekommt den Vertrag aufs Handy - erst
+    // nach der Antwort, damit an der Tuer niemand auf die Push-Dienste wartet.
+    if (outcome === "SALE") {
+      after(() => notifySale(id).catch((error) => console.warn("[push] Abschluss:", error)));
+    }
 
     return { ok: true, id };
   });

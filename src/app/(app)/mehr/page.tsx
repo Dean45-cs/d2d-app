@@ -11,6 +11,9 @@ export const dynamic = "force-dynamic";
 
 /** Farbe des Symbols je Bereich - wie in den iOS-Einstellungen. */
 const TINT: Record<string, string> = {
+  "/gebiete": "var(--brand-600)",
+  "/feed": "var(--brand-500)",
+  "/vergleich": "var(--gas-500)",
   "/karte": "var(--gas-500)",
   "/auswertung": "var(--brand-500)",
   "/team": "var(--energy-600)",
@@ -35,11 +38,13 @@ export default async function MorePage() {
       <div className="mb-6">
         <AccountCard
           user={{
+            id: user.id,
             name: user.name,
             email: user.email,
             roleLabel: user.role === "LEADER" ? "Teamleitung" : "Vertrieb",
             avatar: user.avatar || null,
           }}
+          href={`/profil/${user.id}`}
         />
       </div>
 

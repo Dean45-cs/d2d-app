@@ -9,6 +9,10 @@
  * Die erfassten Türen werden NICHT hier gepuffert, sondern in der App selbst
  * (src/lib/offline-queue.ts) – so bleibt die Warteschlange sichtbar und
  * steuerbar.
+ *
+ * Außerdem nimmt er Push-Nachrichten entgegen (Abschluss eines abonnierten
+ * Kollegen, Kommentar auf einen eigenen Beitrag) und öffnet beim Antippen die
+ * passende Seite. Versendet werden sie in src/lib/push.ts.
  */
 
 const VERSION = "v1";
@@ -96,4 +100,50 @@ self.addEventListener("fetch", (event) => {
       ),
     );
   }
+});
+
+/* ------------------------------ Push-Nachrichten ------------------------- */
+
+self.addEventListener("push", (event) => {
+  let data = {};
+  try {
+    data = event.data ? event.data.json() : {};
+  } catch {
+    data = { body: event.data ? event.data.text() : "" };
+  }
+  event.waitUntil(
+    self.registration.showNotification(data.title || "EP24 Vertrieb", {
+      body: data.body || "",
+      icon: "/icon-192.png",
+      tag: data.tag,
+      // Nur relative Pfade der eigenen App - eine Nachricht fuehrt nie nach draussen.
+      data: {
+        url:
+          typeof data.url === "string" && data.url.startsWith("/") && !data.url.startsWith("//")
+            ? data.url
+            : "/feed",
+      },
+    }),
+  );
+});
+
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  const url = new URL(event.notification.data?.url || "/feed", self.location.origin).href;
+  event.waitUntil(
+    self.clients.matchAll({ type: "window", includeUncontrolled: true }).then(async (windows) => {
+      // Ist die App schon offen, dorthin springen statt ein zweites Fenster zu oeffnen.
+      for (const client of windows) {
+        if (new URL(client.url).origin !== self.location.origin) continue;
+        try {
+          await client.focus();
+          if ("navigate" in client) await client.navigate(url);
+          return;
+        } catch {
+          // Nicht steuerbar (etwa vor dem ersten Laden) - dann eben neu oeffnen.
+        }
+      }
+      return self.clients.openWindow(url);
+    }),
+  );
 });

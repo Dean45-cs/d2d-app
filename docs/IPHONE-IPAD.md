@@ -103,6 +103,11 @@ Team also nicht erklären – nur den Link schicken.
   Gerät gespeichert und automatisch nachgesendet, sobald wieder Empfang da ist.
   Ein Banner zeigt, wie viele Einträge warten.
 - Kein Zoom beim Doppeltippen, kein Gummiband-Scrollen – fühlt sich an wie eine App
+- **Push-Nachrichten** (ab iOS 16.4): Wer Kollegen abonniert, bekommt eine
+  Nachricht, sobald sie einen Vertrag machen. Eingeschaltet wird im eigenen
+  Profil unter „Push-Nachrichten“ – oder direkt beim ersten „Abonnieren“.
+  Das geht **nur in der installierten App**, nicht im Safari-Tab; die App sagt
+  das an der Stelle auch selbst.
 
 ---
 
@@ -189,6 +194,14 @@ anmelden muss. Wer das anders will, ändert `MAX_AGE_SECONDS` in
 Sie liegen im Speicher des Browsers. Wird der Safari-Verlauf samt Websitedaten
 gelöscht, sind sie weg. Deshalb: bei schlechtem Empfang das Team bitten, die App
 kurz zu öffnen, sobald wieder Netz da ist – dann wird sofort nachgesendet.
+
+**Push kommt nicht an**
+Drei Dinge prüfen: Die App ist über „Zum Home-Bildschirm“ installiert (im
+Safari-Tab gibt es auf dem iPhone kein Push), in den iPhone-Einstellungen →
+Mitteilungen → EP24 Vertrieb ist „Mitteilungen erlauben“ an, und im eigenen
+Profil steht der Schalter „Push-Nachrichten“ auf an. Mit „Probe-Nachricht
+senden“ lässt sich das in Sekunden testen. Fokus-Modi („Nicht stören“)
+halten Nachrichten zurück.
 
 **Der Tarifrechner öffnet sich nicht**
 In der installierten App öffnet der Link in Safari. Ist das unerwünscht,

@@ -264,6 +264,90 @@ function migrate(db: Database.Database) {
   db.exec(
     "CREATE INDEX IF NOT EXISTS idx_visits_follow_up ON visits (team_id, follow_up_at)",
   );
+
+  migrateCommunity(db);
+}
+
+/**
+ * Feed, Profil und Abos.
+ *
+ * Ein Abschluss erscheint als eigener Beitrag im Feed. Er haengt am Besuch:
+ * wird der Eintrag an der Tuer rueckgaengig gemacht, verschwindet mit ihm
+ * auch der Beitrag samt Kommentaren - niemand gratuliert zu einem Vertrag,
+ * den es nicht gibt.
+ */
+function migrateCommunity(db: Database.Database) {
+  // Kurzer Text ueber sich selbst, wie bei Twitter unter dem Namen.
+  addColumn(db, "users", "bio", "TEXT NOT NULL DEFAULT ''");
+
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS posts (
+      id         INTEGER PRIMARY KEY AUTOINCREMENT,
+      team_id    INTEGER NOT NULL REFERENCES teams(id) ON DELETE CASCADE,
+      user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      kind       TEXT NOT NULL CHECK (kind IN ('TEXT','SALE')),
+      body       TEXT NOT NULL DEFAULT '',
+      visit_id   INTEGER REFERENCES visits(id) ON DELETE CASCADE,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+    CREATE INDEX IF NOT EXISTS idx_posts_team_id  ON posts (team_id, id);
+    CREATE INDEX IF NOT EXISTS idx_posts_user_id  ON posts (user_id, id);
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_posts_visit ON posts (visit_id);
+
+    CREATE TABLE IF NOT EXISTS post_comments (
+      id         INTEGER PRIMARY KEY AUTOINCREMENT,
+      post_id    INTEGER NOT NULL REFERENCES posts(id) ON DELETE CASCADE,
+      user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      body       TEXT NOT NULL,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+    CREATE INDEX IF NOT EXISTS idx_comments_post ON post_comments (post_id, id);
+
+    CREATE TABLE IF NOT EXISTS post_likes (
+      post_id    INTEGER NOT NULL REFERENCES posts(id) ON DELETE CASCADE,
+      user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      PRIMARY KEY (post_id, user_id)
+    );
+    CREATE INDEX IF NOT EXISTS idx_likes_user ON post_likes (user_id);
+
+    /* Wer wen abonniert hat. Ein Abo bedeutet: Push aufs Handy, sobald die
+       Person einen Vertrag macht - und ihre Beitraege unter "Abonniert". */
+    CREATE TABLE IF NOT EXISTS follows (
+      follower_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      followee_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      created_at  TEXT NOT NULL DEFAULT (datetime('now')),
+      PRIMARY KEY (follower_id, followee_id),
+      CHECK (follower_id <> followee_id)
+    );
+    CREATE INDEX IF NOT EXISTS idx_follows_followee ON follows (followee_id);
+
+    /* Geraete, die Push-Nachrichten empfangen. Ein Mensch kann mehrere haben
+       (Handy und Tablet); die Adresse vergibt der Push-Dienst des Browsers. */
+    CREATE TABLE IF NOT EXISTS push_subscriptions (
+      id           INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id      INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      endpoint     TEXT NOT NULL UNIQUE,
+      p256dh       TEXT NOT NULL,
+      auth         TEXT NOT NULL,
+      user_agent   TEXT NOT NULL DEFAULT '',
+      created_at   TEXT NOT NULL DEFAULT (datetime('now')),
+      last_success TEXT
+    );
+    CREATE INDEX IF NOT EXISTS idx_push_user ON push_subscriptions (user_id);
+  `);
+
+  // Abschluesse von vor dem Feed nachtragen - sonst stuende er am ersten Tag
+  // leer da, obwohl das Team schon Vertraege gemacht hat. Laeuft bei jedem
+  // Start, fuegt aber nur hinzu, was fehlt.
+  db.exec(`
+    INSERT INTO posts (team_id, user_id, kind, visit_id, created_at)
+    SELECT v.team_id, v.user_id, 'SALE', v.id, v.created_at
+      FROM visits v
+     WHERE v.outcome = 'SALE'
+       AND NOT EXISTS (SELECT 1 FROM posts p WHERE p.visit_id = v.id)
+     ORDER BY v.id
+  `);
 }
 
 function hasColumn(db: Database.Database, table: string, column: string): boolean {

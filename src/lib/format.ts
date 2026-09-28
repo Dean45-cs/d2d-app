@@ -52,6 +52,37 @@ export function sqlDay(value: string): string {
   return new Date(`${value.replace(" ", "T")}Z`).toLocaleDateString("sv-SE", { timeZone: ZONE });
 }
 
+/**
+ * Wie lange etwas her ist, so knapp wie im Feed ueblich: "gerade eben",
+ * "vor 5 Min.", "vor 3 Std.", "gestern", "vor 4 Tagen", danach das Datum.
+ */
+export function timeAgo(value: string, now = new Date()): string {
+  const date = new Date(`${value.replace(" ", "T")}Z`);
+  const minutes = Math.floor((now.getTime() - date.getTime()) / 60_000);
+  if (minutes < 1) return "gerade eben";
+  if (minutes < 60) return `vor ${minutes} Min.`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `vor ${hours} Std.`;
+  const days = Math.floor(hours / 24);
+  if (days === 1) return "gestern";
+  if (days < 7) return `vor ${days} Tagen`;
+  return date.toLocaleDateString("de-DE", {
+    timeZone: ZONE,
+    day: "numeric",
+    month: "short",
+    ...(date.getFullYear() === now.getFullYear() ? {} : { year: "numeric" }),
+  });
+}
+
+/** "September 2026" - fuer "Dabei seit" im Profil. */
+export function monthYear(value: string): string {
+  return new Date(`${value.replace(" ", "T")}Z`).toLocaleDateString("de-DE", {
+    timeZone: ZONE,
+    month: "long",
+    year: "numeric",
+  });
+}
+
 /** "Heute", "Gestern" oder "Freitag, 25. September". */
 export function dayHeading(day: string, now = new Date()): string {
   const today = now.toLocaleDateString("sv-SE", { timeZone: ZONE });

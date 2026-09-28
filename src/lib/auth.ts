@@ -87,7 +87,7 @@ export async function getCurrentUser(): Promise<User | null> {
   if (!userId) return null;
   const user = getDb()
     .prepare(
-      `SELECT id, team_id, name, email, role, phone, active, avatar, created_at
+      `SELECT id, team_id, name, email, role, phone, active, avatar, bio, created_at
          FROM users WHERE id = ? AND active = 1`,
     )
     .get(userId) as User | undefined;

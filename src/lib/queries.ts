@@ -20,7 +20,7 @@ import type {
 export function listMembers(teamId: number): User[] {
   return getDb()
     .prepare(
-      `SELECT id, team_id, name, email, role, phone, active, avatar, created_at
+      `SELECT id, team_id, name, email, role, phone, active, avatar, bio, created_at
          FROM users WHERE team_id = ? ORDER BY active DESC, role, name`,
     )
     .all(teamId) as User[];
@@ -817,6 +817,14 @@ export function createVisit(input: {
       input.lat,
       input.lng,
     );
+
+  // Ein Abschluss kommt als Beitrag in den Feed - dort gratuliert das Team.
+  if (input.outcome === "SALE") {
+    db.prepare(
+      `INSERT INTO posts (team_id, user_id, kind, visit_id, created_at)
+       SELECT team_id, user_id, 'SALE', id, created_at FROM visits WHERE id = ?`,
+    ).run(result.lastInsertRowid);
+  }
 
   // Strasse und Gebiet automatisch auf "in Arbeit" setzen
   if (input.streetId) {

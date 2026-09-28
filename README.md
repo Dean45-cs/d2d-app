@@ -14,6 +14,14 @@ Eine Web-App für Door-to-Door-Teams im Energievertrieb:
 - **Energiekarte** – zeigt, wo der Grundversorger besonders teuer ist; Preise in Sekunden
   vom Preisblatt eingetragen oder als Tabelle aus Excel übernommen
 - **Auswertung** – Antreff- und Abschlussquoten je Mitarbeiter, Gebiet und Zeitraum
+- **Vergleich** – Rangliste je Kennzahl, der eigene Platz samt Abstand zum nächsten,
+  Team-Schnitt, Bestwert und Direktvergleich mit einem Kollegen
+- **Feed** – jeder Abschluss erscheint von selbst; dazu eigene Beiträge, Kommentare
+  und „Gefällt mir“
+- **Abonnieren** – wer Kollegen abonniert, bekommt eine Push-Nachricht aufs Handy,
+  sobald sie einen Vertrag machen
+- **Profil** – wie bei Twitter, aber mit den eigenen Zahlen: Abschlüsse, Quoten, Platz
+  im Team, Serie, Bestwert und Abzeichen
 - **Installierbar auf iPhone und iPad** – eigenes Symbol, Vollbild ohne Browserleiste,
   Erfassung funktioniert auch ohne Empfang
 
@@ -65,11 +73,16 @@ angelegt – praktisch zum Ausprobieren, für den Echtbetrieb weglassen.
 | Türen erfassen | ✅ | ✅ |
 | Eigene Gebiete sehen, Status melden | ✅ (alle) | ✅ (eigene) |
 | Auswertung | ganzes Team | nur eigene Zahlen |
+| Vergleich (Rangliste, Profile mit Zahlen) | ✅ | ✅ |
+| Feed: posten, kommentieren, abonnieren | ✅ | ✅ |
+| Fremde Beiträge und Kommentare löschen | ✅ | – |
 | Energiekarte | ✅ | ✅ |
 
-Auf dem Handy stehen unten höchstens fünf Reiter. Bei der Teamleitung liegen Energiekarte,
-Auswertung, Team und Einstellungen unter **Mehr**; abgemeldet wird dort oder über das
-Profilbild oben rechts. Am Rechner steht alles gruppiert in der Seitenleiste.
+Auf dem Handy stehen unten höchstens fünf Reiter. Im Vertrieb sind das Klinken, Feed,
+Vergleich, Termine und **Mehr** (Gebiete, Energiekarte, Zahlen); bei der Teamleitung
+liegen Feed, Vergleich, Energiekarte, Auswertung, Team und Einstellungen unter **Mehr**.
+Das eigene Profil und das Abmelden erreicht man über das Profilbild oben rechts. Am
+Rechner steht alles gruppiert in der Seitenleiste, das Profil unten links.
 
 ---
 
@@ -128,6 +141,77 @@ am Kopf der Tour; ein Tipp darauf stellt Straße, Hausnummer und Klingel ein.
 
 Gespeichert wird die **Ortszeit** (`2026-09-21 18:00`). Ob ein Termin „heute“ ist,
 entscheidet das Gerät und nicht der Server: vor der Tür zählt die Uhr an der Wand.
+
+---
+
+## Vergleich, Feed und Profil
+
+Der Teil der App, der anspornen soll: Jeder sieht, wo er im Team steht, und jeder
+Vertrag wird gefeiert.
+
+### Vergleich
+
+**Vergleich** zeigt die Rangliste des Teams – wählbar nach Abschlüssen, Terminen,
+Türen, Abschlussquote und Antreffquote, für heute, 7 Tage, 30 Tage oder gesamt.
+
+- **Dein Platz** oben mit dem Satz, der zählt: „Noch 3 Abschlüsse und du überholst
+  Sina (Platz 2).“ – oder, wer vorn liegt, wie groß der Vorsprung ist. Daneben, wie
+  viele Plätze man gegenüber dem Zeitraum davor gutgemacht oder verloren hat.
+- **Treppchen** für die ersten drei, darunter alle mit Balken im Verhältnis zum Besten.
+  Gleiche Werte teilen sich den Platz.
+- **Du im Vergleich:** jede Kennzahl als Balken, der Team-Schnitt als Strich darüber.
+- **Direktvergleich** mit einer Kollegin oder einem Kollegen, Kennzahl für Kennzahl.
+  Voreingestellt ist, wer direkt vor einem steht – der nächste, den man einholen kann.
+
+Fair bleibt es so: Eine **Quote** zählt erst ab 5 Gesprächen (Abschlussquote) bzw.
+20 Türen (Antreffquote); darunter steht man in der Liste, aber ohne Platz. Die
+**Teamleitung** kommt nur in die Wertung, wenn sie im Zeitraum selbst an Türen war.
+
+### Feed
+
+Jeder **Abschluss** erscheint von selbst im Feed – mit Produkt, Gebiet und der wievielte
+Vertrag der Person es ist (runde Zahlen bekommen eine Plakette). Adresse und Kunde stehen
+dort bewusst nicht. Wird der Eintrag an der Tür rückgängig gemacht, verschwindet auch der
+Beitrag. Abschlüsse von vor dem Feed werden beim ersten Start nachgetragen.
+
+Dazu kann jeder **eigene Beiträge** schreiben (bis 500 Zeichen), **kommentieren** und
+**„Gefällt mir“** setzen. Unter einem Abschluss stehen Ein-Tipp-Glückwünsche („Stark! 💪“)
+bereit. „Abonniert“ zeigt nur die Beiträge der Leute, denen man folgt. Eigene Beiträge
+und Kommentare löscht man selbst, die Teamleitung darf alle löschen.
+
+### Abonnieren und Push-Nachrichten
+
+Auf einem Profil (oder rechts im Feed) **„Abonnieren“** tippen – ab dann kommt jeder
+Vertrag dieser Person als Push-Nachricht aufs Handy. Ein Tipp darauf öffnet den Beitrag
+zum Gratulieren. Außerdem gibt es eine Nachricht, wenn jemand den eigenen Beitrag
+kommentiert oder einen abonniert.
+
+- Beim ersten Abonnieren fragt das Gerät nach der Erlaubnis. Ein- und ausschalten lässt
+  sich Push im **eigenen Profil**; dort gibt es auch eine Probe-Nachricht.
+- **iPhone/iPad:** nur in der installierten App (ab iOS 16.4), nicht im Safari-Tab.
+- Einrichten muss man nichts: Die Schlüssel (VAPID) erzeugt die App beim ersten Bedarf
+  selbst und speichert sie in der Datenbank. Eigene Schlüssel gehen über
+  `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY`, der Kontakt für die Push-Dienste über
+  `VAPID_SUBJECT` (sonst die E-Mail der Teamleitung).
+- Versendet wird direkt an die Push-Dienste von Apple, Google, Mozilla und Microsoft –
+  ohne Zusatzdienst und ohne weitere Bibliothek (`src/lib/push.ts`). Andere Adressen
+  nimmt der Server nicht an. Der Server muss diese Dienste erreichen können.
+
+### Profil
+
+Das Profil ist wie bei Twitter aufgebaut – Titelbild, Profilbild, Name, ein Satz über
+sich, „Dabei seit“, Abonnenten und Abonnierte, darunter die Reiter **Beiträge**,
+**Abschlüsse** und **Gefällt mir**. Der Unterschied: oben stehen die **Zahlen** der Person.
+
+- Abschlüsse gesamt und der letzten 30 Tage mit **Platz im Team**
+- Abschluss- und Antreffquote
+- **Serie**: Arbeitstage in Folge mit mindestens einem Abschluss (Tage ohne Türen
+  unterbrechen nicht), **bester Tag**, Termine
+- **Abzeichen** für 1, 5, 10, 25, 50, 100 … Abschlüsse und ein Balken bis zum nächsten
+- Verlauf der letzten 14 Tage
+
+Über „Profil bearbeiten“ ändert jeder sein Bild und den Text über sich selbst; Name,
+Rolle und Zugang bleiben bei der Teamleitung.
 
 ---
 
@@ -537,6 +621,7 @@ entstehen zwei getrennte Datenbestände.
 | Aufteilung | k-Means auf den Straßenmitten, danach Ausgleich nach Türen |
 | Login | Signiertes Session-Cookie (HMAC), Passwörter als scrypt-Hash |
 | App auf dem Handy | PWA mit Manifest, Service Worker und lokaler Erfassungs-Warteschlange |
+| Push-Nachrichten | Web Push (VAPID, aes128gcm) direkt mit `node:crypto`, Schlüssel selbst erzeugt |
 
 ### Struktur
 
@@ -547,6 +632,9 @@ src/
       start/          Dashboard der Teamleitung
       tour/           Türerfassung (das Herzstück)
       termine/        Vereinbarte Termine
+      feed/           Abschlüsse, Beiträge, Kommentare
+      vergleich/      Rangliste, eigener Platz, Direktvergleich
+      profil/         Profil mit Zahlen, Abonnenten
       gebiete/        Gebiete und Straßen
       karte/          Energiekarte
       auswertung/     Zahlen
@@ -557,7 +645,11 @@ src/
   lib/
     db.ts             Schema und Verbindung
     auth.ts           Login, Rollen, Passwörter
-    queries.ts        alle Datenbankabfragen
+    queries.ts        Datenbankabfragen für Gebiete, Türen, Termine, Zahlen
+    community.ts      Datenbankabfragen für Feed, Kommentare, Abos, Profil
+    ranking.ts        Rangliste, Abstand zum Nächsten, Serie, Abzeichen
+    push.ts           Push-Nachrichten senden (Server)
+    push-client.ts    Push ein- und ausschalten (Browser)
     appointments.ts   Terminzeiten, Vorschläge, Beschriftung
     doors.ts          Türstatus: offen, Wiedervorlage, fertig, gesperrt
     energy/           Preise, Bewertung, Tabellen-Import, Städteliste, Tagesquelle
@@ -602,7 +694,12 @@ npm run energy:refresh  # Tagesquelle abrufen (falls eingerichtet)
   funktioniert alles weiter – die Straßen werden dann von Hand eingetragen.
 - Bei Plattformen ohne dauerhaften Dateispeicher (z. B. Vercel) ist SQLite nicht die
   richtige Wahl – dort ein Volume einbinden (Fly.io, Railway, eigener Server) oder das
-  Schema auf Postgres portieren. Alle Abfragen liegen gebündelt in `src/lib/queries.ts`.
+  Schema auf Postgres portieren. Die Abfragen liegen gebündelt in `src/lib/queries.ts`
+  und `src/lib/community.ts`.
+- Für Push-Nachrichten muss der Server die Push-Dienste der Browser erreichen
+  (`web.push.apple.com`, `fcm.googleapis.com`, `updates.push.services.mozilla.com`,
+  `*.notify.windows.com`). Die VAPID-Schlüssel liegen in der Datenbank – mit dem
+  Backup sind sie also gesichert.
 
 ## Datenschutz
 
@@ -616,6 +713,14 @@ Tarifrechner des Partners – diese App nimmt sie bewusst nicht auf. Für das, w
 braucht es trotzdem eine Rechtsgrundlage, eine Information der Kundschaft und eine
 Löschfrist; das gehört mit dem eigenen Datenschutzbeauftragten abgestimmt. Die App gibt
 keine Frist vor und löscht nichts von selbst.
+
+**Vergleich, Feed und Profil** machen die Leistung jedes Einzelnen im Team sichtbar:
+Abschlüsse, Quoten und Platz sieht jeder, der angemeldet ist – im Vertrieb also auch die
+Zahlen der Kollegen. Das ist eine Leistungsauswertung von Beschäftigten und gehört vor dem
+Einsatz mit dem Betriebsrat bzw. den Beschäftigten abgestimmt. Kundendaten tauchen dort
+nicht auf: ein Abschluss im Feed nennt Produkt und Gebiet, keine Adresse und keinen Namen.
+Für Push-Nachrichten speichert die App je Gerät die Adresse beim Push-Dienst des
+Browsers; beim Ausschalten wird sie gelöscht.
 
 Ohne Netz liegen wartende Einträge **auf dem Gerät** im lokalen Speicher des Browsers, bis
 sie gesendet sind. Geräte des Außendienstes gehören deshalb gesperrt und im Verlustfall

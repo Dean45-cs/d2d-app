@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { requireUser } from "@/lib/auth";
 import {
   dailySeries,
@@ -121,10 +122,10 @@ export default async function StatsPage({
                 {members.map((m) => (
                   <tr key={m.user_id}>
                     <td>
-                      <span className="flex items-center gap-2.5">
+                      <Link href={`/profil/${m.user_id}`} className="flex items-center gap-2.5 hover:underline">
                         <Avatar name={m.user_name} src={faces.get(m.user_id)} size={28} />
                         <span className="truncate font-medium">{m.user_name}</span>
-                      </span>
+                      </Link>
                     </td>
                     <td className="num">{m.doors}</td>
                     <td className="num">{m.met}</td>
