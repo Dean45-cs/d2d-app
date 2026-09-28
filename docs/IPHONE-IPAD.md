@@ -54,14 +54,16 @@ fly secrets set \
 fly deploy
 ```
 
-Beim ersten Start legt die App Team, Teamleitung und Ablehnungsgruende selbst an
-und befuellt die Energiekarte - ein Einrichtungsschritt ueber die Kommandozeile
-ist nicht noetig. Im Protokoll (`fly logs`) steht dann:
+Beim ersten Start legt die App Team, Teamleitung und Ablehnungsgruende selbst an -
+ein Einrichtungsschritt ueber die Kommandozeile ist nicht noetig. Im Protokoll
+(`fly logs`) steht dann:
 
 ```
 [Start] Team „Door2Door Team“ und Teamleitung chef@deinefirma.de angelegt.
-[Start] Energiekarte: 88 Postleitzahlen aktualisiert
 ```
+
+Die Preise der Energiekarte traegt die Teamleitung danach in der App ein
+(Energiekarte → Preis eintragen oder Tabelle).
 
 Ein spaeterer Neustart aendert daran nichts mehr: Sobald ein Nutzer existiert,
 laesst die App die Zugangsdaten unberuehrt. Das Passwort wird danach nur noch

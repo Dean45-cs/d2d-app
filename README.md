@@ -11,7 +11,8 @@ Eine Web-App für Door-to-Door-Teams im Energievertrieb:
   in dem der Auftrag aufgenommen und unterschrieben wird
 - **Termine mit Uhrzeit** – Vorschläge für den Abend, Rufnummer dazu, und am nächsten Tag
   stehen sie oben auf der Tour
-- **Energiekarte** – zeigt täglich aktualisiert, wo der Grundversorger besonders teuer ist
+- **Energiekarte** – zeigt, wo der Grundversorger besonders teuer ist; Preise in Sekunden
+  vom Preisblatt eingetragen oder als Tabelle aus Excel übernommen
 - **Auswertung** – Antreff- und Abschlussquoten je Mitarbeiter, Gebiet und Zeitraum
 - **Installierbar auf iPhone und iPad** – eigenes Symbol, Vollbild ohne Browserleiste,
   Erfassung funktioniert auch ohne Empfang
@@ -317,70 +318,94 @@ Findet die App keine Straßen, hilft der Weg über „Liste einfügen“.
 
 ## Energiekarte
 
-Die Karte zeigt je Postleitzahl die Jahreskosten eines Musterhaushalts beim örtlichen
-**Grundversorger** (Strom: 3.500 kWh, Gas: 15.000 kWh). Rot = teuer = größtes
-Wechselargument. Die Liste „Teuerste Grundversorger“ führt direkt zu den lohnendsten
-Gebieten.
+Die Karte zeigt je Ort die Jahreskosten eines Musterhaushalts beim örtlichen
+**Grundversorger** (Strom: 3.500 kWh, Gas: 15.000 kWh), gemessen am Bundesschnitt der
+Grundversorgung. Rot = teuer = größtes Wechselargument. Die Liste „Teuerste Orte“ führt
+direkt zu den lohnendsten Gebieten.
+
+Es gibt **keine Beispiel- oder Demowerte** mehr: Auf der Karte steht nur, was wirklich
+auf einem Preisblatt steht. Ältere Datenbanken werden beim Start automatisch von den
+früheren Demowerten bereinigt.
+
+### Preise eintragen – ohne Schnittstelle
+
+Eine kostenlose Schnittstelle mit Grundversorgungstarifen gibt es nicht (Anbieter wie
+ene't oder Verivox verkaufen sie als Webservice). Jeder Grundversorger muss seine Preise
+aber gut auffindbar im Internet veröffentlichen (§ 36 EnWG). Die App macht das Abtippen
+so kurz wie möglich – alles direkt auf der **Energiekarte** (nur Teamleitung):
+
+**Einzeln** – „Preis eintragen“, ein grauer Punkt auf der Karte oder „Eintragen“ in der
+Liste „Noch ohne Preis“:
+
+- PLZ, Ort und ein Namensvorschlag für den Grundversorger sind bei Orten aus den eigenen
+  Gebieten schon ausgefüllt; zwei Links suchen das Preisblatt für Strom und Gas.
+- Arbeitspreis (ct/kWh) und Grundpreis abtippen, brutto. Steht der Grundpreis pro Jahr
+  auf dem Blatt, auf „Jahr“ umschalten – die App rechnet selbst um.
+- Schon beim Tippen erscheint die Bewertung („sehr teuer, +157 € ggü. Bundesschnitt“) –
+  ein Tippfehler wie „385“ statt „38,5“ fällt so sofort auf.
+- „Gültig ab“ und der Link zum Preisblatt sind optional, aber der Beleg, falls an der Tür
+  jemand nachfragt.
+
+**Viele Orte auf einmal** – „Tabelle“:
+
+1. **Vorlage herunterladen** (CSV): enthält alle Orte eurer Gebiete ohne Preis – PLZ, Ort
+   und Namensvorschlag stehen schon drin – und alle bereits eingetragenen Orte.
+2. In Excel oder Google Tabellen die Preise ergänzen. Zeilen ohne Preis werden
+   übersprungen; es muss nicht alles auf einmal gefüllt sein.
+3. Alle Zellen kopieren und einfügen (oder die CSV-Datei wählen). Die Vorschau zeigt vor
+   dem Speichern, welche Orte neu sind, welche ersetzt werden und welche Zeile einen
+   Fehler hat.
+
+Die Tabelle darf auch selbst gebaut sein: Spalten werden am Namen erkannt („PLZ“,
+„Arbeitspreis Strom“, „Grundpreis Gas pro Jahr“, `strom_ct_kwh` …), Komma oder Punkt als
+Dezimaltrennzeichen, Tabulator, Semikolon oder Komma als Trenner. Ohne Kopfzeile gilt die
+Spaltenfolge der Vorlage. Excel-typische Eigenheiten (PLZ `1067` statt `01067`, ANSI-Umlaute)
+werden ausgeglichen.
+
+**Gepflegt halten:** Ein Tipp auf einen Ort zeigt alle Werte samt Preisblatt-Link, mit
+„Bearbeiten“ und „Löschen“. Nach einem halben Jahr steht „prüfen“ daneben – Grundversorger
+ändern ihre Preise meist ein- bis zweimal im Jahr. Die Vorlage taugt zugleich als Sicherung
+aller Preise.
+
+Die Lage eines Ortes bestimmt die App selbst: Mitte des eigenen Gebiets mit derselben PLZ,
+sonst die mitgelieferte Städteliste (`src/lib/energy/cities.ts`, rund 90 Städte mit
+Grundversorger-Vorschlag), sonst die Ortssuche. Ein Ort ohne bekannte Lage gilt trotzdem
+für Gebiete mit dieser PLZ, erscheint aber nicht als Punkt auf der Karte.
 
 ### Grundversorger je Gebiet
 
 Überall, wo ein Gebiet auftaucht, stehen Name und Preis des Grundversorgers mit einer
 **Bewertung in fünf Stufen** (sehr günstig · günstig · mittel · teuer · sehr teuer):
 
-- **Übersicht:** eigener Abschnitt „Grundversorger in deinen Gebieten“ – das Gebiet mit
-  dem teuersten Grundversorger ganz oben, daneben alle offenen Gebiete nach Preis sortiert
+- **Übersicht:** eigener Abschnitt mit dem Gebiet, dessen Grundversorger am teuersten ist
 - **Gebietsliste** und **Gebietsseite** (dort mit Strom und Gas, Jahreskosten und
-  Abstand zum Median)
+  Abstand zum Bundesschnitt; fehlt der Preis, führt „Preis vom Preisblatt eintragen“
+  direkt ins vorausgefüllte Formular auf der Energiekarte)
 - **Klinken:** unter der Straßenauswahl, damit das Argument an der Tür parat ist
 
-### Echte Preise selbst eintragen
+Zugeordnet wird über die PLZ des Gebiets, sonst über den Ortsnamen, sonst über den nächsten
+eingetragenen Ort (bis 30 km) oder die PLZ-Region – dann steht dabei, aus welchem Ort der
+Preis stammt.
 
-Eine kostenlose Schnittstelle mit echten Grundversorgungstarifen gibt es nicht (Anbieter
-wie ene't oder Verivox verkaufen sie als Webservice). Jeder Grundversorger muss seine
-Preise aber gut auffindbar im Internet veröffentlichen (§ 36 EnWG). Deshalb:
+**Bewertung:** gemessen am Bundesdurchschnitt der Grundversorgung (voreingestellt Stand
+September 2026: Strom 37,3 ct/kWh + 13,76 €/Monat, Gas 13,6 ct/kWh; unter Einstellungen →
+Grundversorger-Preise änderbar). Ab 3 % darüber „teuer“, ab 8 % „sehr teuer“,
+entsprechend nach unten. Eine Rangfolge der eingetragenen Orte untereinander wäre bei
+wenigen Orten nichtssagend – einer wäre immer „sehr teuer“.
 
-**Einstellungen → Grundversorger-Preise** (nur Teamleitung)
+### Optional: Tagesquelle
 
-- „Eure Gebiete ohne echten Preis“ listet die Orte der eigenen Gebiete, für die noch
-  Demo-Werte gelten – ein Tipp auf „Preis eintragen“ füllt PLZ, Ort und einen
-  Namensvorschlag vor, zwei Links suchen das Preisblatt für Strom und Gas.
-- Eintragen: Arbeitspreis (ct/kWh) und Grundpreis (€/Monat), brutto, für Strom und/oder
-  Gas; dazu „gültig ab“ und den Link zum Preisblatt als Beleg. Ist der Gasversorger ein
-  anderer als beim Strom, eigenes Feld.
-- Eingetragene Preise gehen den Demo-Werten vor – in Übersicht, Gebieten, beim Klinken
-  und auf der Energiekarte. Sie gelten für die PLZ, den gleichen Ort und (mit Hinweis)
-  für Gebiete bis 30 km entfernt.
-- Nach einem halben Jahr erscheint „bitte prüfen“ – Grundversorger ändern ihre Preise
-  meist ein- bis zweimal im Jahr.
-
-**Bewertung eingetragener Preise:** gemessen am Bundesdurchschnitt der Grundversorgung
-(voreingestellt Stand September 2026: Strom 37,3 ct/kWh + 13,76 €/Monat, Gas 13,6 ct/kWh;
-in den Einstellungen änderbar). Ab 3 % darüber „teuer“, ab 8 % „sehr teuer“, entsprechend
-nach unten. Eine Rangfolge der eigenen Orte untereinander wäre bei wenigen Orten
-nichtssagend.
-
-Für die Werte aus der Tagesquelle (Demo oder Feed) richtet sich die Stufe nach allen Orten
-der Quelle: die teuersten 20 % sind „sehr teuer“, die günstigsten 20 % „sehr günstig“. Zugeordnet wird über die PLZ des Gebiets,
-sonst über den Ortsnamen, sonst über den nächsten bekannten Ort (bis 30 km) oder die
-PLZ-Region – dann steht dabei, aus welchem Ort der Preis stammt.
-
-### Datenquelle einrichten
-
-Es gibt keine kostenlose offene Schnittstelle mit tagesaktuellen Grundversorgertarifen.
-Die App bringt deshalb eine **austauschbare Quelle** mit, die in `.env.local` konfiguriert wird:
+Wer doch eine Quelle mit Preisen hat – einen Export des Tarifdatenanbieters oder eine
+**als CSV veröffentlichte Google-Tabelle** (Datei → Freigeben → Im Web veröffentlichen →
+CSV) –, kann sie zusätzlich täglich abrufen lassen. Selbst eingetragene Preise gehen ihr
+immer vor.
 
 ```bash
-ENERGY_FEED_MODE=csv                       # seed | csv | json
+ENERGY_FEED_MODE=csv                       # csv | json – leer = keine Tagesquelle
 ENERGY_FEED_URL=https://…/grundversorger.csv
 ENERGY_FEED_TOKEN=…                        # optional, wird als Bearer-Token gesendet
-ENERGY_FEED_LABEL=Mein Tarifdatenanbieter  # Anzeigename in der Karte
+ENERGY_FEED_LABEL=Mein Tarifdatenanbieter  # Anzeigename in der App
 ```
-
-- **`seed`** (Voreinstellung): erzeugt Beispielwerte, damit die Karte bedienbar ist.
-  Diese Werte sind **keine echten Tarife** – die App weist in der Karte deutlich darauf hin.
-- **`csv` / `json`**: ruft täglich die hinterlegte Adresse ab. Geeignet ist alles, was
-  PLZ-bezogene Preise liefert: ein Export eures Tarifdatenanbieters (z. B. ene't, Verivox
-  Partner-Feed, Check24 Partnerprogramm) oder eine selbst gepflegte Tabelle.
 
 Erwartete Spalten (deutsche oder englische Namen, Groß-/Kleinschreibung egal, Komma oder
 Punkt als Dezimaltrennzeichen):
@@ -391,40 +416,31 @@ Punkt als Dezimaltrennzeichen):
 | `ort` / `city` | – | `Dortmund` |
 | `versorger` / `provider` | – | `DEW21` |
 | `strom_ct_kwh` | – | `38,45` |
-| `strom_grundpreis_eur` | – | `142,80` |
+| `strom_grundpreis_eur` (pro Jahr) | – | `142,80` |
 | `gas_ct_kwh` | – | `12,10` |
-| `gas_grundpreis_eur` | – | `178,00` |
+| `gas_grundpreis_eur` (pro Jahr) | – | `178,00` |
 | `lat`, `lng` | – | `51.5136`, `7.4653` |
 | `gueltig_ab` / `valid_from` | – | `2026-09-17` |
 
-Fehlen `lat`/`lng`, ergänzt die App die Koordinate aus der mitgelieferten Städteliste
-(`src/lib/energy/cities.ts`, rund 90 Städte mit ihrem Grundversorger). Zeilen ohne
-zuordenbare Koordinate werden übersprungen. Für flächendeckende PLZ-Abdeckung einfach
-`lat`/`lng` in den Feed aufnehmen oder die Städteliste erweitern.
+Fehlen `lat`/`lng`, ergänzt die App die Koordinate aus der Städteliste; Zeilen ohne
+zuordenbare Koordinate werden übersprungen.
 
-### Täglich aktualisieren
-
-Drei Wege, je nach Betrieb:
+Mit eingerichteter Quelle ruft die App sie beim Start und danach täglich selbst ab.
+Alternativ per Cron:
 
 ```bash
 # 1) Cron auf dem Server (App muss nicht laufen)
 0 5 * * *  cd /pfad/zur/app && npm run energy:refresh
 
-# 2) HTTP-Aufruf, z. B. aus einem Cron-Dienst oder Vercel Cron
+# 2) HTTP-Aufruf, z. B. aus einem Cron-Dienst
 curl -X POST https://deine-app.de/api/energy/refresh \
      -H "Authorization: Bearer $ENERGY_REFRESH_TOKEN"
 
-# 3) Von Hand: auf der Energiekarte über den Aktualisieren-Knopf oben rechts (nur Teamleitung)
+# 3) Von Hand: auf der Energiekarte über den Abruf-Knopf oben rechts (nur Teamleitung)
 ```
 
-Für Vercel Cron genügt eine `vercel.json`:
-
-```json
-{ "crons": [{ "path": "/api/energy/refresh", "schedule": "0 5 * * *" }] }
-```
-
-Jeder Lauf wird protokolliert; der Stand steht im Kopf der Energiekarte, Quelle, Zeitpunkt
-und Ergebnis unter Einstellungen → „Preisdaten der Energiekarte“.
+Jeder Lauf wird protokolliert; Quelle, Zeitpunkt und Ergebnis stehen unter
+Einstellungen → „Tagesquelle der Energiekarte“.
 
 ---
 
@@ -496,8 +512,8 @@ fly deploy
 ```
 
 Team, Teamleitung und Ablehnungsgründe legt die App beim ersten Start selbst an
-(`src/lib/bootstrap.ts`), ebenso wird die Energiekarte einmal befüllt und danach
-täglich aktualisiert. Ein Einrichtungsschritt über die Kommandozeile entfällt.
+(`src/lib/bootstrap.ts`). Ein Einrichtungsschritt über die Kommandozeile entfällt. Die
+Preise der Energiekarte trägt die Teamleitung danach in der App ein.
 
 Geht genauso bei Railway, Render, Hetzner oder einem eigenen Server – Hauptsache, es gibt
 **dauerhaften Dateispeicher** für die SQLite-Datei. **Vercel und Netlify funktionieren
@@ -535,7 +551,7 @@ src/
       karte/          Energiekarte
       auswertung/     Zahlen
       team/           Mitarbeiterverwaltung
-      einstellungen/  Ablehnungsgründe, Quellen, Design-Hinweise
+      einstellungen/  Ablehnungsgründe, Vergleichswert, Tarifrechner
     api/              REST-Endpunkte
     brand.css         >>> hier die Markenfarben eintragen <<<
   lib/
@@ -544,7 +560,7 @@ src/
     queries.ts        alle Datenbankabfragen
     appointments.ts   Terminzeiten, Vorschläge, Beschriftung
     doors.ts          Türstatus: offen, Wiedervorlage, fertig, gesperrt
-    energy/           Städteliste, Datenquellen-Adapter, Tagesabruf
+    energy/           Preise, Bewertung, Tabellen-Import, Städteliste, Tagesquelle
     geo/              Flächenberechnung, Aufteilung, OpenStreetMap-Abfragen
     offline-queue.ts  Puffer für Türeinträge ohne Netz
   components/         UI-Bausteine, Diagramme, Navigation
@@ -555,7 +571,7 @@ docs/
   IPHONE-IPAD.md      Installation auf dem Handy und App-Store-Weg
 scripts/
   seed.ts             Ersteinrichtung
-  refresh-energy.ts   Tagesabruf für Cron
+  refresh-energy.ts   Abruf der (optionalen) Tagesquelle für Cron
 ```
 
 ### Befehle
@@ -566,7 +582,7 @@ npm run build           # Produktionsbuild
 npm run start           # Produktionsserver
 npm run typecheck       # TypeScript prüfen
 npm run db:seed         # Datenbank einrichten
-npm run energy:refresh  # Energiepreise abrufen
+npm run energy:refresh  # Tagesquelle abrufen (falls eingerichtet)
 ```
 
 ---

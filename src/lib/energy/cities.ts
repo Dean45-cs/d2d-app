@@ -2,10 +2,10 @@
  * Stammdaten fuer die Energiekarte: deutsche Staedte mit Postleitzahl,
  * Koordinate und dem oertlichen Grundversorger.
  *
- * WICHTIG: Diese Datei enthaelt KEINE Preise. Preise kommen ausschliesslich
- * aus der in .env konfigurierten Tagesquelle (siehe src/lib/energy/adapters.ts).
- * Ohne konfigurierte Quelle erzeugt der Seed-Adapter klar als "Demo"
- * gekennzeichnete Beispielwerte, damit die Karte bedienbar ist.
+ * WICHTIG: Diese Datei enthaelt KEINE Preise. Sie liefert beim Eintragen
+ * einen Namensvorschlag fuer den Grundversorger und die Lage eines Ortes,
+ * wenn keine andere bekannt ist. Die Namen sind ein Vorschlag - verbindlich
+ * ist, was auf dem Preisblatt steht.
  */
 
 export interface CityRecord {
@@ -109,3 +109,20 @@ export const CITIES: CityRecord[] = [
   { plz: "35390", city: "Gießen", state: "Hessen", provider: "Stadtwerke Gießen", lat: 50.5841, lng: 8.6784, population: 90000 },
   { plz: "56068", city: "Koblenz", state: "Rheinland-Pfalz", provider: "evm Energieversorgung Mittelrhein", lat: 50.3569, lng: 7.5890, population: 114000 },
 ];
+
+/** Ortsname zum Vergleichen: klein, ohne Klammerzusatz ("Halle (Saale)" -> "halle"). */
+export function normalizeCity(city: string): string {
+  return city
+    .toLocaleLowerCase("de-DE")
+    .replace(/\(.*?\)/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+const byPlz = new Map(CITIES.map((c) => [c.plz, c]));
+const byName = new Map(CITIES.map((c) => [normalizeCity(c.city), c]));
+
+/** Stadt aus der Liste - ueber die PLZ, sonst ueber den Namen. */
+export function findCity(postalCode: string, city: string): CityRecord | null {
+  return byPlz.get(postalCode.trim()) ?? byName.get(normalizeCity(city)) ?? null;
+}

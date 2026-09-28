@@ -1,11 +1,12 @@
 /**
- * Selbst gepflegte Grundversorger-Preise.
+ * Selbst gepflegte Grundversorger-Preise - die eigentliche Quelle der
+ * Energiekarte.
  *
  * Eine kostenlose Schnittstelle mit echten Grundversorgungstarifen gibt es
  * nicht. Jeder Grundversorger muss seine Preise aber gut auffindbar im
- * Internet veroeffentlichen (§ 36 EnWG) - die Teamleitung tippt sie fuer die
- * eigenen Orte vom Preisblatt ab. Diese Werte gehen allen Werten aus der
- * Tagesquelle vor.
+ * Internet veroeffentlichen (§ 36 EnWG) - die Teamleitung tippt sie vom
+ * Preisblatt ab, direkt auf der Energiekarte oder als Tabelle. Diese Werte
+ * gehen einer (optionalen) Tagesquelle vor.
  */
 import { getDb, getSetting, setSetting } from "../db";
 import { CONSUMPTION_GAS_KWH, CONSUMPTION_STROM_KWH } from "./refresh";
@@ -138,3 +139,14 @@ export function referenceYear(reference: Reference): { strom: number; gas: numbe
 
 /** Nach so vielen Tagen sollte ein gepflegter Preis geprueft werden. */
 export const STALE_AFTER_DAYS = 183;
+
+/** Aelter als ein halbes Jahr - Grundversorger aendern ihre Preise ein- bis zweimal im Jahr. */
+export function isStale(updatedAt: string, now = Date.now()): boolean {
+  const updated = Date.parse(`${updatedAt.replace(" ", "T")}Z`);
+  return Number.isFinite(updated) && now - updated > STALE_AFTER_DAYS * 86_400_000;
+}
+
+/** Gespeichert wird der Grundpreis pro Jahr, eingetragen pro Monat. */
+export function monthly(yearly: number | null): number | null {
+  return yearly === null ? null : Math.round((yearly / 12) * 100) / 100;
+}

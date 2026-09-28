@@ -1,18 +1,23 @@
-import crypto from "node:crypto";
 import { CITIES, type CityRecord } from "./cities";
+import { splitTable } from "./table";
 
 /**
- * Datenquellen fuer die Energiekarte.
+ * Optionale Tagesquelle fuer die Energiekarte.
  *
  * Die Karte zeigt, wo der oertliche GRUNDVERSORGER besonders teuer ist -
  * dort ist die Ersparnis beim Wechsel am groessten, also das beste Klingelgebiet.
  *
- * Es gibt keine offene, kostenlose API mit tagesaktuellen Grundversorger-
- * Tarifen. Deshalb ist die Quelle austauschbar:
+ * Es gibt keine offene, kostenlose API mit Grundversorger-Tarifen. Im
+ * Normalfall traegt die Teamleitung die Preise deshalb selbst ein (direkt auf
+ * der Energiekarte, einzeln oder als Tabelle). Wer doch eine Quelle hat - einen
+ * Export des Tarifdatenanbieters oder eine als CSV veroeffentlichte Google-
+ * Tabelle -, kann sie zusaetzlich taeglich abrufen lassen:
  *
- *   ENERGY_FEED_MODE=seed  -> Beispielwerte (deutlich als Demo markiert)
  *   ENERGY_FEED_MODE=csv   -> taeglicher Abruf einer CSV unter ENERGY_FEED_URL
  *   ENERGY_FEED_MODE=json  -> taeglicher Abruf einer JSON-Liste/API
+ *
+ * Ohne beides bleibt die Tagesquelle aus. Erfundene Beispielpreise gibt es
+ * nicht mehr - eine Karte, die Preise zeigt, muss echte zeigen.
  *
  * Erwartete Spalten/Felder (Gross-/Kleinschreibung egal, deutsche oder
  * englische Namen):
@@ -20,9 +25,9 @@ import { CITIES, type CityRecord } from "./cities";
  *   ort | city
  *   versorger | provider
  *   strom_ct_kwh | power_ct_kwh
- *   strom_grundpreis_eur
+ *   strom_grundpreis_eur       (pro Jahr)
  *   gas_ct_kwh
- *   gas_grundpreis_eur
+ *   gas_grundpreis_eur         (pro Jahr)
  *   lat, lng                   (optional, sonst aus der Staedteliste)
  *   gueltig_ab | valid_from    (optional)
  */
@@ -40,57 +45,14 @@ export interface PriceRow {
   gas_base_eur: number | null;
   households: number;
   valid_from: string | null;
-  is_demo: boolean;
 }
 
 export interface FeedResult {
   rows: PriceRow[];
   source: string;
-  isDemo: boolean;
 }
 
 const cityByPlz = new Map<string, CityRecord>(CITIES.map((c) => [c.plz, c]));
-
-/* ------------------------------ Seed-Adapter ----------------------------- */
-
-/** Stabiler Pseudo-Zufall aus der PLZ - gleiche PLZ ergibt immer den gleichen Wert. */
-function deterministic(seed: string, salt: string): number {
-  const hash = crypto.createHash("sha256").update(`${seed}:${salt}`).digest();
-  return hash.readUInt32BE(0) / 0xffffffff;
-}
-
-function round(value: number, digits: number): number {
-  const f = 10 ** digits;
-  return Math.round(value * f) / f;
-}
-
-/**
- * Erzeugt Beispielpreise in realistischen Spannen, damit die Karte und alle
- * Auswertungen ohne externe Quelle bedienbar sind. Diese Werte sind KEINE
- * echten Tarife und werden in der Oberflaeche ueberall als "Demo" markiert.
- */
-export function seedFeed(): FeedResult {
-  const rows: PriceRow[] = CITIES.map((c) => {
-    const s = deterministic(c.plz, "strom");
-    const g = deterministic(c.plz, "gas");
-    return {
-      postal_code: c.plz,
-      city: c.city,
-      state: c.state,
-      provider: c.provider,
-      lat: c.lat,
-      lng: c.lng,
-      strom_ct_kwh: round(34 + s * 13, 2), // 34,00 - 47,00 ct/kWh
-      strom_base_eur: round(95 + s * 90, 2),
-      gas_ct_kwh: round(9.5 + g * 7, 2), // 9,50 - 16,50 ct/kWh
-      gas_base_eur: round(100 + g * 130, 2),
-      households: Math.round(c.population / 2.0),
-      valid_from: null,
-      is_demo: true,
-    };
-  });
-  return { rows, source: "Demo-Beispieldaten (keine echten Tarife)", isDemo: true };
-}
 
 /* ------------------------------ Externe Feeds ---------------------------- */
 
@@ -138,60 +100,20 @@ function mapRow(raw: Record<string, unknown>): PriceRow | null {
     gas_base_eur: toNumber(pick(lower, "gas_grundpreis_eur", "gas_base_eur", "grundpreis_gas")),
     households: Math.round((known?.population ?? 0) / 2.0),
     valid_from: pick(lower, "gueltig_ab", "valid_from", "stand"),
-    is_demo: false,
   };
 }
 
-/** Sehr einfacher CSV-Parser: Trennzeichen ; oder , mit Anfuehrungszeichen. */
+/** CSV mit Kopfzeile -> ein Objekt je Zeile. Trennzeichen ; , oder Tabulator. */
 export function parseCsv(text: string): Record<string, string>[] {
-  const clean = text.replace(/^﻿/, "").replace(/\r\n/g, "\n").trim();
-  if (!clean) return [];
-  const delimiter = (clean.split("\n")[0].match(/;/g)?.length ?? 0) >=
-    (clean.split("\n")[0].match(/,/g)?.length ?? 0)
-    ? ";"
-    : ",";
-
-  const rows: string[][] = [];
-  let field = "";
-  let row: string[] = [];
-  let inQuotes = false;
-
-  for (let i = 0; i < clean.length; i++) {
-    const char = clean[i];
-    if (inQuotes) {
-      if (char === '"') {
-        if (clean[i + 1] === '"') {
-          field += '"';
-          i++;
-        } else inQuotes = false;
-      } else field += char;
-      continue;
-    }
-    if (char === '"') inQuotes = true;
-    else if (char === delimiter) {
-      row.push(field);
-      field = "";
-    } else if (char === "\n") {
-      row.push(field);
-      rows.push(row);
-      row = [];
-      field = "";
-    } else field += char;
-  }
-  row.push(field);
-  rows.push(row);
-
-  const [header, ...body] = rows;
+  const [header, ...body] = splitTable(text);
   if (!header) return [];
-  return body
-    .filter((r) => r.some((cell) => cell.trim() !== ""))
-    .map((r) => {
-      const obj: Record<string, string> = {};
-      header.forEach((name, idx) => {
-        obj[name.trim()] = (r[idx] ?? "").trim();
-      });
-      return obj;
+  return body.map((cells) => {
+    const obj: Record<string, string> = {};
+    header.forEach((name, idx) => {
+      obj[name] = cells[idx] ?? "";
     });
+    return obj;
+  });
 }
 
 async function fetchFeed(url: string): Promise<string> {
@@ -206,17 +128,30 @@ async function fetchFeed(url: string): Promise<string> {
   return response.text();
 }
 
-/** Holt die aktuellen Preise aus der konfigurierten Quelle. */
-export async function loadFeed(): Promise<FeedResult> {
-  const mode = (process.env.ENERGY_FEED_MODE ?? "seed").toLowerCase();
+export interface FeedConfig {
+  mode: "csv" | "json";
+  url: string;
+  label: string;
+}
+
+/** Die eingerichtete Tagesquelle - null, wenn keine eingerichtet ist. */
+export function feedConfig(): FeedConfig | null {
+  const mode = (process.env.ENERGY_FEED_MODE ?? "").trim().toLowerCase();
   const url = process.env.ENERGY_FEED_URL?.trim();
-  const label = process.env.ENERGY_FEED_LABEL?.trim();
+  if ((mode !== "csv" && mode !== "json") || !url) return null;
+  return { mode, url, label: process.env.ENERGY_FEED_LABEL?.trim() ?? "" };
+}
 
-  if (mode === "seed" || !url) return seedFeed();
+/** Holt die aktuellen Preise aus der eingerichteten Quelle. */
+export async function loadFeed(): Promise<FeedResult> {
+  const config = feedConfig();
+  if (!config) {
+    throw new Error("Keine Tagesquelle eingerichtet (ENERGY_FEED_MODE und ENERGY_FEED_URL).");
+  }
 
-  const text = await fetchFeed(url);
+  const text = await fetchFeed(config.url);
   const raw: Record<string, unknown>[] =
-    mode === "json"
+    config.mode === "json"
       ? (() => {
           const parsed = JSON.parse(text);
           if (Array.isArray(parsed)) return parsed;
@@ -236,7 +171,6 @@ export async function loadFeed(): Promise<FeedResult> {
 
   return {
     rows,
-    source: label || new URL(url).host,
-    isDemo: false,
+    source: config.label || new URL(config.url).host,
   };
 }

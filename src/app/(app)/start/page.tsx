@@ -283,7 +283,7 @@ export default async function StartPage() {
           <ProviderCard
             info={top ? (providerOf.get(top.id) ?? null) : null}
             title={top ? `Größtes Potenzial · ${top.name}` : "Grundversorger"}
-            editHref="/einstellungen#grundversorger"
+            editHref={top ? `/karte?gebiet=${top.id}` : "/karte"}
           />
         </div>
       </div>

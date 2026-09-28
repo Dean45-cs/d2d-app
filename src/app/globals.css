@@ -1078,6 +1078,12 @@ a[role="button"] {
   box-shadow: 0 0 0 4px color-mix(in srgb, var(--ink) 22%, transparent),
     0 4px 12px rgb(11 21 36 / 0.45);
 }
+/* Ort ohne Preis: hohl und gestrichelt - "hier fehlt noch etwas" */
+.map-price.is-open {
+  background: color-mix(in srgb, #94a3b8 35%, #fff) !important;
+  border: 2px dashed #64748b;
+  box-shadow: 0 1px 2px rgb(11 21 36 / 0.2);
+}
 
 /* Filter ueber der Arbeitskarte */
 .map-filter {

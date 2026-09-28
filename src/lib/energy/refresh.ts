@@ -5,14 +5,14 @@ export interface RefreshResult {
   status: "ok" | "error";
   source: string;
   rowCount: number;
-  isDemo: boolean;
   message: string;
   finishedAt: string;
 }
 
 /**
- * Holt die Tagespreise und schreibt sie in die Datenbank.
- * Wird taeglich per Cron ueber /api/energy/refresh aufgerufen.
+ * Holt die Preise der Tagesquelle und schreibt sie in die Datenbank.
+ * Nur mit eingerichteter Quelle (siehe adapters.ts) - sonst pflegt das Team
+ * die Preise selbst, und hier gibt es nichts abzurufen.
  */
 export async function refreshEnergyPrices(): Promise<RefreshResult> {
   const db = getDb();
@@ -36,13 +36,11 @@ export async function refreshEnergyPrices(): Promise<RefreshResult> {
 
     setSetting("energy_last_success", finishedAt);
     setSetting("energy_source", feed.source);
-    setSetting("energy_is_demo", feed.isDemo ? "1" : "0");
 
     return {
       status: "ok",
       source: feed.source,
       rowCount: feed.rows.length,
-      isDemo: feed.isDemo,
       message: `${feed.rows.length} Postleitzahlen aktualisiert`,
       finishedAt,
     };
@@ -58,7 +56,6 @@ export async function refreshEnergyPrices(): Promise<RefreshResult> {
       status: "error",
       source: "",
       rowCount: 0,
-      isDemo: false,
       message,
       finishedAt,
     };
@@ -70,10 +67,10 @@ function writeRows(rows: PriceRow[], source: string) {
   const upsert = db.prepare(`
     INSERT INTO energy_prices
       (postal_code, city, state, provider, lat, lng, strom_ct_kwh, strom_base_eur,
-       gas_ct_kwh, gas_base_eur, households, source, is_demo, valid_from, updated_at)
+       gas_ct_kwh, gas_base_eur, households, source, valid_from, updated_at)
     VALUES
       (@postal_code, @city, @state, @provider, @lat, @lng, @strom_ct_kwh, @strom_base_eur,
-       @gas_ct_kwh, @gas_base_eur, @households, @source, @is_demo, @valid_from, datetime('now'))
+       @gas_ct_kwh, @gas_base_eur, @households, @source, @valid_from, datetime('now'))
     ON CONFLICT(postal_code) DO UPDATE SET
       city           = excluded.city,
       state          = excluded.state,
@@ -86,18 +83,13 @@ function writeRows(rows: PriceRow[], source: string) {
       gas_base_eur   = excluded.gas_base_eur,
       households     = excluded.households,
       source         = excluded.source,
-      is_demo        = excluded.is_demo,
       valid_from     = excluded.valid_from,
       updated_at     = datetime('now')
   `);
 
   const run = db.transaction((items: PriceRow[]) => {
     for (const row of items) {
-      upsert.run({
-        ...row,
-        source,
-        is_demo: row.is_demo ? 1 : 0,
-      });
+      upsert.run({ ...row, source });
     }
   });
   run(rows);

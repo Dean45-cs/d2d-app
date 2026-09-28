@@ -58,8 +58,11 @@ export function labelMarker(text: string, width = 140) {
   };
 }
 
-/** Preis-Pin der Energiekarte: Farbe = Preisstufe, Groesse = Abstand zum Median. */
-export function priceMarker(color: string, diameter: number, selected: boolean) {
+/**
+ * Preis-Pin der Energiekarte: Farbe = Preisstufe, Groesse = Abstand zum
+ * Bundesschnitt. `open`: Ort ohne Preis - gestrichelt, zum Antippen und Eintragen.
+ */
+export function priceMarker(color: string, diameter: number, selected: boolean, open = false) {
   const box = Math.round(diameter + 8);
   return {
     size: [box, box] as [number, number],
@@ -67,7 +70,7 @@ export function priceMarker(color: string, diameter: number, selected: boolean) 
       const wrap = el("span", "map-price-wrap");
       wrap.style.width = `${box}px`;
       wrap.style.height = `${box}px`;
-      const dot = el("span", `map-price${selected ? " is-selected" : ""}`);
+      const dot = el("span", `map-price${selected ? " is-selected" : ""}${open ? " is-open" : ""}`);
       dot.style.background = color;
       dot.style.width = `${diameter}px`;
       dot.style.height = `${diameter}px`;

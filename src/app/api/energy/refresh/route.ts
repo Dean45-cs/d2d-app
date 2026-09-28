@@ -1,12 +1,14 @@
 import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth";
+import { feedConfig } from "@/lib/energy/adapters";
 import { refreshEnergyPrices } from "@/lib/energy/refresh";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
 /**
- * Taeglicher Abruf der Grundversorger-Preise.
+ * Taeglicher Abruf der Grundversorger-Preise aus der Tagesquelle - nur, wenn
+ * eine eingerichtet ist (ENERGY_FEED_MODE/ENERGY_FEED_URL).
  *
  * Aufruf entweder
  *   - per Cron mit Header  Authorization: Bearer <ENERGY_REFRESH_TOKEN>
@@ -24,6 +26,12 @@ async function authorise(request: Request): Promise<boolean> {
 export async function POST(request: Request) {
   if (!(await authorise(request))) {
     return NextResponse.json({ error: "Nicht berechtigt" }, { status: 401 });
+  }
+  if (!feedConfig()) {
+    return NextResponse.json(
+      { error: "Keine Tagesquelle eingerichtet – Preise werden direkt auf der Energiekarte eingetragen." },
+      { status: 409 },
+    );
   }
   const result = await refreshEnergyPrices();
   return NextResponse.json(result, { status: result.status === "ok" ? 200 : 502 });

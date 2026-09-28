@@ -79,12 +79,12 @@ function dateLabel(value: string): string {
   return d && m && y ? `${d}.${m}.${y}` : value;
 }
 
-/** Herkunft der Zahlen in einem Satz: eigene Eingabe mit Stand, Demo oder Quelle. */
+/** Herkunft der Zahlen in einem Satz: eigene Eingabe mit Stand oder Tagesquelle. */
 function originNote(info: ProviderInfo): string {
   if (info.manual) {
     return info.validFrom ? `Preisblatt, gültig ab ${dateLabel(info.validFrom)}` : "vom Preisblatt eingetragen";
   }
-  return info.isDemo ? "Beispielwerte" : "Tagesquelle";
+  return "Tagesquelle";
 }
 
 /**
@@ -96,7 +96,7 @@ export function ProviderLine({ info, className = "" }: { info: ProviderInfo | nu
     return (
       <p className={`muted flex items-center gap-1.5 text-[12px] ${className}`}>
         <IconBolt className="h-3.5 w-3.5 shrink-0" />
-        Grundversorger unbekannt
+        Noch kein Grundversorger-Preis
       </p>
     );
   }
@@ -112,7 +112,6 @@ export function ProviderLine({ info, className = "" }: { info: ProviderInfo | nu
             {ctLabel(price.ct)}
           </span>
         )}
-        {info.isDemo && <span className="muted"> · Beispiel</span>}
         {info.stale && <span className="font-semibold text-warn"> · prüfen</span>}
       </span>
       {price && <PriceBadge step={price.step} size="sm" />}
@@ -121,7 +120,6 @@ export function ProviderLine({ info, className = "" }: { info: ProviderInfo | nu
 }
 
 function PriceRow({ label, price }: { label: string; price: PriceInfo | null }) {
-  const basis = price?.basis === "average" ? "ggü. Bundesschnitt" : "ggü. Median";
   if (!price) {
     return (
       <div className="flex items-center justify-between gap-3 py-2">
@@ -145,7 +143,7 @@ function PriceRow({ label, price }: { label: string; price: PriceInfo | null }) 
           style={{ color: price.delta > 0 ? "var(--danger-ink)" : "var(--ok-ink)" }}
         >
           {price.delta > 0 ? "+" : ""}
-          {euro(price.delta)} {basis}
+          {euro(price.delta)} ggü. Bundesschnitt
         </span>
       </div>
     </div>
@@ -195,7 +193,7 @@ export function ProviderCard({
         <div className="min-w-0 flex-1">
           <p className="muted truncate text-[12px] font-medium">{title}</p>
           <p className="truncate text-[16px] font-bold">
-            {info ? info.provider || "Name unbekannt" : "Nicht zugeordnet"}
+            {info ? info.provider || "Name unbekannt" : "Noch kein Preis"}
           </p>
           {info ? (
             <p className="muted text-[12px]">
@@ -211,7 +209,7 @@ export function ProviderCard({
             </p>
           ) : (
             <p className="muted text-[12px]">
-              Für diesen Ort liegt kein Preis vor – PLZ und Ort im Gebiet prüfen.
+              Sobald der Preis des Grundversorgers eingetragen ist, steht hier, wie teuer er ist.
             </p>
           )}
         </div>
@@ -238,12 +236,10 @@ export function ProviderCard({
           className="border-t px-4 py-2.5 text-[12px] font-medium"
           style={{
             borderColor: "var(--line)",
-            color: info?.isDemo ? "var(--ink-muted)" : inkOf(lead.step),
+            color: inkOf(lead.step),
           }}
         >
-          {info?.isDemo
-            ? "Beispielwerte, kein echter Tarif – nicht als Verkaufsargument nutzen."
-            : PRICE_LEVELS[lead.step].pitch}
+          {PRICE_LEVELS[lead.step].pitch}
         </p>
       )}
       {info?.stale && (
@@ -256,7 +252,7 @@ export function ProviderCard({
           href={editHref}
           className="flex items-center justify-between gap-2 border-t px-4 py-2.5 text-[13px] font-semibold text-tint transition-colors hover:bg-[var(--hover)] [border-color:var(--line)]"
         >
-          {info?.manual ? "Preis für diesen Ort eintragen" : "Echten Preis vom Preisblatt eintragen"}
+          {info ? "Preis für diesen Ort eintragen" : "Preis vom Preisblatt eintragen"}
           <IconChevronRight className="h-4 w-4 shrink-0" />
         </Link>
       )}
