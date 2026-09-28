@@ -1,6 +1,7 @@
 import { getDb, getSetting } from "./db";
 import { hashPassword } from "./auth";
 import { ensureDefaultReasons } from "./queries";
+import { feedConfig } from "./energy/adapters";
 import { refreshEnergyPrices } from "./energy/refresh";
 
 /**
@@ -8,7 +9,8 @@ import { refreshEnergyPrices } from "./energy/refresh";
  *
  * Damit nach dem Deployen kein zusätzlicher Schritt über die Kommandozeile
  * nötig ist: Ist die Datenbank noch leer und sind Zugangsdaten hinterlegt,
- * werden Team und Teamleitung angelegt und die Energiekarte einmal befüllt.
+ * werden Team und Teamleitung angelegt. Ist eine Tagesquelle für die
+ * Energiekarte eingerichtet, wird sie einmal abgerufen.
  *
  * Läuft bewusst nur bei komplett leerer Nutzertabelle – ein versehentlicher
  * zweiter Durchlauf kann also niemandem das Passwort überschreiben.
@@ -52,7 +54,10 @@ export async function bootstrap(): Promise<void> {
     console.log(`[Start] Team „${teamName}“ und Teamleitung ${email} angelegt.`);
   }
 
-  // Energiekarte einmalig befüllen, damit sie nicht leer bleibt.
+  // Ohne Tagesquelle pflegt das Team die Preise selbst - dann gibt es nichts abzurufen.
+  if (!feedConfig()) return;
+
+  // Tagesquelle einmalig abrufen, damit die Karte nicht bis morgen leer bleibt.
   const prices = db.prepare("SELECT COUNT(*) AS count FROM energy_prices").get() as {
     count: number;
   };

@@ -166,7 +166,6 @@ function migrate(db: Database.Database) {
       gas_base_eur      REAL,
       households        INTEGER NOT NULL DEFAULT 0,
       source            TEXT NOT NULL DEFAULT '',
-      is_demo           INTEGER NOT NULL DEFAULT 0,
       valid_from        TEXT,
       updated_at        TEXT NOT NULL DEFAULT (datetime('now')),
       UNIQUE (postal_code)
@@ -245,11 +244,31 @@ function migrate(db: Database.Database) {
     addColumn(db, table, "blocked_note", "TEXT NOT NULL DEFAULT ''");
   }
 
+  // Frueher fuellte die App die Energiekarte ohne Quelle mit erfundenen
+  // Beispielpreisen. Die fliegen raus - samt Protokoll und Merker, sonst
+  // stuende in den Einstellungen weiter "Demo" als Quelle.
+  if (hasColumn(db, "energy_prices", "is_demo")) {
+    db.exec("DELETE FROM energy_prices WHERE is_demo = 1");
+  }
+  db.exec("DELETE FROM energy_refresh_log WHERE source LIKE 'Demo%'");
+  const source = db.prepare("SELECT value FROM settings WHERE key = 'energy_source'").get() as
+    | { value: string }
+    | undefined;
+  if (source?.value.startsWith("Demo")) {
+    db.exec("DELETE FROM settings WHERE key IN ('energy_source', 'energy_last_success')");
+  }
+  db.exec("DELETE FROM settings WHERE key = 'energy_is_demo'");
+
   // Erst hier, denn vor addColumn gibt es die Spalte in alten Datenbanken nicht.
   db.exec("CREATE INDEX IF NOT EXISTS idx_visits_doorbell ON visits (doorbell_id)");
   db.exec(
     "CREATE INDEX IF NOT EXISTS idx_visits_follow_up ON visits (team_id, follow_up_at)",
   );
+}
+
+function hasColumn(db: Database.Database, table: string, column: string): boolean {
+  const columns = db.prepare(`PRAGMA table_info(${table})`).all() as Array<{ name: string }>;
+  return columns.some((c) => c.name === column);
 }
 
 /** Fuegt eine Spalte hinzu, falls sie noch fehlt. */
@@ -259,8 +278,7 @@ function addColumn(
   column: string,
   definition: string,
 ): void {
-  const columns = db.prepare(`PRAGMA table_info(${table})`).all() as Array<{ name: string }>;
-  if (columns.some((c) => c.name === column)) return;
+  if (hasColumn(db, table, column)) return;
   db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);
 }
 

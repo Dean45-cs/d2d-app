@@ -13,9 +13,9 @@ primary_region = "fra"
   NODE_ENV = "production"
   DATABASE_PATH = "/data/d2d.db"
   NEXT_PUBLIC_TARIFRECHNER_URL = "https://portal-ep24.de/menues/tarifrechner/"
-  # Energiekarte: "seed" = Demo-Beispielwerte. Für echte Tagespreise auf
-  # "csv" oder "json" umstellen und ENERGY_FEED_URL als Secret setzen.
-  ENERGY_FEED_MODE = "seed"
+  # Energiekarte: Preise trägt die Teamleitung in der App ein. Eine
+  # Tagesquelle ist optional - dann ENERGY_FEED_MODE = "csv" oder "json"
+  # setzen und ENERGY_FEED_URL als Secret hinterlegen.
 
 [[mounts]]
   source = "d2d_data"
@@ -24,8 +24,8 @@ primary_region = "fra"
 [http_service]
   internal_port = 3000
   force_https = true
-  # Die Maschine bleibt an: sie holt einmal täglich die Energiepreise und
-  # ein schlafender Server würde den Außendienst Sekunden kosten.
+  # Die Maschine bleibt an: ein schlafender Server würde den Außendienst
+  # Sekunden kosten (und eine Tagesquelle würde nicht abgerufen).
   auto_stop_machines = "off"
   auto_start_machines = true
   min_machines_running = 1

@@ -10,6 +10,7 @@ import "./load-env";
 import { getDb } from "../src/lib/db";
 import { hashPassword } from "../src/lib/auth";
 import { addStreets, ensureDefaultReasons } from "../src/lib/queries";
+import { feedConfig } from "../src/lib/energy/adapters";
 import { refreshEnergyPrices } from "../src/lib/energy/refresh";
 
 async function main() {
@@ -51,12 +52,16 @@ async function main() {
     seedDemo(team.id);
   }
 
-  const result = await refreshEnergyPrices();
-  console.log(
-    result.status === "ok"
-      ? `Energiekarte: ${result.rowCount} Postleitzahlen aus „${result.source}“`
-      : `Energiekarte konnte nicht geladen werden: ${result.message}`,
-  );
+  if (feedConfig()) {
+    const result = await refreshEnergyPrices();
+    console.log(
+      result.status === "ok"
+        ? `Energiekarte: ${result.rowCount} Postleitzahlen aus „${result.source}“`
+        : `Energiekarte konnte nicht geladen werden: ${result.message}`,
+    );
+  } else {
+    console.log("Energiekarte: Preise in der App eintragen (Energiekarte → Preis eintragen).");
+  }
 
   console.log("\nFertig. Starten mit:  npm run dev");
 }

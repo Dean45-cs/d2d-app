@@ -144,7 +144,6 @@ export interface EnergyPrice {
   gas_base_eur: number | null;
   households: number;
   source: string;
-  is_demo: number;
   valid_from: string | null;
   updated_at: string;
 }

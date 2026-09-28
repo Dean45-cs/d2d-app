@@ -174,7 +174,7 @@ export default async function TerritoryDetailPage({
       <ProviderCard
         info={provider}
         className="mb-4"
-        editHref={isLeader ? "/einstellungen#grundversorger" : undefined}
+        editHref={isLeader ? `/karte?gebiet=${territory.id}` : undefined}
       />
 
       <TerritoryAreaCard
