@@ -13,16 +13,21 @@ export interface LocalSaleDraft {
 const KEY = "d2d_sale_drafts_v1";
 export const SALE_DRAFT_EVENT = "d2d-sale-drafts";
 
-export function localSaleDrafts(userId: number): LocalSaleDraft[] {
+function readAll(): LocalSaleDraft[] {
   try {
     const value = JSON.parse(localStorage.getItem(KEY) ?? "[]");
-    return Array.isArray(value) ? value.filter((item) => item.ownerUserId === userId) : [];
+    return Array.isArray(value) ? value : [];
   } catch { return []; }
 }
 
+export function localSaleDrafts(userId: number): LocalSaleDraft[] {
+  return readAll().filter((item) => item?.ownerUserId === userId);
+}
+
+/** Wirft, wenn der Geraetespeicher voll oder gesperrt ist - der Aufrufer meldet das. */
 export function storeSaleDrafts(userId: number, drafts: LocalSaleDraft[]) {
-  const all = JSON.parse(localStorage.getItem(KEY) ?? "[]") as LocalSaleDraft[];
-  localStorage.setItem(KEY, JSON.stringify([...all.filter((item) => item.ownerUserId !== userId), ...drafts]));
+  const others = readAll().filter((item) => item?.ownerUserId !== userId);
+  localStorage.setItem(KEY, JSON.stringify([...others, ...drafts]));
   window.dispatchEvent(new Event(SALE_DRAFT_EVENT));
 }
 

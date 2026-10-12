@@ -15,9 +15,12 @@ const TINT: Record<string, string> = {
   "/gebiete": "var(--brand-600)",
   "/feed": "var(--brand-500)",
   "/vergleich": "var(--gas-500)",
+  "/level": "var(--energy-600)",
   "/karte": "var(--gas-500)",
   "/auswertung": "var(--brand-500)",
   "/team": "var(--energy-600)",
+  "/einladungen": "var(--brand-600)",
+  "/berechtigungen": "var(--ink-muted)",
   "/einstellungen": "var(--ink-muted)",
 };
 

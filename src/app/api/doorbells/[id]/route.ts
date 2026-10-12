@@ -31,7 +31,7 @@ export async function PATCH(
       floor: body.floor === undefined ? undefined : optionalText(body.floor, 20),
     });
 
-    // Sperren darf jeder an der Tuer, aufheben nur die Teamleitung.
+    // Sperren darf jeder an der Tuer, aufheben nur mit "Türsperren aufheben".
     if (body.blocked !== undefined) {
       if (body.blocked) {
         setDoorBlocked("doorbells", bell.id, user.id, optionalText(body.blockedNote, 200));

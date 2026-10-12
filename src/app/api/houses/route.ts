@@ -53,8 +53,8 @@ export async function POST(request: Request) {
 
     /*
      * Sperren darf jeder, der an der Tuer steht - dort faellt der Widerspruch
-     * an. Aufheben nur die Teamleitung: sonst raeumt der naechste Kollege die
-     * Sperre weg, weil er die Vorgeschichte nicht kennt.
+     * an. Aufheben nur mit dem Recht "Türsperren aufheben": sonst raeumt der
+     * naechste Kollege die Sperre weg, weil er die Vorgeschichte nicht kennt.
      */
     if (body.blocked !== undefined) {
       if (body.blocked) {

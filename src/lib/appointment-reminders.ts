@@ -13,13 +13,17 @@ interface Reminder {
 /** DB leases prevent concurrent workers sending the same reminder at once. */
 export async function sendAppointmentReminders(now = new Date(), send = pushToUsers): Promise<number> {
   const db = getDb();
+  // Ortszeit weicht hoechstens gut einen halben Tag von UTC ab. Das Fenster
+  // haelt die Abfrage klein, auch wenn alte Termine nie abgehakt wurden.
+  const slot = (offsetMs: number) => new Date(now.getTime() + offsetMs).toISOString().slice(0, 16).replace("T", " ");
   const rows = db.prepare(`SELECT v.id, COALESCE(v.follow_up_user_id, v.user_id) AS owner_id,
       v.follow_up_at, v.follow_up_timezone, v.follow_up_utc
     FROM visits v JOIN users u ON u.id = COALESCE(v.follow_up_user_id, v.user_id)
-    WHERE v.outcome = 'APPOINTMENT' AND v.follow_up_done_at IS NULL AND v.follow_up_at IS NOT NULL
+    WHERE v.outcome = 'APPOINTMENT' AND v.follow_up_done_at IS NULL
+      AND v.follow_up_at BETWEEN ? AND ?
       AND u.active = 1 AND u.team_id = v.team_id
       AND EXISTS (SELECT 1 FROM push_subscriptions p WHERE p.user_id = u.id)`)
-    .all() as Reminder[];
+    .all(slot(-86_400_000), slot(86_400_000)) as Reminder[];
   let delivered = 0;
   for (const row of rows) {
     let start: number;
