@@ -11,8 +11,8 @@ export const dynamic = "force-dynamic";
 
 /**
  * Loescht einen gerade erfassten Eintrag ("Rückgängig" an der Tür).
- * Erlaubt nur fuer eigene Eintraege der letzten 15 Minuten - die Teamleitung
- * darf auch aeltere Eintraege ihres Teams entfernen.
+ * Erlaubt nur fuer eigene Eintraege der letzten 15 Minuten - mit dem Recht
+ * "Besuche korrigieren" auch aeltere und fremde Eintraege des Teams.
  */
 export async function DELETE(
   _request: Request,
@@ -54,9 +54,9 @@ export async function DELETE(
 /**
  * Termin abhaken oder verschieben.
  *
- * Der eigene Termin gehoert dem, der ihn vereinbart hat; die Teamleitung darf
- * auch die Termine des Teams pflegen - etwa wenn jemand krank ist und der
- * Rueckweg neu verteilt werden muss.
+ * Der Termin gehoert dem, der ihn vereinbart oder per Gebietsuebergabe
+ * uebernommen hat; mit "Teamtermine verwalten" auch die Termine des Teams -
+ * etwa wenn jemand krank ist und der Rueckweg neu verteilt werden muss.
  */
 export async function PATCH(
   request: Request,

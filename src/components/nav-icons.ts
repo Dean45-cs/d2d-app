@@ -9,7 +9,10 @@ import {
   IconGrid,
   IconHome,
   IconMap,
+  IconShield,
+  IconTarget,
   IconTrophy,
+  IconUserPlus,
   IconUsers,
 } from "./icons";
 import type { IconName } from "@/lib/nav";
@@ -27,4 +30,7 @@ export const NAV_ICONS: Record<IconName, (props: { className?: string }) => Reac
   grid: IconGrid,
   feed: IconFeed,
   trophy: IconTrophy,
+  target: IconTarget,
+  invite: IconUserPlus,
+  shield: IconShield,
 };

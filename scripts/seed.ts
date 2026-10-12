@@ -73,15 +73,20 @@ function seedDemo(teamId: number) {
     { name: "Sina Krause", email: "sina@example.de" },
   ];
 
+  // Vertrieb braucht eine direkte Fuehrungskraft - sonst kann niemand einladen.
+  const leader = db
+    .prepare("SELECT id FROM users WHERE team_id = ? AND role = 'LEADER' ORDER BY id LIMIT 1")
+    .get(teamId) as { id: number } | undefined;
+
   for (const member of members) {
     const exists = db
       .prepare("SELECT id FROM users WHERE lower(email) = ?")
       .get(member.email);
     if (exists) continue;
     db.prepare(
-      `INSERT INTO users (team_id, name, email, password_hash, role)
-       VALUES (?, ?, ?, ?, 'MEMBER')`,
-    ).run(teamId, member.name, member.email, hashPassword("start1234"));
+      `INSERT INTO users (team_id, name, email, password_hash, role, manager_id)
+       VALUES (?, ?, ?, ?, 'MEMBER', ?)`,
+    ).run(teamId, member.name, member.email, hashPassword("start1234"), leader?.id ?? null);
     console.log(`Mitarbeiter angelegt: ${member.email} / start1234`);
   }
 

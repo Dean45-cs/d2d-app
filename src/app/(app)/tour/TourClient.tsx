@@ -5,7 +5,7 @@ import { beginSaleDraft } from "@/lib/sale-drafts-client";
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { routeUrl } from "@/lib/map";
 import type { ProviderInfo } from "@/lib/energy/provider";
 import { ProviderLine } from "@/components/ProviderRating";
@@ -337,22 +337,12 @@ export function TourClient({
             : `${result.sent} gepufferte Einträge wurden gesendet`) +
             (levelFeedbackText(result.progression) ? ` · ${levelFeedbackText(result.progression)}` : ""),
         );
-        // Erst wenn nichts mehr wartet, kennt der Server alles - dann darf der
-        // lokale Zuschlag weg, sonst wuerde er ein zweites Mal mitgezaehlt.
-        if (result.remaining === 0) {
-          setLocalVisits(new Map());
-          setLocalBlocked(new Set());
-        }
-        router.refresh();
       }
       if (result.rejected > 0) {
         setToast(`${result.rejected} Eintrag/Einträge konnten nicht gespeichert werden`);
-        if (result.remaining === 0) {
-          setLocalVisits(new Map());
-          setLocalBlocked(new Set());
-        }
-        router.refresh();
       }
+      // Den lokalen Zuschlag raeumt der Effekt an der Warteschlange ab.
+      router.refresh();
     }, userId);
 
     const update = () => setOnline(navigator.onLine);
@@ -399,6 +389,22 @@ export function TourClient({
    */
   const [localVisits, setLocalVisits] = useState<Map<string, LocalVisits>>(new Map());
   const [localBlocked, setLocalBlocked] = useState<Set<string>>(new Set());
+
+  /*
+   * Wartet kein Tuereintrag mehr, kennt der Server alles - dann muss der
+   * lokale Zuschlag weg, sonst zaehlt ein Versuch doppelt. Gleich, wer die
+   * Warteschlange geleert hat: das Nachsenden hier, "Offene Auftraege"
+   * (sendet dieselbe Schlange mit) oder "verwerfen".
+   */
+  const hadQueuedDoors = useRef(false);
+  useEffect(() => {
+    const queued = pending.some((item) => item.url !== "/api/sale-drafts");
+    if (hadQueuedDoors.current && !queued) {
+      setLocalVisits(new Map());
+      setLocalBlocked(new Set());
+    }
+    hadQueuedDoors.current = queued;
+  }, [pending]);
 
   /**
    * Gerade online gespeicherte Eintraege, bis der Server sie zurueckmeldet.
@@ -1258,13 +1264,7 @@ export function TourClient({
     if (result.rejected > 0) {
       setToast(`${result.rejected} Eintrag/Einträge konnten nicht gespeichert werden`);
     }
-    if (result.sent > 0 || result.rejected > 0) {
-      if (result.remaining === 0) {
-        setLocalVisits(new Map());
-        setLocalBlocked(new Set());
-      }
-      router.refresh();
-    }
+    if (result.sent > 0 || result.rejected > 0) router.refresh();
   }
 
   /* ----------------------------- leeres Gebiet ---------------------------- */

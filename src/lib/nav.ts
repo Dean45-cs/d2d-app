@@ -12,7 +12,10 @@ export type IconName =
   | "cog"
   | "grid"
   | "feed"
-  | "trophy";
+  | "trophy"
+  | "target"
+  | "invite"
+  | "shield";
 
 export interface NavItem {
   href: string;
@@ -56,12 +59,12 @@ export function navigation(role: Role, rights: PermissionSet): Navigation {
     { href: "/termine", label: rights["appointments.team"] ? "Termine" : "Meine Termine", short: "Termine", icon: "calendar", group: "Vertrieb" },
     { href: "/feed", label: "Feed", short: "Feed", icon: "feed", group: "Community" },
     { href: "/vergleich", label: "Vergleich", short: "Vergleich", icon: "trophy", group: "Community" },
-    { href: "/level", label: "Level & Erfolge", short: "Level", icon: "bolt", group: "Community" },
+    { href: "/level", label: "Level & Erfolge", short: "Level", icon: "target", group: "Community" },
     { href: "/karte", label: "Energiekarte", short: "Karte", icon: "bolt", group: "Analyse" },
     { href: "/auswertung", label: rights["reports.team"] ? "Auswertung" : "Meine Zahlen", short: "Zahlen", icon: "chart", group: "Analyse" },
     ...((rights["team.manage"] || rights["structure.manage"] || rights["team.roles"]) ? [{ href: "/team", label: "Team", short: "Team", icon: "users" as const, group: "Verwaltung" }] : []),
-    { href: "/einladungen", label: "Einladungen", short: "Einladen", icon: "users", group: "Verwaltung" },
-    ...(rights["permissions.manage"] ? [{ href: "/berechtigungen", label: "Berechtigungen", short: "Rechte", icon: "cog" as const, group: "Verwaltung" }] : []),
+    { href: "/einladungen", label: "Einladungen", short: "Einladen", icon: "invite", group: "Verwaltung" },
+    ...(rights["permissions.manage"] ? [{ href: "/berechtigungen", label: "Berechtigungen", short: "Rechte", icon: "shield" as const, group: "Verwaltung" }] : []),
     ...((rights["settings.reasons"] || rights["energy.reference"] || rights["energy.manage"] || rights["energy.refresh"]) ? [{ href: "/einstellungen", label: "Einstellungen", short: "Einstellungen", icon: "cog" as const, group: "Verwaltung" }] : []),
   ];
   return split(items, role === "LEADER" ? ["/start", "/gebiete", "/tour", "/termine"] : ["/tour", "/feed", "/vergleich", "/termine"]);
