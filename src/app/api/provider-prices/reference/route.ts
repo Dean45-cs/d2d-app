@@ -1,4 +1,4 @@
-import { requireRole } from "@/lib/auth";
+import { requirePermission } from "@/lib/permissions";
 import { handle, optionalNumber, ValidationError } from "@/lib/api";
 import { DEFAULT_REFERENCE, setReference } from "@/lib/energy/manual";
 
@@ -14,7 +14,7 @@ function value(input: unknown, fallback: number, max: number, label: string): nu
 /** Vergleichswert (Bundesdurchschnitt der Grundversorgung) fuer die Bewertung. */
 export async function PUT(request: Request) {
   return handle(async () => {
-    const leader = await requireRole("LEADER");
+    const leader = await requirePermission("energy.reference");
     const body = await request.json();
     if (body.reset) {
       setReference(leader.team_id, DEFAULT_REFERENCE);

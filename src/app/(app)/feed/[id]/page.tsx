@@ -1,3 +1,4 @@
+import { hasPermission } from "@/lib/permissions";
 import Link from "next/link";
 import { requireUser } from "@/lib/auth";
 import { getPost } from "@/lib/community";
@@ -32,7 +33,7 @@ export default async function PostPage({ params }: { params: Promise<{ id: strin
             id: user.id,
             name: user.name,
             avatar: user.avatar,
-            isLeader: user.role === "LEADER",
+            isLeader: hasPermission(user, "community.moderate"),
           }}
           empty={{ title: "Beitrag gelöscht" }}
         />

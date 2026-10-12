@@ -1,3 +1,5 @@
+import { assertPermission, assertStreetAccess } from "@/lib/permissions";
+import { getDb } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
 import { handle, optionalText } from "@/lib/api";
 import {
@@ -18,8 +20,12 @@ export async function PATCH(
     const user = await requireUser();
     const { id } = await params;
     const bell = requireTeamDoorbell(Number(id), user.team_id);
+    const house = getDb().prepare("SELECT street_id FROM house_numbers WHERE id = ?").get(bell.house_number_id) as { street_id: number };
+    assertStreetAccess(user, house.street_id);
 
     const body = await request.json();
+    if (body.blocked !== undefined && typeof body.blocked !== "boolean") throw new Error("Ungültige Sperre.");
+    if (body.blocked === false) assertPermission(user, "doors.unblock");
     updateDoorbell(bell.id, {
       label: body.label === undefined ? undefined : optionalText(body.label, 60),
       floor: body.floor === undefined ? undefined : optionalText(body.floor, 20),
@@ -30,7 +36,7 @@ export async function PATCH(
       if (body.blocked) {
         setDoorBlocked("doorbells", bell.id, user.id, optionalText(body.blockedNote, 200));
       } else {
-        if (user.role !== "LEADER") throw new Error("Nur die Teamleitung kann eine Sperre aufheben.");
+        assertPermission(user, "doors.unblock");
         setDoorBlocked("doorbells", bell.id, null);
       }
     }
@@ -50,6 +56,8 @@ export async function DELETE(
     const user = await requireUser();
     const { id } = await params;
     const bell = requireTeamDoorbell(Number(id), user.team_id);
+    const house = getDb().prepare("SELECT street_id FROM house_numbers WHERE id = ?").get(bell.house_number_id) as { street_id: number };
+    assertStreetAccess(user, house.street_id);
     if (bell.visit_count > 0) {
       throw new Error("An diesem Klingelschild hängen schon Einträge.");
     }

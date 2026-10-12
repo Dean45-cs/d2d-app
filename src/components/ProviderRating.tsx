@@ -170,16 +170,7 @@ export function ProviderCard({
   const note = info ? sourceNote(info) : null;
   return (
     <section className={`card overflow-hidden ${className}`}>
-      <div
-        className="flex items-start gap-3 px-4 pb-3 pt-4"
-        style={
-          lead
-            ? {
-                background: `linear-gradient(135deg, color-mix(in srgb, ${PRICE_SCALE[lead.step]} 14%, transparent), transparent 70%)`,
-              }
-            : undefined
-        }
-      >
+      <div className="flex items-start gap-3 px-4 pb-3 pt-4">
         <span
           className="tile-icon h-10 w-10 shrink-0"
           style={{
@@ -209,7 +200,7 @@ export function ProviderCard({
             </p>
           ) : (
             <p className="muted text-[12px]">
-              Sobald der Preis des Grundversorgers eingetragen ist, steht hier, wie teuer er ist.
+              Für diesen Ort ist noch kein Grundversorgungstarif hinterlegt.
             </p>
           )}
         </div>

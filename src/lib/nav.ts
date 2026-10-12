@@ -1,3 +1,4 @@
+import type { PermissionSet } from "./permission-definitions";
 import type { Role } from "./types";
 
 export type IconName =
@@ -38,7 +39,7 @@ const MORE: NavItem = { href: MORE_HREF, label: "Mehr", short: "Mehr", icon: "gr
 
 /** Reiter nach Adresse auswaehlen, der Rest landet unter "Mehr". */
 function split(items: NavItem[], tabHrefs: string[]): Navigation {
-  const tabs = tabHrefs.map((href) => items.find((item) => item.href === href)!);
+  const tabs = items.filter((item) => tabHrefs.includes(item.href)).sort((a, b) => tabHrefs.indexOf(a.href) - tabHrefs.indexOf(b.href));
   const more = items.filter((item) => !tabHrefs.includes(item.href));
   return { items, tabs: more.length > 0 ? [...tabs, MORE] : tabs, more };
 }
@@ -47,37 +48,21 @@ function split(items: NavItem[], tabHrefs: string[]): Navigation {
  * Bewusst ohne "use client": die Navigation wird in einer Server-Komponente
  * zusammengestellt und als Prop an die Client-Leisten uebergeben.
  */
-export function navigation(role: Role): Navigation {
-  if (role === "LEADER") {
-    return split(
-      [
-        { href: "/start", label: "Übersicht", short: "Übersicht", icon: "home", group: "Vertrieb" },
-        { href: "/gebiete", label: "Gebiete", short: "Gebiete", icon: "map", group: "Vertrieb" },
-        { href: "/tour", label: "Klinken", short: "Klinken", icon: "door", group: "Vertrieb" },
-        { href: "/termine", label: "Termine", short: "Termine", icon: "calendar", group: "Vertrieb" },
-        { href: "/feed", label: "Feed", short: "Feed", icon: "feed", group: "Community" },
-        { href: "/vergleich", label: "Vergleich", short: "Vergleich", icon: "trophy", group: "Community" },
-        { href: "/karte", label: "Energiekarte", short: "Karte", icon: "bolt", group: "Analyse" },
-        { href: "/auswertung", label: "Auswertung", short: "Zahlen", icon: "chart", group: "Analyse" },
-        { href: "/team", label: "Team", short: "Team", icon: "users", group: "Verwaltung" },
-        { href: "/einstellungen", label: "Einstellungen", short: "Einstellungen", icon: "cog", group: "Verwaltung" },
-      ],
-      ["/start", "/gebiete", "/tour", "/termine"],
-    );
-  }
-  // Im Aussendienst stehen Tuer, Feed und Vergleich vorn: das ist, was man
-  // unterwegs zwischen zwei Haeusern aufmacht. Das Gebiet waehlt man in
-  // "Klinken" selbst - die Gebietsliste rutscht unter "Mehr".
-  return split(
-    [
-      { href: "/tour", label: "Klinken", short: "Klinken", icon: "door", group: "Vertrieb" },
-      { href: "/termine", label: "Meine Termine", short: "Termine", icon: "calendar", group: "Vertrieb" },
-      { href: "/gebiete", label: "Meine Gebiete", short: "Gebiete", icon: "map", group: "Vertrieb" },
-      { href: "/feed", label: "Feed", short: "Feed", icon: "feed", group: "Community" },
-      { href: "/vergleich", label: "Vergleich", short: "Vergleich", icon: "trophy", group: "Community" },
-      { href: "/karte", label: "Energiekarte", short: "Karte", icon: "bolt", group: "Analyse" },
-      { href: "/auswertung", label: "Meine Zahlen", short: "Zahlen", icon: "chart", group: "Analyse" },
-    ],
-    ["/tour", "/feed", "/vergleich", "/termine"],
-  );
+export function navigation(role: Role, rights: PermissionSet): Navigation {
+  const items: NavItem[] = [
+    ...(rights["reports.team"] ? [{ href: "/start", label: "Übersicht", short: "Übersicht", icon: "home" as const, group: "Vertrieb" }] : []),
+    { href: "/gebiete", label: rights["territories.view_all"] ? "Gebiete" : "Meine Gebiete", short: "Gebiete", icon: "map", group: "Vertrieb" },
+    { href: "/tour", label: "Klinken", short: "Klinken", icon: "door", group: "Vertrieb" },
+    { href: "/termine", label: rights["appointments.team"] ? "Termine" : "Meine Termine", short: "Termine", icon: "calendar", group: "Vertrieb" },
+    { href: "/feed", label: "Feed", short: "Feed", icon: "feed", group: "Community" },
+    { href: "/vergleich", label: "Vergleich", short: "Vergleich", icon: "trophy", group: "Community" },
+    { href: "/level", label: "Level & Erfolge", short: "Level", icon: "bolt", group: "Community" },
+    { href: "/karte", label: "Energiekarte", short: "Karte", icon: "bolt", group: "Analyse" },
+    { href: "/auswertung", label: rights["reports.team"] ? "Auswertung" : "Meine Zahlen", short: "Zahlen", icon: "chart", group: "Analyse" },
+    ...((rights["team.manage"] || rights["structure.manage"] || rights["team.roles"]) ? [{ href: "/team", label: "Team", short: "Team", icon: "users" as const, group: "Verwaltung" }] : []),
+    { href: "/einladungen", label: "Einladungen", short: "Einladen", icon: "users", group: "Verwaltung" },
+    ...(rights["permissions.manage"] ? [{ href: "/berechtigungen", label: "Berechtigungen", short: "Rechte", icon: "cog" as const, group: "Verwaltung" }] : []),
+    ...((rights["settings.reasons"] || rights["energy.reference"] || rights["energy.manage"] || rights["energy.refresh"]) ? [{ href: "/einstellungen", label: "Einstellungen", short: "Einstellungen", icon: "cog" as const, group: "Verwaltung" }] : []),
+  ];
+  return split(items, role === "LEADER" ? ["/start", "/gebiete", "/tour", "/termine"] : ["/tour", "/feed", "/vergleich", "/termine"]);
 }

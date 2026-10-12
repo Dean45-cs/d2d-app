@@ -45,6 +45,7 @@ interface Props {
   /** Jahreskosten des Musterhaushalts beim Bundesdurchschnitt */
   reference: Record<Energy, number>;
   isLeader: boolean;
+  canRefresh: boolean;
   /** Nur mit eingerichteter Tagesquelle */
   feed: {
     refresh: {
@@ -74,6 +75,7 @@ export function EnergyMapClient({
   open,
   reference,
   isLeader,
+  canRefresh,
   feed,
   consumption,
   initialDraft,
@@ -276,7 +278,7 @@ export function EnergyMapClient({
                 ]}
               />
             )}
-            {isLeader && feed && (
+            {canRefresh && feed && (
               <button
                 className="icon-btn icon-btn-outline h-10 w-10"
                 onClick={refreshFeed}

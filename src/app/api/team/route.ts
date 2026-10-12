@@ -1,4 +1,5 @@
-import { hashPassword, requireRole } from "@/lib/auth";
+import { AuthError, hashPassword } from "@/lib/auth";
+import { assertPermission, requirePermission } from "@/lib/permissions";
 import { getDb } from "@/lib/db";
 import { handle, optionalAvatar, optionalText, requireText } from "@/lib/api";
 
@@ -6,7 +7,7 @@ export const dynamic = "force-dynamic";
 
 export async function POST(request: Request) {
   return handle(async () => {
-    const leader = await requireRole("LEADER");
+    const leader = await requirePermission("team.manage");
     const body = await request.json();
 
     const email = requireText(body.email, "E-Mail", 190).toLowerCase();
@@ -15,6 +16,10 @@ export async function POST(request: Request) {
       throw new Error("Das Passwort braucht mindestens 8 Zeichen.");
     }
     const role = body.role === "LEADER" ? "LEADER" : "MEMBER";
+    if (role === "LEADER") {
+      assertPermission(leader, "team.roles");
+      if (leader.role !== "LEADER") throw new AuthError("Nur Teamleitungen können Teamleitungen ernennen.", 403);
+    }
 
     const exists = getDb()
       .prepare("SELECT id FROM users WHERE lower(email) = ?")
@@ -23,8 +28,8 @@ export async function POST(request: Request) {
 
     const id = getDb()
       .prepare(
-        `INSERT INTO users (team_id, name, email, password_hash, role, phone, avatar)
-         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO users (team_id, name, email, password_hash, role, phone, avatar, manager_id)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
       )
       .run(
         leader.team_id,
@@ -34,6 +39,7 @@ export async function POST(request: Request) {
         role,
         optionalText(body.phone, 40),
         optionalAvatar(body.avatar),
+        leader.id,
       ).lastInsertRowid as number;
 
     return { ok: true, id };

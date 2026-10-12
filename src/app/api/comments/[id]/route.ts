@@ -1,3 +1,4 @@
+import { assertPermission } from "@/lib/permissions";
 import { requireUser } from "@/lib/auth";
 import { handle } from "@/lib/api";
 import { deleteComment, requireTeamComment } from "@/lib/community";
@@ -10,9 +11,7 @@ export async function DELETE(_request: Request, { params }: { params: Promise<{ 
     const user = await requireUser();
     const { id } = await params;
     const comment = requireTeamComment(Number(id), user.team_id);
-    if (comment.user_id !== user.id && user.role !== "LEADER") {
-      throw new Error("Das ist nicht dein Kommentar.");
-    }
+    if (comment.user_id !== user.id) assertPermission(user, "community.moderate");
     deleteComment(comment.id);
     return { ok: true };
   });

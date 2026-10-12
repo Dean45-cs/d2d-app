@@ -7,6 +7,7 @@ export type TerritoryStatus = "OPEN" | "ACTIVE" | "DONE" | "PAUSED";
 export interface User {
   id: number;
   team_id: number;
+  manager_id: number | null;
   name: string;
   email: string;
   role: Role;
@@ -33,6 +34,7 @@ export interface Territory {
   city: string;
   postal_code: string;
   assigned_user_id: number | null;
+  created_by: number | null;
   status: TerritoryStatus;
   note: string;
   due_date: string | null;

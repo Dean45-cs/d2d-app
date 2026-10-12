@@ -1,3 +1,4 @@
+import { hasPermission } from "@/lib/permissions";
 import Link from "next/link";
 import { requireUser } from "@/lib/auth";
 import { followSuggestions, listFeed, teamTotals } from "@/lib/community";
@@ -43,7 +44,7 @@ export default async function FeedPage({
     id: user.id,
     name: user.name,
     avatar: user.avatar,
-    isLeader: user.role === "LEADER",
+    isLeader: hasPermission(user, "community.moderate"),
   };
 
   return (

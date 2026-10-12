@@ -1,3 +1,4 @@
+import { hasPermission } from "@/lib/permissions";
 import Link from "next/link";
 import { requireUser } from "@/lib/auth";
 import {
@@ -39,7 +40,7 @@ export default async function StatsPage({
   searchParams: Promise<{ range?: string }>;
 }) {
   const user = await requireUser();
-  const isLeader = user.role === "LEADER";
+  const isLeader = hasPermission(user, "reports.team");
   const { range } = await searchParams;
   const key: RangeKey = (RANGES.some((r) => r.key === range) ? range : "7") as RangeKey;
   const since = rangeToSince(key);
@@ -49,7 +50,7 @@ export default async function StatsPage({
   // "Gesamt" zeigt im Verlauf die letzten 90 Tage, zu Wochen gebuendelt.
   const days = key === "all" ? 90 : Number(key);
   const series = fillDays(dailySeries(user.team_id, days, isLeader ? undefined : user.id), days);
-  const reasons = reasonStats(user.team_id, since);
+  const reasons = reasonStats(user.team_id, since, isLeader ? undefined : user.id);
   const members = isLeader
     ? memberStats(user.team_id, since).sort((a, b) => b.sales - a.sales || b.doors - a.doors)
     : [];

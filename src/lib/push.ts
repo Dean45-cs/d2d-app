@@ -23,6 +23,8 @@ export interface PushMessage {
   url: string;
   /** Gleiche Kennung ersetzt eine aeltere Nachricht, statt eine zweite zu zeigen. */
   tag?: string;
+  /** Appointment messages expire when the appointment starts. */
+  ttl?: number;
 }
 
 interface Subscription {
@@ -193,7 +195,7 @@ async function sendTo(subscription: Subscription, message: PushMessage): Promise
         Authorization: authorization(subscription.endpoint),
         "Content-Encoding": "aes128gcm",
         "Content-Type": "application/octet-stream",
-        TTL: String(24 * 3600),
+        TTL: String(message.ttl ?? 24 * 3600),
         Urgency: "high",
       },
       body: new Uint8Array(encrypt(payload, subscription.p256dh, subscription.auth)),

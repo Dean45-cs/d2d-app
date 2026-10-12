@@ -9,6 +9,7 @@
     "start": "next start",
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
+    "test": "node --import tsx --test scripts/tests/*.test.ts",
     "db:seed": "tsx scripts/seed.ts",
     "energy:refresh": "tsx scripts/refresh-energy.ts"
   },

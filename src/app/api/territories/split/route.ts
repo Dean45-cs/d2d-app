@@ -1,16 +1,14 @@
-import { requireRole } from "@/lib/auth";
+import { requirePermission, territoryAssignee } from "@/lib/permissions";
 import { createTerritories, freeArea, type TerritoryDraft } from "@/lib/queries";
 import { parseShape, shapeToJson } from "@/lib/geo/area";
 import type { Shape } from "@/lib/geo/shape";
 import { MAX_PLOTS } from "@/lib/geo/split";
 import {
   handle,
-  optionalNumber,
   optionalText,
   parseStreetList,
   requireText,
 } from "@/lib/api";
-import { getDb } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
 
@@ -20,7 +18,7 @@ export const dynamic = "force-dynamic";
  */
 export async function POST(request: Request) {
   return handle(async () => {
-    const leader = await requireRole("LEADER");
+    const leader = await requirePermission("territories.create");
     const body = await request.json();
 
     const groups = Array.isArray(body.groups) ? body.groups : [];
@@ -34,19 +32,11 @@ export async function POST(request: Request) {
     const note = optionalText(body.note);
     const dueDate = optionalText(body.dueDate, 10) || null;
 
-    const members = getDb()
-      .prepare("SELECT id FROM users WHERE team_id = ?")
-      .all(leader.team_id) as Array<{ id: number }>;
-    const memberIds = new Set(members.map((m) => m.id));
-
     // Die Teilgebiete teilen sich die Flaeche lueckenlos - keines darf in ein
     // anderes oder in ein schon vergebenes Gebiet ragen.
     const claimed: Shape[] = [];
     const drafts: TerritoryDraft[] = groups.map((group: Record<string, unknown>, index: number) => {
-      const assignedUserId = optionalNumber(group.assignedUserId);
-      if (assignedUserId !== null && !memberIds.has(assignedUserId)) {
-        throw new Error("Mitarbeiter gehört nicht zu diesem Team.");
-      }
+      const assignedUserId = territoryAssignee(leader, group.assignedUserId, true);
       const streets = parseStreetList(group.streetList);
       if (streets.length === 0) {
         throw new Error(`Teilgebiet ${index + 1} enthält keine Straßen.`);
@@ -67,7 +57,7 @@ export async function POST(request: Request) {
       };
     });
 
-    const ids = createTerritories(leader.team_id, drafts);
+    const ids = createTerritories(leader.team_id, drafts, leader.id);
     return { ok: true, ids };
   });
 }

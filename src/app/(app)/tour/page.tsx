@@ -1,3 +1,4 @@
+import { hasPermission } from "@/lib/permissions";
 import { requireUser } from "@/lib/auth";
 import { getDb } from "@/lib/db";
 import {
@@ -6,7 +7,7 @@ import {
   listMembers,
   listHouseNumbers,
   listReasons,
-  listTerritories,
+  listAccessibleTerritories,
   listVisits,
   totals,
 } from "@/lib/queries";
@@ -14,6 +15,7 @@ import { TourClient } from "./TourClient";
 import { providerLookup } from "@/lib/energy/provider";
 import { readArea } from "@/lib/geo/area";
 import type { StreetWithStats } from "@/lib/queries";
+import { getLevelProgress } from "@/lib/level-queries";
 
 export const dynamic = "force-dynamic";
 
@@ -21,9 +23,7 @@ export default async function TourPage() {
   const user = await requireUser();
 
   // Vertriebler sehen nur ihre zugeteilten Gebiete, die Teamleitung alle.
-  const territories = listTerritories(user.team_id, {
-    userId: user.role === "LEADER" ? undefined : user.id,
-  }).filter((t) => t.status !== "DONE");
+  const territories = listAccessibleTerritories(user).filter((t) => t.status !== "DONE");
 
   const streets = territories.length
     ? (getDb()
@@ -75,6 +75,8 @@ export default async function TourPage() {
 
   return (
     <TourClient
+      userId={user.id}
+      initialProgress={getLevelProgress(user.team_id, user.id)}
       territories={territories.map((t) => ({
         id: t.id,
         name: t.name,
@@ -89,7 +91,7 @@ export default async function TourPage() {
       streets={streets}
       houseNumbers={houseNumbers}
       doorbells={doorbells}
-      isLeader={user.role === "LEADER"}
+      isLeader={hasPermission(user, "doors.unblock")}
       team={team}
       reasons={listReasons(user.team_id)}
       todayTotals={todayTotals}

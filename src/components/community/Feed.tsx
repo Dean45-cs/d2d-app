@@ -29,7 +29,7 @@ const MAX_POST = 500;
 const MAX_COMMENT = 300;
 
 /** Ein-Tipp-Antworten unter einem Abschluss - gratulieren geht so im Vorbeigehen. */
-const CHEERS = ["Glückwunsch! 🎉", "Stark! 💪", "Weiter so! 🔥"];
+const CHEERS = ["Glückwunsch!", "Gut gemacht!", "Danke fürs Teilen!"];
 
 const PRODUCT: Record<string, string> = { STROM: "Strom", GAS: "Gas", BEIDES: "Strom + Gas" };
 
@@ -183,7 +183,7 @@ function Composer({ viewer, onPosted }: { viewer: Viewer; onPosted: (post: FeedP
           className="textarea resize-none"
           rows={2}
           maxLength={MAX_POST}
-          placeholder="Was gibt’s Neues? Ein Tipp, ein Erfolg, eine Frage ans Team …"
+          placeholder="Nachricht ans Team …"
           value={text}
           onChange={(e) => {
             setText(e.target.value);
@@ -374,9 +374,9 @@ function SaleCard({ sale, mine }: { sale: NonNullable<FeedPost["sale"]>; mine: b
       {sale.number > 0 && (
         <span className="shrink-0 text-right">
           {MILESTONES.has(sale.number) ? (
-            <Pill tone="warn">🏅 Nr. {sale.number}</Pill>
+            <Pill tone="warn">Nr. {sale.number}</Pill>
           ) : sale.number === 1 ? (
-            <Pill tone="success">{mine ? "Dein erster!" : "Der erste!"}</Pill>
+            <Pill tone="success">{mine ? "Dein erster Vertrag" : "Erster Vertrag"}</Pill>
           ) : (
             <span className="muted text-[12px] font-semibold tabular-nums">Nr. {sale.number}</span>
           )}

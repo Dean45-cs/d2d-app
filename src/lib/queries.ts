@@ -1,4 +1,6 @@
+import { appointmentUtc } from "./appointment-time";
 import { getDb } from "./db";
+import { canAccessTerritory, permissionsFor } from "./permissions";
 import { bellKey, MAX_BELLS_PER_HOUSE, normalizeFloor, normalizeLabel } from "./doorbells";
 import { MAX_NOT_HOME_ATTEMPTS } from "./doors";
 import { readShape } from "./geo/area";
@@ -20,7 +22,7 @@ import type {
 export function listMembers(teamId: number): User[] {
   return getDb()
     .prepare(
-      `SELECT id, team_id, name, email, role, phone, active, avatar, bio, created_at
+      `SELECT id, team_id, manager_id, name, email, role, phone, active, avatar, bio, created_at
          FROM users WHERE team_id = ? ORDER BY active DESC, role, name`,
     )
     .all(teamId) as User[];
@@ -84,6 +86,11 @@ export function getTerritory(
   return row ?? null;
 }
 
+export function listAccessibleTerritories(user: User): TerritoryWithStats[] {
+  const rights = permissionsFor(user);
+  return listTerritories(user.team_id).filter((territory) => canAccessTerritory(user, territory, rights));
+}
+
 export interface StreetWithStats extends Street {
   visit_count: number;
   met_count: number;
@@ -118,12 +125,13 @@ export function createTerritory(input: {
   dueDate: string | null;
   /** Auf der Karte gezeichnete Flaeche als JSON, sonst leer. */
   areaJson?: string;
+  createdBy?: number;
 }): number {
   const result = getDb()
     .prepare(
       `INSERT INTO territories
-         (team_id, name, city, postal_code, assigned_user_id, note, due_date, status, area_json)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         (team_id, name, city, postal_code, assigned_user_id, note, due_date, status, area_json, created_by)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .run(
       input.teamId,
@@ -135,6 +143,7 @@ export function createTerritory(input: {
       input.dueDate,
       input.assignedUserId ? "ACTIVE" : "OPEN",
       input.areaJson ?? "",
+      input.createdBy ?? null,
     );
   return result.lastInsertRowid as number;
 }
@@ -201,12 +210,12 @@ export interface TerritoryDraft {
  * mehrere Leute aufgeteilt wird. Entweder entstehen alle oder keines: ein
  * halb aufgeteiltes Viertel waere schlimmer als gar keines.
  */
-export function createTerritories(teamId: number, drafts: TerritoryDraft[]): number[] {
+export function createTerritories(teamId: number, drafts: TerritoryDraft[], createdBy?: number): number[] {
   const db = getDb();
   const run = db.transaction(() => {
     const ids: number[] = [];
     for (const draft of drafts) {
-      const id = createTerritory({ teamId, ...draft });
+      const id = createTerritory({ teamId, createdBy, ...draft });
       addStreetEntries(id, draft.streets);
       ids.push(id);
     }
@@ -935,7 +944,7 @@ export function listAppointments(
   ];
   const params: (string | number)[] = [teamId];
   if (opts.userId) {
-    where.push("v.user_id = ?");
+    where.push("COALESCE(v.follow_up_user_id, v.user_id) = ?");
     params.push(opts.userId);
   }
   if (!opts.includeDone) where.push("v.follow_up_done_at IS NULL");
@@ -945,7 +954,7 @@ export function listAppointments(
     .prepare(
       `SELECT v.id, v.created_at, v.follow_up_at, v.follow_up_done_at,
               v.contact_name, v.contact_phone, v.reason_note, v.energy_type,
-              v.house_number, v.user_id,
+              v.house_number, COALESCE(v.follow_up_user_id, v.user_id) AS user_id,
               u.name AS user_name,
               s.id   AS street_id,
               s.name AS street_name,
@@ -954,7 +963,7 @@ export function listAppointments(
               t.name AS territory_name,
               d.label AS doorbell_label
          FROM visits v
-         JOIN users u ON u.id = v.user_id
+         JOIN users u ON u.id = COALESCE(v.follow_up_user_id, v.user_id)
          LEFT JOIN streets s ON s.id = v.street_id
          LEFT JOIN territories t ON t.id = v.territory_id
          LEFT JOIN doorbells d ON d.id = v.doorbell_id
@@ -976,10 +985,10 @@ export function setAppointmentDone(visitId: number, done: boolean): void {
 }
 
 /** Termin umlegen - der Kunde hat eine andere Zeit genannt. */
-export function setAppointmentSlot(visitId: number, slot: string): void {
+export function setAppointmentSlot(visitId: number, slot: string, zone = "Europe/Berlin"): void {
   getDb()
-    .prepare("UPDATE visits SET follow_up_at = ?, follow_up_done_at = NULL WHERE id = ?")
-    .run(slot, visitId);
+    .prepare("UPDATE visits SET follow_up_at = ?, follow_up_timezone = ?, follow_up_utc = ?, follow_up_done_at = NULL WHERE id = ?")
+    .run(slot, zone, appointmentUtc(slot, zone), visitId);
 }
 
 /** Prueft, dass der Eintrag zum Team gehoert - und wem er gehoert. */
@@ -988,7 +997,7 @@ export function requireTeamVisit(
   teamId: number,
 ): { id: number; user_id: number; outcome: VisitOutcome } {
   const row = getDb()
-    .prepare("SELECT id, user_id, outcome FROM visits WHERE id = ? AND team_id = ?")
+    .prepare("SELECT id, COALESCE(follow_up_user_id, user_id) AS user_id, outcome FROM visits WHERE id = ? AND team_id = ?")
     .get(visitId, teamId) as
     | { id: number; user_id: number; outcome: VisitOutcome }
     | undefined;
@@ -1070,9 +1079,12 @@ export interface ReasonStat {
   count: number;
 }
 
-export function reasonStats(teamId: number, since?: string): ReasonStat[] {
-  const joinFilter = since ? "AND v.created_at >= ?" : "";
-  const params: (string | number)[] = since ? [since, teamId] : [teamId];
+export function reasonStats(teamId: number, since?: string, userId?: number): ReasonStat[] {
+  let joinFilter = "AND v.team_id = ?";
+  const params: (string | number)[] = [teamId];
+  if (since) { joinFilter += " AND v.created_at >= ?"; params.push(since); }
+  if (userId !== undefined) { joinFilter += " AND v.user_id = ?"; params.push(userId); }
+  params.push(teamId);
   return getDb()
     .prepare(
       `SELECT r.id, r.label, r.emoji, COUNT(v.id) AS count

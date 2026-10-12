@@ -1,4 +1,4 @@
-import { requireRole } from "@/lib/auth";
+import { requirePermission } from "@/lib/permissions";
 import { handle, optionalNumber, ValidationError } from "@/lib/api";
 import { getDb } from "@/lib/db";
 import { listManualPrices, saveManualPrice, type ManualPriceInput } from "@/lib/energy/manual";
@@ -18,7 +18,7 @@ const MAX_SEARCHES = 10;
  */
 export async function POST(request: Request) {
   return handle(async () => {
-    const leader = await requireRole("LEADER");
+    const leader = await requirePermission("energy.manage");
     const body = await request.json();
     const rows: TableRow[] = Array.isArray(body?.rows) ? body.rows : [];
     if (rows.length === 0) throw new ValidationError("Die Tabelle enthält keine Zeilen.");

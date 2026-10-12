@@ -1,4 +1,4 @@
-import { requireRole } from "@/lib/auth";
+import { requirePermission } from "@/lib/permissions";
 import { getDb } from "@/lib/db";
 import { handle, optionalText } from "@/lib/api";
 
@@ -9,7 +9,7 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> },
 ) {
   return handle(async () => {
-    const leader = await requireRole("LEADER");
+    const leader = await requirePermission("settings.reasons");
     const { id } = await params;
     const db = getDb();
     const reason = db

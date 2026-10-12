@@ -1,4 +1,5 @@
-import { requireRole } from "@/lib/auth";
+import { requireUser, AuthError } from "@/lib/auth";
+import { hasPermission } from "@/lib/permissions";
 import { parseShape } from "@/lib/geo/area";
 import { normalize } from "@/lib/geo/shape";
 import { streetsInArea } from "@/lib/geo/osm";
@@ -13,7 +14,8 @@ export const dynamic = "force-dynamic";
  */
 export async function POST(request: Request) {
   return handle(async () => {
-    await requireRole("LEADER");
+    const user = await requireUser();
+    if (!hasPermission(user, "territories.create") && !hasPermission(user, "territories.edit")) throw new AuthError("Keine Berechtigung zur Gebietspflege.", 403);
     const body = await request.json();
     const area = normalize(parseShape(body.area));
     if (area.length === 0) throw new Error("Die Fläche ist zu klein.");

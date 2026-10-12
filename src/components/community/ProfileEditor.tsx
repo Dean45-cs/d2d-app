@@ -127,7 +127,7 @@ export function ProfileEditor({
                 className="textarea resize-none"
                 rows={3}
                 maxLength={MAX_BIO}
-                placeholder="z. B. „Seit 2024 im Team · Spezialist für Mehrfamilienhäuser · Ziel: 30 im Monat“"
+                placeholder="Ein paar Worte über dich (optional)"
                 value={bio}
                 onChange={(e) => setBio(e.target.value)}
               />

@@ -7,8 +7,8 @@ Eine Web-App für Door-to-Door-Teams im Energievertrieb:
 - **Türen tracken** – nicht angetroffen / angetroffen / Termin / Abschluss, mit einem Daumen bedienbar;
   Ein- und Mehrfamilienhäuser mit eigenem Klingelbrett, höchstens drei Versuche je Tür
 - **Ablehnungsgründe mit einem Tap** – konfigurierbare Kachel-Auswahl statt Freitext
-- **Abschluss-Button** – speichert den Verkauf und öffnet den Tarifrechner des Partners,
-  in dem der Auftrag aufgenommen und unterschrieben wird
+- **Auftrag erfassen** – öffnet den Tarifrechner des Partners und merkt einen offenen Auftrag vor;
+  erst die anschließende Bestätigung zählt als Abschluss
 - **Termine mit Uhrzeit** – Vorschläge für den Abend, Rufnummer dazu, und am nächsten Tag
   stehen sie oben auf der Tour
 - **Energiekarte** – zeigt, wo der Grundversorger besonders teuer ist; Preise in Sekunden
@@ -63,7 +63,7 @@ angelegt – praktisch zum Ausprobieren, für den Echtbetrieb weglassen.
 
 ---
 
-## Rollen
+## Rollen und Berechtigungen
 
 | | Teamleitung | Vertrieb |
 |---|---|---|
@@ -77,6 +77,44 @@ angelegt – praktisch zum Ausprobieren, für den Echtbetrieb weglassen.
 | Feed: posten, kommentieren, abonnieren | ✅ | ✅ |
 | Fremde Beiträge und Kommentare löschen | ✅ | – |
 | Energiekarte | ✅ | ✅ |
+
+Die Tabelle beschreibt die Rollenstandards. Unter **Mehr → Berechtigungen** lassen
+sich 20 Rechte pro Person auf **Standard**, **Erlauben** oder **Entziehen** setzen:
+Gebiete erstellen/sehen/bearbeiten/zuteilen/löschen, Besuchskorrekturen, Türsperren,
+Teamtermine, Teamauswertung, Mitglieder- und Strukturverwaltung, Rollen,
+Berechtigungen, Einladungen, Energiepreise und Referenzwerte, Tagesquelle,
+Ablehnungsgründe und Feedmoderation. Ein ausdrücklicher Entzug hat Vorrang vor
+automatischen Rechten; „Standard“ folgt der aktuellen Rolle und Struktur.
+
+**Sobald mindestens eine aktive Person in der eigenen Struktur ist**, darf auch
+ein Vertriebsmitglied eigene Gebiete erstellen, aufteilen, bearbeiten, zuteilen
+und löschen. Ein Erstellrecht kann außerdem einzeln vergeben werden, auch ohne
+eigene Struktur. Bearbeiten, Zuteilen und Löschen sind dabei standardmäßig erlaubt
+und können separat entzogen werden. Ohne Zuteilungsrecht werden neue Gebiete der
+erstellenden Person selbst zugeteilt. Die erstellende Person behält Zugriff,
+auch nach Zuteilung an jemand anderen. Bestehende Gebiete behalten ihre Zuteilung.
+
+Strukturverantwortliche dürfen Berechtigungen für Personen unterhalb ihrer
+Struktur vergeben; Teamleitungen für andere Personen ihres Teams. Sie können
+nur Rechte vergeben oder ändern, die sie selbst besitzen. Auch zusätzliche
+automatische Rechte beim Erlauben von „Gebiete erstellen“ werden dabei geprüft.
+Eigene Berechtigungen müssen andere Verantwortliche ändern. Die Ernennung von
+Teamleitungen bleibt echten Teamleitungen mit dem Recht „Rollen ändern“ vorbehalten.
+
+Im Vertrieb sind Gebiete auf selbst erstellte und zugeteilte Gebiete begrenzt.
+„Alle Teamgebiete sehen“ erweitert diesen Zugriff ausdrücklich und ermöglicht
+mit dem Zuteilungsrecht Zuteilungen im ganzen Team. Mitglieder- und
+Strukturverwaltung bleiben für Vertriebsmitglieder innerhalb der eigenen
+Struktur. Teamtermine und Teamauswertung werden unabhängig davon freigegeben.
+Persönliche Türerfassung, Statusmeldungen in zugeteilten Gebieten, eigene Termine,
+eigene Zahlen und eigene Community-Beiträge bleiben wie bisher möglich.
+
+Navigation und Schaltflächen folgen den Rechten; jede geschützte API prüft sie
+zusätzlich serverseitig bei jeder Anfrage. Änderungen benötigen keinen neuen
+Login. Die Migration ergänzt `user_permissions` und `territories.created_by`
+automatisch beim Serverstart. **Nach dem Update einen laufenden Server neu starten.**
+Die Sicherheitstests laufen über `npm test`, einschließlich
+`scripts/tests/permissions.test.ts`.
 
 Auf dem Handy stehen unten höchstens fünf Reiter. Im Vertrieb sind das Klinken, Feed,
 Vergleich, Termine und **Mehr** (Gebiete, Energiekarte, Zahlen); bei der Teamleitung
@@ -100,7 +138,7 @@ Rechner steht alles gruppiert in der Seitenleiste, das Profil unten links.
    - **Termin vereinbart** – kurze Abfrage: Vorschläge wie „Morgen 18:00“ oder freie
      Eingabe, dazu Name und Rufnummer. Ein Termin ohne Uhrzeit verfällt, deshalb fragt die
      App danach.
-4. **Abschluss** – der große grüne Button speichert den Verkauf **und öffnet im selben
+4. **Auftrag erfassen** – der große grüne Button merkt den Auftrag vor **und öffnet im selben
    Moment den Tarifrechner des Partners**
    (`https://portal-ep24.de/menues/tarifrechner/`, änderbar über
    `NEXT_PUBLIC_TARIFRECHNER_URL`). Dort wird der Auftrag aufgenommen und unterschrieben –
@@ -108,6 +146,13 @@ Rechner steht alles gruppiert in der Seitenleiste, das Profil unten links.
    ein zweites Mal in diese App. Das Fenster wird direkt beim Antippen geöffnet, damit kein
    Popup-Blocker dazwischenkommt; blockiert der Browser es trotzdem, wechselt die App selbst
    auf die Seite.
+   Bei der Rückkehr fragt die App nach **Abschluss bestätigen**, **Später fortsetzen** oder
+   **Abgebrochen**. Nur die Bestätigung erzeugt Besuch, Abschluss-XP und Feedmeldung.
+   Offene Aufträge stehen beim Klinken und auf der Leitungsübersicht; über „Tarifrechner
+   öffnen“ lässt sich die Erfassung fortsetzen. Öffnen, Bestätigen und Abbrechen werden
+   bei fehlender Verbindung kontogebunden lokal vorgemerkt und danach synchronisiert.
+   Wiederholtes Bestätigen erzeugt keinen zweiten Verkauf. Bestehende Abschlüsse und
+   bereits wartende Besuche bleiben erhalten.
 5. Vertippt? „Letzten Eintrag rückgängig machen“ – für eigene Einträge bis 15 Minuten,
    die Teamleitung kann jederzeit korrigieren.
 
@@ -141,6 +186,91 @@ am Kopf der Tour; ein Tipp darauf stellt Straße, Hausnummer und Klingel ein.
 
 Gespeichert wird die **Ortszeit** (`2026-09-21 18:00`). Ob ein Termin „heute“ ist,
 entscheidet das Gerät und nicht der Server: vor der Tür zählt die Uhr an der Wand.
+
+---
+
+### Terminerinnerungen per Push
+
+Unter **Termine** lässt sich Push auf dem Gerät einschalten. Offene eigene Termine
+lösen etwa **15 Minuten vorher** eine Erinnerung aus, auch bei geschlossener App.
+Die Nachricht enthält nur die Uhrzeit; beim Antippen öffnet sie den betreffenden
+Termin mit Anruf- und Routen-Schaltflächen. Erledigte und bereits vergangene Termine
+werden übersprungen. Nicht zugestellte Erinnerungen werden vor Terminbeginn erneut
+versucht; eine erfolgreiche Erinnerung wird nicht erneut versendet.
+
+Neue Termine speichern zusätzlich die Gerätezeitzone und den UTC-Zeitpunkt. Alte
+Termine verwenden **Europe/Berlin**. Verschiebungen aktualisieren den Zeitpunkt.
+Der laufende Node-Server prüft alle 30 Sekunden; dafür ist kein zusätzlicher Cron-Dienst
+nötig. Die App benötigt wie bisher Push-Erlaubnis; auf iPhone/iPad ist die Installation
+auf dem Home-Bildschirm nötig. Der Server muss während des Erinnerungsfensters laufen.
+
+### Gebietsübergabe
+
+Die Gebietsdetails zeigen eine **Übergabeübersicht** mit offenen Türen, bisherigen
+Versuchen, gesperrten Klingeln, Teamnotiz und offenen Terminen samt Verantwortlichen.
+Türzahlen beziehen sich auf hinterlegte Häuser/Klingeln; fehlende Klingelbretter werden
+kenntlich gemacht. Beim Wechsel der Zuteilung wird die neue Person zunächst gewählt,
+eine optionale Übergabenotiz ergänzt und dann **Übergabe speichern** gedrückt.
+
+Bei offenen Terminen muss ausdrücklich gewählt werden: **bei bisherigen Verantwortlichen
+belassen** oder **an die neu zugeteilte Person übergeben**. Letzteres benötigt zusätzlich
+„Teamtermine“; ohne neue Person ist nur das Belassen möglich. Die Übergabe ändert die
+Terminverantwortung, Terminliste und Push-Empfänger, bewahrt jedoch Besuchsautor,
+ursprüngliche Auswertung und XP. Zuteilung und Terminübergabe werden gemeinsam gespeichert;
+eine inzwischen geänderte Zuteilung erfordert ein erneutes Laden der Seite. Die letzte
+Übergabe samt Notiz wird im Gebiet angezeigt.
+
+Die Datenbank wird beim nächsten Serverstart automatisch erweitert. Nach dem Update
+einen laufenden Server neu starten. Tests: `npm test` (einschließlich
+`scripts/tests/sales-reminders-handover.test.ts`).
+
+## Level, XP und Abzeichen
+
+Unter **Level & Erfolge** (`/level`, mobil unter **Mehr**) stehen der eigene Fortschritt,
+Tagesziele, 50 Erfolge in fünf Schwierigkeitsstufen, sieben Rangtitel, die Teamrangliste und die letzten
+20 XP-Einträge. Das Level ist außerdem beim Klinken, im Profil, in der Übersicht
+und im Vergleich sichtbar. Beim Speichern zeigt die App die gewonnenen XP und
+meldet einen Levelaufstieg.
+
+| Ergebnis eines Besuchs | XP insgesamt |
+| --- | ---: |
+| Nicht angetroffen | 5 |
+| Angetroffen, kein Abschluss | 15 |
+| Termin vereinbart | 40 |
+| Abschluss | 100 |
+
+Pro Besuch zählt genau ein Ergebnis. Level 1 beginnt bei 0 XP, Level 2 bei 100 XP,
+Level 3 bei 250 XP. Jeder weitere Aufstieg kostet 50 XP mehr als der vorherige;
+es gibt kein festes Maximallevel. Die Regeln stehen zentral in `src/lib/levels.ts`.
+Die Erfolgssammlung ist von **Bronze → Silber → Gold → Platin → Diamant** sortiert.
+Farbige Medaillen und Kategorie-Symbole unterscheiden Türen, Gespräche, Termine,
+Abschlüsse, Strom/Gas und Beständigkeit. Filter zeigen einzelne Stufen, Bereiche
+oder offene/freigeschaltete Erfolge. Ein nächster Meilenstein wird hervorgehoben.
+
+Neu zählen Strom-, Gas- und Kombiabschlüsse, erledigte Termine, aktive Tage,
+Tage mit Abschluss und persönliche Tagesbestwerte. `BEIDES` zählt für beide
+Produktabzeichen, bleibt aber ein Besuch mit einmaligen XP. Ein Abschluss ohne
+Produktangabe zählt nur zum allgemeinen Abschlussfortschritt. Aktive und erfolgreiche
+Tage müssen nicht aufeinanderfolgen; beim Wiederöffnen eines Termins sinkt dessen
+Erfolgsfortschritt. Tagesbestwerte und Aktivitätstage folgen Europe/Berlin.
+Die Schwierigkeit ist eine redaktionelle Zielstaffel, kein Branchenbenchmark.
+Quellenvergleich und Grenzen: [Recherche zu Vertriebserfolgen](docs/VERTRIEBSERFOLGE.md).
+
+Tagesziele (20 Türen, 5 Gespräche, 1 Abschluss) beginnen um Mitternacht in
+**Europe/Berlin** neu, einschließlich Sommerzeitwechsel. Abzeichen und Tagesziele
+vergeben keine zusätzlichen XP.
+
+XP werden serverseitig aus den bestehenden Besuchen ermittelt: Altbestand zählt
+automatisch, gelöschte Besuche ziehen XP und Abzeichenfortschritt wieder ab.
+Die Rangliste berücksichtigt aktive Teammitglieder und Teamleitungen mit mindestens
+einem Besuch; gleiche Gesamt-XP teilen sich einen Platz. Gesamt-XP bleiben dauerhaft.
+Offline-Einträge zählen nach erfolgreicher Synchronisierung, am Tag der Speicherung
+auf dem Server. Stabile Anfrage-IDs verhindern doppelte Besuche, XP und Feedbeiträge
+bei wiederholtem Senden; auch nach einem Undo bleibt eine Anfrage als erledigt bekannt.
+Neue wartende Einträge sind an das erfassende Konto gebunden.
+
+`npm test` prüft unter anderem Levelgrenzen, Teamisolation, Tageswechsel, Stornos,
+transaktionale Speicherung und Offline-Wiederholungen mit isolierten Testdatenbanken.
 
 ---
 
@@ -734,3 +864,36 @@ bzw. den Beschäftigten abgestimmt. Wer das nicht möchte: in
 Ein erkennbares Verbot („Keine Werbung“, „Für Vertreter verboten“) und ein ausdrückliches
 „kein Interesse“ sind bindend: dafür gibt es die Sperre, die serverseitig auch beim
 Nachsenden greift.
+
+### Einladungen und Vertriebsstruktur
+
+Unter **Mehr → Einladungen** können alle aktiven Mitglieder persönliche Links
+anlegen, kopieren und widerrufen. Jeder Link gilt sieben Tage für eine Registrierung.
+Die eingeladene Person legt Name, E-Mail und Passwort selbst fest. Ihr Konto wird
+erst bei Freigabe angelegt; vorher ist kein Login möglich.
+
+Die Freigabe oder Ablehnung erfolgt ausschließlich durch die **direkte Führungskraft
+des Einladenden**, ebenfalls unter **Einladungen**. Neue Mitglieder werden direkt
+unter dem Einladenden eingeordnet und erhalten die Rolle Vertrieb. Teamleitungen
+an der Strukturspitze (ohne eigene Führungskraft) bearbeiten ihre eigenen
+Einladungen. Bei einer Strukturänderung ist die aktuelle direkte Führungskraft
+zuständig. Bereits eingereichte Anfragen bleiben nach Ablauf des Links bearbeitbar.
+
+Unter **Team → Struktur** zeigt ein Organigramm die vorhandenen Zuordnungen mit
+Profilbildern und Verbindungslinien. Teamleitungen, Führungskräfte mit eigenen
+Mitgliedern und Vertrieb sind farblich gekennzeichnet. Einzelne Zweige oder die
+gesamte Struktur lassen sich ein- und ausklappen; auf dem Handy steht der Baum
+untereinander. Die Ansicht enthält nur die bereits freigegebenen Personen,
+einschließlich deaktivierter Mitglieder. Nicht zugeordnete Personen stehen separat.
+
+Unter **Team → Mitglieder → Direkte Führungskraft** kann die Teamleitung die Zuordnung ändern.
+Kreise und Zuordnungen zu anderen Teams werden verhindert. Bestehende Mitglieder
+werden bei der Migration nur dann automatisch zugeordnet, wenn ihr Team genau eine
+Teamleitung hat. Andernfalls muss die Struktur zunächst manuell zugeordnet werden.
+Manuell angelegte Mitglieder werden der anlegenden Teamleitung zugeordnet.
+
+Der Status steht beim Einladenden; es werden keine Einladungs- oder Freigabe-E-Mails
+verschickt. Die neuen Tabellen und die Strukturspalte werden beim Serverstart
+angelegt. Einen bereits laufenden Server nach dem Update neu starten.
+
+Tests: `node --import tsx --test scripts/tests/invitations.test.ts`

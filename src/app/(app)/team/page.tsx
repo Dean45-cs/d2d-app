@@ -1,3 +1,4 @@
+import { canManageMember, permissionsFor } from "@/lib/permissions";
 import { redirect } from "next/navigation";
 import { requireUser } from "@/lib/auth";
 import { listMembers, listTerritories, memberStats } from "@/lib/queries";
@@ -7,10 +8,11 @@ export const dynamic = "force-dynamic";
 
 export default async function TeamPage() {
   const user = await requireUser();
-  if (user.role !== "LEADER") redirect("/tour");
+  const rights = permissionsFor(user);
+  if (!rights["team.manage"] && !rights["structure.manage"] && !rights["team.roles"]) redirect("/tour");
 
-  const members = listMembers(user.team_id);
-  const stats = memberStats(user.team_id);
+  const members = listMembers(user.team_id).filter((member) => member.id === user.id || canManageMember(user, member));
+  const stats = rights["reports.team"] ? memberStats(user.team_id) : [];
   const territories = listTerritories(user.team_id);
 
   const rows = members.map((m) => {
@@ -27,8 +29,8 @@ export default async function TeamPage() {
   });
 
   return (
-    <div className="mx-auto max-w-4xl">
-      <TeamTable rows={rows} currentUserId={user.id} />
+    <div className="mx-auto max-w-6xl">
+      <TeamTable rows={rows} currentUserId={user.id} rights={{ ...rights, "team.roles": user.role === "LEADER" && rights["team.roles"] }} editableIds={members.filter((member) => canManageMember(user, member)).map((member) => member.id)} />
     </div>
   );
 }

@@ -46,9 +46,11 @@ type Tab = "map" | "list";
  */
 export function NewTerritoryButton({
   members,
+  canAssign,
   existingAreas = [],
 }: {
   members: User[];
+  canAssign: boolean;
   existingAreas?: ExistingArea[];
 }) {
   const router = useRouter();
@@ -524,7 +526,7 @@ export function NewTerritoryButton({
                 onPlotCount={setPlotCount}
                 plots={plots}
                 plotOf={plotOf}
-                members={members}
+                members={canAssign ? members : []}
                 assignees={assignees}
                 onAssignee={(index, value) =>
                   setAssignees((prev) => {
@@ -594,7 +596,7 @@ export function NewTerritoryButton({
               </div>
 
               <div className="grid grid-cols-2 gap-3">
-                {!splitting && (
+                {!splitting && canAssign && (
                   <div>
                     <label className="label" htmlFor="t-user">
                       Zuteilen an

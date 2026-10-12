@@ -1,3 +1,4 @@
+import { hasPermission } from "@/lib/permissions";
 import { requireUser } from "@/lib/auth";
 import { getTerritory, lastRefresh, listEnergyPrices } from "@/lib/queries";
 import { centerOf, readArea } from "@/lib/geo/area";
@@ -34,7 +35,7 @@ export default async function EnergyMapPage({
   searchParams: Promise<{ gebiet?: string }>;
 }) {
   const user = await requireUser();
-  const isLeader = user.role === "LEADER";
+  const isLeader = hasPermission(user, "energy.manage");
 
   // Eigene Preise ersetzen den Wert der Tagesquelle fuer dieselbe PLZ.
   const manual = listManualPrices(user.team_id);
@@ -134,6 +135,7 @@ export default async function EnergyMapPage({
       open={open}
       reference={reference}
       isLeader={isLeader}
+      canRefresh={hasPermission(user, "energy.refresh")}
       feed={feed ? { refresh: lastRefresh() } : null}
       consumption={{ strom: CONSUMPTION_STROM_KWH, gas: CONSUMPTION_GAS_KWH }}
       initialDraft={initialDraft}

@@ -19,6 +19,21 @@ export async function handle<T>(fn: () => Promise<T>): Promise<NextResponse> {
     }
     const message = error instanceof Error ? error.message : "Unbekannter Fehler";
     console.error("[api]", message);
+    // Ein Datenbankfehler ist keine dauerhaft ungueltige Benutzereingabe.
+    // Offline-Clients behalten 5xx-Antworten fuer einen spaeteren Versuch.
+    const code = typeof error === "object" && error !== null && "code" in error ? error.code : undefined;
+    if (typeof code === "string" && code.startsWith("SQLITE_")) {
+      return NextResponse.json(
+        { error: "Der Dienst ist vorübergehend nicht verfügbar. Bitte versuche es erneut." },
+        { status: 503 },
+      );
+    }
+    if (error instanceof TypeError || error instanceof RangeError) {
+      return NextResponse.json(
+        { error: "Interner Serverfehler. Bitte versuche es erneut." },
+        { status: 500 },
+      );
+    }
     return NextResponse.json({ error: message }, { status: 400 });
   }
 }

@@ -19,6 +19,8 @@ import { IconCheck, IconTrendDown, IconTrendUp, IconTrophy } from "@/components/
 import { RangePicker } from "../auswertung/RangePicker";
 import { parseRange, previousRange, rangeToSince, type RangeKey } from "../auswertung/ranges";
 import { OpponentPicker } from "./OpponentPicker";
+import { getLevelProgress } from "@/lib/level-queries";
+import { LevelBadge } from "@/components/levels/LevelCard";
 
 export const dynamic = "force-dynamic";
 
@@ -36,8 +38,6 @@ const COMPARED_TO: Record<RangeKey, string> = {
   all: "",
 };
 
-const MEDAL = ["🥇", "🥈", "🥉"];
-
 /**
  * Wo stehe ich im Team? Rangliste je Kennzahl, der eigene Platz mit dem
  * Abstand zum naechsten, der Vergleich mit Team-Schnitt und Bestwert - und
@@ -49,6 +49,7 @@ export default async function ComparePage({
   searchParams: Promise<{ range?: string; kennzahl?: string; mit?: string }>;
 }) {
   const user = await requireUser();
+  const level = getLevelProgress(user.team_id, user.id);
   const params = await searchParams;
   const key = parseRange(params.range, "7");
   const metric = metricByKey(params.kennzahl);
@@ -90,6 +91,15 @@ export default async function ComparePage({
         action={<RangePicker current={key} keep={keep} />}
       />
 
+      <Link href="/level#rangliste" className="card mb-5 flex items-center gap-3 p-4 transition-colors hover:bg-[var(--hover)]">
+        <LevelBadge progress={level} />
+        <div className="min-w-0 flex-1">
+          <p className="text-[13.5px] font-semibold">Level-Rangliste</p>
+          <p className="muted text-[12px]">{level.totalXp.toLocaleString("de-DE")} XP insgesamt · unabhängig vom Zeitraum</p>
+        </div>
+        <span className="shrink-0 text-[12px] font-semibold text-tint">Ansehen →</span>
+      </Link>
+
       {/* Kennzahl - als Leiste, die sich auf dem Handy seitlich schieben laesst */}
       <nav className="-mx-4 mb-5 flex gap-2 overflow-x-auto px-4 pb-1 md:mx-0 md:px-0" aria-label="Kennzahl">
         {METRICS.map((m) => (
@@ -109,7 +119,7 @@ export default async function ComparePage({
         <EmptyState
           icon={<IconTrophy className="h-7 w-7" />}
           title="Noch niemand in der Wertung"
-          text="Sobald das Team Türen erfasst, steht hier, wer wo steht."
+          text="Die Rangliste zeigt die erfassten Ergebnisse des Teams."
         />
       ) : (
         <>
@@ -201,7 +211,7 @@ function MyPlace({
     <section className="card mb-4 overflow-hidden">
       <div
         className="flex items-center gap-4 p-5 text-white"
-        style={{ background: "linear-gradient(135deg, var(--brand-900), var(--brand-600))" }}
+        style={{ background: "var(--brand-900)" }}
       >
         <Avatar name={me.user_name} src={avatar} size={56} tone="light" />
         <div className="min-w-0 flex-1">
@@ -255,7 +265,7 @@ function Podium({ entries, metric, meId }: { entries: RankEntry[]; metric: Metri
             style={{ background: "var(--card-inset)" }}
             aria-label={`Platz ${entry.rank}`}
           >
-            {MEDAL[(entry.rank ?? 3) - 1] ?? entry.rank}
+            {entry.rank}.
           </div>
         </Link>
       ))}
@@ -286,8 +296,6 @@ function RankRow({
       <span className="w-7 shrink-0 text-center text-[15px] font-bold tabular-nums">
         {entry.rank === null ? (
           <span className="muted">–</span>
-        ) : entry.rank <= 3 && best ? (
-          <span aria-label={`Platz ${entry.rank}`}>{MEDAL[entry.rank - 1]}</span>
         ) : (
           entry.rank
         )}

@@ -1,4 +1,6 @@
+import { hasPermission } from "@/lib/permissions";
 import Link from "next/link";
+import type { ReactNode } from "react";
 import { notFound } from "next/navigation";
 import { requireUser } from "@/lib/auth";
 import { dailySeries, totals } from "@/lib/queries";
@@ -19,8 +21,10 @@ import {
   StatTile,
   percent,
 } from "@/components/ui";
-import { IconCalendar, IconTrophy } from "@/components/icons";
+import { IconCalendar, IconCheck, IconTrophy } from "@/components/icons";
 import { rangeToSince } from "../../auswertung/ranges";
+import { LevelBadge, LevelCard } from "@/components/levels/LevelCard";
+import { getLevelProgress } from "@/lib/level-queries";
 
 export const dynamic = "force-dynamic";
 
@@ -53,6 +57,7 @@ export default async function ProfilePage({
   const isMe = profile.id === user.id;
   const first = firstName(profile.name);
   const teamId = user.team_id;
+  const level = getLevelProgress(teamId, profile.id);
 
   /* ------------------------------- Zahlen -------------------------------- */
   const all = totals(teamId, { userId: profile.id });
@@ -89,10 +94,9 @@ export default async function ProfilePage({
       {/* ------------------------------- Kopf -------------------------------- */}
       <section className="card overflow-hidden">
         <div
-          className="h-28 md:h-36"
+          className="h-20 md:h-24"
           style={{
-            background:
-              "radial-gradient(120% 140% at 100% 0%, color-mix(in srgb, var(--energy-500) 55%, transparent), transparent 55%), linear-gradient(135deg, var(--brand-900), var(--brand-600))",
+            background: "var(--brand-900)",
           }}
           aria-hidden
         />
@@ -123,6 +127,7 @@ export default async function ProfilePage({
           <h1 className="mt-3 text-[22px] font-bold leading-tight">{profile.name}</h1>
           <p className="muted mt-0.5 flex flex-wrap items-center gap-2 text-[13.5px]">
             {roleLabel}
+            <LevelBadge progress={level} />
             {profile.follows_me && <Pill>Hat dich abonniert</Pill>}
             {!profile.active && <Pill tone="danger">Deaktiviert</Pill>}
           </p>
@@ -132,7 +137,7 @@ export default async function ProfilePage({
           ) : (
             isMe && (
               <p className="muted mt-2.5 text-[14px]">
-                Noch kein Text über dich – ein Satz unter „Profil bearbeiten“ reicht.
+                Unter „Profil bearbeiten“ kannst du eine Beschreibung ergänzen.
               </p>
             )
           )}
@@ -164,6 +169,9 @@ export default async function ProfilePage({
       </section>
 
       {/* ------------------------------ Leistung ------------------------------ */}
+      <div className="mt-4">
+        <LevelCard progress={level} compact href={isMe ? "/level" : undefined} title={isMe ? "Dein Level" : `Level von ${first}`} />
+      </div>
       <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
         <StatTile
           label="Abschlüsse"
@@ -193,19 +201,19 @@ export default async function ProfilePage({
         <SectionHeader title="Erfolge" href="/vergleich" linkLabel="Vergleich" />
         <div className="grid grid-cols-3 gap-2">
           <Highlight
-            icon="🔥"
+            icon={<IconCheck className="h-5 w-5" />}
             value={streak}
-            label={streak === 1 ? "Tag mit Abschluss" : "Tage in Folge"}
+            label={streak === 1 ? "Tag in Folge" : "Tage in Folge"}
             hint="mit Abschluss"
           />
           <Highlight
-            icon="⭐"
+            icon={<IconTrophy className="h-5 w-5" />}
             value={best?.sales ?? 0}
             label="Bester Tag"
             hint={best ? shortDate(best.day) : "noch offen"}
           />
           <Highlight
-            icon="📅"
+            icon={<IconCalendar className="h-5 w-5" />}
             value={all.appointments ?? 0}
             label="Termine"
             hint="insgesamt"
@@ -217,7 +225,7 @@ export default async function ProfilePage({
             <>
               <div className="mb-1.5 flex items-baseline justify-between gap-3 text-[13.5px]">
                 <span>
-                  Nächstes Abzeichen: <span className="font-semibold">🏅 {progress.next} Abschlüsse</span>
+                  Nächstes Abzeichen: <span className="font-semibold">{progress.next} {progress.next === 1 ? "Abschluss" : "Abschlüsse"}</span>
                 </span>
                 <span className="muted shrink-0 tabular-nums">
                   {sales} / {progress.next}
@@ -225,12 +233,12 @@ export default async function ProfilePage({
               </div>
               <ProgressBar value={sales - progress.from} max={progress.next - progress.from} tone="success" />
               <p className="muted mt-1.5 text-[12.5px]">
-                {isMe ? "Dir fehlen" : `${first} fehlen`} noch {progress.next - sales}{" "}
+                {isMe ? "Dir" : first} {progress.next - sales === 1 ? "fehlt" : "fehlen"} noch {progress.next - sales}{" "}
                 {progress.next - sales === 1 ? "Abschluss" : "Abschlüsse"}.
               </p>
             </>
           ) : (
-            <p className="text-[13.5px] font-semibold">Alle Abzeichen erreicht – Legende. 🏆</p>
+            <p className="text-[13.5px] font-semibold">Alle Abzeichen erreicht.</p>
           )}
           <div className="mt-3 flex flex-wrap gap-1.5">
             {progress.reached.length === 0 ? (
@@ -238,7 +246,7 @@ export default async function ProfilePage({
             ) : (
               progress.reached.map((milestone) => (
                 <Pill key={milestone} tone="warn">
-                  🏅 {milestone === 1 ? "Erster Vertrag" : `${milestone} Abschlüsse`}
+                  {milestone === 1 ? "Erster Vertrag" : `${milestone} Abschlüsse`}
                 </Pill>
               ))
             )}
@@ -295,7 +303,7 @@ export default async function ProfilePage({
             id: user.id,
             name: user.name,
             avatar: user.avatar,
-            isLeader: user.role === "LEADER",
+            isLeader: hasPermission(user, "community.moderate"),
           }}
           composer={isMe && tabKey === "beitraege"}
           empty={emptyText(tabKey, isMe, first)}
@@ -311,14 +319,14 @@ function Highlight({
   label,
   hint,
 }: {
-  icon: string;
+  icon: ReactNode;
   value: number;
   label: string;
   hint: string;
 }) {
   return (
     <div className="inset px-2 py-3 text-center">
-      <p className="text-[20px] leading-none" aria-hidden>
+      <p className="muted flex justify-center" aria-hidden>
         {icon}
       </p>
       <p className="mt-1.5 text-[22px] font-bold leading-none tabular-nums">{value}</p>
@@ -338,7 +346,7 @@ function emptyText(tab: TabKey, isMe: boolean, first: string): { title: string; 
   if (tab === "abschluesse") {
     return {
       title: "Noch kein Abschluss",
-      text: isMe ? "Der erste Vertrag erscheint hier – und im Feed für das ganze Team." : undefined,
+      text: isMe ? "Erfasste Abschlüsse erscheinen hier und im Team-Feed." : undefined,
     };
   }
   if (tab === "gefaellt") {
@@ -346,6 +354,6 @@ function emptyText(tab: TabKey, isMe: boolean, first: string): { title: string; 
   }
   return {
     title: isMe ? "Noch keine Beiträge" : `${first} hat noch nichts gepostet`,
-    text: isMe ? "Schreib oben etwas – oder mach einen Vertrag, der erscheint von selbst." : undefined,
+    text: isMe ? "Beiträge kannst du oben verfassen. Abschlüsse werden automatisch veröffentlicht." : undefined,
   };
 }

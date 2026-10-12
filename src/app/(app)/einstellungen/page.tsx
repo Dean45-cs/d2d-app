@@ -1,3 +1,4 @@
+import { permissionsFor } from "@/lib/permissions";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { requireUser } from "@/lib/auth";
@@ -19,7 +20,8 @@ export const dynamic = "force-dynamic";
 
 export default async function SettingsPage() {
   const user = await requireUser();
-  if (user.role !== "LEADER") redirect("/tour");
+  const rights = permissionsFor(user);
+  if (!["settings.reasons", "energy.reference", "energy.manage", "energy.refresh"].some((key) => rights[key as keyof typeof rights])) redirect("/tour");
 
   const reasons = listReasons(user.team_id, false);
   const feed = feedConfig();
@@ -74,13 +76,13 @@ export default async function SettingsPage() {
               <IconChevronRight className="muted h-4 w-4 shrink-0" />
             </Link>
           </div>
-          <ReferenceSettings
+          {rights["energy.reference"] && <ReferenceSettings
             reference={getReference(user.team_id)}
             referenceDefault={DEFAULT_REFERENCE}
-          />
+          />}
         </section>
 
-        <ReasonSettings reasons={reasons} />
+        {rights["settings.reasons"] && <ReasonSettings reasons={reasons} />}
 
         <section className="card p-5">
           <SectionHeader title="Abschluss" className="mb-1" />

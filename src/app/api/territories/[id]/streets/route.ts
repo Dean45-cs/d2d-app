@@ -1,4 +1,4 @@
-import { requireRole } from "@/lib/auth";
+import { requirePermission, assertTerritoryAccess } from "@/lib/permissions";
 import { addStreetEntries, addStreets, getTerritory } from "@/lib/queries";
 import { handle, optionalText, parseStreetList } from "@/lib/api";
 
@@ -9,10 +9,11 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> },
 ) {
   return handle(async () => {
-    const leader = await requireRole("LEADER");
+    const leader = await requirePermission("territories.edit");
     const { id } = await params;
     const territory = getTerritory(Number(id), leader.team_id);
     if (!territory) throw new Error("Gebiet nicht gefunden.");
+    assertTerritoryAccess(leader, territory);
 
     const body = await request.json();
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { AppointmentRow } from "@/lib/queries";
 import {
@@ -41,7 +41,21 @@ export function AppointmentList({
   const [view, setView] = useState<View>("open");
   /* Was "heute" ist, entscheidet die Uhr des Geräts - nicht die des Servers. */
   const [now, setNow] = useState<Date | null>(null);
-  useEffect(() => setNow(new Date()), []);
+  const focusedAppointment = useRef<string | null>(null);
+  useEffect(() => {
+    setNow(new Date());
+    const id = new URLSearchParams(window.location.search).get("termin");
+    if (id && /^\d+$/.test(id)) {
+      focusedAppointment.current = id;
+      if (appointments.find((item) => item.id === Number(id))?.follow_up_done_at) setView("done");
+    }
+  }, [appointments]);
+  useEffect(() => {
+    if (!now || !focusedAppointment.current) return;
+    const target = document.getElementById(`appointment-${focusedAppointment.current}`);
+    target?.scrollIntoView({ block: "center" });
+    target?.focus();
+  }, [now, view]);
 
   async function setDone(id: number, done: boolean) {
     setBusy(id);
@@ -171,7 +185,7 @@ export function AppointmentList({
       ) : (
         <ul className="list">
           {done.map((item) => (
-            <li key={item.id} className="list-row">
+            <li key={item.id} id={`appointment-${item.id}`} tabIndex={-1} className="list-row focus:outline-2 focus:outline-offset-2">
               <SlotBlock slot={item.follow_up_at} showDay muted />
               <span className="min-w-0 flex-1">
                 <span className="block truncate text-[14px] font-medium line-through decoration-[var(--line-strong)]">
@@ -217,7 +231,7 @@ function AppointmentItem({
 }) {
   const phone = item.contact_phone.replace(/[^+\d]/g, "");
   return (
-    <li className="list-row items-start py-3 sm:items-center">
+    <li id={`appointment-${item.id}`} tabIndex={-1} className="list-row items-start py-3 focus:outline-2 focus:outline-offset-2 sm:items-center">
       <SlotBlock slot={item.follow_up_at} showDay={late} late={late} />
       <div className="min-w-0 flex-1">
         <p className="truncate text-[14.5px] font-semibold">{item.contact_name || "Ohne Namen"}</p>

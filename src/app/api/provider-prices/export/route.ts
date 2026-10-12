@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { AuthError, requireRole } from "@/lib/auth";
+import { AuthError } from "@/lib/auth";
+import { requirePermission } from "@/lib/permissions";
 import { listManualPrices, monthly } from "@/lib/energy/manual";
 import { openPlaces } from "@/lib/energy/places";
 import { TABLE_COLUMNS, tableNumber, toCsv } from "@/lib/energy/table";
@@ -21,7 +22,7 @@ function germanDate(value: string): string {
 export async function GET() {
   let teamId: number;
   try {
-    teamId = (await requireRole("LEADER")).team_id;
+    teamId = (await requirePermission("energy.manage")).team_id;
   } catch (error) {
     if (error instanceof AuthError) {
       return NextResponse.json({ error: error.message }, { status: error.status });

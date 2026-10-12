@@ -265,7 +265,109 @@ function migrate(db: Database.Database) {
     "CREATE INDEX IF NOT EXISTS idx_visits_follow_up ON visits (team_id, follow_up_at)",
   );
 
+  addColumn(db, "visits", "follow_up_user_id", "INTEGER REFERENCES users(id) ON DELETE SET NULL");
+  addColumn(db, "visits", "follow_up_timezone", "TEXT NOT NULL DEFAULT 'Europe/Berlin'");
+  addColumn(db, "visits", "follow_up_utc", "TEXT");
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS sale_drafts (
+      draft_key TEXT NOT NULL,
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      team_id INTEGER NOT NULL REFERENCES teams(id) ON DELETE CASCADE,
+      payload TEXT NOT NULL,
+      label TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'OPEN' CHECK(status IN ('OPEN','CONFIRMED','ABORTED')),
+      visit_id INTEGER REFERENCES visits(id) ON DELETE SET NULL,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      PRIMARY KEY(user_id, draft_key)
+    );
+    CREATE TABLE IF NOT EXISTS appointment_reminders (
+      visit_id INTEGER NOT NULL REFERENCES visits(id) ON DELETE CASCADE,
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      slot TEXT NOT NULL,
+      timezone TEXT NOT NULL,
+      lease_until INTEGER NOT NULL DEFAULT 0,
+      sent_at TEXT,
+      PRIMARY KEY(visit_id, user_id, slot, timezone)
+    );
+    CREATE TABLE IF NOT EXISTS territory_handovers (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      territory_id INTEGER NOT NULL REFERENCES territories(id) ON DELETE CASCADE,
+      actor_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+      from_user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+      to_user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+      note TEXT NOT NULL DEFAULT '',
+      appointment_policy TEXT NOT NULL CHECK(appointment_policy IN ('KEEP','TRANSFER')),
+      appointments_transferred INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+  `);
+
   migrateCommunity(db);
+  migrateInvitations(db);
+  addColumn(db, "territories", "created_by", "INTEGER REFERENCES users(id) ON DELETE SET NULL");
+  db.exec(`
+    CREATE INDEX IF NOT EXISTS idx_territories_creator ON territories(created_by);
+    CREATE TABLE IF NOT EXISTS user_permissions (
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      permission TEXT NOT NULL,
+      allowed INTEGER NOT NULL CHECK(allowed IN (0, 1)),
+      granted_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+      updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+      PRIMARY KEY (user_id, permission)
+    );
+  `);
+  // Nach einem Undo bleibt die Anfrage bekannt. Ein spaeter Offline-Retry
+  // darf weder den Besuch wiederherstellen noch erneut XP vergeben.
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS visit_requests (
+      client_request_id TEXT NOT NULL,
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      team_id INTEGER NOT NULL REFERENCES teams(id) ON DELETE CASCADE,
+      visit_id INTEGER REFERENCES visits(id) ON DELETE SET NULL,
+      PRIMARY KEY (user_id, client_request_id)
+    );
+    CREATE INDEX IF NOT EXISTS idx_visit_requests_visit ON visit_requests(visit_id);
+  `);
+}
+
+function migrateInvitations(db: Database.Database) {
+  const needsStructure = !hasColumn(db, "users", "manager_id");
+  addColumn(db, "users", "manager_id", "INTEGER REFERENCES users(id) ON DELETE RESTRICT");
+  // Nur eindeutige bestehende Teams automatisch zuordnen. Bei mehreren
+  // Teamleitungen wird die tatsächliche Struktur in der Teamverwaltung gesetzt.
+  if (needsStructure) {
+    db.exec(`UPDATE users SET manager_id = (
+      SELECT id FROM users leader WHERE leader.team_id = users.team_id AND leader.role = 'LEADER'
+    ) WHERE role = 'MEMBER' AND (
+      SELECT COUNT(*) FROM users leader WHERE leader.team_id = users.team_id AND leader.role = 'LEADER'
+    ) = 1`);
+  }
+  db.exec(`
+    CREATE INDEX IF NOT EXISTS idx_users_manager ON users(manager_id);
+    CREATE TABLE IF NOT EXISTS invitation_links (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      token TEXT NOT NULL UNIQUE,
+      inviter_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      expires_at TEXT NOT NULL DEFAULT (datetime('now', '+7 days')),
+      revoked_at TEXT
+    );
+    CREATE INDEX IF NOT EXISTS idx_invitation_owner ON invitation_links(inviter_id);
+    CREATE TABLE IF NOT EXISTS join_requests (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      invitation_id INTEGER NOT NULL UNIQUE REFERENCES invitation_links(id),
+      name TEXT NOT NULL,
+      email TEXT NOT NULL,
+      phone TEXT NOT NULL DEFAULT '',
+      password_hash TEXT,
+      status TEXT NOT NULL DEFAULT 'PENDING' CHECK(status IN ('PENDING', 'APPROVED', 'REJECTED')),
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      decided_at TEXT,
+      decided_by INTEGER REFERENCES users(id),
+      user_id INTEGER REFERENCES users(id)
+    );
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_join_pending_email ON join_requests(lower(email)) WHERE status = 'PENDING';
+  `);
 }
 
 /**

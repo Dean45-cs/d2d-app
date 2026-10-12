@@ -1,3 +1,4 @@
+import { permissionsFor } from "@/lib/permissions";
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
 import { MobileTabBar, MobileTopBar, Sidebar, type NavUser } from "@/components/AppNav";
@@ -14,7 +15,7 @@ export default async function AppLayout({
   const user = await getCurrentUser();
   if (!user) redirect("/login");
 
-  const nav = navigation(user.role);
+  const nav = navigation(user.role, permissionsFor(user));
   const navUser: NavUser = {
     id: user.id,
     name: user.name,

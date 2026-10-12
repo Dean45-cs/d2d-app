@@ -1,3 +1,6 @@
+import { handoverSummary } from "@/lib/territory-handover";
+import { TerritoryHandover } from "@/components/TerritoryHandover";
+import { canAccessTerritory, permissionsFor, structureIds } from "@/lib/permissions";
 import { notFound } from "next/navigation";
 import { requireUser } from "@/lib/auth";
 import { getDb } from "@/lib/db";
@@ -7,7 +10,7 @@ import {
   listMembers,
   listStreets,
   listHouseNumbers,
-  listTerritories,
+  listAccessibleTerritories,
   listVisits,
   type HouseNumberWithStats,
   type StreetWithStats,
@@ -44,11 +47,14 @@ export default async function TerritoryDetailPage({
   const territory = getTerritory(Number(id), user.team_id);
   if (!territory) notFound();
 
-  const isLeader = user.role === "LEADER";
-  if (!isLeader && territory.assigned_user_id !== user.id) notFound();
+  const rights = permissionsFor(user);
+  const isLeader = rights["territories.edit"];
+  if (!canAccessTerritory(user, territory)) notFound();
+  const canStatus = isLeader || territory.assigned_user_id === user.id;
 
   const streets = listStreets(territory.id);
-  const members = isLeader ? listMembers(user.team_id) : [];
+  const ids = new Set([user.id, ...structureIds(user)]);
+  const members = rights["territories.assign"] ? listMembers(user.team_id).filter((member) => rights["territories.view_all"] || ids.has(member.id) || member.id === territory.assigned_user_id) : [];
   const visits = listVisits(user.team_id, { territoryId: territory.id, limit: 30 });
 
   // Hausnummern je Strasse - aus der Kartenauswahl uebernommen.
@@ -66,7 +72,7 @@ export default async function TerritoryDetailPage({
   });
   // Beim Nachziehen der Flaeche sollen die Nachbargebiete sichtbar sein.
   const otherAreas = isLeader
-    ? listTerritories(user.team_id).flatMap((t) => {
+    ? listAccessibleTerritories(user).flatMap((t) => {
         const other = t.id === territory.id ? null : readShape(t.area_json);
         return other ? [{ id: t.id, name: t.name, area: other }] : [];
       })
@@ -122,6 +128,7 @@ export default async function TerritoryDetailPage({
   );
 
   const hours = hourBuckets(territory.id);
+  const handover = handoverSummary(territory);
 
   return (
     <div className="mx-auto max-w-4xl">
@@ -171,10 +178,12 @@ export default async function TerritoryDetailPage({
         )}
       </div>
 
+      <TerritoryHandover summary={handover} />
+
       <ProviderCard
         info={provider}
         className="mb-4"
-        editHref={isLeader ? `/karte?gebiet=${territory.id}` : undefined}
+        editHref={rights["energy.manage"] ? `/karte?gebiet=${territory.id}` : undefined}
       />
 
       <TerritoryAreaCard
@@ -188,6 +197,8 @@ export default async function TerritoryDetailPage({
       />
 
       <TerritoryControls
+        openAppointments={handover.appointments.length}
+        canTransferAppointments={rights["appointments.team"]}
         territory={{
           id: territory.id,
           name: territory.name,
@@ -197,7 +208,9 @@ export default async function TerritoryDetailPage({
           due_date: territory.due_date,
         }}
         members={members}
-        isLeader={isLeader}
+        canAssign={rights["territories.assign"]}
+        canDelete={rights["territories.delete"]}
+        canStatus={canStatus}
       />
 
       <StreetList
@@ -205,6 +218,7 @@ export default async function TerritoryDetailPage({
         streets={streets}
         numbers={numbersByStreet}
         isLeader={isLeader}
+        canStatus={canStatus}
       />
 
       {visits.length > 0 && (

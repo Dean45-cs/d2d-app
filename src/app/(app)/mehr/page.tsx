@@ -1,3 +1,4 @@
+import { permissionsFor } from "@/lib/permissions";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { requireUser } from "@/lib/auth";
@@ -26,7 +27,7 @@ const TINT: Record<string, string> = {
  */
 export default async function MorePage() {
   const user = await requireUser();
-  const nav = navigation(user.role);
+  const nav = navigation(user.role, permissionsFor(user));
   if (nav.more.length === 0) redirect(nav.tabs[0].href);
 
   const groups = [...new Set(nav.more.map((item) => item.group))];

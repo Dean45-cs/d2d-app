@@ -1,3 +1,4 @@
+import { hasPermission } from "@/lib/permissions";
 import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth";
 import { feedConfig } from "@/lib/energy/adapters";
@@ -14,18 +15,20 @@ export const maxDuration = 60;
  *   - per Cron mit Header  Authorization: Bearer <ENERGY_REFRESH_TOKEN>
  *   - oder aus der App heraus durch die Teamleitung (Button "Jetzt aktualisieren").
  */
-async function authorise(request: Request): Promise<boolean> {
+async function authorise(request: Request): Promise<200 | 401 | 403> {
   const token = process.env.ENERGY_REFRESH_TOKEN;
   const header = request.headers.get("authorization");
-  if (token && header === `Bearer ${token}`) return true;
+  if (token && header === `Bearer ${token}`) return 200;
 
   const user = await getCurrentUser();
-  return user?.role === "LEADER";
+  if (!user) return 401;
+  return hasPermission(user, "energy.refresh") ? 200 : 403;
 }
 
 export async function POST(request: Request) {
-  if (!(await authorise(request))) {
-    return NextResponse.json({ error: "Nicht berechtigt" }, { status: 401 });
+  const authorization = await authorise(request);
+  if (authorization !== 200) {
+    return NextResponse.json({ error: "Nicht berechtigt" }, { status: authorization });
   }
   if (!feedConfig()) {
     return NextResponse.json(

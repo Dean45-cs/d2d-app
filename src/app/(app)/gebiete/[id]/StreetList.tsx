@@ -21,12 +21,14 @@ export function StreetList({
   streets,
   numbers,
   isLeader,
+  canStatus,
 }: {
   territoryId: number;
   streets: StreetWithStats[];
   /** Hausnummern je Strassen-ID, aus der Kartenauswahl uebernommen. */
   numbers: Record<number, HouseNumberWithStats[]>;
   isLeader: boolean;
+  canStatus: boolean;
 }) {
   const router = useRouter();
   const [adding, setAdding] = useState(false);
@@ -199,6 +201,7 @@ export function StreetList({
                       Plakette daneben waere doppelt und kostet auf dem Handy Platz. */}
                   <select
                     className="select select-sm shrink-0"
+                    disabled={!canStatus}
                     value={s.status}
                     onChange={(e) => setStatus(s.id, e.target.value)}
                     aria-label={`Status von ${s.name}`}

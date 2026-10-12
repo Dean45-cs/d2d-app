@@ -1,4 +1,4 @@
-import { requireRole } from "@/lib/auth";
+import { requirePermission } from "@/lib/permissions";
 import { getDb } from "@/lib/db";
 import { handle, optionalText, requireText } from "@/lib/api";
 
@@ -6,7 +6,7 @@ export const dynamic = "force-dynamic";
 
 export async function POST(request: Request) {
   return handle(async () => {
-    const leader = await requireRole("LEADER");
+    const leader = await requirePermission("settings.reasons");
     const body = await request.json();
     const label = requireText(body.label, "Bezeichnung", 80);
 

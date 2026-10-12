@@ -1,8 +1,11 @@
-import { requireUser } from "@/lib/auth";
+import { hasPermission } from "@/lib/permissions";
+import { AuthError, requireUser } from "@/lib/auth";
 import { getDb } from "@/lib/db";
 import { handle } from "@/lib/api";
 import { normalizeSlot } from "@/lib/appointments";
+import { appointmentTimeZone } from "@/lib/appointment-time";
 import { requireTeamVisit, setAppointmentDone, setAppointmentSlot } from "@/lib/queries";
+import { getLevelProgress } from "@/lib/level-queries";
 
 export const dynamic = "force-dynamic";
 
@@ -29,8 +32,8 @@ export async function DELETE(
       throw new Error("Eintrag nicht gefunden.");
     }
 
-    if (user.role !== "LEADER") {
-      if (visit.user_id !== user.id) throw new Error("Das ist nicht dein Eintrag.");
+    if (!hasPermission(user, "visits.correct")) {
+      if (visit.user_id !== user.id) throw new AuthError("Das ist nicht dein Eintrag.", 403);
       const ageMinutes =
         (Date.now() - new Date(`${visit.created_at.replace(" ", "T")}Z`).getTime()) / 60000;
       if (ageMinutes > 15) {
@@ -38,8 +41,13 @@ export async function DELETE(
       }
     }
 
-    db.prepare("DELETE FROM visits WHERE id = ?").run(visit.id);
-    return { ok: true };
+    const progression = db.transaction(() => {
+      const before = getLevelProgress(user.team_id, visit.user_id);
+      db.prepare("DELETE FROM visits WHERE id = ?").run(visit.id);
+      const progress = getLevelProgress(user.team_id, visit.user_id);
+      return { progress, awardedXp: progress.totalXp - before.totalXp, previousLevel: before.level, levelUp: false };
+    }).immediate();
+    return { ok: true, progression };
   });
 }
 
@@ -58,8 +66,8 @@ export async function PATCH(
     const user = await requireUser();
     const { id } = await params;
     const visit = requireTeamVisit(Number(id), user.team_id);
-    if (user.role !== "LEADER" && visit.user_id !== user.id) {
-      throw new Error("Das ist nicht dein Termin.");
+    if (!hasPermission(user, "appointments.team") && visit.user_id !== user.id) {
+      throw new AuthError("Das ist nicht dein Termin.", 403);
     }
     if (visit.outcome !== "APPOINTMENT") throw new Error("Das ist kein Termin.");
 
@@ -68,7 +76,8 @@ export async function PATCH(
     if (body.followUpAt !== undefined) {
       const slot = normalizeSlot(body.followUpAt);
       if (!slot) throw new Error("Bitte Datum und Uhrzeit angeben.");
-      setAppointmentSlot(visit.id, slot);
+      const current = getDb().prepare("SELECT follow_up_timezone FROM visits WHERE id = ?").get(visit.id) as { follow_up_timezone: string };
+      setAppointmentSlot(visit.id, slot, appointmentTimeZone(body.followUpTimeZone ?? current.follow_up_timezone));
       return { ok: true, followUpAt: slot };
     }
 

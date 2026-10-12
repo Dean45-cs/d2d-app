@@ -1,11 +1,13 @@
+import { hasPermission } from "@/lib/permissions";
 import Link from "next/link";
+import { PendingSales } from "@/components/PendingSales";
 import { redirect } from "next/navigation";
 import { requireUser } from "@/lib/auth";
 import {
   dailySeries,
   listAppointments,
   listMembers,
-  listTerritories,
+  listAccessibleTerritories,
   memberStats,
   reasonStats,
   totals,
@@ -27,12 +29,15 @@ import { providerLookup, type ProviderInfo } from "@/lib/energy/provider";
 import { readArea } from "@/lib/geo/area";
 import { greeting, todayLong } from "@/lib/format";
 import { IconCalendar, IconMap } from "@/components/icons";
+import { LevelCard } from "@/components/levels/LevelCard";
+import { getLevelProgress } from "@/lib/level-queries";
 
 export const dynamic = "force-dynamic";
 
 export default async function StartPage() {
   const user = await requireUser();
-  if (user.role !== "LEADER") redirect("/tour");
+  if (!hasPermission(user, "reports.team")) redirect("/tour");
+  const level = getLevelProgress(user.team_id, user.id);
 
   const today = new Date().toISOString().slice(0, 10);
   const todayTotals = totals(user.team_id, { since: today });
@@ -45,11 +50,11 @@ export default async function StartPage() {
     (a, b) => b.sales - a.sales || b.doors - a.doors,
   );
   const reasons = reasonStats(user.team_id, weekAgo);
-  const territories = listTerritories(user.team_id);
+  const territories = listAccessibleTerritories(user);
 
   // Termine gehoeren ins Dashboard: ein Termin, den niemand mehr sieht,
   // verfaellt - und mit ihm die beste Tuer der Woche.
-  const appointments = listAppointments(user.team_id, { limit: 100 });
+  const appointments = listAppointments(user.team_id, { userId: hasPermission(user, "appointments.team") ? undefined : user.id, limit: 100 });
 
   // Grundversorger je Gebiet - teuerster zuerst: dort ist das Wechselargument am staerksten.
   const providers = providerLookup(user.team_id);
@@ -78,6 +83,8 @@ export default async function StartPage() {
         }
       />
 
+      <PendingSales userId={user.id} />
+
       <div className="mb-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
         <StatTile
           label="Türen heute"
@@ -105,6 +112,7 @@ export default async function StartPage() {
       </div>
 
       <div className="grid gap-4 lg:grid-cols-3">
+        <div className="lg:col-span-3"><LevelCard progress={level} compact href="/level" /></div>
         {/* ------------------------------ Verlauf ------------------------------ */}
         <section className="card p-5 lg:col-span-2">
           <SectionHeader title="Letzte 14 Tage" href="/auswertung" linkLabel="Auswertung" />
@@ -285,7 +293,7 @@ export default async function StartPage() {
         <div>
           <ProviderCard
             info={top ? (providerOf.get(top.id) ?? null) : null}
-            title={top ? `Größtes Potenzial · ${top.name}` : "Grundversorger"}
+            title={top ? `Höchste Jahreskosten · ${top.name}` : "Grundversorger"}
             editHref={top ? `/karte?gebiet=${top.id}` : "/karte"}
           />
         </div>

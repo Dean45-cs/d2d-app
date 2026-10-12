@@ -1,8 +1,10 @@
-import { requireRole, requireUser } from "@/lib/auth";
+import { recordTerritoryHandover } from "@/lib/territory-handover";
+import { requireUser } from "@/lib/auth";
+import { assertPermission, assertTerritoryAccess, territoryAssignee } from "@/lib/permissions";
 import { getDb } from "@/lib/db";
 import { freeArea, getTerritory } from "@/lib/queries";
 import { parseShape, shapeToJson } from "@/lib/geo/area";
-import { handle, optionalNumber, optionalText } from "@/lib/api";
+import { handle, optionalText } from "@/lib/api";
 
 export const dynamic = "force-dynamic";
 
@@ -16,22 +18,15 @@ export async function PATCH(
     const territoryId = Number(id);
     const territory = getTerritory(territoryId, user.team_id);
     if (!territory) throw new Error("Gebiet nicht gefunden.");
+    assertTerritoryAccess(user, territory);
 
     const body = await request.json();
     const db = getDb();
 
-    // Vertriebler duerfen nur den Status ihres eigenen Gebiets aendern.
-    if (user.role !== "LEADER") {
-      if (territory.assigned_user_id !== user.id) {
-        throw new Error("Dieses Gebiet ist dir nicht zugeteilt.");
-      }
-      const status = optionalText(body.status, 10);
-      if (!["OPEN", "ACTIVE", "DONE", "PAUSED"].includes(status)) {
-        throw new Error("Unbekannter Status.");
-      }
-      db.prepare("UPDATE territories SET status = ? WHERE id = ?").run(status, territoryId);
-      return { ok: true };
-    }
+    if (Object.keys(body).some((key) => !["status", "assignedUserId", "appointmentPolicy", "handoverNote", "expectedAssignedUserId"].includes(key))) assertPermission(user, "territories.edit");
+    if (body.status !== undefined && territory.assigned_user_id !== user.id) assertPermission(user, "territories.edit");
+    if (["assignedUserId", "appointmentPolicy", "handoverNote", "expectedAssignedUserId"].some((key) => body[key] !== undefined)) assertPermission(user, "territories.assign");
+    if (body.assignedUserId === undefined && (body.appointmentPolicy !== undefined || body.handoverNote !== undefined)) throw new Error("Für eine Übergabe bitte die neue Zuteilung angeben.");
 
     const fields: string[] = [];
     const values: (string | number | null)[] = [];
@@ -56,13 +51,7 @@ export async function PATCH(
     if (body.note !== undefined) set("note", optionalText(body.note));
     if (body.dueDate !== undefined) set("due_date", optionalText(body.dueDate, 10) || null);
     if (body.assignedUserId !== undefined) {
-      const assignee = optionalNumber(body.assignedUserId);
-      if (assignee !== null) {
-        const member = db
-          .prepare("SELECT id FROM users WHERE id = ? AND team_id = ?")
-          .get(assignee, user.team_id);
-        if (!member) throw new Error("Mitarbeiter gehört nicht zu diesem Team.");
-      }
+      const assignee = territoryAssignee(user, body.assignedUserId);
       set("assigned_user_id", assignee);
       if (body.status === undefined && assignee !== null && territory.status === "OPEN") {
         set("status", "ACTIVE");
@@ -78,7 +67,18 @@ export async function PATCH(
 
     if (fields.length === 0) return { ok: true };
     values.push(territoryId);
-    db.prepare(`UPDATE territories SET ${fields.join(", ")} WHERE id = ?`).run(...values);
+    db.transaction(() => {
+      const current = getTerritory(territoryId, user.team_id);
+      if (!current) throw new Error("Gebiet nicht gefunden.");
+      if (body.assignedUserId !== undefined) {
+        if (body.expectedAssignedUserId !== undefined && body.expectedAssignedUserId !== current.assigned_user_id) {
+          throw new Error("Die Zuteilung wurde inzwischen geändert. Bitte die Seite neu laden.");
+        }
+        recordTerritoryHandover(user, current, territoryAssignee(user, body.assignedUserId),
+          body.appointmentPolicy, optionalText(body.handoverNote, 1000));
+      }
+      db.prepare(`UPDATE territories SET ${fields.join(", ")} WHERE id = ?`).run(...values);
+    }).immediate();
     return { ok: true };
   });
 }
@@ -88,8 +88,12 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> },
 ) {
   return handle(async () => {
-    const leader = await requireRole("LEADER");
+    const leader = await requireUser();
     const { id } = await params;
+    assertPermission(leader, "territories.delete");
+    const territory = getTerritory(Number(id), leader.team_id);
+    if (!territory) throw new Error("Gebiet nicht gefunden.");
+    assertTerritoryAccess(leader, territory);
     getDb()
       .prepare("DELETE FROM territories WHERE id = ? AND team_id = ?")
       .run(Number(id), leader.team_id);

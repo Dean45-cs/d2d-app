@@ -1,6 +1,7 @@
+import { permissionsFor, structureIds } from "@/lib/permissions";
 import Link from "next/link";
 import { requireUser } from "@/lib/auth";
-import { listMembers, listTerritories } from "@/lib/queries";
+import { listMembers, listAccessibleTerritories } from "@/lib/queries";
 import { readArea, readShape } from "@/lib/geo/area";
 import { providerLookup } from "@/lib/energy/provider";
 import { ProviderLine } from "@/components/ProviderRating";
@@ -22,12 +23,13 @@ export const dynamic = "force-dynamic";
 
 export default async function TerritoriesPage() {
   const user = await requireUser();
-  const isLeader = user.role === "LEADER";
+  const rights = permissionsFor(user);
+  const canCreate = rights["territories.create"];
+  const isLeader = rights["territories.view_all"] || canCreate;
 
-  const territories = listTerritories(user.team_id, {
-    userId: isLeader ? undefined : user.id,
-  });
-  const members = isLeader ? listMembers(user.team_id) : [];
+  const territories = listAccessibleTerritories(user);
+  const ids = new Set([user.id, ...structureIds(user)]);
+  const members = canCreate ? listMembers(user.team_id).filter((member) => rights["territories.assign"] ? rights["territories.view_all"] || ids.has(member.id) : member.id === user.id) : [];
   const providers = providerLookup(user.team_id);
 
   // Nur Gebiete mit gezeichneter Flaeche kommen auf die Uebersichtskarte.
@@ -68,9 +70,10 @@ export default async function TerritoriesPage() {
         title={isLeader ? "Gebiete" : "Meine Gebiete"}
         subtitle={summary}
         action={
-          isLeader ? (
+          canCreate ? (
             <NewTerritoryButton
               members={members}
+              canAssign={rights["territories.assign"]}
               existingAreas={mapped.map((t) => ({ id: t.id, name: t.name, area: t.area }))}
             />
           ) : undefined
@@ -84,7 +87,7 @@ export default async function TerritoriesPage() {
           icon={<IconMap className="h-7 w-7" />}
           title={isLeader ? "Noch keine Gebiete" : "Dir ist noch kein Gebiet zugeteilt"}
           text={
-            isLeader
+            canCreate
               ? "Neues Gebiet anlegen, auf der Karte einkreisen – die Straßen holt die App aus OpenStreetMap."
               : "Sobald deine Teamleitung dir ein Gebiet zuweist, erscheint es hier."
           }

@@ -26,14 +26,7 @@ export function Logo({
   );
 }
 
-/**
- * Nur die Bildmarke - fuer enge Stellen.
- *
- * Der Verlauf sitzt als CSS-Hintergrund auf dem Kaestchen und nicht als
- * SVG-Verlauf: der braucht eine ID, und steht dieselbe ID zweimal auf der
- * Seite (Seitenleiste und Kopfzeile), zeichnet der Browser die zweite Marke
- * ohne Farbe, sobald die erste ausgeblendet ist.
- */
+/** Bildmarke fuer Navigation und Anmeldung. */
 export function LogoMark({ size = 32 }: { size?: number }) {
   return (
     <span
@@ -42,7 +35,7 @@ export function LogoMark({ size = 32 }: { size?: number }) {
         width: size,
         height: size,
         borderRadius: size * 0.25,
-        background: "linear-gradient(135deg, var(--energy-400), var(--brand-500))",
+        background: "var(--brand-600)",
       }}
       role="img"
       aria-label="Energie Partner 24"

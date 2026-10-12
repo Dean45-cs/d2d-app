@@ -19,7 +19,7 @@ import { useToast } from "./Toast";
  * "card" steht im eigenen Profil, "banner" oben im Feed - der Banner zeigt
  * sich nur, solange Push aus ist und sich einschalten liesse.
  */
-export function PushToggle({ variant = "card" }: { variant?: "card" | "banner" }) {
+export function PushToggle({ variant = "card", description }: { variant?: "card" | "banner"; description?: string }) {
   const [state, setState] = useState<PushState | null>(null);
   const [busy, setBusy] = useState(false);
   const [dismissed, setDismissed] = useState(false);
@@ -121,7 +121,7 @@ export function PushToggle({ variant = "card" }: { variant?: "card" | "banner" }
         </span>
         <span className="min-w-0 flex-1">
           <span className="block text-[15px] font-medium">Push-Nachrichten</span>
-          <span className="muted block text-[12.5px] leading-snug">{PUSH_HINT[state]}</span>
+          <span className="muted block text-[12.5px] leading-snug">{available && description ? description : PUSH_HINT[state]}</span>
         </span>
         {available && (
           <Switch

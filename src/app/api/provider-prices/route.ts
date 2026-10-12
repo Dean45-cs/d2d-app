@@ -1,4 +1,4 @@
-import { requireRole } from "@/lib/auth";
+import { requirePermission } from "@/lib/permissions";
 import { handle, optionalNumber, ValidationError } from "@/lib/api";
 import { deleteManualPrice, saveManualPrice } from "@/lib/energy/manual";
 import { locator } from "@/lib/energy/places";
@@ -12,7 +12,7 @@ export const dynamic = "force-dynamic";
  */
 export async function POST(request: Request) {
   return handle(async () => {
-    const leader = await requireRole("LEADER");
+    const leader = await requirePermission("energy.manage");
     const body = (await request.json()) as PriceFields & { id?: unknown };
 
     const checked = checkPrice(body);

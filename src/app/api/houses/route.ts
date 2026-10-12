@@ -1,3 +1,4 @@
+import { assertPermission, assertStreetAccess } from "@/lib/permissions";
 import { requireUser } from "@/lib/auth";
 import { handle, optionalNumber, optionalText, parseDoorbellList } from "@/lib/api";
 import {
@@ -27,10 +28,13 @@ export async function POST(request: Request) {
   return handle(async () => {
     const user = await requireUser();
     const body = await request.json();
+    if (body.blocked !== undefined && typeof body.blocked !== "boolean") throw new Error("Ungültige Sperre.");
 
     const streetId = optionalNumber(body.streetId);
     if (streetId === null) throw new Error("Straße fehlt.");
     requireTeamStreet(streetId, user.team_id);
+    assertStreetAccess(user, streetId);
+    if (body.blocked === false) assertPermission(user, "doors.unblock");
 
     const number = optionalText(body.houseNumber, 20);
     if (!number) throw new Error("Hausnummer fehlt.");
@@ -56,7 +60,7 @@ export async function POST(request: Request) {
       if (body.blocked) {
         setDoorBlocked("house_numbers", houseNumberId, user.id, optionalText(body.blockedNote, 200));
       } else {
-        if (user.role !== "LEADER") throw new Error("Nur die Teamleitung kann eine Sperre aufheben.");
+        assertPermission(user, "doors.unblock");
         setDoorBlocked("house_numbers", houseNumberId, null);
       }
     }

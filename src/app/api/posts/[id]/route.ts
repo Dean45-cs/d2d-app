@@ -1,3 +1,4 @@
+import { assertPermission } from "@/lib/permissions";
 import { requireUser } from "@/lib/auth";
 import { handle } from "@/lib/api";
 import { deletePost, getPost, requireTeamPost } from "@/lib/community";
@@ -33,9 +34,7 @@ export async function DELETE(
     if (post.kind === "SALE") {
       throw new Error("Ein Abschluss lässt sich nur über den Eintrag an der Tür zurücknehmen.");
     }
-    if (post.user_id !== user.id && user.role !== "LEADER") {
-      throw new Error("Das ist nicht dein Beitrag.");
-    }
+    if (post.user_id !== user.id) assertPermission(user, "community.moderate");
     deletePost(post.id);
     return { ok: true };
   });

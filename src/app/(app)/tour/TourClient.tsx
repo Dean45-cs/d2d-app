@@ -1,5 +1,8 @@
 "use client";
 
+import { PendingSales } from "@/components/PendingSales";
+import { beginSaleDraft } from "@/lib/sale-drafts-client";
+
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
@@ -81,6 +84,7 @@ import {
 import { readDraft, writeDraft, type LocalVisits } from "@/lib/tour-draft";
 import {
   enqueue,
+  createVisitRequestId,
   flush,
   getQueue,
   remove as removeQueued,
@@ -88,6 +92,10 @@ import {
   subscribe,
   type QueuedWrite,
 } from "@/lib/offline-queue";
+import type { LevelProgress } from "@/lib/levels";
+import { levelFeedbackText, type LevelFeedback } from "@/lib/level-feedback";
+import { LevelCard } from "@/components/levels/LevelCard";
+import { LevelUpNotice } from "@/components/levels/LevelUpNotice";
 
 type TerritoryLite = {
   id: number;
@@ -136,11 +144,13 @@ const NEW_BELL = {
 } as const;
 
 type SaveResult =
-  | { status: "saved"; id: number; nextBell: string | null; pickBell?: boolean }
+  | { status: "saved"; id: number; nextBell: string | null; pickBell?: boolean; progression?: LevelFeedback }
   | { status: "queued"; nextBell: string | null; pickBell?: boolean }
   | { status: "error" };
 
 interface Props {
+  userId: number;
+  initialProgress: LevelProgress;
   territories: TerritoryLite[];
   streets: StreetWithStats[];
   houseNumbers: HouseNumberWithStats[];
@@ -164,6 +174,8 @@ const PRODUCTS: Array<{ value: EnergyType; label: string }> = [
 ];
 
 export function TourClient({
+  userId,
+  initialProgress,
   territories,
   streets,
   houseNumbers,
@@ -177,6 +189,15 @@ export function TourClient({
   tarifrechnerUrl,
 }: Props) {
   const router = useRouter();
+  const [level, setLevel] = useState(initialProgress);
+  const [levelUp, setLevelUp] = useState<LevelFeedback | null>(null);
+  const dismissLevelUp = useCallback(() => setLevelUp(null), []);
+  useEffect(() => setLevel(initialProgress), [initialProgress]);
+  const receiveProgress = useCallback((feedback?: LevelFeedback) => {
+    if (!feedback) return;
+    setLevel(feedback.progress);
+    if (feedback.levelUp) setLevelUp(feedback);
+  }, []);
 
   const [territoryId, setTerritoryId] = useState<number | null>(
     territories[0]?.id ?? null,
@@ -303,16 +324,18 @@ export function TourClient({
 
   // Warteschlange beobachten und automatisch nachsenden
   useEffect(() => {
-    setPending(getQueue());
+    setPending(getQueue(userId));
     setOnline(navigator.onLine);
 
-    const unsubscribe = subscribe(setPending);
+    const unsubscribe = subscribe(setPending, userId);
     const stopAutoFlush = startAutoFlush((result) => {
       if (result.sent > 0) {
+        receiveProgress(result.progression);
         setToast(
-          result.sent === 1
+          (result.sent === 1
             ? "1 gepufferter Eintrag wurde gesendet"
-            : `${result.sent} gepufferte Einträge wurden gesendet`,
+            : `${result.sent} gepufferte Einträge wurden gesendet`) +
+            (levelFeedbackText(result.progression) ? ` · ${levelFeedbackText(result.progression)}` : ""),
         );
         // Erst wenn nichts mehr wartet, kennt der Server alles - dann darf der
         // lokale Zuschlag weg, sonst wuerde er ein zweites Mal mitgezaehlt.
@@ -324,8 +347,13 @@ export function TourClient({
       }
       if (result.rejected > 0) {
         setToast(`${result.rejected} Eintrag/Einträge konnten nicht gespeichert werden`);
+        if (result.remaining === 0) {
+          setLocalVisits(new Map());
+          setLocalBlocked(new Set());
+        }
+        router.refresh();
       }
-    });
+    }, userId);
 
     const update = () => setOnline(navigator.onLine);
     window.addEventListener("online", update);
@@ -337,7 +365,7 @@ export function TourClient({
       window.removeEventListener("online", update);
       window.removeEventListener("offline", update);
     };
-  }, [router]);
+  }, [router, userId, receiveProgress, setToast]);
 
   /* -------------------------------- Auswahl ------------------------------- */
 
@@ -626,8 +654,13 @@ export function TourClient({
       }
       router.refresh();
     } catch {
-      enqueue(label, payload, { url: "/api/houses", kind: "house" });
-      setToast("Kein Netz – gemerkt, wird automatisch nachgesendet");
+      try {
+        enqueue(label, payload, { url: "/api/houses", kind: "house", ownerUserId: userId });
+        setToast("Kein Netz – gemerkt, wird automatisch nachgesendet");
+      } catch (error) {
+        rollback?.();
+        setToast(error instanceof Error ? error.message : "Nicht gespeichert. Bitte erneut versuchen.");
+      }
     }
   }
 
@@ -909,6 +942,8 @@ export function TourClient({
     /* Echte Namen am Brett? Dann gehoert jeder Eintrag ausdruecklich zugeordnet. */
     const named = hasNamedBells(currentBells.map((item) => item.label));
     const payload = {
+      clientRequestId: createVisitRequestId(),
+      ownerUserId: userId,
       territoryId,
       streetId,
       houseNumber: currentNumber,
@@ -919,6 +954,7 @@ export function TourClient({
       reasonNote: extra.reasonNote ?? "",
       energyType: outcome === "SALE" ? product : "",
       followUpAt: extra.followUpAt ?? "",
+      followUpTimeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
       contactName: extra.contactName ?? "",
       contactPhone: extra.contactPhone ?? "",
       lat: position?.lat ?? null,
@@ -992,14 +1028,21 @@ export function TourClient({
       });
       const data = await response.json();
       if (!response.ok) {
+        if (response.status >= 500) throw new Error("Server vorübergehend nicht erreichbar");
         setToast(data.error ?? "Speichern fehlgeschlagen");
+        return { status: "error" };
+      }
+      receiveProgress(data.progression);
+      if (data.deleted || data.id === null) {
+        setToast("Dieser Eintrag wurde bereits rückgängig gemacht.");
+        router.refresh();
         return { status: "error" };
       }
       setLastVisitId(data.id);
       markDone(false);
       const { nextBell, pickBell } = advance();
       router.refresh();
-      return { status: "saved", id: data.id as number, nextBell, pickBell };
+      return { status: "saved", id: data.id as number, nextBell, pickBell, progression: data.progression };
     } catch {
       // Kein Netz: Eintrag lokal puffern, damit nichts verloren geht.
       const label = [
@@ -1011,7 +1054,12 @@ export function TourClient({
       ]
         .filter(Boolean)
         .join(" ");
-      enqueue(label, payload);
+      try {
+        enqueue(label, payload, { ownerUserId: userId });
+      } catch (error) {
+        setToast(error instanceof Error ? error.message : "Nicht gespeichert. Bitte erneut versuchen.");
+        return { status: "error" };
+      }
       setLastVisitId(null);
       markDone(true);
       const { nextBell, pickBell } = advance();
@@ -1025,8 +1073,8 @@ export function TourClient({
     if (result.status === "error") return;
     const base =
       result.status === "saved"
-        ? savedText
-        : "Kein Netz – gespeichert, wird automatisch nachgesendet";
+        ? [savedText, levelFeedbackText(result.progression)].filter(Boolean).join(" · ")
+        : "Lokal gespeichert – XP zählen nach dem Nachsenden";
     const text = result.nextBell
       ? `${base} · weiter mit ${result.nextBell}`
       : result.pickBell
@@ -1107,8 +1155,9 @@ export function TourClient({
   /* -------------------------------- Abschluss ----------------------------- */
 
   /**
-   * Abschluss: der Tarifrechner des Partners wird SOFORT beim Tippen geoeffnet
-   * (sonst blockt der Browser das Fenster), gespeichert wird parallel.
+   * Auftrag: zuerst den offenen Vorgang dauerhaft vormerken, dann den
+   * Tarifrechner noch im selben Klick oeffnen. Erst die Bestaetigung erzeugt
+   * den Verkauf; die Vorgangsqueue wird parallel synchronisiert.
    *
    * Der Auftrag selbst entsteht dort - Kundendaten, Widerrufsbelehrung und
    * Unterschrift gehoeren in den Tarifrechner, nicht ein zweites Mal hierher.
@@ -1125,12 +1174,23 @@ export function TourClient({
      * offen ist. Die Verbindung wird gleich danach gekappt, damit die fremde
      * Seite die Tour nicht fernsteuern kann.
      */
+    try {
+      beginSaleDraft(userId, {
+        territoryId, streetId, houseNumber: currentNumber,
+        doorbellLabel: activeBell?.label ?? "", doorbellFloor: activeBell?.floor ?? "",
+        energyType: product, lat: position?.lat ?? null, lng: position?.lng ?? null,
+      }, `${street?.name ?? ""} ${currentNumber}${activeBell ? ` · ${activeBell.label}` : ""}`);
+    } catch (error) {
+      setToast(error instanceof Error ? error.message : "Auftrag konnte nicht vorgemerkt werden.");
+      return;
+    }
     const win = window.open(tarifrechnerUrl, "_blank");
     if (win) win.opener = null;
-
-    const result = await save("SALE");
-    report(result, "Abschluss gespeichert – viel Erfolg bei der Erfassung!");
-    // Hat der Browser das Fenster blockiert, geht es eben hier weiter.
+    setToast("Auftrag vorgemerkt – nach der Erfassung den Abschluss bestätigen.");
+    void flush(userId).then((result) => {
+      receiveProgress(result.progression);
+      if (result.sent > 0 && navigator.onLine) router.refresh();
+    });
     if (!win) window.location.href = tarifrechnerUrl;
   }
 
@@ -1154,8 +1214,10 @@ export function TourClient({
     try {
       const response = await fetch(`/api/visits/${lastVisitId}`, { method: "DELETE" });
       const data = await response.json();
-      setToast(response.ok ? "Letzter Eintrag entfernt" : (data.error ?? "Nicht möglich"));
+      setToast(response.ok ? `Letzter Eintrag entfernt${data.progression?.awardedXp ? ` · ${data.progression.awardedXp} XP` : ""}` : (data.error ?? "Nicht möglich"));
       if (response.ok) {
+        receiveProgress(data.progression);
+        setLevelUp(null);
         setLastVisitId(null);
         // Den Vermerk aus dieser Sitzung mitnehmen, sonst bliebe die Klingel
         // durchgestrichen, obwohl der Eintrag weg ist.
@@ -1184,12 +1246,24 @@ export function TourClient({
 
   async function sendPendingNow() {
     setToast("Sende …");
-    const result = await flush();
+    const result = await flush(userId);
     if (result.sent > 0) {
-      setToast(`${result.sent} Eintrag/Einträge gesendet`);
-      router.refresh();
+      receiveProgress(result.progression);
+      setToast([`${result.sent} Eintrag/Einträge gesendet`, levelFeedbackText(result.progression)].filter(Boolean).join(" · "));
     } else if (result.remaining > 0) {
-      setToast("Immer noch keine Verbindung");
+      setToast("Senden noch nicht möglich – Einträge bleiben gespeichert.");
+    } else if (result.rejected === 0) {
+      setToast("Alle Einträge sind synchronisiert.");
+    }
+    if (result.rejected > 0) {
+      setToast(`${result.rejected} Eintrag/Einträge konnten nicht gespeichert werden`);
+    }
+    if (result.sent > 0 || result.rejected > 0) {
+      if (result.remaining === 0) {
+        setLocalVisits(new Map());
+        setLocalBlocked(new Set());
+      }
+      router.refresh();
     }
   }
 
@@ -1198,6 +1272,8 @@ export function TourClient({
   if (territories.length === 0) {
     return (
       <div className="mx-auto max-w-md">
+        <PendingSales userId={userId} onProgress={receiveProgress} />
+        <LevelCard progress={level} compact href="/level" />
         <EmptyState
           icon={<IconMap className="h-7 w-7" />}
           title="Noch kein Gebiet zugeteilt"
@@ -1230,6 +1306,7 @@ export function TourClient({
 
   const overlays = (
     <>
+      <LevelUpNotice feedback={levelUp} onDismiss={dismissLevelUp} />
       {/* ========================== Blatt: Straße wählen ==================== */}
       {sheet === "street" && (
         <Sheet
@@ -2325,12 +2402,11 @@ export function TourClient({
                       className="btn btn-success btn-lg mt-2.5 w-full"
                     >
                       <IconCheck className="h-5 w-5" />
-                      Abschluss – Auftrag erfassen
+                      Auftrag erfassen
                       <IconArrowRight className="h-[18px] w-[18px]" />
                     </button>
                     <p className="muted mt-2 text-center text-[11px] leading-snug">
-                      Öffnet den Tarifrechner des Partners und speichert den Abschluss
-                      automatisch.
+                      Öffnet den Tarifrechner – Abschluss anschließend bestätigen.
                     </p>
 
                     {lastVisitId && (
@@ -2350,6 +2426,7 @@ export function TourClient({
           </>
         )}
 
+        <PendingSales userId={userId} onProgress={receiveProgress} />
         {overlays}
       </div>
     );
@@ -2362,6 +2439,8 @@ export function TourClient({
   return (
     <div className="mx-auto max-w-2xl space-y-3">
       {/* ---------------------------- Netz & Puffer ------------------------- */}
+      <PendingSales userId={userId} onProgress={receiveProgress} />
+      <LevelCard progress={level} compact href="/level" />
       {(!online || pending.length > 0) && (
         <div
           className="card rise flex items-center gap-3 px-3.5 py-2.5"
@@ -2750,7 +2829,9 @@ export function TourClient({
                 <span className="min-w-0 flex-1 truncate text-[13px]">{item.label}</span>
                 <button
                   type="button"
-                  onClick={() => removeQueued(item.localId)}
+                  onClick={() => {
+                    if (!removeQueued(item.localId)) setToast("Eintrag konnte nicht aus dem Gerätespeicher entfernt werden.");
+                  }}
                   className="muted shrink-0 text-[11px] font-semibold underline"
                 >
                   verwerfen

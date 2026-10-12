@@ -1,3 +1,4 @@
+import { hasPermission } from "@/lib/permissions";
 import { NextResponse } from "next/server";
 import { authenticate, startSession } from "@/lib/auth";
 
@@ -24,6 +25,6 @@ export async function POST(request: Request) {
   await startSession(user.id);
   return NextResponse.json({
     ok: true,
-    redirect: user.role === "LEADER" ? "/start" : "/tour",
+    redirect: hasPermission(user, "reports.team") ? "/start" : "/tour",
   });
 }

@@ -4,7 +4,10 @@
  * Datenbank nicht in die Edge-Laufzeit gezogen wird.
  */
 export async function register() {
-  if (process.env.NEXT_RUNTIME !== "nodejs") return;
-  const { bootstrap } = await import("./lib/bootstrap");
-  await bootstrap();
+  if (process.env.NEXT_RUNTIME === "nodejs") {
+    const { bootstrap } = await import("./lib/bootstrap");
+    await bootstrap();
+    const { startAppointmentReminderWorker } = await import("./lib/appointment-reminders");
+    startAppointmentReminderWorker();
+  }
 }

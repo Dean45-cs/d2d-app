@@ -1,3 +1,5 @@
+import type { LevelFeedback } from "./level-feedback";
+
 /**
  * Warteschlange für Schreibvorgänge ohne Netz.
  *
@@ -28,6 +30,8 @@ export interface QueuedWrite {
   url?: string;
   /** Nur fürs Symbol in der Warteliste. */
   kind?: "visit" | "house";
+  /** Neue Eintraege duerfen nach einem Kontowechsel nicht fremd verbucht werden. */
+  ownerUserId?: number;
 }
 
 type Listener = (queue: QueuedWrite[]) => void;
@@ -46,30 +50,39 @@ function read(): QueuedWrite[] {
   }
 }
 
-function write(queue: QueuedWrite[]): void {
+function write(queue: QueuedWrite[]): boolean {
   try {
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(queue));
   } catch {
-    // Speicher voll oder gesperrt – der Eintrag geht dann leider verloren,
-    // der Aufrufer zeigt in dem Fall eine Fehlermeldung.
+    return false;
   }
   listeners.forEach((listener) => listener(queue));
+  return true;
 }
 
-export function getQueue(): QueuedWrite[] {
+export function getQueue(userId?: number): QueuedWrite[] {
   if (typeof window === "undefined") return [];
-  return read();
+  return read().filter((entry) => entry.ownerUserId === undefined || entry.ownerUserId === userId);
 }
 
-export function subscribe(listener: Listener): () => void {
-  listeners.add(listener);
-  return () => listeners.delete(listener);
+export function subscribe(listener: Listener, userId?: number): () => void {
+  const scoped: Listener = () => listener(getQueue(userId));
+  listeners.add(scoped);
+  return () => listeners.delete(scoped);
+}
+
+export function createVisitRequestId(): string {
+  if (globalThis.crypto.randomUUID) return globalThis.crypto.randomUUID();
+  // getRandomValues funktioniert auch beim lokalen Zugriff ueber http://LAN-IP.
+  return Array.from(globalThis.crypto.getRandomValues(new Uint32Array(4)), (value) =>
+    value.toString(16).padStart(8, "0"),
+  ).join("-");
 }
 
 export function enqueue(
   label: string,
   payload: Record<string, unknown>,
-  target: { url?: string; kind?: QueuedWrite["kind"] } = {},
+  target: { url?: string; kind?: QueuedWrite["kind"]; ownerUserId?: number } = {},
 ): QueuedWrite {
   const entry: QueuedWrite = {
     localId: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
@@ -78,19 +91,28 @@ export function enqueue(
     payload,
     url: target.url ?? DEFAULT_URL,
     kind: target.kind ?? "visit",
+    ownerUserId: target.ownerUserId,
   };
-  write([...read(), entry]);
+  if (entry.kind === "visit") entry.payload = {
+    ...payload,
+    clientRequestId: payload.clientRequestId ?? createVisitRequestId(),
+    ...(target.ownerUserId === undefined ? {} : { ownerUserId: target.ownerUserId }),
+  };
+  if (!write([...read(), entry])) {
+    throw new Error("Nicht gespeichert: Der Gerätespeicher ist voll oder gesperrt. Bitte mit Verbindung erneut versuchen.");
+  }
   return entry;
 }
 
-export function remove(localId: string): void {
-  write(read().filter((item) => item.localId !== localId));
+export function remove(localId: string): boolean {
+  return write(read().filter((item) => item.localId !== localId));
 }
 
 export interface FlushResult {
   sent: number;
   rejected: number;
   remaining: number;
+  progression?: LevelFeedback;
 }
 
 let flushing = false;
@@ -100,31 +122,53 @@ let flushing = false;
  *
  * Unterschieden wird bewusst:
  *  - Netzfehler  -> Eintrag bleibt in der Warteschlange, nächster Versuch später
- *  - Antwort 4xx -> Eintrag ist dauerhaft ungültig (z. B. Gebiet gelöscht) und
+ *  - 401/403/429 -> Anmeldung oder Wartezeit erforderlich, Eintrag bleibt liegen
+ *  - andere 4xx -> Eintrag ist dauerhaft ungültig (z. B. Gebiet gelöscht) und
  *                   wird verworfen, sonst blockiert er die Schlange für immer
  *  - Antwort 5xx -> Serverproblem, Eintrag bleibt liegen
  */
-export async function flush(): Promise<FlushResult> {
+export async function flush(userId?: number): Promise<FlushResult> {
   if (typeof window === "undefined" || flushing) {
-    return { sent: 0, rejected: 0, remaining: getQueue().length };
+    return { sent: 0, rejected: 0, remaining: getQueue(userId).length };
   }
   flushing = true;
   let sent = 0;
   let rejected = 0;
+  let progression: LevelFeedback | undefined;
 
   try {
-    for (const entry of read()) {
+    for (const entry of getQueue(userId)) {
       try {
+        // Auch Eintraege aus einer aelteren App-Version behalten beim Retry
+        // dieselbe ID. Vor dem Senden speichern, sonst hilft es bei Abbruch nicht.
+        if ((entry.url ?? DEFAULT_URL) === DEFAULT_URL && !entry.payload.clientRequestId) {
+          entry.payload = { ...entry.payload, clientRequestId: `legacy-${entry.localId}` };
+          if (!write(read().map((item) => item.localId === entry.localId ? entry : item))) break;
+        }
         const response = await fetch(entry.url ?? DEFAULT_URL, {
           method: "POST",
           headers: { "content-type": "application/json" },
           body: JSON.stringify(entry.payload),
         });
         if (response.ok) {
-          remove(entry.localId);
+          // Die Bestaetigung vor dem Entfernen lesen: bei Verbindungsabbruch
+          // bleibt die Anfrage wiederholbar und erzeugt serverseitig keine Duplikate.
+          const data = await response.json();
+          if (!remove(entry.localId)) break;
+          if (data.progression) {
+            const next = data.progression as LevelFeedback;
+            progression = {
+              ...next,
+              awardedXp: (progression?.awardedXp ?? 0) + next.awardedXp,
+              previousLevel: progression?.previousLevel ?? next.previousLevel,
+              levelUp: Boolean(progression?.levelUp || next.levelUp),
+            };
+          }
           sent += 1;
+        } else if (response.status === 401 || response.status === 403 || response.status === 429) {
+          break; // Neu anmelden bzw. spaeter versuchen; keine Besuche verlieren.
         } else if (response.status >= 400 && response.status < 500) {
-          remove(entry.localId);
+          if (!remove(entry.localId)) break;
           rejected += 1;
         } else {
           break; // Serverproblem: später nochmal, Reihenfolge bleibt erhalten
@@ -137,17 +181,17 @@ export async function flush(): Promise<FlushResult> {
     flushing = false;
   }
 
-  return { sent, rejected, remaining: read().length };
+  return { sent, rejected, remaining: getQueue(userId).length, progression };
 }
 
 /** Hängt sich an die Ereignisse, bei denen ein neuer Versuch sinnvoll ist. */
-export function startAutoFlush(onFlushed: (result: FlushResult) => void): () => void {
+export function startAutoFlush(onFlushed: (result: FlushResult) => void, userId?: number): () => void {
   if (typeof window === "undefined") return () => {};
 
   const run = async () => {
     if (!navigator.onLine) return;
-    if (getQueue().length === 0) return;
-    const result = await flush();
+    if (getQueue(userId).length === 0) return;
+    const result = await flush(userId);
     if (result.sent > 0 || result.rejected > 0) onFlushed(result);
   };
 

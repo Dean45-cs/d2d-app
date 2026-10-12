@@ -1,11 +1,13 @@
 "use client";
 
+import type { PermissionSet } from "@/lib/permission-definitions";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import {
   IconCheck,
   IconImage,
   IconKey,
+  IconList,
   IconShield,
   IconUserPlus,
   IconUsers,
@@ -17,6 +19,7 @@ import { Sheet } from "@/components/Sheet";
 import { useConfirm } from "@/components/useConfirm";
 import { fileToAvatar } from "@/lib/avatar";
 import type { User } from "@/lib/types";
+import { TeamStructure } from "./TeamStructure";
 
 type Row = User & {
   doors: number;
@@ -30,12 +33,17 @@ type Notice = { tone: Tone; text: string } | null;
 export function TeamTable({
   rows,
   currentUserId,
+  rights,
+  editableIds,
 }: {
   rows: Row[];
   currentUserId: number;
+  rights: PermissionSet;
+  editableIds: number[];
 }) {
   const router = useRouter();
   const [creating, setCreating] = useState(false);
+  const [view, setView] = useState<"structure" | "members">("structure");
   const [resetFor, setResetFor] = useState<Row | null>(null);
   const [notice, setNotice] = useState<Notice>(null);
   const { confirm, dialog } = useConfirm();
@@ -99,11 +107,11 @@ export function TeamTable({
         ]
           .filter(Boolean)
           .join(" · ")}
-        action={
+        action={rights["team.manage"] ?
           <button className="btn btn-primary" onClick={() => setCreating(true)}>
             <IconUserPlus className="h-[18px] w-[18px]" />
             Mitarbeiter anlegen
-          </button>
+          </button> : undefined
         }
       />
 
@@ -115,23 +123,47 @@ export function TeamTable({
         </div>
       )}
 
+      {rows.length > 0 && (
+        <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+          <div className="seg" role="group" aria-label="Teamansicht">
+            <button type="button" aria-pressed={view === "structure"} aria-controls="team-structure-view" onClick={() => setView("structure")}>
+              <IconUsers className="h-4 w-4" />Struktur
+            </button>
+            <button type="button" aria-pressed={view === "members"} aria-controls="team-members-view" onClick={() => setView("members")}>
+              <IconList className="h-4 w-4" />Mitglieder
+            </button>
+          </div>
+          {view === "members" && <p className="muted text-[13px]">Mitglieder und Zuordnungen verwalten</p>}
+        </div>
+      )}
+
+      {rows.length > 0 && (
+        <div id="team-structure-view" hidden={view !== "structure"}>
+          <TeamStructure members={rows} currentUserId={currentUserId} />
+        </div>
+      )}
+
       {rows.length === 0 ? (
         <EmptyState
           icon={<IconUsers className="h-7 w-7" />}
           title="Noch niemand im Team"
-          action={
+          action={rights["team.manage"] ?
             <button className="btn btn-primary" onClick={() => setCreating(true)}>
               Ersten Mitarbeiter anlegen
-            </button>
+            </button> : undefined
           }
         />
       ) : (
         // Ohne "overflow: hidden" der Liste - sonst schneidet sie das Menue ab.
-        <ul className="list" style={{ overflow: "visible" }}>
+        <ul id="team-members-view" className="list" hidden={view !== "members"} style={{ overflow: "visible" }}>
           {rows.map((m) => (
             <MemberRow
               key={m.id}
               member={m}
+              rights={rights}
+              editable={editableIds.includes(m.id)}
+              members={rows}
+              onManager={(managerId) => patch(m.id, { manager_id: managerId }, "Struktur gespeichert.")}
               isSelf={m.id === currentUserId}
               onAvatar={(avatar) =>
                 patch(m.id, { avatar }, avatar ? "Profilbild gespeichert." : "Profilbild entfernt.")
@@ -155,6 +187,7 @@ export function TeamTable({
 
       {creating && (
         <CreateMemberSheet
+          canSetRole={rights["team.roles"]}
           onClose={() => setCreating(false)}
           onCreated={(name) => {
             setCreating(false);
@@ -183,6 +216,10 @@ export function TeamTable({
 
 function MemberRow({
   member: m,
+  rights,
+  editable,
+  members,
+  onManager,
   isSelf,
   onAvatar,
   onAvatarError,
@@ -191,6 +228,10 @@ function MemberRow({
   onActive,
 }: {
   member: Row;
+  rights: PermissionSet;
+  editable: boolean;
+  members: Row[];
+  onManager: (managerId: number | null) => Promise<boolean>;
   isSelf: boolean;
   onAvatar: (avatar: string) => Promise<boolean>;
   onAvatarError: (text: string) => void;
@@ -228,23 +269,40 @@ function MemberRow({
         <p className="muted truncate text-[13px]">
           {[m.email, m.phone].filter(Boolean).join(" · ")}
         </p>
+        <label className="muted mt-2 block text-xs" htmlFor={`manager-${m.id}`}>Direkte Führungskraft</label>
+        <select
+          id={`manager-${m.id}`}
+          className="select mt-1 max-w-xs"
+          value={m.manager_id ?? ""}
+          disabled={busy || !rights["structure.manage"] || !editable}
+          onChange={async (event) => {
+            setBusy(true);
+            try { await onManager(event.target.value ? Number(event.target.value) : null); }
+            finally { setBusy(false); }
+          }}
+        >
+          <option value="" disabled={m.role !== "LEADER"}>{m.role === "LEADER" ? "Strukturspitze" : "Bitte zuordnen"}</option>
+          {members.filter((person) => person.id !== m.id && (person.active || person.id === m.manager_id)).map((person) => (
+            <option key={person.id} value={person.id}>{person.name}{person.active ? "" : " (deaktiviert)"}</option>
+          ))}
+        </select>
         {m.territories.length > 0 && (
           <p className="muted mt-0.5 truncate text-[12px]">
             {plural(m.territories.length, "Gebiet", "Gebiete")}: {m.territories.join(", ")}
           </p>
         )}
         {/* Auf dem Handy stehen die Zahlen unter dem Namen. */}
-        <p className="muted mt-1 text-[12px] tabular-nums sm:hidden">
+        {rights["reports.team"] && <p className="muted mt-1 text-[12px] tabular-nums sm:hidden">
           {m.doors} Türen · {m.met} angetroffen ·{" "}
           <span className="font-semibold text-ok">{m.sales} Abschlüsse</span>
-        </p>
+        </p>}
       </div>
 
-      <dl className="hidden shrink-0 gap-6 text-right sm:flex">
+      {rights["reports.team"] && <dl className="hidden shrink-0 gap-6 text-right sm:flex">
         <Figure label="Türen" value={m.doors} />
         <Figure label="Angetroffen" value={m.met} />
         <Figure label="Abschlüsse" value={m.sales} success />
-      </dl>
+      </dl>}
 
       <input
         ref={fileRef}
@@ -255,7 +313,8 @@ function MemberRow({
         aria-hidden
         onChange={(e) => void pick(e.target.files?.[0])}
       />
-      <Menu label={`Aktionen für ${m.name}`}>
+      {editable && (rights["team.manage"] || rights["team.roles"]) && <Menu label={`Aktionen für ${m.name}`}>
+        {rights["team.manage"] && <>
         <MenuItem icon={<IconImage className="h-[18px] w-[18px]" />} onSelect={() => fileRef.current?.click()}>
           {m.avatar ? "Profilbild ändern" : "Profilbild hinzufügen"}
         </MenuItem>
@@ -267,22 +326,23 @@ function MemberRow({
         <MenuItem icon={<IconKey className="h-[18px] w-[18px]" />} onSelect={onPassword}>
           Passwort neu setzen
         </MenuItem>
+        </>}
         {!isSelf && (
           <>
-            <MenuItem icon={<IconShield className="h-[18px] w-[18px]" />} onSelect={onRole}>
+            {rights["team.roles"] && <MenuItem icon={<IconShield className="h-[18px] w-[18px]" />} onSelect={onRole}>
               {m.role === "LEADER" ? "Zu Vertrieb machen" : "Zur Teamleitung machen"}
-            </MenuItem>
-            <MenuSeparator />
+            </MenuItem>}
+            {rights["team.manage"] && <><MenuSeparator />
             <MenuItem
               icon={<IconUsers className="h-[18px] w-[18px]" />}
               onSelect={onActive}
               tone={m.active ? "danger" : undefined}
             >
               {m.active ? "Deaktivieren" : "Wieder aktivieren"}
-            </MenuItem>
+            </MenuItem></>}
           </>
         )}
-      </Menu>
+      </Menu>}
     </li>
   );
 }
@@ -366,11 +426,13 @@ function PasswordSheet({
 }
 
 function CreateMemberSheet({
+  canSetRole,
   onClose,
   onCreated,
 }: {
   onClose: () => void;
   onCreated: (name: string) => void;
+  canSetRole: boolean;
 }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -469,6 +531,7 @@ function CreateMemberSheet({
             <select
               id="m-role"
               className="select"
+              disabled={!canSetRole}
               value={form.role}
               onChange={(e) => setForm({ ...form, role: e.target.value })}
             >
