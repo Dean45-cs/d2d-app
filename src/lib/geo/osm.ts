@@ -139,12 +139,15 @@ export async function streetsInArea(area: Shape): Promise<AreaStreets> {
       (poly) => `node["addr:housenumber"](poly:"${poly}");way["addr:housenumber"](poly:"${poly}");`,
     )
     .join("");
-  const query = `[out:json][timeout:40];(${roads});out tags center;(${houses});out tags center;`;
+  const query = `[out:json][timeout:25];(${roads});out tags center;(${houses});out tags center;`;
 
-  const elements = await overpass(query);
+  // Strassen und Ortsname gleichzeitig holen - hintereinander addieren sich die Wartezeiten.
+  const [elements, place] = await Promise.all([
+    overpass(query),
+    describePlaceQuickly(centerOf(mainRing(area) ?? area[0][0])),
+  ]);
   const streets = groupStreets(elements, area);
   const addressCount = streets.reduce((sum, s) => sum + s.addresses, 0);
-  const place = await describePlace(centerOf(mainRing(area) ?? area[0][0]));
 
   const result: AreaStreets = { streets, addressCount, place, areaSqKm: size };
   if (streetCache.size >= STREET_CACHE_MAX) streetCache.clear();
@@ -153,65 +156,137 @@ export async function streetsInArea(area: Shape): Promise<AreaStreets> {
 }
 
 /** Zeit je Versuch. Eine uebliche Antwort kommt in wenigen Sekunden. */
-const OVERPASS_TIMEOUT_MS = 35_000;
+const OVERPASS_TIMEOUT_MS = 25_000;
+/** Antwortet ein Server so lange nicht, wird zusaetzlich der naechste gefragt. */
+const OVERPASS_HEDGE_MS = 7_000;
+/** Der Ortsname ist nur Beiwerk - dafuer wartet niemand laenger. */
+const PLACE_TIMEOUT_MS = 8_000;
 
 /** Der Server, der zuletzt geantwortet hat - beim naechsten Mal zuerst gefragt. */
 let preferredServer = 0;
 
-/**
- * Fragt die Overpass-Server der Reihe nach, bis einer antwortet.
- * Ueberlastung (429) und Zeitueberschreitungen sind kein Grund aufzugeben,
- * ein fehlerhafter Abfragetext dagegen schon.
- */
-async function overpass(query: string): Promise<OverpassElement[]> {
-  let lastProblem = "";
+/** Die Abfrage selbst ist fehlerhaft - ein anderer Server hilft nicht. */
+class QueryRejected extends Error {}
 
-  for (let attempt = 0; attempt < OVERPASS_URLS.length; attempt += 1) {
-    const index = (preferredServer + attempt) % OVERPASS_URLS.length;
-    const url = OVERPASS_URLS[index];
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), OVERPASS_TIMEOUT_MS);
+async function overpassAttempt(
+  url: string,
+  query: string,
+  controller: AbortController,
+): Promise<OverpassElement[]> {
+  const timer = setTimeout(() => controller.abort(), OVERPASS_TIMEOUT_MS);
+  try {
+    const response = await fetch(url, {
+      method: "POST",
+      headers: {
+        "content-type": "application/x-www-form-urlencoded",
+        "user-agent": USER_AGENT,
+      },
+      body: new URLSearchParams({ data: query }).toString(),
+      signal: controller.signal,
+      cache: "no-store",
+    });
 
-    try {
-      const response = await fetch(url, {
-        method: "POST",
-        headers: {
-          "content-type": "application/x-www-form-urlencoded",
-          "user-agent": USER_AGENT,
-        },
-        body: new URLSearchParams({ data: query }).toString(),
-        signal: controller.signal,
-        cache: "no-store",
-      });
-
-      if (response.ok) {
-        const data = (await response.json()) as { elements?: OverpassElement[] };
-        preferredServer = index;
-        return data.elements ?? [];
-      }
-
-      // 400 heisst: die Abfrage selbst taugt nichts - da hilft kein anderer Server.
-      if (response.status === 400) {
-        throw new Error("Die Straßenabfrage wurde abgelehnt. Bitte das Gebiet neu zeichnen.");
-      }
-      lastProblem = `Fehler ${response.status}`;
-      console.warn(`[overpass] ${url}: ${lastProblem}`);
-    } catch (error) {
-      if (error instanceof Error && error.message.startsWith("Die Straßenabfrage")) throw error;
-      lastProblem =
-        error instanceof Error && error.name === "AbortError"
-          ? "keine Antwort"
-          : "nicht erreichbar";
-      console.warn(`[overpass] ${url}: ${lastProblem}`);
-    } finally {
-      clearTimeout(timer);
+    if (response.status === 400) {
+      throw new QueryRejected("Die Straßenabfrage wurde abgelehnt. Bitte das Gebiet neu zeichnen.");
     }
-  }
+    if (!response.ok) throw new Error(`Fehler ${response.status}`);
 
-  throw new Error(
-    `Die Straßen-Server sind gerade alle ausgelastet (zuletzt: ${lastProblem}). ` +
-      "In einer Minute noch einmal versuchen – oder die Straßen über „Liste einfügen“ eintragen.",
-  );
+    const data = (await response.json()) as { elements?: OverpassElement[]; remark?: string };
+    // Overpass meldet Zeitueberschreitung und Speichermangel mit Status 200 und
+    // einer Bemerkung - das Ergebnis ist dann leer oder unvollstaendig.
+    if (data.remark && /runtime error/i.test(data.remark)) throw new Error("Server überlastet");
+    return data.elements ?? [];
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/**
+ * Fragt die Overpass-Server ab. Antwortet der erste nicht binnen weniger
+ * Sekunden (oder mit einem Fehler), kommt der naechste dazu - die schnellste
+ * Antwort gewinnt. So wartet niemand nacheinander auf drei Zeitueberschreitungen.
+ */
+function overpass(query: string): Promise<OverpassElement[]> {
+  const total = OVERPASS_URLS.length;
+  const controllers: AbortController[] = [];
+
+  return new Promise((resolve, reject) => {
+    let settled = false;
+    let started = 0;
+    let failed = 0;
+    let lastProblem = "";
+    let hedge: ReturnType<typeof setTimeout> | undefined;
+
+    const finish = (done: () => void) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(hedge);
+      for (const controller of controllers) controller.abort();
+      done();
+    };
+
+    const launch = () => {
+      if (settled || started >= total) return;
+      const index = (preferredServer + started) % total;
+      const url = OVERPASS_URLS[index];
+      const controller = new AbortController();
+      controllers.push(controller);
+      started += 1;
+
+      clearTimeout(hedge);
+      if (started < total) hedge = setTimeout(launch, OVERPASS_HEDGE_MS);
+
+      overpassAttempt(url, query, controller).then(
+        (elements) =>
+          finish(() => {
+            preferredServer = index;
+            resolve(elements);
+          }),
+        (error: unknown) => {
+          if (settled) return;
+          if (error instanceof QueryRejected) {
+            finish(() => reject(error));
+            return;
+          }
+          lastProblem =
+            error instanceof Error && error.name === "AbortError"
+              ? "keine Antwort"
+              : error instanceof Error && error.message
+                ? error.message
+                : "nicht erreichbar";
+          console.warn(`[overpass] ${url}: ${lastProblem}`);
+          failed += 1;
+          if (failed >= total) {
+            finish(() =>
+              reject(
+                new Error(
+                  `Die Straßen-Server sind gerade alle ausgelastet (zuletzt: ${lastProblem}). ` +
+                    "In einer Minute noch einmal versuchen – oder die Straßen über „Liste einfügen“ eintragen.",
+                ),
+              ),
+            );
+          } else {
+            launch();
+          }
+        },
+      );
+    };
+
+    launch();
+  });
+}
+
+/** Wie describePlace, gibt aber nach kurzer Zeit leer auf, statt die Straßensuche aufzuhalten. */
+async function describePlaceQuickly(center: LatLng): Promise<PlaceInfo> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const giveUp = new Promise<PlaceInfo>((resolve) => {
+    timer = setTimeout(() => resolve({ city: "", postalCode: "", district: "" }), PLACE_TIMEOUT_MS);
+  });
+  try {
+    return await Promise.race([describePlace(center), giveUp]);
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 /** Macht aus Overpass-Elementen je Strasse eine Zeile mit allen Hausnummern. */
