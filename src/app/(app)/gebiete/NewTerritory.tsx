@@ -15,7 +15,7 @@ import { GroupLabel, Note, Segmented } from "@/components/ui";
 import { plotColor } from "@/components/map-colors";
 import type { User } from "@/lib/types";
 import { labelPoint, type Shape } from "@/lib/geo/shape";
-import { fetchStreets, StreetsTimeout } from "@/lib/geo/fetch-streets";
+import { loadStreets as fetchAreaStreets, StreetsError } from "@/lib/geo/fetch-streets";
 import { plotAreas, splitStreets } from "@/lib/geo/split";
 import { AreaPicker, type ExistingArea, type OverlayPlot, type OverlayStreet } from "./AreaPicker";
 import {
@@ -104,13 +104,7 @@ export function NewTerritoryButton({
     setLoadingStreets(true);
     setError(null);
     try {
-      const response = await fetchStreets(area);
-      const data = await response.json();
-      if (!response.ok) {
-        setError(data.error ?? "Die Straßen konnten nicht geladen werden.");
-        return false;
-      }
-      const found = data as StreetResponse;
+      const found: StreetResponse = await fetchAreaStreets(area);
       setResult(found);
       setChosen(new Set(found.streets.map((s) => s.name)));
 
@@ -124,8 +118,10 @@ export function NewTerritoryButton({
       return true;
     } catch (caught) {
       setError(
-        caught instanceof StreetsTimeout
-          ? `${caught.message} Straßen lassen sich auch von Hand eintragen.`
+        caught instanceof StreetsError
+          ? caught.message.includes("Liste einfügen")
+            ? caught.message
+            : `${caught.message} Straßen lassen sich auch von Hand eintragen.`
           : "Die Straßensuche ist nicht erreichbar. Straßen lassen sich auch von Hand eintragen.",
       );
       return false;

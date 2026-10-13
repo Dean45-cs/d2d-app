@@ -6,7 +6,7 @@ import { EmptyState, Note, plural } from "@/components/ui";
 import { IconInfo, IconMap } from "@/components/icons";
 import { AreaPicker } from "../AreaPicker";
 import { labelPoint, type Shape } from "@/lib/geo/shape";
-import { fetchStreets, StreetsTimeout } from "@/lib/geo/fetch-streets";
+import { loadStreets, StreetsError } from "@/lib/geo/fetch-streets";
 import {
   TerritoryWorkspace,
   type HourBucket,
@@ -79,12 +79,7 @@ export function TerritoryAreaCard({
     setError(null);
     setMessage(null);
     try {
-      const found = await fetchStreets(area);
-      const data = await found.json();
-      if (!found.ok) {
-        setError(data.error ?? "Die Straßen konnten nicht geladen werden.");
-        return;
-      }
+      const data = await loadStreets(area);
       if (data.streets.length === 0) {
         setMessage("In dieser Fläche sind keine Straßen hinterlegt.");
         return;
@@ -107,7 +102,7 @@ export function TerritoryAreaCard({
       router.refresh();
     } catch (caught) {
       setError(
-        caught instanceof StreetsTimeout ? caught.message : "OpenStreetMap ist gerade nicht erreichbar.",
+        caught instanceof StreetsError ? caught.message : "OpenStreetMap ist gerade nicht erreichbar.",
       );
     } finally {
       setBusy(false);
