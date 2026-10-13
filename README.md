@@ -512,8 +512,10 @@ GEO_COUNTRY_CODES=de,at,ch                       # Länder der Ortssuche
 **„Die Straßen-Server sind gerade alle ausgelastet"?** Der offizielle Overpass-Server
 begrenzt die Abfragen pro IP-Adresse. Bei einem Hoster, dessen Ausgangs-IP sich viele
 Kunden teilen (Fly.io, Railway & Co.), ist dieses Kontingent oft schon von anderen
-verbraucht. Die App probiert deshalb von sich aus mehrere Spiegelserver durch und merkt
-sich den, der geantwortet hat. Bleibt es hartnäckig, hilft eine eigene Overpass-Instanz –
+verbraucht. Deshalb fragt zuerst das Gerät selbst bei Overpass an – mit seiner eigenen
+IP-Adresse (`src/lib/geo/fetch-streets.ts`). Erst wenn das scheitert, geht die Anfrage
+über den App-Server, der mehrere Spiegelserver durchprobiert und sich den merkt, der
+geantwortet hat. Bleibt es hartnäckig, hilft eine eigene Overpass-Instanz –
 `OVERPASS_URL` darauf zeigen lassen, fertig. Welcher Server gerade genommen wurde, steht
 im Serverprotokoll (`[overpass] …`).
 
