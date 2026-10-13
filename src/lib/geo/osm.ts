@@ -27,20 +27,29 @@ import { mainRing, shapeContains, shapeSqm, type Shape } from "./shape";
  * viele teilen. Dann wird der naechste Spiegel genommen.
  * Eigene Adressen (auch mehrere, mit Komma getrennt) ueber OVERPASS_URL.
  */
-const OVERPASS_URLS = (
-  process.env.OVERPASS_URL ??
-  [
-    "https://overpass-api.de/api/interpreter",
-    "https://overpass.kumi.systems/api/interpreter",
-    "https://overpass.private.coffee/api/interpreter",
-  ].join(",")
-)
+const DEFAULT_OVERPASS_URLS = [
+  "https://overpass-api.de/api/interpreter",
+  "https://overpass.kumi.systems/api/interpreter",
+  "https://overpass.private.coffee/api/interpreter",
+];
+
+/**
+ * Wert aus der Umgebung - eine leer gelassene Zeile ("OVERPASS_URL=") zaehlt
+ * als nicht gesetzt. Sonst stuende die App ohne einen einzigen Server da.
+ */
+function env(name: string, fallback: string): string {
+  return process.env[name]?.trim() || fallback;
+}
+
+const CONFIGURED_OVERPASS_URLS = env("OVERPASS_URL", "")
   .split(",")
   .map((url) => url.trim())
   .filter(Boolean);
-const NOMINATIM_URL = (process.env.NOMINATIM_URL ?? "https://nominatim.openstreetmap.org").replace(/\/$/, "");
-const COUNTRY_CODES = process.env.GEO_COUNTRY_CODES ?? "de,at,ch";
-const USER_AGENT = process.env.GEO_USER_AGENT ?? "d2d-app (Gebietsplanung; https://github.com/)";
+const OVERPASS_URLS =
+  CONFIGURED_OVERPASS_URLS.length > 0 ? CONFIGURED_OVERPASS_URLS : DEFAULT_OVERPASS_URLS;
+const NOMINATIM_URL = env("NOMINATIM_URL", "https://nominatim.openstreetmap.org").replace(/\/$/, "");
+const COUNTRY_CODES = env("GEO_COUNTRY_CODES", "de,at,ch");
+const USER_AGENT = env("GEO_USER_AGENT", "d2d-app (Gebietsplanung; https://github.com/)");
 
 /** Strassenarten, an denen Menschen wohnen - Autobahnen und Feldwege fliegen raus. */
 const STREET_TYPES = "residential|living_street|pedestrian|unclassified|tertiary|secondary|primary|road";
@@ -209,6 +218,8 @@ async function overpassAttempt(
 function overpass(query: string): Promise<OverpassElement[]> {
   const total = OVERPASS_URLS.length;
   const controllers: AbortController[] = [];
+  // Ohne Server kaeme nie eine Antwort - lieber gleich sagen, was fehlt.
+  if (total === 0) return Promise.reject(new Error("Kein Straßen-Server eingerichtet (OVERPASS_URL)."));
 
   return new Promise((resolve, reject) => {
     let settled = false;
