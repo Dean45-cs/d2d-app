@@ -819,9 +819,9 @@ export function TourClient({
                     </span>
                     <span className="min-w-0 flex-1">
                       <span className="block truncate text-body">{item.contact_name || "Termin"}</span>
-                      <span className={`block truncate text-footnote ${late ? "font-semibold text-danger" : "text-muted"}`}>
-                        {slotLabel(item.follow_up_at, now ?? undefined)}
-                        {late && " · überfällig"} · {item.street_name ?? ""} {item.house_number}
+                      <span className="block truncate text-footnote text-muted">
+                        {late && <span className="font-semibold text-danger">Überfällig · </span>}
+                        {slotLabel(item.follow_up_at, now ?? undefined)} · {item.street_name ?? ""} {item.house_number}
                       </span>
                     </span>
                   </button>

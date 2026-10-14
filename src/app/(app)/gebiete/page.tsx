@@ -85,7 +85,7 @@ export default async function TerritoriesPage() {
           text={canCreate ? "Gebiet auf der Karte abstecken – die Straßen kommen von selbst." : undefined}
         />
       ) : (
-        <div className="grid gap-6 lg:grid-cols-[minmax(0,400px)_minmax(0,1fr)] lg:items-start">
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,400px)_minmax(0,1fr)] lg:items-start">
           {mapped.length > 0 && (
             <div className="lg:sticky lg:top-6 lg:col-start-2">
               <TerritoryOverviewMap territories={mapped} className="h-[44vh] min-h-64 w-full lg:h-[calc(100dvh-220px)]" />

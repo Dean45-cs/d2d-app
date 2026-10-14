@@ -259,7 +259,7 @@ function Preview({
   if (!result) return null;
   return (
     <div className="mt-2 flex items-center justify-between gap-2 px-1 text-footnote">
-      <span className="kpi text-muted">
+      <span className="text-muted">
         {euro(result.year)} im Jahr ·{" "}
         <span className={`font-semibold ${result.delta > 0 ? "text-accent-ink" : "text-ink-2"}`}>
           {result.delta > 0 ? "+" : ""}

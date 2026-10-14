@@ -124,7 +124,7 @@ export function ProfileEditor({
               value={bio}
               onChange={(e) => setBio(e.target.value)}
             />
-            <p className="kpi mt-1 px-1 text-right text-footnote text-muted">
+            <p className="mt-1 px-1 text-right text-footnote text-muted">
               {bio.length}/{MAX_BIO}
             </p>
           </form>

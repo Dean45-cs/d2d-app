@@ -8,7 +8,7 @@ const number = (value: number) => value.toLocaleString("de-DE");
 /** "Lv. 12" als kleine Plakette - in Listen neben dem Namen. */
 export function LevelBadge({ progress }: { progress: LevelProgress }) {
   return (
-    <span className="badge kpi" title={progress.title}>
+    <span className="badge" title={progress.title}>
       Lv. {number(progress.level)}
     </span>
   );
@@ -35,7 +35,7 @@ export function LevelSummary({
       <span className="min-w-0 flex-1">
         <span className="block text-footnote font-semibold text-ink-2">{label}</span>
         <span className="block truncate text-title-3">{progress.title}</span>
-        <span className="kpi block text-footnote text-muted">
+        <span className="block text-footnote text-muted">
           {number(progress.totalXp)} XP · noch {number(progress.xpToNextLevel)} bis Lv. {number(progress.level + 1)}
         </span>
       </span>

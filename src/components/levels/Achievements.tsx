@@ -73,7 +73,7 @@ export function Achievements({ achievements }: { achievements: Achievement[] }) 
               onClick={() => setOpen(next)}
               icon={<Medal achievement={next} size={40} />}
               title={next.title}
-              subtitle={`Nächstes · noch ${number(Math.max(0, next.target - next.current))} ${next.unit}`}
+              subtitle={`Nächstes · ${number(Math.min(next.current, next.target))} von ${number(next.target)}`}
               chevron
             />
           </li>
@@ -95,7 +95,7 @@ export function Achievements({ achievements }: { achievements: Achievement[] }) 
               onClick={() => setTier(entry.id)}
             >
               {entry.label}
-              <span className="kpi font-normal text-muted">
+              <span className="font-normal text-muted">
                 {badges.filter((badge) => badge.unlocked).length}/{badges.length}
               </span>
             </button>
@@ -120,7 +120,7 @@ export function Achievements({ achievements }: { achievements: Achievement[] }) 
                   >
                     <Medal achievement={achievement} size={56} />
                     <span className="line-clamp-2 text-footnote font-semibold">{achievement.title}</span>
-                    <span className="kpi text-caption text-muted">
+                    <span className="text-caption text-muted">
                       {achievement.unlocked
                         ? "Erreicht"
                         : `${number(Math.min(achievement.current, achievement.target))}/${number(achievement.target)}`}

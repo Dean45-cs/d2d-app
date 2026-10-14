@@ -1,4 +1,4 @@
-import { canManageMember, permissionsFor } from "@/lib/permissions";
+import { canAccessTerritory, canManageMember, permissionsFor } from "@/lib/permissions";
 import { redirect } from "next/navigation";
 import { requireUser } from "@/lib/auth";
 import { listMembers, listTerritories, memberStats } from "@/lib/queries";
@@ -6,7 +6,11 @@ import { TeamTable } from "./TeamTable";
 
 export const dynamic = "force-dynamic";
 
-export default async function TeamPage() {
+/**
+ * Mitglieder verwalten: Liste (Handy) bzw. Tabelle (Rechner) und die
+ * Struktur als eingerueckter Baum. Alles Bearbeiten passiert im Blatt.
+ */
+export default async function MembersPage() {
   const user = await requireUser();
   const rights = permissionsFor(user);
   if (!rights["team.manage"] && !rights["structure.manage"] && !rights["team.roles"]) redirect("/tour");
@@ -24,13 +28,19 @@ export default async function TeamPage() {
       sales: s?.sales ?? 0,
       territories: territories
         .filter((t) => t.assigned_user_id === m.id && t.status !== "DONE")
-        .map((t) => t.name),
+        // Verlinkt wird nur, was die Leitung selbst oeffnen darf.
+        .map((t) => ({ id: t.id, name: t.name, open: canAccessTerritory(user, t, rights) })),
     };
   });
 
   return (
-    <div className="mx-auto max-w-6xl">
-      <TeamTable rows={rows} currentUserId={user.id} rights={{ ...rights, "team.roles": user.role === "LEADER" && rights["team.roles"] }} editableIds={members.filter((member) => canManageMember(user, member)).map((member) => member.id)} />
+    <div className="page">
+      <TeamTable
+        rows={rows}
+        currentUserId={user.id}
+        rights={{ ...rights, "team.roles": user.role === "LEADER" && rights["team.roles"] }}
+        editableIds={members.filter((member) => canManageMember(user, member)).map((member) => member.id)}
+      />
     </div>
   );
 }

@@ -199,7 +199,7 @@ function Composer({ viewer, onPosted }: { viewer: Viewer; onPosted: (post: FeedP
         {text.trim() && (
           <div className="mt-2 flex items-center justify-end gap-3">
             {left <= 80 && (
-              <span className={`kpi text-footnote ${left <= 20 ? "text-danger" : "text-muted"}`}>{left}</span>
+              <span className={`text-footnote ${left <= 20 ? "text-danger" : "text-muted"}`}>{left}</span>
             )}
             <button className="btn btn-primary btn-sm" disabled={busy}>
               {busy ? "Posten …" : "Posten"}
@@ -312,7 +312,7 @@ function PostCard({
           aria-label={`${post.comment_count} Kommentare`}
         >
           <IconComment className="h-5 w-5" />
-          <span className="kpi">{post.comment_count || ""}</span>
+          <span>{post.comment_count || ""}</span>
         </button>
         <button
           type="button"
@@ -324,7 +324,7 @@ function PostCard({
           aria-label={post.liked ? "Gefällt mir nicht mehr" : "Gefällt mir"}
         >
           <IconHeart className={`h-5 w-5 ${post.liked ? "check-pop" : ""}`} filled={post.liked} />
-          <span className="kpi">{post.like_count || ""}</span>
+          <span>{post.like_count || ""}</span>
         </button>
       </div>
 
@@ -359,7 +359,7 @@ function SaleRow({ sale, mine }: { sale: NonNullable<FeedPost["sale"]>; mine: bo
         ) : MILESTONES.has(sale.number) ? (
           <Pill tone="accent">Nr. {sale.number}</Pill>
         ) : (
-          <span className="kpi shrink-0 text-footnote text-muted">Nr. {sale.number}</span>
+          <span className="shrink-0 text-footnote text-muted">Nr. {sale.number}</span>
         ))}
     </div>
   );

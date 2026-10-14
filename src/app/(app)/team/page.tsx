@@ -8,7 +8,7 @@ import { Feed } from "@/components/community/Feed";
 import { FollowButton } from "@/components/community/FollowButton";
 import { PushBanner } from "@/components/community/PushToggle";
 import { Avatar, Cell, ListLabel, PageHeader, SegmentedLinks } from "@/components/ui";
-import { IconUsers } from "@/components/icons";
+import { IconTrophy, IconUsers } from "@/components/icons";
 import { TEAM_VIEWS } from "./views";
 
 export const dynamic = "force-dynamic";
@@ -52,7 +52,7 @@ export default async function TeamPage({
     <div className="page">
       <PageHeader
         title="Team"
-        subtitle={me?.rank ? `Platz ${me.rank} diese Woche` : undefined}
+        subtitle={me?.rank && me.sales > 0 ? `Platz ${me.rank} diese Woche` : undefined}
         actions={
           canManage ? (
             <Link href="/einstellungen/mitglieder" className="icon-btn" aria-label="Mitglieder">
@@ -64,7 +64,7 @@ export default async function TeamPage({
         <SegmentedLinks ariaLabel="Team" current="feed" options={TEAM_VIEWS} className="max-w-md" />
       </PageHeader>
 
-      <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,340px)] lg:items-start">
+      <div className="grid grid-cols-1 gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,340px)] lg:items-start">
         <div className="min-w-0">
           {/* Auf dem Handy statt der Seitenspalte: der eigene Platz in einer Zeile. */}
           {me?.rank && (
@@ -72,7 +72,11 @@ export default async function TeamPage({
               <li>
                 <Cell
                   href="/team/rangliste"
-                  icon={<span className="glyph glyph-round kpi text-subhead">{me.rank}</span>}
+                  icon={
+                    <span className="glyph glyph-round kpi text-subhead">
+                      {me.sales > 0 ? me.rank : <IconTrophy className="h-4 w-4" />}
+                    </span>
+                  }
                   title={`${me.sales} ${me.sales === 1 ? "Abschluss" : "Abschlüsse"} diese Woche`}
                   subtitle={chase ?? undefined}
                 />

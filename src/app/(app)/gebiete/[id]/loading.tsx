@@ -6,7 +6,7 @@ export default function LoadingTerritory() {
     <div className="page" aria-busy="true" aria-label="Gebiet wird geladen">
       <SkeletonHeader />
       <SkeletonStats />
-      <div className="mt-8 grid gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,400px)]">
+      <div className="mt-8 grid grid-cols-1 gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,400px)]">
         <div className="skeleton h-[52vh] min-h-80 rounded-xl" aria-hidden="true" />
         <div className="space-y-8">
           <SkeletonList rows={2} />

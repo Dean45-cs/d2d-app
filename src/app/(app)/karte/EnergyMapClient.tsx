@@ -308,7 +308,7 @@ export function EnergyMapClient({
           }
         />
       ) : (
-        <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,380px)] lg:items-start">
+        <div className="grid grid-cols-1 gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,380px)] lg:items-start">
           <div className="lg:sticky lg:top-16">
             <div className="relative overflow-hidden rounded-xl">
               <MapView

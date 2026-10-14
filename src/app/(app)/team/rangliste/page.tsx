@@ -14,7 +14,7 @@ import {
   type Metric,
   type RankEntry,
 } from "@/lib/ranking";
-import { Avatar, EmptyState, ListLabel, Notice, PageHeader, SegmentedLinks } from "@/components/ui";
+import { Avatar, EmptyState, ListLabel, Notice, PageHeader, SegmentedLinks, plural } from "@/components/ui";
 import { IconCheck, IconTrendDown, IconTrendUp, IconTrophy } from "@/components/icons";
 import { RangePicker } from "@/components/RangePicker";
 import { parseRange, previousRange, rangeToSince, type RangeKey } from "@/lib/ranges";
@@ -105,7 +105,7 @@ export default async function ComparePage({
       {board.length === 0 ? (
         <EmptyState boxed icon={<IconTrophy className="h-6 w-6" />} title="Noch niemand in der Wertung" />
       ) : (
-        <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,380px)] lg:items-start">
+        <div className="grid grid-cols-1 gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,380px)] lg:items-start">
           <div>
             {me ? (
               <MyPlace
@@ -227,10 +227,10 @@ function RankRow({
         </span>
         <span className="min-w-0 flex-1">
           <span className="block truncate text-body">{isMe ? `${entry.user_name} (du)` : entry.user_name}</span>
-          <span className="kpi block truncate text-footnote text-muted">
+          <span className="block truncate text-footnote text-muted">
             {entry.rank === null && metric.rate
               ? `${entry[metric.rate.den]} von ${metric.rate.min} ${metric.rate.basis}`
-              : `${entry.doors} Türen · ${entry.met} Gespräche · ${entry.sales} Abschl.`}
+              : `${entry.doors} Türen · ${plural(entry.met, "Gespräch", "Gespräche")} · ${entry.sales} Abschl.`}
           </span>
         </span>
         {delta !== null && delta !== 0 && (
@@ -302,7 +302,7 @@ function MeVersusTeam({ me, totals }: { me: RankEntry; totals: PersonTotals[] })
                     />
                   )}
                 </div>
-                <p className="kpi mt-1 text-caption text-muted">
+                <p className="mt-1 text-caption text-muted">
                   Ø {formatAverage(m, avg)} · Top {formatMetric(m, top)}
                 </p>
               </li>
@@ -372,7 +372,7 @@ function HeadToHead({
           {rows.map((row) => (
             <li
               key={row.metric.key}
-              className="kpi grid grid-cols-[1fr_auto_1fr] items-center gap-2 border-t border-separator py-2 text-body"
+              className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 border-t border-separator py-2 text-body"
             >
               <Value value={formatMetric(row.metric, row.a)} lead={row.lead > 0} />
               <span className="text-center text-footnote text-muted">{row.metric.label}</span>
@@ -388,7 +388,7 @@ function HeadToHead({
 
 function Value({ value, lead, right = false }: { value: string; lead: boolean; right?: boolean }) {
   return (
-    <span className={`flex items-center gap-1 ${right ? "justify-end" : ""} ${lead ? "font-bold text-ink" : "text-muted"}`}>
+    <span className={`kpi flex items-center gap-1 ${right ? "justify-end" : ""} ${lead ? "text-ink" : "font-normal text-muted"}`}>
       {lead && !right && <IconCheck className="h-4 w-4 text-accent-ink" />}
       {value}
       {lead && right && <IconCheck className="h-4 w-4 text-accent-ink" />}

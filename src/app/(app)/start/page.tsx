@@ -96,7 +96,7 @@ export default async function StartPage({ searchParams }: { searchParams: Promis
         ]}
       />
 
-      <div className="mt-8 grid gap-8 lg:grid-cols-3">
+      <div className="mt-8 grid grid-cols-1 gap-8 lg:grid-cols-3">
         <section className="lg:col-span-2">
           <SectionHeader title="Verlauf" />
           <div className="surface p-4">

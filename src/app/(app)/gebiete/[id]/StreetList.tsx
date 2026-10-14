@@ -250,7 +250,8 @@ const CHIP_CLASS: Record<ChipState, string> = {
   open: "bg-surface text-ink ring-1 ring-inset ring-[var(--ink-2)]",
   retry: "bg-fill-strong text-ink",
   done: "bg-fill text-ink-2",
-  sale: "bg-accent text-on-accent",
+  // Schrift auf vollem Gruen haette nur 3,5:1 - deshalb getoent, mit Haken.
+  sale: "bg-accent-tint text-accent-ink ring-1 ring-inset ring-[var(--accent-edge)]",
   blocked: "bg-danger-tint text-danger",
 };
 

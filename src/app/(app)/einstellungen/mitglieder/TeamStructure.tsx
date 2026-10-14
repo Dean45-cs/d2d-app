@@ -1,18 +1,38 @@
 "use client";
 
-import Link from "next/link";
-import { useEffect, useMemo, useRef, useState } from "react";
-import { IconChevronDown, IconChevronUp, IconUsers } from "@/components/icons";
-import { Avatar, plural } from "@/components/ui";
+import { useMemo, useState, type CSSProperties } from "react";
+import { IconChevronDown, IconChevronRight } from "@/components/icons";
+import { Avatar, ListLabel, plural } from "@/components/ui";
 import { buildTeamStructure, type StructureMember, type StructureNode } from "@/lib/team-structure";
-import styles from "./TeamStructure.module.css";
 
-export function TeamStructure({ members, currentUserId }: { members: StructureMember[]; currentUserId: number }) {
+/** Einrueckung je Ebene; tiefer als fuenf Ebenen rueckt nichts mehr ein. */
+const STEP = 16;
+const MAX_DEPTH = 5;
+
+const CONTEXT: Record<NonNullable<StructureNode["rootReason"]>, string> = {
+  top: "Strukturspitze",
+  unassigned: "Ohne Führungskraft",
+  outside: "Führungskraft nicht sichtbar",
+  cycle: "Zuordnung prüfen",
+};
+
+/**
+ * Die Vertriebsstruktur als eingerueckte Liste: jede Zeile eine Person,
+ * darunter ihre direkten Mitglieder. Tippen oeffnet das Blatt der Person,
+ * der Pfeil rechts klappt den Zweig ein.
+ */
+export function TeamStructure({
+  members,
+  currentUserId,
+  onOpen,
+}: {
+  members: StructureMember[];
+  currentUserId: number;
+  onOpen: (id: number) => void;
+}) {
   const roots = useMemo(() => buildTeamStructure(members), [members]);
   const [collapsed, setCollapsed] = useState<Set<number>>(new Set());
-  const viewportRef = useRef<HTMLDivElement>(null);
-  const forestRef = useRef<HTMLUListElement>(null);
-  const [overflows, setOverflows] = useState(false);
+
   const branchIds = useMemo(() => {
     const ids: number[] = [];
     const pending = [...roots];
@@ -25,18 +45,21 @@ export function TeamStructure({ members, currentUserId }: { members: StructureMe
   }, [roots]);
   const hasCollapsed = branchIds.some((id) => collapsed.has(id));
 
-  useEffect(() => {
-    const viewport = viewportRef.current;
-    const forest = forestRef.current;
-    if (!viewport || !forest) return;
-    const observer = new ResizeObserver(() => setOverflows(viewport.scrollWidth > viewport.clientWidth + 1));
-    observer.observe(viewport);
-    observer.observe(forest);
-    // Die Spitze beim ersten Öffnen mittig zeigen; danach die Scrollposition behalten.
-    viewport.scrollLeft = window.matchMedia("(max-width: 639px)").matches
-      ? 0 : Math.max(0, (viewport.scrollWidth - viewport.clientWidth) / 2);
-    return () => observer.disconnect();
-  }, []);
+  // Sichtbare Zeilen in Lesereihenfolge - iterativ, auch bei tiefen Strukturen.
+  const rows = useMemo(() => {
+    const out: Array<{ node: StructureNode; depth: number }> = [];
+    const stack = [...roots].reverse().map((node) => ({ node, depth: 0 }));
+    while (stack.length) {
+      const entry = stack.pop()!;
+      out.push(entry);
+      if (!collapsed.has(entry.node.member.id)) {
+        for (let i = entry.node.children.length - 1; i >= 0; i--) {
+          stack.push({ node: entry.node.children[i], depth: entry.depth + 1 });
+        }
+      }
+    }
+    return out;
+  }, [roots, collapsed]);
 
   function toggle(id: number) {
     setCollapsed((previous) => {
@@ -48,104 +71,68 @@ export function TeamStructure({ members, currentUserId }: { members: StructureMe
   }
 
   return (
-    <section className={styles.structure} aria-labelledby="team-structure-heading">
-      <div className={styles.toolbar}>
-        <div>
-          <h2 id="team-structure-heading" className="text-[16px] font-semibold">Vertriebsstruktur</h2>
-          <p className="muted mt-1 text-[13px]">Jede Verbindung zeigt die direkte Führungskraft.</p>
-        </div>
+    <section aria-label="Struktur">
+      <div className="flex items-end justify-between gap-4">
+        <ListLabel>{plural(members.length, "Person", "Personen")}</ListLabel>
         {branchIds.length > 0 && (
           <button
             type="button"
-            className="btn btn-sm"
+            className="btn btn-plain btn-sm mb-1"
             onClick={() => setCollapsed(hasCollapsed ? new Set() : new Set(branchIds))}
           >
-            {hasCollapsed ? <IconChevronDown className="h-4 w-4" /> : <IconChevronUp className="h-4 w-4" />}
             {hasCollapsed ? "Alle aufklappen" : "Alle einklappen"}
           </button>
         )}
       </div>
-
-      <div className={styles.legend} aria-label="Kennzeichnung der Personen">
-        <span><i className={styles.leaderDot} aria-hidden />Teamleitung</span>
-        <span><i className={styles.managerDot} aria-hidden />Führungskraft</span>
-        <span><i className={styles.memberDot} aria-hidden />Vertrieb</span>
-      </div>
-
-      <div
-        ref={viewportRef}
-        className={styles.viewport}
-        role="region"
-        aria-label="Organigramm der sichtbaren Teammitglieder"
-        tabIndex={0}
-      >
-        <ul ref={forestRef} className={styles.forest} aria-label="Strukturspitzen und weitere Teilstrukturen">
-          {roots.map((node) => (
-            <StructureBranch key={node.member.id} node={node} currentUserId={currentUserId} collapsed={collapsed} onToggle={toggle} />
-          ))}
-        </ul>
-      </div>
-
-      <div className={styles.caption}>
-        <span><IconUsers className="h-4 w-4" />{plural(members.length, "Person", "Personen")} in dieser Ansicht</span>
-        <span>{overflows ? "Seitlich scrollen, um weitere Zweige zu sehen." : "Über die Mitgliederzahl lassen sich Zweige ein- und ausklappen."}</span>
-      </div>
+      <ul className="list">
+        {rows.map(({ node, depth }) => {
+          const { member, children, descendantCount, rootReason } = node;
+          const indent = 16 + Math.min(depth, MAX_DEPTH) * STEP;
+          const expanded = !collapsed.has(member.id);
+          const role = member.role === "LEADER" ? "Teamleitung" : children.length ? "Führungskraft" : "Vertrieb";
+          const facts = [
+            member.id === currentUserId ? "Du" : null,
+            member.active ? role : `${role}, deaktiviert`,
+            rootReason ? CONTEXT[rootReason] : null,
+            children.length ? `${children.length} direkt · ${descendantCount} gesamt` : null,
+          ].filter(Boolean);
+          return (
+            <li
+              key={member.id}
+              className="flex items-center"
+              // Die Haarlinie beginnt dort, wo der Name beginnt.
+              style={{ "--sep-inset": `${indent + 44}px` } as CSSProperties}
+            >
+              <button
+                type="button"
+                className="cell cell-tap min-w-0 flex-1"
+                style={{ paddingLeft: indent }}
+                onClick={() => onOpen(member.id)}
+              >
+                <span className="sr-only">Ebene {depth + 1}: </span>
+                <Avatar name={member.name} src={member.avatar} size={32} className={member.active ? "" : "opacity-50"} />
+                <span className="min-w-0 flex-1">
+                  <span className={`block truncate text-body ${member.active ? "" : "text-muted"}`}>{member.name}</span>
+                  <span className={`block truncate text-footnote ${rootReason === "cycle" ? "text-warn" : "text-muted"}`}>
+                    {facts.join(" · ")}
+                  </span>
+                </span>
+              </button>
+              {children.length > 0 ? (
+                <button
+                  type="button"
+                  className="icon-btn mr-1"
+                  aria-expanded={expanded}
+                  aria-label={`Zweig von ${member.name} ${expanded ? "einklappen" : "aufklappen"}`}
+                  onClick={() => toggle(member.id)}
+                >
+                  {expanded ? <IconChevronDown className="h-4 w-4" /> : <IconChevronRight className="h-4 w-4" />}
+                </button>
+              ) : null}
+            </li>
+          );
+        })}
+      </ul>
     </section>
-  );
-}
-
-function StructureBranch({ node, currentUserId, collapsed, onToggle }: {
-  node: StructureNode;
-  currentUserId: number;
-  collapsed: Set<number>;
-  onToggle: (id: number) => void;
-}) {
-  const { member, children, descendantCount, rootReason } = node;
-  const hasChildren = children.length > 0;
-  const expanded = !collapsed.has(member.id);
-  const category = member.role === "LEADER" ? "leader" : hasChildren ? "manager" : "member";
-  const label = member.role === "LEADER" ? "Teamleitung" : hasChildren ? "Führungskraft" : "Vertrieb";
-  const context = rootReason === "unassigned" ? "Noch ohne Führungskraft"
-    : rootReason === "outside" ? "Führungskraft außerhalb der Ansicht"
-      : rootReason === "cycle" ? "Zuordnung prüfen: Kreis in der Struktur"
-        : rootReason === "top" ? "Strukturspitze"
-          : null;
-
-  return (
-    <li className={styles.branch}>
-      <article className={styles.person} data-category={category} data-inactive={!member.active || undefined}>
-        <div className={styles.role}>
-          <span>{label}</span>
-          {member.id === currentUserId && <span className={styles.self}>Du</span>}
-        </div>
-        <Link href={`/profil/${member.id}`} className={styles.identity} aria-label={`Profil von ${member.name}`}>
-          <Avatar name={member.name} src={member.avatar} size={42} tone={member.active ? "brand" : "muted"} />
-          <span className={styles.name} title={member.name}>{member.name}</span>
-        </Link>
-        <p className={styles.context}>
-          {!member.active ? <span><span className={styles.inactive}>Deaktiviert</span>{context && ` · ${context}`}</span> : context ?? (hasChildren ? `${descendantCount} in der Struktur` : "Teammitglied")}
-        </p>
-        {hasChildren ? (
-          <button
-            type="button"
-            className={styles.branchButton}
-            aria-expanded={expanded}
-            aria-controls={`structure-children-${member.id}`}
-            aria-label={`Struktur von ${member.name} ${expanded ? "einklappen" : "aufklappen"}: ${children.length} direkte Mitglieder, ${descendantCount} insgesamt`}
-            onClick={() => onToggle(member.id)}
-          >
-            <span><IconUsers className="h-3.5 w-3.5" />{children.length} direkt<span className={styles.total}> · {descendantCount} gesamt</span></span>
-            {expanded ? <IconChevronUp className="h-4 w-4" /> : <IconChevronDown className="h-4 w-4" />}
-          </button>
-        ) : <div className={styles.leafFooter}>Keine direkten Mitglieder</div>}
-      </article>
-      {hasChildren && (
-        <ul id={`structure-children-${member.id}`} className={styles.children} hidden={!expanded} aria-label={`Direkte Mitglieder von ${member.name}`}>
-          {children.map((child) => (
-            <StructureBranch key={child.member.id} node={child} currentUserId={currentUserId} collapsed={collapsed} onToggle={onToggle} />
-          ))}
-        </ul>
-      )}
-    </li>
   );
 }

@@ -114,7 +114,7 @@ export function Cell({
         <span className="shrink-0 text-subhead text-muted">{detail}</span>
       )}
       {trailing}
-      {external ? (
+      {external && !(href && /^(tel|mailto|sms):/.test(href)) ? (
         <IconExternal className="h-4 w-4 shrink-0 text-muted" />
       ) : (
         (chevron ?? Boolean(href)) && <IconChevronRight className="cell-chevron" />
@@ -122,6 +122,14 @@ export function Cell({
     </>
   );
   const classes = `cell ${href || onClick ? "cell-tap" : ""} ${className}`;
+  // Anrufen und Mail oeffnen die Telefon- bzw. Mail-App - kein neues Fenster.
+  if (href && /^(tel|mailto|sms):/.test(href)) {
+    return (
+      <a href={href} className={classes} aria-label={ariaLabel}>
+        {inner}
+      </a>
+    );
+  }
   if (href && external) {
     return (
       <a href={href} target="_blank" rel="noreferrer" className={classes} aria-label={ariaLabel}>

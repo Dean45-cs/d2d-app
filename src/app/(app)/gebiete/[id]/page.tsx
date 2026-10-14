@@ -203,7 +203,7 @@ export default async function TerritoryDetailPage({
         </div>
       )}
 
-      <div className="mt-8 grid gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,400px)] lg:items-start">
+      <div className="mt-8 grid grid-cols-1 gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,400px)] lg:items-start">
         <div className="lg:sticky lg:top-16">
           {hasMap ? (
             <TerritoryWorkspace area={area} doors={doors} streets={workStreets} />
