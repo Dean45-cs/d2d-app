@@ -11,7 +11,6 @@ import {
   Segmented,
   SegmentedLinks,
   StatGrid,
-  ct,
   euro,
   plural,
 } from "@/components/ui";
@@ -163,6 +162,9 @@ export function EnergyMapClient({
       layer.marker(at, {
         ...priceMarker(colorOf(point), Math.round(diameter), isSelected),
         title: point.city || point.plz,
+        subtitle: `${(energy === "gas" && point.gasProvider ? point.gasProvider : point.provider) || "Grundversorger unbekannt"} · ${
+          value !== null ? `${euro(value)} / Jahr` : `kein ${label}preis`
+        }`,
         priority: isSelected ? 5 : 2,
         onClick: () => setSelectedKey(point.key),
       });
@@ -174,6 +176,7 @@ export function EnergyMapClient({
       layer.marker(at, {
         ...priceMarker(NO_PRICE_COLOR, 12, isSelected, true),
         title: place.city || place.plz || "Ohne Ort",
+        subtitle: "Noch kein Preis",
         priority: isSelected ? 5 : 1,
         onClick: () => setSelectedKey(place.key),
       });
@@ -217,7 +220,10 @@ export function EnergyMapClient({
   }
 
   async function refreshFeed() {
+    // Ein Abruf dauert - kein zweiter, solange er laeuft.
+    if (busy) return;
     setBusy(true);
+    toast("Tagesquelle wird abgerufen …", { duration: 60000 });
     try {
       const response = await fetch("/api/energy/refresh", { method: "POST" });
       const data = await response.json();
@@ -245,7 +251,7 @@ export function EnergyMapClient({
         title="Karte"
         subtitle={[
           prices.length > 0 ? plural(prices.length, "Ort", "Orte") : "Noch keine Preise",
-          `${consumption[energy].toLocaleString("de-DE")} kWh ${label}`,
+          `Musterhaushalt ${consumption[energy].toLocaleString("de-DE")} kWh`,
           stand,
         ]
           .filter(Boolean)
@@ -398,7 +404,12 @@ export function EnergyMapClient({
                           </span>
                         }
                         title={point.city || point.plz}
-                        subtitle={[point.provider || null, point.stale ? "prüfen" : null].filter(Boolean).join(" · ")}
+                        subtitle={[
+                          (energy === "gas" && point.gasProvider ? point.gasProvider : point.provider) || null,
+                          point.stale ? "prüfen" : null,
+                        ]
+                          .filter(Boolean)
+                          .join(" · ")}
                         detail={<span className="kpi">{euro(valueOf(point))}</span>}
                         chevron
                       />
@@ -568,7 +579,14 @@ function PriceDetail({
         ) : (
           <>
             <li>
-              <Cell title="Arbeitspreis" detail={<span className="kpi">{ct(ctValue)}/kWh</span>} />
+              <Cell
+                title="Arbeitspreis"
+                detail={
+                  <span className="kpi">
+                    {ctValue?.toLocaleString("de-DE", { minimumFractionDigits: 2, maximumFractionDigits: 3 })} ct/kWh
+                  </span>
+                }
+              />
             </li>
             <li>
               <Cell

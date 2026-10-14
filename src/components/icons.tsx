@@ -181,14 +181,6 @@ export function IconCalendar(props: IconProps) {
     </Line>
   );
 }
-export function IconClock(props: IconProps) {
-  return (
-    <Line {...props}>
-      <circle cx="12" cy="12" r="8.75" />
-      <path d="M12 7.25V12l3 2" />
-    </Line>
-  );
-}
 export function IconHistory(props: IconProps) {
   return (
     <Line {...props}>
@@ -251,21 +243,6 @@ export function IconChevronUp(props: IconProps) {
   return (
     <Line {...props}>
       <path d="m5.5 14.5 6.5-6.5 6.5 6.5" strokeWidth={2.25} />
-    </Line>
-  );
-}
-export function IconChevronUpDown(props: IconProps) {
-  return (
-    <Line {...props}>
-      <path d="m8 9 4-4 4 4M8 15l4 4 4-4" strokeWidth={2} />
-    </Line>
-  );
-}
-export function IconArrowRight(props: IconProps) {
-  return (
-    <Line {...props}>
-      <path d="M4.5 12h14" />
-      <path d="m13 6 6 6-6 6" />
     </Line>
   );
 }
@@ -403,15 +380,6 @@ export function IconFit(props: IconProps) {
     </Line>
   );
 }
-export function IconImage(props: IconProps) {
-  return (
-    <Line {...props}>
-      <rect x="3.5" y="4.5" width="17" height="15" rx="3" />
-      <circle cx="9" cy="10" r="1.6" />
-      <path d="m20.5 15.5-4.5-4.5-8.5 8.5" />
-    </Line>
-  );
-}
 export function IconList(props: IconProps) {
   return (
     <Line {...props}>
@@ -463,14 +431,6 @@ export function IconShield(props: IconProps) {
     <Line {...props}>
       <path d="M12 3.25 5 6v5.5c0 4.3 2.95 7.85 7 9.25 4.05-1.4 7-4.95 7-9.25V6l-7-2.75Z" />
       <path d="m9 12 2.1 2.1L15 10.2" />
-    </Line>
-  );
-}
-export function IconMail(props: IconProps) {
-  return (
-    <Line {...props}>
-      <rect x="3" y="5" width="18" height="14" rx="3" />
-      <path d="m3.75 7.5 8.25 5.75 8.25-5.75" />
     </Line>
   );
 }
@@ -550,15 +510,6 @@ export function IconPolygonArea(props: IconProps) {
       <circle cx="12" cy="3.5" r="1.6" fill="currentColor" stroke="none" />
       <circle cx="20" cy="8" r="1.6" fill="currentColor" stroke="none" />
       <circle cx="9" cy="20" r="1.6" fill="currentColor" stroke="none" />
-    </Line>
-  );
-}
-export function IconSplit(props: IconProps) {
-  return (
-    <Line {...props}>
-      <path d="M4 5h6a2 2 0 0 1 2 2v10a2 2 0 0 0 2 2h6" />
-      <path d="M20 5h-6a2 2 0 0 0-2 2" />
-      <path d="m17 2 3 3-3 3M17 16l3 3-3 3" />
     </Line>
   );
 }

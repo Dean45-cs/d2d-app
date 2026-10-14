@@ -1,7 +1,7 @@
 import Link from "next/link";
 import type { DailyGoal, LevelProgress } from "@/lib/levels";
 import { IconChevronRight } from "@/components/icons";
-import { ProgressBar, ProgressRing } from "@/components/ui";
+import { ProgressRing } from "@/components/ui";
 
 const number = (value: number) => value.toLocaleString("de-DE");
 
@@ -49,17 +49,6 @@ export function LevelSummary({
     </Link>
   ) : (
     <div className={cls}>{content}</div>
-  );
-}
-
-/** Fortschritt im Level als schmale Leiste - fuer Kopfzeilen. */
-export function LevelMeter({ progress }: { progress: LevelProgress }) {
-  return (
-    <ProgressBar
-      value={progress.xpInLevel}
-      max={Math.max(progress.xpForNextLevel, 1)}
-      label={`${number(progress.xpInLevel)} von ${number(progress.xpForNextLevel)} XP bis Level ${progress.level + 1}`}
-    />
   );
 }
 

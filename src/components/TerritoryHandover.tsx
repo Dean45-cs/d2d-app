@@ -57,6 +57,15 @@ export function TerritoryHandover({ summary }: { summary: HandoverSummary }) {
             />
           </li>
         )}
+        {summary.attempts > 0 && (
+          <li>
+            <Cell
+              icon={<Glyph icon={<IconHistory className="h-4 w-4" />} />}
+              title="Versuche bisher"
+              detail={summary.attempts}
+            />
+          </li>
+        )}
         <li>
           <Cell
             onClick={summary.appointments.length > 0 ? () => setOpen("appointments") : undefined}

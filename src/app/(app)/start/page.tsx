@@ -25,6 +25,9 @@ import {
   plural,
 } from "@/components/ui";
 import { PendingSales } from "@/components/PendingSales";
+import { PriceBadge, ProviderSummary } from "@/components/ProviderRating";
+import { providerLookup, type ProviderInfo } from "@/lib/energy/provider";
+import { readArea } from "@/lib/geo/area";
 import { RangePicker } from "@/components/RangePicker";
 import { ShowMore } from "@/components/ShowMore";
 import { IconCalendar, IconChart, IconMap } from "@/components/icons";
@@ -73,7 +76,18 @@ export default async function StartPage({ searchParams }: { searchParams: Promis
   const met = sum.met ?? 0;
   const sales = sum.sales ?? 0;
   const unassigned = territories.filter((t) => !t.assigned_user_id).length;
-  const activeTerritories = territories.filter((t) => t.status !== "DONE");
+  // Wo der Grundversorger am teuersten ist, lohnt das Klingeln am meisten.
+  const providers = team ? providerLookup(user.team_id) : null;
+  const providerOf = new Map<number, ProviderInfo | null>(
+    territories.map((t) => [
+      t.id,
+      providers?.find({ postal_code: t.postal_code, city: t.city, area: readArea(t.area_json) }) ?? null,
+    ]),
+  );
+  const activeTerritories = territories
+    .filter((t) => t.status !== "DONE")
+    .sort((a, b) => leadYear(providerOf.get(b.id)) - leadYear(providerOf.get(a.id)));
+  const topPriced = activeTerritories.find((t) => providerOf.get(t.id)) ?? null;
 
   return (
     <div className="page">
@@ -143,7 +157,7 @@ export default async function StartPage({ searchParams }: { searchParams: Promis
                         href={`/profil/${m.user_id}`}
                         icon={<Avatar name={m.user_name} src={faces.get(m.user_id)} size={32} />}
                         title={m.user_name}
-                        subtitle={`${m.doors} Türen · ${m.met} Gespräche · ${percent(m.sales, m.met)}`}
+                        subtitle={`${m.doors} Türen · ${m.met} Gespräche · ${m.appointments} Termine`}
                         trailing={
                           <span className={`kpi text-title-3 ${m.sales > 0 ? "text-accent-ink" : "text-muted"}`}>
                             {m.sales}
@@ -162,7 +176,8 @@ export default async function StartPage({ searchParams }: { searchParams: Promis
                         <th className="num">Gespräche</th>
                         <th className="num">Termine</th>
                         <th className="num">Abschlüsse</th>
-                        <th className="num">Quote</th>
+                        <th className="num">Antreffquote</th>
+                        <th className="num">Abschlussquote</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -178,6 +193,7 @@ export default async function StartPage({ searchParams }: { searchParams: Promis
                           <td className="num">{m.met}</td>
                           <td className="num">{m.appointments}</td>
                           <td className={`num font-semibold ${m.sales > 0 ? "text-accent-ink" : ""}`}>{m.sales}</td>
+                          <td className="num text-muted">{percent(m.met, m.doors)}</td>
                           <td className="num text-muted">{percent(m.sales, m.met)}</td>
                         </tr>
                       ))}
@@ -206,34 +222,51 @@ export default async function StartPage({ searchParams }: { searchParams: Promis
               <div className="surface">
                 <EmptyState
                   icon={<IconMap className="h-5 w-5" />}
-                  title="Noch keine Gebiete"
+                  title={territories.length === 0 ? "Noch keine Gebiete" : "Alle Gebiete abgeschlossen"}
                   action={
                     <Link href="/gebiete" className="btn btn-primary btn-sm">
-                      Gebiet anlegen
+                      {territories.length === 0 ? "Gebiet anlegen" : "Zur Karte"}
                     </Link>
                   }
                 />
               </div>
             ) : (
               <ul className="list list-icons">
-                {activeTerritories.slice(0, 5).map((t) => (
-                  <li key={t.id}>
-                    <Cell
-                      href={`/gebiete/${t.id}`}
-                      icon={
-                        <ProgressRing value={territoryProgress(t).done} max={Math.max(territoryProgress(t).total, 1)} size={32} stroke={4} />
-                      }
-                      title={t.name}
-                      subtitle={[
-                        t.assignee_name ?? "Nicht zugeteilt",
-                        territoryProgress(t).label,
-                      ].join(" · ")}
-                      detail={t.sale_count > 0 ? plural(t.sale_count, "Abschluss", "Abschlüsse") : undefined}
-                    />
-                  </li>
-                ))}
+                {activeTerritories.slice(0, 5).map((t) => {
+                  const progress = territoryProgress(t);
+                  const info = providerOf.get(t.id);
+                  const lead = info?.strom ?? info?.gas ?? null;
+                  return (
+                    <li key={t.id}>
+                      <Cell
+                        href={`/gebiete/${t.id}`}
+                        icon={<ProgressRing value={progress.done} max={Math.max(progress.total, 1)} size={32} stroke={4} />}
+                        title={t.name}
+                        subtitle={[
+                          t.assignee_name ?? "Nicht zugeteilt",
+                          progress.label,
+                          t.sale_count > 0 ? plural(t.sale_count, "Abschluss", "Abschlüsse") : null,
+                        ]
+                          .filter(Boolean)
+                          .join(" · ")}
+                        trailing={lead ? <PriceBadge step={lead.step} size="sm" /> : undefined}
+                      />
+                    </li>
+                  );
+                })}
               </ul>
             )}
+          </section>
+        )}
+
+        {team && topPriced && (
+          <section>
+            <SectionHeader title="Teuerster Grundversorger" />
+            <p className="mb-2 px-1 text-footnote text-muted">{topPriced.name}</p>
+            <ProviderSummary
+              info={providerOf.get(topPriced.id) ?? null}
+              editHref={hasPermission(user, "energy.manage") ? `/karte?gebiet=${topPriced.id}` : undefined}
+            />
           </section>
         )}
 
@@ -253,7 +286,14 @@ export default async function StartPage({ searchParams }: { searchParams: Promis
                       {v.street_name ?? "–"} {v.house_number}
                     </span>
                     <span className="block truncate text-footnote text-muted">
-                      {[team ? v.user_name : null, v.reason_label, productLabel(v.energy_type), sqlDateTime(v.created_at)]
+                      {[
+                        team ? v.user_name : null,
+                        v.reason_label,
+                        v.reason_note ? `„${v.reason_note}“` : null,
+                        productLabel(v.energy_type),
+                        v.territory_name,
+                        sqlDateTime(v.created_at),
+                      ]
                         .filter(Boolean)
                         .join(" · ")}
                     </span>
@@ -282,6 +322,11 @@ function SlotBadge({ slot }: { slot: string }) {
       </span>
     </span>
   );
+}
+
+/** Jahreskosten Strom (sonst Gas) - zum Sortieren; unbekannt landet hinten. */
+function leadYear(info: ProviderInfo | null | undefined): number {
+  return info?.strom?.year ?? info?.gas?.year ?? -1;
 }
 
 function productLabel(value: string): string | null {

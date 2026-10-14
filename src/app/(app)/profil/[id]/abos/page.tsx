@@ -27,35 +27,39 @@ export default async function ConnectionsPage({
   const people = listConnections(profile.id, user.id, followers ? "followers" : "following");
   const isMe = profile.id === user.id;
   const first = firstName(profile.name);
+  const base = `/profil/${profile.id}/abos`;
 
   return (
-    <div className="mx-auto max-w-2xl">
+    <div className="page-narrow">
       <PageHeader
-        title={profile.name}
-        back={{ href: `/profil/${profile.id}`, label: "Profil" }}
-        action={
-          <nav className="seg" aria-label="Liste">
-            <Link
-              href={`/profil/${profile.id}/abos?liste=abonniert`}
-              aria-current={followers ? undefined : "page"}
-              scroll={false}
-            >
-              Abonniert · {profile.following_count}
-            </Link>
-            <Link
-              href={`/profil/${profile.id}/abos?liste=abonnenten`}
-              aria-current={followers ? "page" : undefined}
-              scroll={false}
-            >
-              Abonnenten · {profile.follower_count}
-            </Link>
-          </nav>
-        }
-      />
+        title={followers ? "Abonnenten" : "Abonniert"}
+        subtitle={profile.name}
+        back={{ href: `/profil/${profile.id}`, label: first }}
+      >
+        <nav className="chips" aria-label="Liste">
+          <Link
+            href={`${base}?liste=abonniert`}
+            className="chip"
+            aria-current={followers ? undefined : "page"}
+            scroll={false}
+          >
+            Abonniert · {profile.following_count}
+          </Link>
+          <Link
+            href={`${base}?liste=abonnenten`}
+            className="chip"
+            aria-current={followers ? "page" : undefined}
+            scroll={false}
+          >
+            Abonnenten · {profile.follower_count}
+          </Link>
+        </nav>
+      </PageHeader>
 
       {people.length === 0 ? (
         <EmptyState
-          icon={<IconUsers className="h-7 w-7" />}
+          boxed
+          icon={<IconUsers className="h-5 w-5" />}
           title={
             followers
               ? isMe
@@ -65,28 +69,27 @@ export default async function ConnectionsPage({
                 ? "Du hast noch niemanden abonniert"
                 : `${first} hat noch niemanden abonniert`
           }
-          text={
-            isMe && !followers
-              ? "Auf dem Profil eines Kollegen „Abonnieren“ tippen – dann kommt jeder Vertrag als Push."
-              : undefined
-          }
+          text={isMe && !followers ? "Im Profil einer Person auf „Abonnieren“ tippen." : undefined}
           action={
             isMe && !followers ? (
-              <Link href="/vergleich" className="btn btn-primary">
+              <Link href="/team/rangliste" className="btn btn-primary btn-sm">
                 Zur Rangliste
               </Link>
             ) : undefined
           }
         />
       ) : (
-        <ul className="list">
+        <ul className="list list-icons">
           {people.map((person) => (
-            <li key={person.id} className="flex items-center gap-3 px-4 py-3">
-              <Link href={`/profil/${person.id}`} className="flex min-w-0 flex-1 items-center gap-3">
-                <Avatar name={person.name} src={person.avatar} size={44} />
+            <li key={person.id} className="cell">
+              <Link href={`/profil/${person.id}`} className="flex min-h-11 min-w-0 flex-1 items-center gap-3">
+                <Avatar name={person.name} src={person.avatar} size={32} />
                 <span className="min-w-0">
-                  <span className="block truncate text-[15px] font-semibold">{person.name}</span>
-                  <span className="muted block truncate text-[13px]">
+                  <span className="block truncate text-body">
+                    {person.name}
+                    {person.id === user.id && <span className="text-muted"> (du)</span>}
+                  </span>
+                  <span className="block truncate text-footnote text-muted">
                     {person.bio || (person.role === "LEADER" ? "Teamleitung" : "Vertrieb")}
                   </span>
                 </span>

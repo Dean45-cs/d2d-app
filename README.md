@@ -1,4 +1,4 @@
-# D2D-App – Vertriebs-App für Strom & Gas an der Haustür
+# Carlsson Sales – Vertriebs-App für Strom & Gas an der Haustür
 
 Eine Web-App für Door-to-Door-Teams im Energievertrieb:
 
@@ -11,12 +11,12 @@ Eine Web-App für Door-to-Door-Teams im Energievertrieb:
   erst die anschließende Bestätigung zählt als Abschluss
 - **Termine mit Uhrzeit** – Vorschläge für den Abend, Rufnummer dazu, und am nächsten Tag
   stehen sie oben auf der Tour
-- **Energiekarte** – zeigt, wo der Grundversorger besonders teuer ist; Preise in Sekunden
+- **Preise auf der Karte** – zeigt, wo der Grundversorger besonders teuer ist; Preise in Sekunden
   vom Preisblatt eingetragen oder als Tabelle aus Excel übernommen
-- **Auswertung** – Antreff- und Abschlussquoten je Mitarbeiter, Gebiet und Zeitraum
-- **Vergleich** – Rangliste je Kennzahl, der eigene Platz samt Abstand zum nächsten,
+- **Übersicht** – Antreff- und Abschlussquoten je Mitarbeiter, Gebiet und Zeitraum
+- **Rangliste** – je Kennzahl, der eigene Platz samt Abstand zum nächsten,
   Team-Schnitt, Bestwert und Direktvergleich mit einem Kollegen
-- **Feed** – jeder Abschluss erscheint von selbst; dazu eigene Beiträge, Kommentare
+- **Team-Feed** – jeder Abschluss erscheint von selbst; dazu eigene Beiträge, Kommentare
   und „Gefällt mir“
 - **Abonnieren** – wer Kollegen abonniert, bekommt eine Push-Nachricht aufs Handy,
   sobald sie einen Vertrag machen
@@ -78,7 +78,7 @@ angelegt – praktisch zum Ausprobieren, für den Echtbetrieb weglassen.
 | Fremde Beiträge und Kommentare löschen | ✅ | – |
 | Energiekarte | ✅ | ✅ |
 
-Die Tabelle beschreibt die Rollenstandards. Unter **Mehr → Berechtigungen** lassen
+Die Tabelle beschreibt die Rollenstandards. Unter **Profil › Verwaltung › Rechte** lassen
 sich 20 Rechte pro Person auf **Standard**, **Erlauben** oder **Entziehen** setzen:
 Gebiete erstellen/sehen/bearbeiten/zuteilen/löschen, Besuchskorrekturen, Türsperren,
 Teamtermine, Teamauswertung, Mitglieder- und Strukturverwaltung, Rollen,
@@ -116,11 +116,14 @@ automatisch beim Serverstart. **Nach dem Update einen laufenden Server neu start
 Die Sicherheitstests laufen über `npm test`, einschließlich
 `scripts/tests/permissions.test.ts`.
 
-Auf dem Handy stehen unten höchstens fünf Reiter. Im Vertrieb sind das Klinken, Feed,
-Vergleich, Termine und **Mehr** (Gebiete, Energiekarte, Zahlen); bei der Teamleitung
-liegen Feed, Vergleich, Energiekarte, Auswertung, Team und Einstellungen unter **Mehr**.
-Das eigene Profil und das Abmelden erreicht man über das Profilbild oben rechts. Am
-Rechner steht alles gruppiert in der Seitenleiste, das Profil unten links.
+Auf dem Handy schwebt unten eine Reiterleiste aus Glas: **Klinken · Karte · Team ·
+Profil**, mit dem Recht „Teamauswertung“ vorne zusätzlich **Übersicht**. Der Vertrieb
+landet direkt beim Klinken. „Karte“ umfasst Gebiete und Preise, „Team“ Feed, Rangliste
+und Erfolge, „Profil“ die eigenen Listen, das Gerät und – je nach Recht – die
+Verwaltung (Mitglieder, Einladungen, Rechte, Ablehnungsgründe, Energie & Tarif). Auf
+iPad und Rechner steht alles in einer einklappbaren Seitenleiste. Alte Adressen
+(`/feed`, `/vergleich`, `/level`, `/auswertung`, `/mehr`, `/einladungen`,
+`/berechtigungen`, `/einstellungen`) leiten auf die neuen weiter.
 
 ---
 
@@ -226,10 +229,10 @@ einen laufenden Server neu starten. Tests: `npm test` (einschließlich
 
 ## Level, XP und Abzeichen
 
-Unter **Level & Erfolge** (`/level`, mobil unter **Mehr**) stehen der eigene Fortschritt,
+Unter **Team › Erfolge** (`/team/erfolge`) stehen der eigene Fortschritt,
 Tagesziele, 50 Erfolge in fünf Schwierigkeitsstufen, sieben Rangtitel, die Teamrangliste und die letzten
 20 XP-Einträge. Das Level ist außerdem beim Klinken, im Profil, in der Übersicht
-und im Vergleich sichtbar. Beim Speichern zeigt die App die gewonnenen XP und
+und in der Rangliste sichtbar. Beim Speichern zeigt die App die gewonnenen XP und
 meldet einen Levelaufstieg.
 
 | Ergebnis eines Besuchs | XP insgesamt |
@@ -378,7 +381,7 @@ Zoom, tritt das kleinere zurück und erscheint beim Hineinzoomen wieder.
 Die geladenen Hausnummern bleiben erhalten und werden an drei Stellen benutzt:
 
 - **Gebietsseite:** hinter jeder Straße steht „8 Nr.“ – aufgeklappt erscheint jedes
-  Haus als Plakette, grau = offen, blau = erfasst, grün = Abschluss. Damit sieht die
+  Haus als Plakette: hohl = offen, grau = nochmal, getönt = erfasst, grün mit Haken = Abschluss. Damit sieht die
   Teamleitung, was tatsächlich abgearbeitet ist, nicht nur die Summe.
 - **An der Tür:** unter dem Eingabefeld stehen die Häuser der Straße zum Antippen –
   erfasste sind durchgestrichen. Statt „+1“ heißt der Knopf dann **„weiter“** und
@@ -419,8 +422,8 @@ lässt sich nicht halbieren. Angestrebt sind höchstens 12 % Unterschied.
 
 ### Den Überblick behalten
 
-- Die **Gebietsliste** zeigt oben alle Flächen auf einer Karte: Farbe = Status (blau in
-  Arbeit, grün fertig, orange pausiert, grau offen), das Kürzel im Kreis = wer dran ist.
+- Die **Gebietsliste** zeigt oben alle Flächen auf einer Karte: grün = in Arbeit,
+  dunkel = fertig, grau = offen, gestrichelt = pausiert; das Kürzel im Kreis = wer dran ist.
   Über das Auswahlfeld lässt sich die Karte auf eine Person oder auf „nicht zugeteilt“
   filtern; ein Tipp auf eine Fläche öffnet das Gebiet.
 - Die **Gebietsseite** zeigt die Fläche und jede Straße als Punkt, eingefärbt nach
@@ -436,10 +439,10 @@ lässt sich nicht halbieren. Angestrebt sind höchstens 12 % Unterschied.
 
 Die Gebietsseite ist das Werkzeug für unterwegs:
 
-- **Jede Tür als Punkt**, eingefärbt nach Stand: blau = noch nicht besucht, orange =
-  nochmal versuchen, lila = Termin, grün = Abschluss, grau = erledigt, rot = gesperrt.
+- **Jede Tür als Punkt**, Form vor Farbe: hohl = noch nicht besucht, grau = nochmal
+  versuchen, dunkel = Termin, grün = Abschluss, klein und blass = erledigt, klein rot = gesperrt.
   Die Filter über der Karte blenden den Rest aus (Standard: nur offene Türen).
-- **Eigener Standort** als blauer Punkt mit Genauigkeitskreis (Pfeil-Knopf auf jeder Karte).
+- **Eigener Standort** als Punkt mit Genauigkeitskreis (Pfeil-Knopf auf jeder Karte).
 - **Nächste offene Tür** ab dem eigenen Standort, mit „Hier klingeln“ und „Route“.
 - **Laufroute planen:** eine günstige Reihenfolge durch alle offenen Türen, ab dem
   eigenen Standort (sonst ab dem Rand des Gebiets), mit Strecke und geschätzter Dauer
@@ -604,7 +607,7 @@ eingetragenen Ort (bis 30 km) oder die PLZ-Region – dann steht dabei, aus welc
 Preis stammt.
 
 **Bewertung:** gemessen am Bundesdurchschnitt der Grundversorgung (voreingestellt Stand
-September 2026: Strom 37,3 ct/kWh + 13,76 €/Monat, Gas 13,6 ct/kWh; unter Einstellungen →
+September 2026: Strom 37,3 ct/kWh + 13,76 €/Monat, Gas 13,6 ct/kWh; unter Profil › Verwaltung › Energie & Tarif →
 Grundversorger-Preise änderbar). Ab 3 % darüber „teuer“, ab 8 % „sehr teuer“,
 entsprechend nach unten. Eine Rangfolge der eingetragenen Orte untereinander wäre bei
 wenigen Orten nichtssagend – einer wäre immer „sehr teuer“.
@@ -656,36 +659,32 @@ curl -X POST https://deine-app.de/api/energy/refresh \
 ```
 
 Jeder Lauf wird protokolliert; Quelle, Zeitpunkt und Ergebnis stehen unter
-Einstellungen → „Tagesquelle der Energiekarte“.
+Profil › Verwaltung › Energie & Tarif.
 
 ---
 
 ## Design anpassen
 
-Alle Farben stehen in **einer** Datei: `src/app/brand.css`. Dort die Hex-Werte von
-Energie Partner 24 eintragen – Kopfzeile, Buttons, Diagramme und Karte übernehmen sie
-automatisch, inklusive Dunkelmodus.
+Das Gestaltungssystem ist in **`docs/DESIGN.md`** beschrieben – Tokens, gemessene
+Kontraste (hell und dunkel), Glas-Material, Schrift, Radien, Bewegung, Bausteine.
 
-```css
-:root {
-  --brand-600: #0f5cab;   /* Hauptfarbe */
-  --energy-600: #059450;  /* Abschluss / Strom */
-  --gas-500:   #f59e0b;   /* Gas */
-  --signal-500:#e5484d;   /* Ablehnung */
-}
-```
+- **Markenfarben** stehen in `src/app/brand.css`: genau ein Akzent (Energie-Grün,
+  `--accent` für Flächen, `--accent-ink` für Schrift), zwei Signale (`--danger`,
+  `--warn`), die Datenfarben für Diagramme (`--chart-*`), Teilgebiete (`--plot-1…4`)
+  und Preisstufen (`--price-0…4`).
+- **Neutrales und Material** (Flächen, Schrift, Glas, Radien, Schriftstufen) steht in
+  `src/app/globals.css`. Tailwinds eigene Farben und Schriftgrößen sind dort bewusst
+  abgeschaltet – es gibt nur die Tokens.
+- **Logo:** Bildmarke und Schriftzug in `src/components/Logo.tsx`; dieselbe Geometrie in
+  `public/logo.svg`, `public/logo-mark.svg`, `public/icon.svg` und
+  `public/icon-maskable.svg`. Nach einer Änderung `npm run icons` – das erzeugt
+  `icon-192.png`, `icon-512.png`, `icon-maskable-512.png`, `apple-touch-icon.png` und
+  `favicon-32.png` neu. Danach in `public/sw.js` die `VERSION` erhöhen.
 
-Eigenes Logo: Datei als `public/logo.svg` ablegen und in `src/components/Logo.tsx`
-einbinden (der Platzhalter ist dort kommentiert).
-
-Für Schrift und Symbole in den Tonfarben gibt es eigene Stufen (`--tint`, `--ok-ink`,
-`--danger-ink`, `--warn-ink` in `globals.css`): hell entsprechen sie den 600er-Stufen, im
-Dunkelmodus werden sie aufgehellt, damit Verweise und Plaketten lesbar bleiben.
-
-Die Diagrammfarben (`--chart-doors`, `--chart-sales`) und die Farben der Teilgebiete
-(`--plot-1` bis `--plot-4`) sind auf Farbfehlsichtigkeit geprüft – jedes Paar gegen jedes,
-hell und dunkel. Wer sie austauscht, sollte den Abstand der Farben zueinander prüfen;
-sonst sind auf der Karte zwei Teilgebiete nicht mehr auseinanderzuhalten.
+Die Diagrammfarben und die Farben der Teilgebiete (`--plot-1` bis `--plot-4`) sind auf
+Farbfehlsichtigkeit geprüft – jedes Paar gegen jedes, hell und dunkel. Wer sie
+austauscht, sollte den Abstand der Farben zueinander prüfen; sonst sind auf der Karte
+zwei Teilgebiete nicht mehr auseinanderzuhalten.
 
 ---
 
@@ -761,19 +760,17 @@ entstehen zwei getrennte Datenbestände.
 src/
   app/
     (app)/            Bereich nach dem Login (Layout mit Navigation)
-      start/          Dashboard der Teamleitung
+      start/          Übersicht (Team) bzw. Meine Zahlen
       tour/           Türerfassung (das Herzstück)
       termine/        Vereinbarte Termine
-      feed/           Abschlüsse, Beiträge, Kommentare
-      vergleich/      Rangliste, eigener Platz, Direktvergleich
-      profil/         Profil mit Zahlen, Abonnenten
+      team/           Feed, Beitrag, Rangliste, Erfolge
+      profil/         Profil-Übersicht, Profil mit Zahlen, Abonnenten
       gebiete/        Gebiete und Straßen
-      karte/          Energiekarte
-      auswertung/     Zahlen
-      team/           Mitarbeiterverwaltung
-      einstellungen/  Ablehnungsgründe, Vergleichswert, Tarifrechner
+      karte/          Energiepreise auf der Karte
+      einstellungen/  Mitglieder, Einladungen, Rechte, Ablehnungsgründe, Energie & Tarif
     api/              REST-Endpunkte
-    brand.css         >>> hier die Markenfarben eintragen <<<
+    brand.css         Markenfarben (Akzent, Signale, Datenfarben)
+    globals.css       Gestaltungssystem: Tokens, Glas, Schrift, Bausteine
   lib/
     db.ts             Schema und Verbindung
     auth.ts           Login, Rollen, Passwörter

@@ -5,8 +5,8 @@
     "Anleitung: docs/IPHONE-IPAD.md",
     "Vor dem Bauen unter server.url die eigene HTTPS-Adresse eintragen."
   ],
-  "appId": "de.energiepartner24.vertrieb",
-  "appName": "EP24 Vertrieb",
+  "appId": "de.carlssonsales.vertrieb",
+  "appName": "Carlsson Sales",
   "webDir": "public",
   "server": {
     "url": "https://d2d-app.fly.dev",
@@ -14,6 +14,6 @@
   },
   "ios": {
     "contentInset": "always",
-    "backgroundColor": "#0c2f56"
+    "backgroundColor": "#f2f2f7"
   }
 }

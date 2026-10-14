@@ -15,7 +15,7 @@
  * passende Seite. Versendet werden sie in src/lib/push.ts.
  */
 
-const VERSION = "v2";
+const VERSION = "v3";
 const SHELL_CACHE = `d2d-shell-${VERSION}`;
 const ASSET_CACHE = `d2d-assets-${VERSION}`;
 

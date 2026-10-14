@@ -162,7 +162,7 @@ npx cap open ios
 ```
 
 In Xcode dann: Team auswählen, Bundle Identifier setzen
-(`de.energiepartner24.vertrieb` ist ein Vorschlag, muss eindeutig sein),
+(`de.carlssonsales.vertrieb` ist ein Vorschlag, muss eindeutig sein),
 Version setzen, **Product → Archive**, hochladen zu App Store Connect.
 
 Zusätzlich verlangt Apple:
@@ -198,7 +198,7 @@ kurz zu öffnen, sobald wieder Netz da ist – dann wird sofort nachgesendet.
 **Push kommt nicht an**
 Drei Dinge prüfen: Die App ist über „Zum Home-Bildschirm“ installiert (im
 Safari-Tab gibt es auf dem iPhone kein Push), in den iPhone-Einstellungen →
-Mitteilungen → EP24 Vertrieb ist „Mitteilungen erlauben“ an, und im eigenen
+Mitteilungen → Carlsson Sales ist „Mitteilungen erlauben“ an, und im eigenen
 Profil steht der Schalter „Push-Nachrichten“ auf an. Mit „Probe-Nachricht
 senden“ lässt sich das in Sekunden testen. Fokus-Modi („Nicht stören“)
 halten Nachrichten zurück.

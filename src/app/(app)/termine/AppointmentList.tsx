@@ -45,6 +45,8 @@ export function AppointmentList({
     if (target) {
       if (target.follow_up_done_at) setView("done");
       setDetail(target);
+      // Nur einmal oeffnen - nach dem Abhaken laedt die Liste neu.
+      window.history.replaceState(null, "", window.location.pathname);
     }
   }, [appointments]);
 

@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { IconCalendar, IconChevronDown, IconCloudUp, IconOffline } from "@/components/icons";
 import { ProgressRing } from "@/components/ui";
-import { PriceBadge } from "@/components/ProviderRating";
+import { ProviderLine } from "@/components/ProviderRating";
 import type { StreetWithStats } from "@/lib/queries";
 import type { TerritoryLite } from "./model";
 
@@ -34,7 +34,6 @@ export function TourHeader({
   onStreet: () => void;
   onDay: () => void;
 }) {
-  const lead = territory?.provider?.strom ?? territory?.provider?.gas ?? null;
   const place = territory
     ? [territory.name, [territory.postal_code, territory.city].filter(Boolean).join(" ")].filter(Boolean).join(" · ")
     : "Gebiet wählen";
@@ -83,10 +82,9 @@ export function TourHeader({
         <h1 className="min-w-0 truncate text-large-title">{street ? street.name : "Straße wählen"}</h1>
         <IconChevronDown className="h-5 w-5 shrink-0 text-accent-ink" />
       </button>
-      <p className="mt-1 flex min-w-0 items-center gap-2 text-subhead text-ink-2">
-        <span className="truncate">{place}</span>
-        {lead && <PriceBadge step={lead.step} size="sm" />}
-      </p>
+      <p className="mt-1 truncate text-subhead text-ink-2">{place}</p>
+      {/* An der Tuer das wichtigste Argument: wer liefert, zu welchem Preis. */}
+      {territory && <ProviderLine info={territory.provider} className="mt-1" />}
     </header>
   );
 }

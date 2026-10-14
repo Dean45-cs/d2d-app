@@ -37,7 +37,7 @@ export interface TerritoryWithStats extends Territory {
   visit_count: number;
   met_count: number;
   sale_count: number;
-  /** Hinterlegte Hausnummern - und wie viele davon schon erfasst oder gesperrt sind. */
+  /** Hinterlegte Hausnummern - und wie viele davon erfasst sind (Mehrfamilienhaus: jede Klingel durch) oder gesperrt. */
   house_count: number;
   house_touched_count: number;
 }
@@ -56,9 +56,18 @@ const TERRITORY_STATS_SQL = `
            WHERE s.territory_id = t.id)                                           AS house_count,
          (SELECT COUNT(*) FROM house_numbers h JOIN streets s ON s.id = h.street_id
            WHERE s.territory_id = t.id
-             AND (h.blocked_at IS NOT NULL OR EXISTS (
-               SELECT 1 FROM visits v WHERE v.street_id = h.street_id
-                 AND lower(replace(v.house_number, ' ', '')) = lower(h.number)))) AS house_touched_count
+             AND (h.blocked_at IS NOT NULL
+               -- Einzeltuer: erfasst, sobald jemand dort war.
+               OR (NOT EXISTS (SELECT 1 FROM doorbells d WHERE d.house_number_id = h.id)
+                   AND EXISTS (SELECT 1 FROM visits v WHERE v.street_id = h.street_id
+                     AND lower(replace(v.house_number, ' ', '')) = lower(h.number)))
+               -- Mehrfamilienhaus: erst, wenn jede Klingel durch ist.
+               OR (EXISTS (SELECT 1 FROM doorbells d WHERE d.house_number_id = h.id)
+                   AND NOT EXISTS (SELECT 1 FROM doorbells d WHERE d.house_number_id = h.id AND NOT (
+                     d.blocked_at IS NOT NULL
+                     OR EXISTS (SELECT 1 FROM visits v WHERE v.doorbell_id = d.id AND v.outcome <> 'NOT_HOME')
+                     OR (SELECT COUNT(*) FROM visits v WHERE v.doorbell_id = d.id
+                           AND v.outcome = 'NOT_HOME') >= ${MAX_NOT_HOME_ATTEMPTS}))))) AS house_touched_count
     FROM territories t
     LEFT JOIN users u ON u.id = t.assigned_user_id
 `;

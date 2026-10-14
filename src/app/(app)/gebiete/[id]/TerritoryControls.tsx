@@ -59,14 +59,21 @@ export function TerritoryControls({
     }).catch(() => null);
     if (!response?.ok) {
       setStatus(previous);
-      toast("Status nicht gespeichert");
+      const data = await response?.json().catch(() => ({}));
+      toast(data?.error ?? "Status nicht gespeichert");
       return;
     }
     router.refresh();
   }
 
-  const due = territory.due_date
-    ? new Date(territory.due_date).toLocaleDateString("de-DE", { day: "numeric", month: "short" })
+  const dueDate = territory.due_date ? new Date(territory.due_date) : null;
+  const due = dueDate
+    ? dueDate.toLocaleDateString("de-DE", {
+        day: "numeric",
+        month: "short",
+        // Das Jahr nur, wenn es nicht das laufende ist.
+        ...(dueDate.getFullYear() !== new Date().getFullYear() ? { year: "numeric" } : {}),
+      })
     : null;
 
   return (
@@ -141,12 +148,14 @@ function HandoverSheet({
   const router = useRouter();
   const toast = useToast();
   const [next, setNext] = useState<number | null>(territory.assigned_user_id);
-  const [policy, setPolicy] = useState<"KEEP" | "TRANSFER">("KEEP");
+  // Offene Termine: bewusst entscheiden lassen, nichts vorwaehlen.
+  const [policy, setPolicy] = useState<"KEEP" | "TRANSFER" | "">("");
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const changed = next !== territory.assigned_user_id;
+  const needsPolicy = changed && openAppointments > 0 && next !== null;
   const candidates = members.filter((m) => m.active);
 
   async function save() {
@@ -159,7 +168,7 @@ function HandoverSheet({
         body: JSON.stringify({
           assignedUserId: next,
           expectedAssignedUserId: territory.assigned_user_id,
-          appointmentPolicy: next === null ? "KEEP" : policy,
+          appointmentPolicy: next === null ? "KEEP" : policy || "KEEP",
           handoverNote: note,
         }),
       });
@@ -185,7 +194,7 @@ function HandoverSheet({
       footer={
         <div className="space-y-3">
           {error && <InlineError>{error}</InlineError>}
-          <button type="button" className="btn btn-primary btn-lg btn-block" onClick={save} disabled={busy || !changed}>
+          <button type="button" className="btn btn-primary btn-lg btn-block" onClick={save} disabled={busy || !changed || (needsPolicy && !policy)}>
             {busy ? "Speichern …" : next === null ? "Zuteilung aufheben" : "Übergeben"}
           </button>
         </div>
@@ -216,10 +225,10 @@ function HandoverSheet({
         })}
       </ul>
 
-      {changed && openAppointments > 0 && next !== null && (
+      {needsPolicy && (
         <>
           <ListLabel>{openAppointments === 1 ? "Offener Termin" : `${openAppointments} offene Termine`}</ListLabel>
-          <Segmented
+          <Segmented<"KEEP" | "TRANSFER" | "">
             ariaLabel="Offene Termine"
             value={policy}
             onChange={setPolicy}

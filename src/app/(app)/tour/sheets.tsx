@@ -5,6 +5,7 @@ import { useMemo, useState } from "react";
 import { Sheet } from "@/components/Sheet";
 import {
   IconBan,
+  IconUndo,
   IconBuilding,
   IconCheck,
   IconCloudUp,
@@ -105,13 +106,16 @@ export function StreetSheet({
                 <Cell
                   onClick={() => onPick(s.id)}
                   title={s.name}
-                  subtitle={
+                  subtitle={[
                     p && p.total > 0
                       ? p.open === 0
                         ? `Alle ${p.total} erledigt`
                         : `${p.open} von ${p.total} offen`
-                      : s.house_numbers || "Ohne Hausnummern"
-                  }
+                      : s.house_numbers || "Ohne Hausnummern",
+                    s.sale_count > 0 ? `${s.sale_count} ${s.sale_count === 1 ? "Abschluss" : "Abschlüsse"}` : null,
+                  ]
+                    .filter(Boolean)
+                    .join(" · ")}
                   trailing={
                     s.id === streetId ? (
                       <IconCheck className="h-5 w-5 text-accent-ink" />
@@ -460,10 +464,16 @@ export function HouseSheet({
 
   return (
     <Sheet title={title} onClose={onClose}>
-      <Segmented<"EFH" | "MFH">
+      {/* Unbekannter Typ: nichts vorgewaehlt - ein Mehrfamilienhaus waere
+          sonst nach dem ersten Eintrag fuers ganze Team erledigt. */}
+      <Segmented<"EFH" | "MFH" | "">
         ariaLabel="Haustyp"
-        value={type === "MFH" ? "MFH" : "EFH"}
-        onChange={(value) => onType(value)}
+        value={type === "MFH" || type === "EFH" ? type : ""}
+        onChange={(value) => {
+          if (!value) return;
+          onType(value);
+          if (value === "MFH" && bells.length === 0) setAdding(true);
+        }}
         options={[
           { value: "EFH", label: "Einfamilienhaus", icon: <IconHome className="h-4 w-4" /> },
           { value: "MFH", label: "Mehrfamilienhaus", icon: <IconBuilding className="h-4 w-4" /> },
@@ -514,7 +524,7 @@ export function HouseSheet({
                       <button
                         type="button"
                         className="btn btn-primary btn-sm"
-                        disabled={busy}
+                        disabled={busy || !editing.label.trim()}
                         onClick={() => {
                           onRename(bell, editing.label, editing.floor);
                           setEditing(null);
@@ -550,16 +560,17 @@ export function HouseSheet({
                         </button>
                       )
                     ) : (
-                      !done && (
-                        <>
-                          <button
-                            type="button"
-                            className="icon-btn"
-                            aria-label={`${bell.label} sperren`}
-                            onClick={() => onBlockBell(bell)}
-                          >
-                            <IconBan className="h-5 w-5" />
-                          </button>
+                      <>
+                        {/* Sperren auch nach einem Gespraech - ein Nein gilt. */}
+                        <button
+                          type="button"
+                          className="icon-btn"
+                          aria-label={`${bell.label} sperren`}
+                          onClick={() => onBlockBell(bell)}
+                        >
+                          <IconBan className="h-5 w-5" />
+                        </button>
+                        {!done && (
                           <button
                             type="button"
                             className="icon-btn"
@@ -568,8 +579,8 @@ export function HouseSheet({
                           >
                             <IconTrash className="h-5 w-5" />
                           </button>
-                        </>
-                      )
+                        )}
+                      </>
                     )}
                   </li>
                 ),
@@ -704,6 +715,7 @@ export function DaySheet({
   pending,
   online,
   recent,
+  last,
   onSend,
   onDiscard,
   onClose,
@@ -713,6 +725,8 @@ export function DaySheet({
   pending: QueuedWrite[];
   online: boolean;
   recent: VisitRow[];
+  /** Zuletzt gespeicherter Eintrag - zuruecknehmen, solange nichts Neues kam. */
+  last: { text: string; onUndo: () => void } | null;
   onSend: () => void;
   onDiscard: (localId: string) => void;
   onClose: () => void;
@@ -723,7 +737,11 @@ export function DaySheet({
         columns={3}
         items={[
           { label: "Türen", value: totals.doors ?? 0 },
-          { label: "Gespräche", value: totals.met ?? 0 },
+          {
+            label: "Gespräche",
+            value: totals.met ?? 0,
+            hint: (totals.doors ?? 0) > 0 ? `${Math.round(((totals.met ?? 0) / (totals.doors ?? 1)) * 100)} % da` : undefined,
+          },
           { label: "Abschlüsse", value: totals.sales ?? 0, accent: (totals.sales ?? 0) > 0 },
         ]}
       />
@@ -742,6 +760,24 @@ export function DaySheet({
           />
         </li>
       </ul>
+
+      {last && (
+        <ul className="list list-icons mt-4">
+          <li>
+            <Cell
+              onClick={last.onUndo}
+              icon={
+                <span className="glyph">
+                  <IconUndo className="h-4 w-4" />
+                </span>
+              }
+              title="Letzten Eintrag zurücknehmen"
+              subtitle={last.text}
+              chevron={false}
+            />
+          </li>
+        </ul>
+      )}
 
       {(pending.length > 0 || !online) && (
         <div className="mt-6">

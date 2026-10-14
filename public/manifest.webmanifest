@@ -1,17 +1,19 @@
 {
-  "name": "Energie Partner 24 · Vertrieb",
-  "short_name": "EP24 Vertrieb",
-  "description": "Gebiete, Tür-Tracking und Energiekarte für den Door-to-Door-Vertrieb von Strom und Gas.",
+  "name": "Carlsson Sales",
+  "short_name": "Carlsson",
+  "description": "Gebiete, Türerfassung und Energiepreise für den Haustürvertrieb von Strom und Gas.",
   "lang": "de",
   "dir": "ltr",
+  "id": "/",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
   "orientation": "portrait",
-  "background_color": "#0c2f56",
-  "theme_color": "#0c2f56",
+  "background_color": "#f2f2f7",
+  "theme_color": "#f2f2f7",
   "categories": ["business", "productivity"],
   "icons": [
+    { "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
     { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
     { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
     { "src": "/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
@@ -20,16 +22,23 @@
     {
       "name": "Klinken",
       "short_name": "Klinken",
-      "description": "Direkt zur Türerfassung",
+      "description": "Tür erfassen",
       "url": "/tour",
-      "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192", "type": "image/png" }]
     },
     {
-      "name": "Energiekarte",
+      "name": "Karte",
       "short_name": "Karte",
-      "description": "Wo der Grundversorger teuer ist",
-      "url": "/karte",
-      "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
+      "description": "Gebiete ansehen",
+      "url": "/gebiete",
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192", "type": "image/png" }]
+    },
+    {
+      "name": "Termine",
+      "short_name": "Termine",
+      "description": "Nächste Termine",
+      "url": "/termine",
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192", "type": "image/png" }]
     }
   ]
 }

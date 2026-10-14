@@ -82,6 +82,7 @@ export function TerritoryOverviewMap({
         { tone: "active", label: "In Arbeit" },
         { tone: "done", label: "Fertig" },
         { tone: "open", label: "Offen" },
+        { tone: "paused", label: "Pause" },
       ]}
       onSelect={(id) => router.push(`/gebiete/${id}`)}
     >
