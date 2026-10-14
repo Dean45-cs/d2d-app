@@ -60,17 +60,32 @@ export const NEW_BELL = {
   blocked_by_name: null,
 } as const;
 
+/** Die Tuer eines gespeicherten Eintrags - fuer "Rückgängig". */
+export interface SavedDoor {
+  streetId: number;
+  number: string;
+  label: string;
+  /** "Nicht da" oder jemand angetroffen - was die Zaehlung zuruecknimmt. */
+  notHome: boolean;
+}
+
 export type SaveResult =
   | {
       status: "saved";
       id: number;
       /** Die Tuer, an der gespeichert wurde - fuer "Rückgängig". */
-      door: { number: string; label: string };
+      door: SavedDoor;
       nextBell: string | null;
       pickBell?: boolean;
       progression?: LevelFeedback;
     }
-  | { status: "queued"; nextBell: string | null; pickBell?: boolean }
+  | {
+      status: "queued";
+      nextBell: string | null;
+      pickBell?: boolean;
+      /** Gemerkt, weil die Anmeldung abgelaufen ist - nach dem neuen Anmelden wird nachgesendet. */
+      loggedOut?: boolean;
+    }
   | { status: "error" };
 
 export type SheetName =

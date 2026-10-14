@@ -1,3 +1,4 @@
+import { bellKey } from "./doorbells";
 import type { LevelFeedback } from "./level-feedback";
 
 /**
@@ -32,11 +33,51 @@ export interface QueuedWrite {
   kind?: "visit" | "house";
   /** Neue Eintraege duerfen nach einem Kontowechsel nicht fremd verbucht werden. */
   ownerUserId?: number;
+  /**
+   * Warum der Server den Eintrag gerade nicht annimmt (fehlende Berechtigung).
+   * Er bleibt liegen, bis er verworfen wird - die Eintraege dahinter gehen weiter.
+   */
+  error?: string;
+}
+
+/**
+ * Wie lange ein Aufruf an der Tuer hoechstens dauern darf. Bei schwachem
+ * Empfang haengt eine Anfrage sonst minutenlang, und die Knoepfe bleiben
+ * gesperrt. Danach wird gemerkt und nachgesendet - alle gepufferten Aufrufe
+ * sind so gebaut, dass ein doppelter Eingang nichts doppelt verbucht.
+ */
+export const DOOR_TIMEOUT_MS = 8000;
+
+/** fetch mit Zeitlimit - eine abgebrochene Anfrage wirft wie ein Netzfehler. */
+export async function fetchWithTimeout(
+  input: string,
+  init: RequestInit = {},
+  timeoutMs = DOOR_TIMEOUT_MS,
+): Promise<Response> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(input, { ...init, signal: controller.signal });
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 type Listener = (queue: QueuedWrite[]) => void;
 
 const listeners = new Set<Listener>();
+
+/** Wer wissen muss, dass Eintraege nie beim Server ankommen (verworfen oder abgelehnt). */
+const droppedListeners = new Set<(entries: QueuedWrite[]) => void>();
+
+export function onDropped(listener: (entries: QueuedWrite[]) => void): () => void {
+  droppedListeners.add(listener);
+  return () => droppedListeners.delete(listener);
+}
+
+function announceDropped(entries: QueuedWrite[]): void {
+  if (entries.length > 0) droppedListeners.forEach((listener) => listener(entries));
+}
 
 function read(): QueuedWrite[] {
   try {
@@ -108,9 +149,50 @@ export function remove(localId: string): boolean {
   return write(read().filter((item) => item.localId !== localId));
 }
 
+/** Von Hand verwerfen: der Eintrag kommt nie beim Server an - die Anzeige nimmt ihn zurueck. */
+export function discard(localId: string): boolean {
+  const entry = read().find((item) => item.localId === localId);
+  if (!remove(localId)) return false;
+  if (entry) announceDropped([entry]);
+  return true;
+}
+
+/**
+ * Eine Klingel, die nur auf dem Geraet existiert, wieder entfernen: auch aus
+ * den wartenden Haus-Eintraegen. Sonst legte das Nachsenden das vertippte
+ * Schild spaeter doch noch an - und das Haus waere nie fertig.
+ */
+export function forgetQueuedBell(userId: number, streetId: number, houseNumber: string, label: string): void {
+  const same = (value: unknown) =>
+    String(value ?? "").replace(/\s+/g, "").toLowerCase() === houseNumber.replace(/\s+/g, "").toLowerCase();
+  const key = bellKey(label);
+  let changed = false;
+  const next = read().map((entry) => {
+    const payload = entry.payload;
+    if (
+      entry.url !== "/api/houses" ||
+      (entry.ownerUserId !== undefined && entry.ownerUserId !== userId) ||
+      payload.streetId !== streetId ||
+      !same(payload.houseNumber) ||
+      !Array.isArray(payload.doorbells)
+    ) {
+      return entry;
+    }
+    const doorbells = (payload.doorbells as Array<{ label?: unknown }>).filter(
+      (bell) => bellKey(String(bell?.label ?? "")) !== key,
+    );
+    if (doorbells.length === payload.doorbells.length) return entry;
+    changed = true;
+    return { ...entry, payload: { ...payload, doorbells } };
+  });
+  if (changed) write(next);
+}
+
 export interface FlushResult {
   sent: number;
   rejected: number;
+  /** Neu zurueckgehalten: der Server nimmt sie nicht an, sie bleiben zum Verwerfen liegen. */
+  held: number;
   remaining: number;
   progression?: LevelFeedback;
 }
@@ -122,18 +204,22 @@ let flushing = false;
  *
  * Unterschieden wird bewusst:
  *  - Netzfehler  -> Eintrag bleibt in der Warteschlange, nächster Versuch später
- *  - 401/403/429 -> Anmeldung oder Wartezeit erforderlich, Eintrag bleibt liegen
+ *  - 401/429     -> Anmeldung oder Wartezeit erforderlich, Eintrag bleibt liegen
+ *  - 403         -> keine Berechtigung (etwa: Gebiet inzwischen übergeben). Der
+ *                   Eintrag bleibt mit Grund sichtbar liegen, die Einträge
+ *                   dahinter gehen trotzdem raus - sonst stünde alles still
  *  - andere 4xx -> Eintrag ist dauerhaft ungültig (z. B. Gebiet gelöscht) und
  *                   wird verworfen, sonst blockiert er die Schlange für immer
  *  - Antwort 5xx -> Serverproblem, Eintrag bleibt liegen
  */
 export async function flush(userId?: number): Promise<FlushResult> {
   if (typeof window === "undefined" || flushing) {
-    return { sent: 0, rejected: 0, remaining: getQueue(userId).length };
+    return { sent: 0, rejected: 0, held: 0, remaining: getQueue(userId).length };
   }
   flushing = true;
   let sent = 0;
   let rejected = 0;
+  let held = 0;
   let progression: LevelFeedback | undefined;
 
   try {
@@ -145,7 +231,7 @@ export async function flush(userId?: number): Promise<FlushResult> {
           entry.payload = { ...entry.payload, clientRequestId: `legacy-${entry.localId}` };
           if (!write(read().map((item) => item.localId === entry.localId ? entry : item))) break;
         }
-        const response = await fetch(entry.url ?? DEFAULT_URL, {
+        const response = await fetchWithTimeout(entry.url ?? DEFAULT_URL, {
           method: "POST",
           headers: { "content-type": "application/json" },
           body: JSON.stringify(entry.payload),
@@ -165,10 +251,19 @@ export async function flush(userId?: number): Promise<FlushResult> {
             };
           }
           sent += 1;
-        } else if (response.status === 401 || response.status === 403 || response.status === 429) {
+        } else if (response.status === 401 || response.status === 429) {
           break; // Neu anmelden bzw. spaeter versuchen; keine Besuche verlieren.
+        } else if (response.status === 403) {
+          // Liegen lassen, Grund merken - und mit dem naechsten weitermachen.
+          const data = await response.json().catch(() => ({}));
+          const error = typeof data.error === "string" && data.error ? data.error : "Keine Berechtigung";
+          if (entry.error !== error) {
+            if (!write(read().map((item) => (item.localId === entry.localId ? { ...item, error } : item)))) break;
+            held += 1;
+          }
         } else if (response.status >= 400 && response.status < 500) {
           if (!remove(entry.localId)) break;
+          announceDropped([entry]);
           rejected += 1;
         } else {
           break; // Serverproblem: später nochmal, Reihenfolge bleibt erhalten
@@ -181,7 +276,7 @@ export async function flush(userId?: number): Promise<FlushResult> {
     flushing = false;
   }
 
-  return { sent, rejected, remaining: getQueue(userId).length, progression };
+  return { sent, rejected, held, remaining: getQueue(userId).length, progression };
 }
 
 /** Hängt sich an die Ereignisse, bei denen ein neuer Versuch sinnvoll ist. */
@@ -192,7 +287,7 @@ export function startAutoFlush(onFlushed: (result: FlushResult) => void, userId?
     if (!navigator.onLine) return;
     if (getQueue(userId).length === 0) return;
     const result = await flush(userId);
-    if (result.sent > 0 || result.rejected > 0) onFlushed(result);
+    if (result.sent > 0 || result.rejected > 0 || result.held > 0) onFlushed(result);
   };
 
   const onVisible = () => {

@@ -1,6 +1,16 @@
 import assert from "node:assert/strict";
 import { afterEach, beforeEach, test } from "node:test";
-import { enqueue, flush, getQueue, subscribe, type QueuedWrite } from "../../src/lib/offline-queue";
+import {
+  DOOR_TIMEOUT_MS,
+  discard,
+  enqueue,
+  flush,
+  forgetQueuedBell,
+  getQueue,
+  onDropped,
+  subscribe,
+  type QueuedWrite,
+} from "../../src/lib/offline-queue";
 import { levelProgress } from "../../src/lib/levels";
 import type { LevelFeedback } from "../../src/lib/level-feedback";
 
@@ -166,7 +176,7 @@ test("flush and subscribers isolate accounts while preserving another account's 
   }
 });
 
-for (const status of [401, 403, 429, 500, 503]) {
+for (const status of [401, 429, 500, 503]) {
   test(`HTTP ${status} keeps queued visits and stops delivery until a later retry`, async () => {
     queueVisit(`first-request-${status}`);
     queueVisit(`second-request-${status}`);
@@ -188,6 +198,73 @@ for (const status of [401, 403, 429, 500, 503]) {
     assert.equal((await flush(firstUser)).sent, 2);
   });
 }
+
+test("HTTP 403 holds only that entry with its reason while later visits are still delivered", async () => {
+  queueVisit("reassigned-territory");
+  queueVisit("still-allowed");
+  const sent: string[] = [];
+  globalThis.fetch = async (_url, options) => {
+    const body = bodyOf(options);
+    if (body.clientRequestId === "reassigned-territory") {
+      return Response.json({ error: "Dieses Gebiet ist für dich nicht freigegeben." }, { status: 403 });
+    }
+    sent.push(String(body.clientRequestId));
+    return confirmed();
+  };
+  const first = await flush(firstUser);
+  assert.deepEqual(sent, ["still-allowed"]);
+  assert.deepEqual([first.sent, first.rejected, first.held, first.remaining], [1, 0, 1, 1]);
+  const [held] = getQueue(firstUser);
+  assert.equal(held.payload.clientRequestId, "reassigned-territory");
+  assert.equal(held.error, "Dieses Gebiet ist für dich nicht freigegeben.");
+
+  // Beim naechsten Versuch keine erneute Meldung - und mit Berechtigung geht er raus.
+  assert.equal((await flush(firstUser)).held, 0);
+  globalThis.fetch = async () => confirmed();
+  assert.equal((await flush(firstUser)).sent, 1);
+  assert.equal(getQueue(firstUser).length, 0);
+});
+
+test("a hanging request times out and keeps the visit for a later retry", async (context) => {
+  context.mock.timers.enable({ apis: ["setTimeout"] });
+  queueVisit("weak-signal");
+  globalThis.fetch = (_url, options) =>
+    new Promise((_resolve, reject) => {
+      options?.signal?.addEventListener("abort", () => reject(new DOMException("aborted", "AbortError")));
+    });
+  const pending = flush(firstUser);
+  context.mock.timers.tick(DOOR_TIMEOUT_MS);
+  const result = await pending;
+  assert.deepEqual([result.sent, result.rejected, result.remaining], [0, 0, 1]);
+});
+
+test("discarded and rejected entries are announced so the door view can take them back", async () => {
+  const dropped: string[] = [];
+  const stop = onDropped((entries) => dropped.push(...entries.map((entry) => String(entry.payload.clientRequestId))));
+  try {
+    const kept = queueVisit("discard-me");
+    queueVisit("invalid");
+    assert.equal(discard(kept.localId), true);
+    globalThis.fetch = async () => Response.json({ error: "Straße nicht gefunden." }, { status: 400 });
+    assert.equal((await flush(firstUser)).rejected, 1);
+    assert.deepEqual(dropped, ["discard-me", "invalid"]);
+  } finally {
+    stop();
+  }
+});
+
+test("a bell removed on the device also leaves the queued house descriptions", () => {
+  enqueue("Haus", { streetId: 4, houseNumber: "12 A", doorbells: [{ label: "Müller" }, { label: "Schmidt" }] }, {
+    url: "/api/houses", kind: "house", ownerUserId: firstUser,
+  });
+  enqueue("Anderes Haus", { streetId: 4, houseNumber: "14", doorbells: [{ label: "Müller" }] }, {
+    url: "/api/houses", kind: "house", ownerUserId: firstUser,
+  });
+  forgetQueuedBell(firstUser, 4, "12a", "müller");
+  const [house, other] = storedQueue();
+  assert.deepEqual(house.payload.doorbells, [{ label: "Schmidt" }]);
+  assert.deepEqual(other.payload.doorbells, [{ label: "Müller" }]);
+});
 
 test("network failures stop the queue without awarding XP or dropping later visits", async () => {
   queueVisit("offline-first-request");

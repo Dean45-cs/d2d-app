@@ -29,6 +29,13 @@ export interface LocalVisits {
   notHome: number;
   /** Eintraege, bei denen jemand an der Tuer war. */
   met: number;
+  /**
+   * Was der Server beim ersten lokalen Eintrag kannte. Damit gilt: die Tuer
+   * steht mindestens bei Serverstand-vorher plus eigene Eintraege - bis der
+   * Server sie selbst zaehlt. Fehlt bei Altbestand aus aelteren Versionen.
+   */
+  baseNotHome?: number;
+  baseMet?: number;
 }
 
 export interface TourDraft {

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { PendingSales } from "@/components/PendingSales";
 import { useToast } from "@/components/Toast";
@@ -17,10 +17,17 @@ import type {
 } from "@/lib/queries";
 import type { RejectionReason, TeamFace, VisitOutcome } from "@/lib/types";
 import { BUILDING_TYPE_LABEL, OUTCOME_LABEL } from "@/lib/types";
-import { bellKey, hasNamedBells, numberedBells, type DoorbellInput } from "@/lib/doorbells";
+import { bellKey, hasNamedBells, isNumberedLabel, numberedBells, type DoorbellInput } from "@/lib/doorbells";
 import { MAX_NOT_HOME_ATTEMPTS, doorFinished, doorStatus, whenLabel, type DoorFacts } from "@/lib/doors";
 import { slotLabel, slotOverdue, slotToday } from "@/lib/appointments";
-import { createVisitRequestId, enqueue, flush, remove as removeQueued } from "@/lib/offline-queue";
+import {
+  createVisitRequestId,
+  discard as discardQueued,
+  enqueue,
+  fetchWithTimeout,
+  flush,
+  forgetQueuedBell,
+} from "@/lib/offline-queue";
 import { routeUrl } from "@/lib/map";
 import { firstName } from "@/lib/ranking";
 import type { LevelProgress } from "@/lib/levels";
@@ -47,6 +54,7 @@ import {
   sameNumber,
   type Bell,
   type EnergyType,
+  type SavedDoor,
   type SaveResult,
   type SheetName,
   type TerritoryLite,
@@ -94,6 +102,17 @@ function remember(key: string, value: string | null): void {
     // Dann startet die Tuer beim naechsten Mal eben ohne Merker.
   }
 }
+
+/**
+ * Wann ein Eintrag gemerkt statt verworfen wird: Serverproblem (5xx) oder
+ * abgelaufene Anmeldung (401). Die Warteschlange sendet ihn nach - nach der
+ * neuen Anmeldung unter demselben Konto.
+ */
+function mustQueue(status: number): boolean {
+  return status === 401 || status >= 500;
+}
+
+const LOGGED_OUT = "Abgemeldet – gemerkt. Bitte neu anmelden, dann wird nachgesendet";
 
 /**
  * Klinken - die Tuer. Ein Bildschirm fuer eine Hand: oben, wo man ist;
@@ -148,7 +167,7 @@ export function TourClient({
   const [sheet, setSheet] = useState<SheetName | null>(null);
   const [lastSaved, setLastSaved] = useState<{
     id: number;
-    door: { number: string; label: string };
+    door: SavedDoor;
     text: string;
   } | null>(null);
   /** Was gesperrt werden soll - eine Klingel oder das ganze Haus. */
@@ -170,27 +189,45 @@ export function TourClient({
   useEffect(() => {
     const storedProduct = recall("d2d_product");
     if (storedProduct === "STROM" || storedProduct === "GAS" || storedProduct === "BEIDES") setProduct(storedProduct);
-    const storedStreet = Number(recall("d2d_street"));
-    const remembered = streets.find((s) => s.id === storedStreet);
-    if (remembered) {
-      setStreetId(remembered.id);
-      setTerritoryId(remembered.territory_id);
-    } else if (streets.length > 0) {
-      const first = streets.find((s) => s.territory_id === (territories[0]?.id ?? null)) ?? streets[0];
-      setStreetId(first.id);
-      setTerritoryId(first.territory_id);
-    }
+  }, []);
+
+  /*
+   * Welche Strasse offen ist. Nach jedem Speichern kommen frische Serverdaten
+   * - dann bleibt die gewaehlte Strasse, solange es sie gibt. Neu gewaehlt
+   * wird nur beim ersten Oeffnen oder wenn sie weggefallen ist (Gebiet
+   * uebergeben); sonst stuende die Hausnummer ploetzlich in einer anderen Strasse.
+   */
+  const streetRef = useRef<number | null>(null);
+  streetRef.current = streetId;
+  const streetPicked = useRef(false);
+  useEffect(() => {
     // "Hier klingeln" von der Karte: /tour?street=12&house=7a oeffnet genau dieses Haus.
     const params = new URLSearchParams(window.location.search);
     const linked = streets.find((s) => s.id === Number(params.get("street")));
     if (linked) {
+      streetPicked.current = true;
       setTerritoryId(linked.territory_id);
       setStreetId(linked.id);
       remember("d2d_street", String(linked.id));
-      const house = params.get("house");
-      if (house) setHouseNumber(house);
+      setHouseNumber(params.get("house") ?? "");
+      setBellLabel("");
       window.history.replaceState(null, "", window.location.pathname);
+      return;
     }
+    const current = streetRef.current;
+    if (current !== null ? streets.some((s) => s.id === current) : streetPicked.current) return;
+    streetPicked.current = true;
+    const storedStreet = Number(recall("d2d_street"));
+    const next =
+      streets.find((s) => s.id === storedStreet) ??
+      streets.find((s) => s.territory_id === (territories[0]?.id ?? null)) ??
+      streets[0];
+    if (current !== null) {
+      setHouseNumber("");
+      setBellLabel("");
+    }
+    setStreetId(next?.id ?? null);
+    if (next) setTerritoryId(next.territory_id);
   }, [streets, territories]);
 
   useEffect(() => {
@@ -201,11 +238,14 @@ export function TourClient({
 
   useEffect(() => {
     if (!navigator.geolocation) return;
-    navigator.geolocation.getCurrentPosition(
+    // Mitlaufen statt einmal beim Oeffnen: sonst traegt jeder Eintrag der Tour
+    // die Stelle, an der die App aufging - und die Route zum Termin fuehrt dorthin.
+    const watch = navigator.geolocation.watchPosition(
       (pos) => setPosition({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
       () => setPosition(null),
-      { enableHighAccuracy: false, maximumAge: 300_000, timeout: 8000 },
+      { enableHighAccuracy: false, maximumAge: 60_000, timeout: 15_000 },
     );
+    return () => navigator.geolocation.clearWatch(watch);
   }, []);
 
   // Der Toast steht ueber der Ergebnisleiste, solange diese Seite offen ist.
@@ -318,11 +358,15 @@ export function TourClient({
 
   function goToAppointment(item: AppointmentRow) {
     const target = item.street_id ? streets.find((s) => s.id === item.street_id) : null;
-    if (target) {
-      setTerritoryId(target.territory_id);
-      setStreetId(target.id);
-      remember("d2d_street", String(target.id));
+    if (!target) {
+      // Die Strasse liegt nicht in den offenen Gebieten (fertig oder uebergeben):
+      // nicht die Hausnummer in die aktuelle Strasse setzen, sondern den Termin zeigen.
+      router.push(`/termine?termin=${item.id}`);
+      return;
     }
+    setTerritoryId(target.territory_id);
+    setStreetId(target.id);
+    remember("d2d_street", String(target.id));
     setHouseNumber(item.house_number);
     setBellLabel(item.doorbell_label ?? "");
     window.scrollTo({ top: 0, behavior: "smooth" });
@@ -335,18 +379,29 @@ export function TourClient({
    * Namen - deshalb darf er gefahrlos in die Warteschlange.
    */
   async function describeHouse(
-    patch: { buildingType?: "EFH" | "MFH"; doorbells?: DoorbellInput[]; blocked?: boolean; blockedNote?: string },
+    patch: {
+      buildingType?: "EFH" | "MFH";
+      doorbells?: DoorbellInput[];
+      blocked?: boolean;
+      blockedNote?: string;
+      /** Sperre nur fuer diese Klingel - auch eine, die noch keine ID vom Server hat. */
+      bellLabel?: string;
+      bellFloor?: string;
+    },
     label: string,
     rollback?: () => void,
   ): Promise<"ok" | "queued" | "error"> {
     if (!streetId || !currentNumber) return "error";
     const payload = { streetId, houseNumber: currentNumber, ...patch };
+    let loggedOut = false;
     try {
-      const response = await fetch("/api/houses", {
+      const response = await fetchWithTimeout("/api/houses", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify(payload),
       });
+      loggedOut = response.status === 401;
+      if (mustQueue(response.status)) throw new Error("merken");
       const data = await response.json();
       if (!response.ok) {
         rollback?.();
@@ -358,7 +413,7 @@ export function TourClient({
     } catch {
       try {
         enqueue(label, payload, { url: "/api/houses", kind: "house", ownerUserId: userId });
-        toast("Offline gemerkt – wird nachgesendet");
+        toast(loggedOut ? LOGGED_OUT : "Offline gemerkt – wird nachgesendet");
         return "queued";
       } catch (error) {
         rollback?.();
@@ -415,7 +470,11 @@ export function TourClient({
     }
     book.dropBell(currentKey, bell.label);
     if (bellKey(bell.label) === bellKey(bellLabel)) setBellLabel("");
-    if (bell.id === null) return;
+    if (bell.id === null) {
+      // Nur auf dem Geraet: auch aus der Warteschlange nehmen, sonst kaeme es beim Nachsenden zurueck.
+      if (streetId && currentNumber) forgetQueuedBell(userId, streetId, currentNumber, bell.label);
+      return;
+    }
     try {
       const response = await fetch(`/api/doorbells/${bell.id}`, { method: "DELETE" });
       const data = await response.json();
@@ -459,34 +518,16 @@ export function TourClient({
     setBlockTarget(null);
     const undo = () => book.setBlocked(key, !blocked);
 
-    if (bell && bell.id !== null) {
-      try {
-        const response = await fetch(`/api/doorbells/${bell.id}`, {
-          method: "PATCH",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({ blocked, blockedNote: note }),
-        });
-        const data = await response.json();
-        if (!response.ok) {
-          undo();
-          toast(data.error ?? "Nicht möglich");
-          return;
-        }
-        toast(blocked ? "Klingel gesperrt" : "Sperre aufgehoben");
-        router.refresh();
-      } catch {
-        undo();
-        toast("Ohne Verbindung nicht möglich");
-      }
-      return;
-    }
+    // Klingeln werden ueber ihren Namen gesperrt - auch eine, die gerade erst
+    // (womoeglich ohne Netz) angelegt wurde. So geht die Sperre auch im
+    // Funkloch in die Warteschlange, und nie wird versehentlich das ganze Haus gesperrt.
     const outcome = await describeHouse(
-      { blocked, blockedNote: note },
-      `${street?.name ?? ""} ${currentNumber} · ${blocked ? "gesperrt" : "Sperre aufgehoben"}`,
+      bell ? { blocked, blockedNote: note, bellLabel: bell.label, bellFloor: bell.floor } : { blocked, blockedNote: note },
+      `${street?.name ?? ""} ${currentNumber}${bell ? ` · ${bell.label}` : ""} · ${blocked ? "gesperrt" : "Sperre aufgehoben"}`,
       undo,
     );
     // Offline und Fehler melden sich schon selbst.
-    if (outcome === "ok") toast(blocked ? "Adresse gesperrt" : "Sperre aufgehoben");
+    if (outcome === "ok") toast(blocked ? (bell ? "Klingel gesperrt" : "Adresse gesperrt") : "Sperre aufgehoben");
   }
 
   /* ------------------------------ Speichern ------------------------------ */
@@ -518,9 +559,11 @@ export function TourClient({
       lng: position?.lng ?? null,
     };
 
-    const markDone = (queued: boolean) => {
+    // Zaehlt sofort - bis der Server den Eintrag selbst kennt, auch ohne Netz.
+    const markDone = () => {
       if (!currentKey) return;
-      book.countVisit(bell ? bellSlot(currentKey, bell.label) : currentKey, outcome === "NOT_HOME", queued);
+      const base = bell ?? currentHouse ?? { blocked_at: null, not_home_count: 0, met_count: 0 };
+      book.countVisit(bell ? bellSlot(currentKey, bell.label) : currentKey, base, outcome === "NOT_HOME");
     };
 
     /*
@@ -553,16 +596,21 @@ export function TourClient({
     };
 
     setBusy(true);
+    let loggedOut = false;
     try {
-      const response = await fetch("/api/visits", {
+      const response = await fetchWithTimeout("/api/visits", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify(payload),
       });
+      loggedOut = response.status === 401;
+      if (mustQueue(response.status)) throw new Error("merken");
       const data = await response.json();
       if (!response.ok) {
-        if (response.status >= 500) throw new Error("Server vorübergehend nicht erreichbar");
         toast(data.error ?? "Speichern fehlgeschlagen");
+        // Meist hat sich an der Tuer etwas geaendert (inzwischen gesperrt,
+        // Gebiet uebergeben) - den aktuellen Stand zeigen statt des alten.
+        router.refresh();
         return { status: "error" };
       }
       receiveProgress(data.progression, true);
@@ -571,13 +619,13 @@ export function TourClient({
         router.refresh();
         return { status: "error" };
       }
-      markDone(false);
+      markDone();
       const { nextBell, pickBell } = advance();
       router.refresh();
       return {
         status: "saved",
         id: data.id as number,
-        door: { number, label: bell?.label ?? "" },
+        door: { streetId: streetId!, number, label: bell?.label ?? "", notHome: outcome === "NOT_HOME" },
         nextBell,
         pickBell,
         progression: data.progression,
@@ -593,9 +641,9 @@ export function TourClient({
         toast(error instanceof Error ? error.message : "Nicht gespeichert");
         return { status: "error" };
       }
-      markDone(true);
+      markDone();
       const { nextBell, pickBell } = advance();
-      return { status: "queued", nextBell, pickBell };
+      return { status: "queued", nextBell, pickBell, loggedOut };
     } finally {
       setBusy(false);
     }
@@ -613,7 +661,9 @@ export function TourClient({
           ]
             .filter(Boolean)
             .join(" · ")
-        : `${text} · offline gemerkt`;
+        : result.loggedOut
+          ? `${text} · ${LOGGED_OUT}`
+          : `${text} · offline gemerkt`;
     // Rueckgaengig bleibt auch nach dem Toast erreichbar (Tagesblatt).
     setLastSaved(result.status === "saved" ? { id: result.id, door: result.door, text } : null);
     const line = result.nextBell ? `${base} · weiter: ${result.nextBell}` : result.pickBell ? `${base} · Klingel wählen` : base;
@@ -625,7 +675,7 @@ export function TourClient({
     );
   }
 
-  async function undo(id: number, door: { number: string; label: string }) {
+  async function undo(id: number, door: SavedDoor) {
     try {
       const response = await fetch(`/api/visits/${id}`, { method: "DELETE" });
       const data = await response.json();
@@ -637,7 +687,14 @@ export function TourClient({
       receiveProgress(data.progression, true);
       const xp = Number(data.progression?.awardedXp ?? 0);
       toast(xp < 0 ? `Zurückgenommen · ${xp.toLocaleString("de-DE").replace("-", "−")} XP` : "Zurückgenommen");
-      // Zurueck an die Tuer, an der der Fehltipp passiert ist.
+      // Der Eintrag ist weg - die sofortige Zaehlung an der Tuer auch.
+      const house = doneKey(door.streetId, door.number);
+      book.uncountVisit(door.label ? bellSlot(house, door.label) : house, door.notHome);
+      // Zurueck an die Tuer, an der der Fehltipp passiert ist - auch aus einer anderen Strasse.
+      if (door.streetId !== streetId && streets.some((s) => s.id === door.streetId)) {
+        setStreetId(door.streetId);
+        remember("d2d_street", String(door.streetId));
+      }
       setHouseNumber(door.number);
       setBellLabel(door.label);
       router.refresh();
@@ -828,6 +885,11 @@ export function TourClient({
   }));
 
   const streetDone = houses.length > 0 && openHouses.length === 0 && !currentNumber;
+  // Offline gemerkte Tueren von heute zaehlen schon mit - der Server kennt sie erst nach dem Senden.
+  const today = new Date().toDateString();
+  const queuedToday = pending.filter(
+    (entry) => (entry.url ?? "/api/visits") === "/api/visits" && new Date(entry.createdAt).toDateString() === today,
+  ).length;
   const nextStreet = streetsOfTerritory.find((s) => s.id !== streetId && (progress.get(s.id)?.open ?? 0) > 0) ?? null;
 
   const lastLine = (() => {
@@ -842,7 +904,7 @@ export function TourClient({
         <TourHeader
           street={street}
           territory={territory}
-          todayDoors={todayTotals.doors ?? 0}
+          todayDoors={(todayTotals.doors ?? 0) + queuedToday}
           dueCount={dueAppointments.length}
           pendingCount={pending.length}
           online={online}
@@ -1017,7 +1079,7 @@ export function TourClient({
       {sheet === "appointment" && (
         <AppointmentSheet
           place={place}
-          contact={activeBell?.label ?? ""}
+          contact={activeBell && !isNumberedLabel(activeBell.label) ? activeBell.label : ""}
           now={now}
           busy={busy}
           onSubmit={(values) => void submitAppointment(values)}
@@ -1093,7 +1155,7 @@ export function TourClient({
           }
           onSend={() => void sendNow()}
           onDiscard={(localId) => {
-            if (!removeQueued(localId)) toast("Eintrag konnte nicht entfernt werden");
+            if (!discardQueued(localId)) toast("Eintrag konnte nicht entfernt werden");
           }}
           onClose={() => setSheet(null)}
         />

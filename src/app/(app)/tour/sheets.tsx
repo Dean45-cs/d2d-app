@@ -789,7 +789,10 @@ export function DaySheet({
                 <span className="glyph glyph-round">
                   <IconCloudUp className="h-4 w-4" />
                 </span>
-                <span className="min-w-0 flex-1 truncate text-subhead">{item.label}</span>
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-subhead">{item.label}</span>
+                  {item.error && <span className="block text-footnote text-danger">{item.error}</span>}
+                </span>
                 <button
                   type="button"
                   className="icon-btn"

@@ -104,6 +104,21 @@ test("done appointments never push open ones out of the list limit", () => {
   assert.deepEqual(listAppointments(team, { userId: member.id, done: true, limit: 2 }).map((row) => row.id), [old[2], old[1]]);
 });
 
+test("the appointment route leads to the house, not to where the visit was typed in", () => {
+  const houseId = ensureHouseNumber(streetId, "40");
+  db.prepare("UPDATE house_numbers SET lat = 51.5, lng = 7.4 WHERE id = ?").run(houseId);
+  const located = recordVisit(member, {
+    streetId, territoryId, houseNumber: "40", outcome: "APPOINTMENT", followUpAt: "2026-12-01 18:00", lat: 50.1, lng: 8.6,
+  }).id as number;
+  const unknown = recordVisit(member, {
+    streetId, territoryId, houseNumber: "41", outcome: "APPOINTMENT", followUpAt: "2026-12-02 18:00", lat: 50.1, lng: 8.6,
+  }).id as number;
+  const rows = new Map(listAppointments(team, { userId: member.id }).map((row) => [row.id, row]));
+  assert.deepEqual([rows.get(located)?.lat, rows.get(located)?.lng], [51.5, 7.4]);
+  // Ohne Lage des Hauses bleibt es beim erfassten Punkt.
+  assert.deepEqual([rows.get(unknown)?.lat, rows.get(unknown)?.lng], [50.1, 8.6]);
+});
+
 test("reason codes stay unique even after reordering lowered the highest sort order", () => {
   db.prepare("INSERT INTO rejection_reasons(team_id, code, label, sort_order) VALUES (?, 'TEST_14', 'Test', 13.5)").run(team);
   assert.equal(reasonCode(team, "Test", "", 14), "TEST_15");
