@@ -45,6 +45,9 @@ export function MemberSheet({
   const canManage = editable && rights["team.manage"];
   const canRole = editable && rights["team.roles"] && !isSelf;
   const canStructure = editable && rights["structure.manage"];
+  // Sind die frischen Daten da, gilt wieder der Server (auch nach "Rückgängig").
+  if (role && role.base !== m.role) setRole(null);
+  if (manager && manager.base !== m.manager_id) setManager(null);
   const shownRole = role && role.base === m.role ? role.value : m.role;
   const shownManager = manager && manager.base === m.manager_id ? manager.value : m.manager_id;
   const managerName = members.find((p) => p.id === m.manager_id)?.name;

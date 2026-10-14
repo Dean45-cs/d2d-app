@@ -159,20 +159,20 @@ export function ReasonSettings({ reasons }: { reasons: RejectionReason[] }) {
       {items.length === 0 ? (
         <EmptyState boxed icon={<IconChat className="h-6 w-6" />} title="Noch keine Gründe" />
       ) : (
-        <>
+        <div className="space-y-6">
           {active.length > 0 && (
-            <>
+            <section>
               <ListLabel>An der Tür</ListLabel>
               <ul className="list list-icons">{rows(active)}</ul>
-            </>
+            </section>
           )}
           {hidden.length > 0 && (
-            <>
+            <section>
               <ListLabel>Ausgeblendet</ListLabel>
               <ul className="list list-icons">{rows(hidden)}</ul>
-            </>
+            </section>
           )}
-        </>
+        </div>
       )}
 
       {sheet && (

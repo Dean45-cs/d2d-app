@@ -6,5 +6,10 @@ export const dynamic = "force-dynamic";
 
 export default async function InvitationsPage() {
   const user = await requireUser();
-  return <Invitations {...invitationDashboard(user)} />;
+  return (
+    <div className="page">
+      {/* An der Strukturspitze gibt die Teamleitung ihre Einladungen selbst frei. */}
+      <Invitations {...invitationDashboard(user)} selfApproves={user.manager_id === null && user.role === "LEADER"} />
+    </div>
+  );
 }

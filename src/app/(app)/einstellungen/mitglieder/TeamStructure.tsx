@@ -9,8 +9,7 @@ import { buildTeamStructure, type StructureMember, type StructureNode } from "@/
 const STEP = 16;
 const MAX_DEPTH = 5;
 
-const CONTEXT: Record<NonNullable<StructureNode["rootReason"]>, string> = {
-  top: "Strukturspitze",
+const CONTEXT: Record<Exclude<StructureNode["rootReason"], null | "top">, string> = {
   unassigned: "Ohne Führungskraft",
   outside: "Führungskraft nicht sichtbar",
   cycle: "Zuordnung prüfen",
@@ -77,7 +76,7 @@ export function TeamStructure({
         {branchIds.length > 0 && (
           <button
             type="button"
-            className="btn btn-plain btn-sm mb-1"
+            className="btn btn-plain btn-sm"
             onClick={() => setCollapsed(hasCollapsed ? new Set() : new Set(branchIds))}
           >
             {hasCollapsed ? "Alle aufklappen" : "Alle einklappen"}
@@ -93,8 +92,13 @@ export function TeamStructure({
           const facts = [
             member.id === currentUserId ? "Du" : null,
             member.active ? role : `${role}, deaktiviert`,
-            rootReason ? CONTEXT[rootReason] : null,
-            children.length ? `${children.length} direkt · ${descendantCount} gesamt` : null,
+            // "Strukturspitze" sagt bei der Teamleitung nichts Neues.
+            rootReason && rootReason !== "top" ? CONTEXT[rootReason] : null,
+            children.length
+              ? descendantCount > children.length
+                ? `${children.length} direkt · ${descendantCount} gesamt`
+                : `${children.length} direkt`
+              : null,
           ].filter(Boolean);
           return (
             <li

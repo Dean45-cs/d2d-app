@@ -1,33 +1,30 @@
-import { permissionsFor } from "@/lib/permissions";
-import Link from "next/link";
 import { redirect } from "next/navigation";
 import { requireUser } from "@/lib/auth";
-import { lastRefresh, listReasons } from "@/lib/queries";
-import { PageHeader, SectionHeader } from "@/components/ui";
-import { IconChevronRight, IconExternal } from "@/components/icons";
+import { permissionsFor } from "@/lib/permissions";
+import { lastRefresh } from "@/lib/queries";
 import { feedConfig } from "@/lib/energy/adapters";
 import { openPlaces } from "@/lib/energy/places";
-import {
-  DEFAULT_REFERENCE,
-  getReference,
-  isStale,
-  listManualPrices,
-} from "@/lib/energy/manual";
-import { ReasonSettings } from "./ReasonSettings";
+import { DEFAULT_REFERENCE, getReference, isStale, listManualPrices } from "@/lib/energy/manual";
+import { Cell, InlineError, ListLabel, PageHeader, Pill, plural } from "@/components/ui";
+import { IconBolt, IconTarget } from "@/components/icons";
+import { FeedRefreshCell } from "./FeedRefreshCell";
 import { ReferenceSettings } from "./ReferenceSettings";
 
 export const dynamic = "force-dynamic";
 
-export default async function SettingsPage() {
+/**
+ * Energie & Tarif: woran Preise gemessen werden (Bundesschnitt), woher sie
+ * taeglich kommen (Tagesquelle) und wohin der Abschluss fuehrt (Tarifrechner).
+ * Gepflegt werden die Preise selbst auf der Karte.
+ */
+export default async function EnergySettingsPage() {
   const user = await requireUser();
   const rights = permissionsFor(user);
-  if (!["settings.reasons", "energy.reference", "energy.manage", "energy.refresh"].some((key) => rights[key as keyof typeof rights])) redirect("/tour");
+  if (!rights["energy.reference"] && !rights["energy.manage"] && !rights["energy.refresh"]) redirect("/profil");
 
-  const reasons = listReasons(user.team_id, false);
   const feed = feedConfig();
   const refresh = feed ? lastRefresh() : null;
 
-  // Grundversorger-Preise: gepflegt wird auf der Energiekarte, hier nur der Stand.
   const prices = listManualPrices(user.team_id);
   const stale = prices.filter((row) => isStale(row.updated_at)).length;
   const open = openPlaces(user.team_id).length;
@@ -36,7 +33,6 @@ export default async function SettingsPage() {
     process.env.NEXT_PUBLIC_TARIFRECHNER_URL ??
     "https://portal-ep24.de/menues/tarifrechner/";
 
-  const tarifrechnerHost = hostOf(tarifrechner);
   const lastRun = refresh?.finished_at
     ? new Date(refresh.finished_at).toLocaleString("de-DE", {
         timeZone: "Europe/Berlin",
@@ -47,103 +43,97 @@ export default async function SettingsPage() {
         minute: "2-digit",
       })
     : "Noch nie";
+  const failed = refresh !== null && refresh.status === "error";
+  const status = !refresh ? "–" : refresh.status === "ok" ? "Aktuell" : refresh.status === "running" ? "Läuft" : "Fehlgeschlagen";
 
-  return (
-    <div className="mx-auto max-w-3xl">
-      <PageHeader title="Einstellungen" />
+  const main = rights["energy.reference"] || feed;
 
-      <div className="space-y-4">
-        <section id="grundversorger" className="card scroll-mt-20 p-5">
-          <SectionHeader title="Grundversorger-Preise" className="mb-1" />
-          <p className="muted mb-4 text-[13px] leading-snug">
-            Eingetragen wird direkt auf der Energiekarte – einzeln vom Preisblatt oder viele Orte
-            auf einmal als Tabelle.
-          </p>
-          <div className="list">
-            <Link href="/karte" className="list-row">
-              <span className="min-w-0 flex-1">
-                <span className="block text-[14px] font-medium">Energiekarte</span>
-                <span className="muted block truncate text-[12.5px]">
-                  {[
-                    `${prices.length} ${prices.length === 1 ? "Ort" : "Orte"} eingetragen`,
-                    open > 0 && `${open} Gebietsorte ohne Preis`,
-                    stale > 0 && `${stale} bitte prüfen`,
-                  ]
-                    .filter(Boolean)
-                    .join(" · ")}
-                </span>
+  const tools = (
+    <section>
+      <ListLabel>Werkzeuge</ListLabel>
+      <ul className="list list-icons">
+        <li>
+          <Cell
+            href="/karte"
+            icon={
+              <span className="glyph">
+                <IconBolt className="h-4 w-4" />
               </span>
-              <IconChevronRight className="muted h-4 w-4 shrink-0" />
-            </Link>
-          </div>
-          {rights["energy.reference"] && <ReferenceSettings
-            reference={getReference(user.team_id)}
-            referenceDefault={DEFAULT_REFERENCE}
-          />}
-        </section>
-
-        {rights["settings.reasons"] && <ReasonSettings reasons={reasons} />}
-
-        <section className="card p-5">
-          <SectionHeader title="Abschluss" className="mb-1" />
-          <p className="muted mb-4 text-[13px] leading-snug">
-            Der Abschluss-Knopf an der Tür öffnet den Tarifrechner des Partners, in dem der
-            Auftrag aufgenommen und unterschrieben wird.
-          </p>
-          <div className="list">
-            <a
-              href={tarifrechner}
-              target="_blank"
-              rel="noreferrer"
-              className="list-row"
-            >
-              <span className="min-w-0 flex-1">
-                <span className="block text-[14px] font-medium">Tarifrechner</span>
-                <span className="muted block truncate text-[12.5px]">{tarifrechnerHost}</span>
+            }
+            title="Preise auf der Karte"
+            subtitle={open > 0 ? `${open} Gebietsorte ohne Preis` : plural(prices.length, "Ort", "Orte")}
+            trailing={stale > 0 ? <Pill tone="warn">{stale} prüfen</Pill> : undefined}
+          />
+        </li>
+        <li>
+          <Cell
+            href={tarifrechner}
+            external
+            icon={
+              <span className="glyph">
+                <IconTarget className="h-4 w-4" />
               </span>
-              <IconExternal className="muted h-4 w-4 shrink-0" />
-            </a>
-          </div>
-        </section>
-
-        {feed && (
-          <section className="card p-5">
-            <SectionHeader title="Tagesquelle der Energiekarte" className="mb-3" />
-            <dl className="list">
-              <InfoRow label="Quelle" value={refresh?.source || feed.label || hostOf(feed.url)} />
-              <InfoRow label="Letzter Abruf" value={lastRun} />
-              <InfoRow
-                label="Status"
-                value={
-                  !refresh
-                    ? "–"
-                    : refresh.status === "ok"
-                      ? `Aktuell · ${refresh.row_count} Orte`
-                      : "Fehlgeschlagen"
-                }
-                tone={refresh && refresh.status !== "ok" ? "danger" : undefined}
-              />
-            </dl>
-            <p className="muted mt-3 text-[12.5px] leading-snug">
-              Selbst eingetragene Preise gehen der Tagesquelle vor.
-            </p>
-          </section>
-        )}
-      </div>
-    </div>
+            }
+            title="Tarifrechner"
+            subtitle={hostOf(tarifrechner)}
+          />
+        </li>
+      </ul>
+    </section>
   );
-}
 
-function InfoRow({ label, value, tone }: { label: string; value: string; tone?: "danger" }) {
   return (
-    <div className="flex items-center justify-between gap-4 px-3.5 py-3 text-[14px]">
-      <dt className="muted">{label}</dt>
-      <dd
-        className="min-w-0 truncate text-right font-medium"
-        style={{ color: tone === "danger" ? "var(--danger-ink)" : undefined }}
-      >
-        {value}
-      </dd>
+    <div className="page-medium">
+      <PageHeader
+        back={{ href: "/profil", label: "Profil" }}
+        title="Energie & Tarif"
+        subtitle={prices.length > 0 ? `${plural(prices.length, "Ort", "Orte")} mit Preis` : "Noch keine Preise"}
+      />
+
+      {main ? (
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,380px)] lg:items-start lg:gap-8">
+          <div className="space-y-6">
+            {rights["energy.reference"] && (
+              <ReferenceSettings reference={getReference(user.team_id)} referenceDefault={DEFAULT_REFERENCE} />
+            )}
+
+            {feed && (
+              <section>
+                <ListLabel>Tagesquelle</ListLabel>
+                <ul className="list">
+                  <li>
+                    <Cell title="Quelle" detail={<span className="block max-w-48 truncate sm:max-w-xs">{refresh?.source || feed.label || hostOf(feed.url)}</span>} />
+                  </li>
+                  <li>
+                    <Cell title="Letzter Abruf" detail={lastRun} />
+                  </li>
+                  {refresh?.status === "ok" && (
+                    <li>
+                      <Cell title="Orte" detail={refresh.row_count.toLocaleString("de-DE")} />
+                    </li>
+                  )}
+                  <li>
+                    <Cell
+                      title="Status"
+                      detail={failed ? <span className="font-semibold text-danger">{status}</span> : status}
+                    />
+                  </li>
+                  {rights["energy.refresh"] && <FeedRefreshCell />}
+                </ul>
+                {failed && refresh?.message && (
+                  <div className="mt-3">
+                    <InlineError>{refresh.message}</InlineError>
+                  </div>
+                )}
+                <p className="list-footer">Eigene Preise gehen der Tagesquelle vor.</p>
+              </section>
+            )}
+          </div>
+          {tools}
+        </div>
+      ) : (
+        tools
+      )}
     </div>
   );
 }
