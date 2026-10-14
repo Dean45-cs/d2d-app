@@ -71,8 +71,11 @@ export function PermissionEditor({
 
   return (
     <div className="grid grid-cols-1 gap-8 lg:grid-cols-[minmax(0,320px)_minmax(0,1fr)] lg:items-start">
-      <section className={selectedId ? "hidden lg:block" : ""} aria-label="Personen">
-        <ul className="list list-icons">
+      <section
+        className={`lg:sticky lg:top-16 ${selectedId ? "hidden lg:block" : ""}`}
+        aria-label="Personen"
+      >
+        <ul className="list list-icons lg:max-h-[calc(100dvh-96px)] lg:overflow-y-auto">
           {members.map((member) => {
             const current = member.id === shown.id;
             return (

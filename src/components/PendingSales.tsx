@@ -58,6 +58,12 @@ export function PendingSales({
           toast(["Abschluss bestätigt", levelFeedbackText(result.progression)].filter(Boolean).join(" · "), {
             tone: "result",
           });
+        } else if (result.sent && !decided) {
+          toast(
+            [result.sent === 1 ? "1 Eintrag nachgesendet" : `${result.sent} Einträge nachgesendet`, levelFeedbackText(result.progression)]
+              .filter(Boolean)
+              .join(" · "),
+          );
         }
         if (result.sent) router.refresh();
         const response = await fetch("/api/sale-drafts", { cache: "no-store" });

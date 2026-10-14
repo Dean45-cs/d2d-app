@@ -166,7 +166,7 @@ export function PriceSheet({
       />
       {!form.provider.trim() && suggestion && (
         <button type="button" className="btn btn-secondary btn-sm mt-2" onClick={() => set("provider", suggestion)}>
-          {suggestion}
+          Vorschlag: {suggestion}
         </button>
       )}
 
@@ -206,8 +206,8 @@ export function PriceSheet({
       <fieldset className="mt-6">
         <legend className="list-label">Strom</legend>
         <div className="grid grid-cols-2 gap-2">
-          <NumberField label="ct/kWh" value={form.stromCt} onChange={(v) => set("stromCt", v)} />
-          <NumberField label={unitLabel} value={form.stromBaseMonth} onChange={(v) => set("stromBaseMonth", v)} />
+          <NumberField label="ct/kWh" ariaLabel="Arbeitspreis Strom in ct/kWh" value={form.stromCt} onChange={(v) => set("stromCt", v)} />
+          <NumberField label={unitLabel} ariaLabel={`Grundpreis Strom in ${unitLabel}`} value={form.stromBaseMonth} onChange={(v) => set("stromBaseMonth", v)} />
         </div>
         <Preview result={preview("strom")} reference={reference.strom} />
       </fieldset>
@@ -222,8 +222,8 @@ export function PriceSheet({
           onChange={(e) => set("gasProvider", e.target.value)}
         />
         <div className="grid grid-cols-2 gap-2">
-          <NumberField label="ct/kWh" value={form.gasCt} onChange={(v) => set("gasCt", v)} />
-          <NumberField label={unitLabel} value={form.gasBaseMonth} onChange={(v) => set("gasBaseMonth", v)} />
+          <NumberField label="ct/kWh" ariaLabel="Arbeitspreis Gas in ct/kWh" value={form.gasCt} onChange={(v) => set("gasCt", v)} />
+          <NumberField label={unitLabel} ariaLabel={`Grundpreis Gas in ${unitLabel}`} value={form.gasBaseMonth} onChange={(v) => set("gasBaseMonth", v)} />
         </div>
         <Preview result={preview("gas")} reference={reference.gas} />
       </fieldset>
@@ -273,17 +273,28 @@ function Preview({
 
 function NumberField({
   label,
+  ariaLabel,
   value,
   onChange,
 }: {
   label: string;
+  /** Vollstaendige Beschriftung fuer Vorlese-Programme - sichtbar steht nur die Einheit. */
+  ariaLabel: string;
   value: string;
   onChange: (value: string) => void;
 }) {
   return (
     <label className="block">
-      <span className="label">{label}</span>
-      <input className="field tabular-nums" inputMode="decimal" value={value} onChange={(e) => onChange(e.target.value)} />
+      <span className="label" aria-hidden="true">
+        {label}
+      </span>
+      <input
+        className="field tabular-nums"
+        inputMode="decimal"
+        aria-label={ariaLabel}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+      />
     </label>
   );
 }

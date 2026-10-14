@@ -1,30 +1,20 @@
-import { hasPermission } from "@/lib/permissions";
 import Link from "next/link";
-import type { ReactNode } from "react";
 import { notFound } from "next/navigation";
+import { hasPermission } from "@/lib/permissions";
 import { requireUser } from "@/lib/auth";
 import { dailySeries, totals } from "@/lib/queries";
 import { activeDays, bestDay, getProfile, listFeed, teamTotals, type FeedScope } from "@/lib/community";
 import { firstName, metricByKey, milestoneProgress, rank, saleStreak } from "@/lib/ranking";
+import { rangeToSince } from "@/lib/ranges";
 import { monthYear } from "@/lib/format";
+import { getLevelProgress } from "@/lib/level-queries";
 import { DailyBars, fillDays } from "@/components/charts";
 import { Feed } from "@/components/community/Feed";
 import { FollowButton } from "@/components/community/FollowButton";
 import { ProfileEditor } from "@/components/community/ProfileEditor";
-import { PushToggle } from "@/components/community/PushToggle";
-import {
-  Avatar,
-  GroupLabel,
-  Pill,
-  ProgressBar,
-  SectionHeader,
-  StatTile,
-  percent,
-} from "@/components/ui";
-import { IconCalendar, IconCheck, IconTrophy } from "@/components/icons";
-import { rangeToSince } from "../../auswertung/ranges";
-import { LevelBadge, LevelCard } from "@/components/levels/LevelCard";
-import { getLevelProgress } from "@/lib/level-queries";
+import { LevelBadge, LevelSummary } from "@/components/levels/LevelCard";
+import { Avatar, PageHeader, Pill, ProgressBar, SectionHeader, StatGrid, percent } from "@/components/ui";
+import { IconCalendar, IconTrophy } from "@/components/icons";
 
 export const dynamic = "force-dynamic";
 
@@ -37,9 +27,10 @@ const TABS = [
 type TabKey = (typeof TABS)[number]["key"];
 
 /**
- * Profil im Stil von Twitter: Titelbild, Bild, Name, ein Satz ueber sich,
- * Abonnenten - und dazu, was Twitter nicht hat: die eigenen Zahlen. Wer ein
- * Profil oeffnet, sieht, was die Person leistet. Das soll anspornen.
+ * Profil einer Person: wer sie ist (Bild, ein Satz, Abonnenten) und was sie
+ * leistet - Zahlen, Level, Abzeichen, die letzten zwei Wochen. Daneben (auf
+ * dem Handy darunter) ihre Beitraege. Wer ein Profil oeffnet, soll sehen,
+ * was moeglich ist.
  */
 export default async function ProfilePage({
   params,
@@ -64,11 +55,13 @@ export default async function ProfilePage({
   const month = totals(teamId, { userId: profile.id, since: rangeToSince("30") });
   const week = totals(teamId, { userId: profile.id, since: rangeToSince("7") });
   const sales = all.sales ?? 0;
+  const met = all.met ?? 0;
+  const doors = all.doors ?? 0;
 
   const board = rank(metricByKey("sales"), teamTotals(teamId, { since: rangeToSince("30") }));
   const place = board.find((e) => e.user_id === profile.id)?.rank ?? null;
   const rankedCount = board.filter((e) => e.rank !== null).length;
-  const hasSalesThisMonth = (month.sales ?? 0) > 0;
+  const showPlace = place !== null && (month.sales ?? 0) > 0;
 
   const today = new Date().toISOString().slice(0, 10);
   const streak = saleStreak(activeDays(profile.id), today);
@@ -90,250 +83,188 @@ export default async function ProfilePage({
   const roleLabel = profile.role === "LEADER" ? "Teamleitung" : "Vertrieb";
 
   return (
-    <div className="mx-auto max-w-2xl">
-      {/* ------------------------------- Kopf -------------------------------- */}
-      <section className="card overflow-hidden">
-        <div
-          className="h-20 md:h-24"
-          style={{
-            background: "var(--brand-900)",
-          }}
-          aria-hidden
-        />
-        <div className="px-4 pb-4 md:px-5">
-          <div className="flex items-start justify-between gap-3">
-            {/* Deckender Grund: das Kuerzel-Bild ist durchscheinend und laege sonst auf dem Titelbild. */}
-            <div
-              className="-mt-12 shrink-0 rounded-full"
-              style={{ background: "var(--card)", boxShadow: "0 0 0 4px var(--card)" }}
-            >
-              <Avatar name={profile.name} src={profile.avatar} size={96} />
-            </div>
-            <div className="pt-3">
-              {isMe ? (
-                <ProfileEditor name={profile.name} avatar={profile.avatar} bio={profile.bio} />
-              ) : profile.active ? (
-                <FollowButton
-                  userId={profile.id}
-                  name={profile.name}
-                  initial={profile.followed_by_me}
-                  size="sm"
-                  refresh
-                />
-              ) : null}
-            </div>
-          </div>
+    <div className="page">
+      <PageHeader
+        title={profile.name}
+        back={isMe ? { href: "/profil", label: "Profil" } : { href: "/team", label: "Team" }}
+        hideLargeTitle
+      />
 
-          <h1 className="mt-3 text-[22px] font-bold leading-tight">{profile.name}</h1>
-          <p className="muted mt-0.5 flex flex-wrap items-center gap-2 text-[13.5px]">
-            {roleLabel}
-            <LevelBadge progress={level} />
-            {profile.follows_me && <Pill>Hat dich abonniert</Pill>}
-            {!profile.active && <Pill tone="danger">Deaktiviert</Pill>}
-          </p>
-
-          {profile.bio ? (
-            <p className="mt-2.5 break-words text-[15px] leading-snug">{profile.bio}</p>
-          ) : (
-            isMe && (
-              <p className="muted mt-2.5 text-[14px]">
-                Unter „Profil bearbeiten“ kannst du eine Beschreibung ergänzen.
-              </p>
-            )
-          )}
-
-          <p className="muted mt-2.5 flex flex-wrap gap-x-4 gap-y-1 text-[13px]">
-            <span className="inline-flex items-center gap-1">
+      <div className="grid grid-cols-1 gap-8 lg:grid-cols-[minmax(0,380px)_minmax(0,1fr)] lg:items-start">
+        <div className="min-w-0 space-y-8">
+          {/* ------------------------------ Person ------------------------------ */}
+          <section className="flex flex-col items-center rounded-xl bg-surface px-4 py-6 text-center">
+            <Avatar name={profile.name} src={profile.avatar} size={88} />
+            <p className="mt-3 max-w-full break-words text-title-1">{profile.name}</p>
+            <p className="mt-1 flex flex-wrap items-center justify-center gap-2 text-subhead text-muted">
+              {roleLabel}
+              <LevelBadge progress={level} />
+              {profile.follows_me && <Pill>Hat dich abonniert</Pill>}
+              {!profile.active && <Pill tone="danger">Deaktiviert</Pill>}
+            </p>
+            {profile.bio && <p className="mt-3 max-w-full break-words text-body">{profile.bio}</p>}
+            <p className="mt-3 inline-flex items-center gap-1 text-footnote text-muted">
               <IconCalendar className="h-4 w-4" />
               Dabei seit {monthYear(profile.created_at)}
-            </span>
-            {place !== null && hasSalesThisMonth && (
-              <Link href="/vergleich?range=30" className="inline-flex items-center gap-1 hover:underline">
-                <IconTrophy className="h-4 w-4" />
-                Platz {place} im Team · 30 Tage
+            </p>
+            <p className="mt-1 flex flex-wrap items-center justify-center gap-x-2 text-subhead">
+              <Link
+                href={`/profil/${profile.id}/abos?liste=abonniert`}
+                className="inline-flex min-h-11 items-center gap-1 rounded-sm px-1 hover:underline"
+              >
+                <span className="kpi font-semibold">{profile.following_count}</span>
+                <span className="text-muted">Abonniert</span>
               </Link>
-            )}
-          </p>
-
-          <p className="mt-2.5 flex gap-4 text-[14px]">
-            <Link href={`/profil/${profile.id}/abos?liste=abonniert`} className="hover:underline">
-              <span className="font-bold tabular-nums">{profile.following_count}</span>{" "}
-              <span className="muted">Abonniert</span>
-            </Link>
-            <Link href={`/profil/${profile.id}/abos?liste=abonnenten`} className="hover:underline">
-              <span className="font-bold tabular-nums">{profile.follower_count}</span>{" "}
-              <span className="muted">{profile.follower_count === 1 ? "Abonnent" : "Abonnenten"}</span>
-            </Link>
-          </p>
-        </div>
-      </section>
-
-      {/* ------------------------------ Leistung ------------------------------ */}
-      <div className="mt-4">
-        <LevelCard progress={level} compact href={isMe ? "/level" : undefined} title={isMe ? "Dein Level" : `Level von ${first}`} />
-      </div>
-      <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <StatTile
-          label="Abschlüsse"
-          value={sales}
-          tone="success"
-          hint={`${week.sales ?? 0} in 7 Tagen`}
-        />
-        <StatTile
-          label="Letzte 30 Tage"
-          value={month.sales ?? 0}
-          tone="brand"
-          hint={place !== null && hasSalesThisMonth ? `Platz ${place} von ${rankedCount}` : "Abschlüsse"}
-        />
-        <StatTile
-          label="Abschlussquote"
-          value={percent(sales, all.met ?? 0)}
-          hint={`aus ${all.met ?? 0} Gesprächen`}
-        />
-        <StatTile
-          label="Antreffquote"
-          value={percent(all.met ?? 0, all.doors ?? 0)}
-          hint={`${all.doors ?? 0} Türen`}
-        />
-      </div>
-
-      <section className="card mt-4 p-5">
-        <SectionHeader title="Erfolge" href="/vergleich" linkLabel="Vergleich" />
-        <div className="grid grid-cols-3 gap-2">
-          <Highlight
-            icon={<IconCheck className="h-5 w-5" />}
-            value={streak}
-            label={streak === 1 ? "Tag in Folge" : "Tage in Folge"}
-            hint="mit Abschluss"
-          />
-          <Highlight
-            icon={<IconTrophy className="h-5 w-5" />}
-            value={best?.sales ?? 0}
-            label="Bester Tag"
-            hint={best ? shortDate(best.day) : "noch offen"}
-          />
-          <Highlight
-            icon={<IconCalendar className="h-5 w-5" />}
-            value={all.appointments ?? 0}
-            label="Termine"
-            hint="insgesamt"
-          />
-        </div>
-
-        <div className="mt-5">
-          {progress.next !== null ? (
-            <>
-              <div className="mb-1.5 flex items-baseline justify-between gap-3 text-[13.5px]">
-                <span>
-                  Nächstes Abzeichen: <span className="font-semibold">{progress.next} {progress.next === 1 ? "Abschluss" : "Abschlüsse"}</span>
-                </span>
-                <span className="muted shrink-0 tabular-nums">
-                  {sales} / {progress.next}
-                </span>
+              <span className="text-muted" aria-hidden="true">
+                ·
+              </span>
+              <Link
+                href={`/profil/${profile.id}/abos?liste=abonnenten`}
+                className="inline-flex min-h-11 items-center gap-1 rounded-sm px-1 hover:underline"
+              >
+                <span className="kpi font-semibold">{profile.follower_count}</span>
+                <span className="text-muted">{profile.follower_count === 1 ? "Abonnent" : "Abonnenten"}</span>
+              </Link>
+            </p>
+            {isMe ? (
+              <div className="mt-2">
+                <ProfileEditor name={profile.name} avatar={profile.avatar} bio={profile.bio} />
               </div>
-              <ProgressBar value={sales - progress.from} max={progress.next - progress.from} tone="success" />
-              <p className="muted mt-1.5 text-[12.5px]">
-                {isMe ? "Dir" : first} {progress.next - sales === 1 ? "fehlt" : "fehlen"} noch {progress.next - sales}{" "}
-                {progress.next - sales === 1 ? "Abschluss" : "Abschlüsse"}.
-              </p>
-            </>
-          ) : (
-            <p className="text-[13.5px] font-semibold">Alle Abzeichen erreicht.</p>
-          )}
-          <div className="mt-3 flex flex-wrap gap-1.5">
-            {progress.reached.length === 0 ? (
-              <span className="muted text-[12.5px]">Das erste Abzeichen gibt es für den ersten Vertrag.</span>
-            ) : (
-              progress.reached.map((milestone) => (
-                <Pill key={milestone} tone="warn">
-                  {milestone === 1 ? "Erster Vertrag" : `${milestone} Abschlüsse`}
-                </Pill>
-              ))
-            )}
-          </div>
+            ) : profile.active ? (
+              <div className="mt-2">
+                <FollowButton userId={profile.id} name={profile.name} initial={profile.followed_by_me} refresh />
+              </div>
+            ) : null}
+          </section>
+
+          {/* ----------------------------- Leistung ----------------------------- */}
+          <section>
+            <SectionHeader title="Leistung" href="/team/rangliste?range=30" linkLabel="Rangliste" />
+            <div className="space-y-4">
+              <StatGrid
+                columns={2}
+                items={[
+                  {
+                    label: "Abschlüsse",
+                    value: sales,
+                    accent: sales > 0,
+                    hint: `${week.sales ?? 0} in 7 Tagen`,
+                  },
+                  {
+                    label: "30 Tage",
+                    value: month.sales ?? 0,
+                    hint: showPlace ? `Platz ${place} von ${rankedCount}` : "Abschlüsse",
+                  },
+                  { label: "Abschlussquote", value: percent(sales, met), hint: `aus ${met} Gesprächen` },
+                  { label: "Antreffquote", value: percent(met, doors), hint: `${doors} Türen` },
+                ]}
+              />
+
+              <LevelSummary
+                progress={level}
+                href={isMe ? "/team/erfolge" : undefined}
+                label={isMe ? "Dein Level" : `Level von ${first}`}
+              />
+
+              <StatGrid
+                columns={3}
+                items={[
+                  { label: "Serie", value: streak, hint: streak === 1 ? "Tag in Folge" : "Tage in Folge" },
+                  { label: "Bester Tag", value: best?.sales ?? 0, hint: best ? shortDate(best.day) : "noch offen" },
+                  { label: "Termine", value: all.appointments ?? 0, hint: "insgesamt" },
+                ]}
+              />
+
+              <div className="rounded-xl bg-surface p-4">
+                <div className="flex items-center gap-3">
+                  <span className="glyph">
+                    <IconTrophy className="h-4 w-4" />
+                  </span>
+                  {progress.next !== null ? (
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-footnote font-semibold text-ink-2">Nächstes Abzeichen</span>
+                      <span className="flex items-baseline justify-between gap-2">
+                        <span className="truncate text-headline">{milestoneLabel(progress.next)}</span>
+                        <span className="kpi shrink-0 text-subhead text-muted">
+                          {sales} / {progress.next}
+                        </span>
+                      </span>
+                    </span>
+                  ) : (
+                    <span className="min-w-0 flex-1 text-headline">Alle Abzeichen erreicht</span>
+                  )}
+                </div>
+                {progress.next !== null && (
+                  <ProgressBar
+                    className="mt-3"
+                    value={sales - progress.from}
+                    max={progress.next - progress.from}
+                    label={`${sales} von ${progress.next} Abschlüssen bis zum nächsten Abzeichen`}
+                  />
+                )}
+                {progress.reached.length > 0 && (
+                  <ul className="mt-4 flex flex-wrap gap-2" aria-label="Erreichte Abzeichen">
+                    {progress.reached.map((milestone) => (
+                      <li key={milestone}>
+                        <Pill tone="accent">{milestoneLabel(milestone)}</Pill>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            </div>
+          </section>
+
+          <section>
+            <SectionHeader title="Letzte 14 Tage" />
+            <div className="rounded-xl bg-surface p-4">
+              <DailyBars data={series} height={150} />
+            </div>
+          </section>
         </div>
-      </section>
 
-      <section className="card mt-4 p-5">
-        <SectionHeader title="Letzte 14 Tage" />
-        <DailyBars data={series} height={150} />
-      </section>
+        {/* ------------------------------ Beitraege ----------------------------- */}
+        <section className="min-w-0" aria-labelledby="posts-heading">
+          <h2 id="posts-heading" className="sr-only">
+            Beiträge
+          </h2>
+          <nav className="chips mb-4" aria-label="Beiträge filtern">
+            {TABS.map((t) => (
+              <Link
+                key={t.key}
+                href={t.key === "beitraege" ? `/profil/${profile.id}` : `/profil/${profile.id}?tab=${t.key}`}
+                className="chip"
+                aria-current={t.key === tabKey ? "page" : undefined}
+                scroll={false}
+              >
+                {t.label}
+              </Link>
+            ))}
+          </nav>
 
-      {isMe && (
-        <section className="mt-6">
-          <GroupLabel>Benachrichtigungen</GroupLabel>
-          <PushToggle />
+          <Feed
+            key={`${profile.id}-${tabKey}`}
+            initial={posts}
+            hasMore={posts.length === 20}
+            query={query}
+            viewer={{
+              id: user.id,
+              name: user.name,
+              avatar: user.avatar,
+              isLeader: hasPermission(user, "community.moderate"),
+            }}
+            composer={isMe && tabKey === "beitraege"}
+            empty={emptyText(tabKey, isMe, first)}
+          />
         </section>
-      )}
-
-      {/* ------------------------------ Beitraege ----------------------------- */}
-      <nav className="mt-6 flex border-b" style={{ borderColor: "var(--line)" }} aria-label="Beiträge">
-        {TABS.map((t) => {
-          const active = t.key === tabKey;
-          return (
-            <Link
-              key={t.key}
-              href={t.key === "beitraege" ? `/profil/${profile.id}` : `/profil/${profile.id}?tab=${t.key}`}
-              aria-current={active ? "page" : undefined}
-              scroll={false}
-              className={`relative flex-1 py-3 text-center text-[14px] font-semibold transition-colors hover:bg-[var(--hover)] ${
-                active ? "" : "muted"
-              }`}
-            >
-              {t.label}
-              {active && (
-                <span
-                  className="absolute bottom-0 left-1/2 h-[3px] w-12 -translate-x-1/2 rounded-full"
-                  style={{ background: "var(--brand-500)" }}
-                  aria-hidden
-                />
-              )}
-            </Link>
-          );
-        })}
-      </nav>
-
-      <div className="mt-4">
-        <Feed
-          key={tabKey}
-          initial={posts}
-          hasMore={posts.length === 20}
-          query={query}
-          viewer={{
-            id: user.id,
-            name: user.name,
-            avatar: user.avatar,
-            isLeader: hasPermission(user, "community.moderate"),
-          }}
-          composer={isMe && tabKey === "beitraege"}
-          empty={emptyText(tabKey, isMe, first)}
-        />
       </div>
     </div>
   );
 }
 
-function Highlight({
-  icon,
-  value,
-  label,
-  hint,
-}: {
-  icon: ReactNode;
-  value: number;
-  label: string;
-  hint: string;
-}) {
-  return (
-    <div className="inset px-2 py-3 text-center">
-      <p className="muted flex justify-center" aria-hidden>
-        {icon}
-      </p>
-      <p className="mt-1.5 text-[22px] font-bold leading-none tabular-nums">{value}</p>
-      <p className="mt-1 truncate text-[12px] font-semibold">{label}</p>
-      <p className="muted truncate text-[11px]">{hint}</p>
-    </div>
-  );
+/** "Erster Vertrag" bzw. "25 Abschlüsse". */
+function milestoneLabel(milestone: number): string {
+  return milestone === 1 ? "Erster Vertrag" : `${milestone} Abschlüsse`;
 }
 
 /** "12.09." aus "2026-09-12". */
@@ -342,18 +273,10 @@ function shortDate(day: string): string {
   return `${date}.${month}.`;
 }
 
-function emptyText(tab: TabKey, isMe: boolean, first: string): { title: string; text?: string } {
-  if (tab === "abschluesse") {
-    return {
-      title: "Noch kein Abschluss",
-      text: isMe ? "Erfasste Abschlüsse erscheinen hier und im Team-Feed." : undefined,
-    };
-  }
+function emptyText(tab: TabKey, isMe: boolean, first: string): { title: string } {
+  if (tab === "abschluesse") return { title: "Noch kein Abschluss" };
   if (tab === "gefaellt") {
     return { title: isMe ? "Noch nichts mit Herz markiert" : `${first} hat noch nichts mit Herz markiert` };
   }
-  return {
-    title: isMe ? "Noch keine Beiträge" : `${first} hat noch nichts gepostet`,
-    text: isMe ? "Beiträge kannst du oben verfassen. Abschlüsse werden automatisch veröffentlicht." : undefined,
-  };
+  return { title: isMe ? "Noch keine Beiträge" : `${first} hat noch nichts gepostet` };
 }

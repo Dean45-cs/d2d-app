@@ -5,8 +5,8 @@ import { MapView, type UserLocation } from "@/components/map/MapView";
 import { badgeMarker } from "@/components/map/markers";
 import type { MapEngine, MapLayer } from "@/components/map/types";
 import { cssColor, doorStyle, progressColor, type DoorState } from "@/components/map-colors";
-import { Cell, plural } from "@/components/ui";
-import { IconDoor, IconNavigate } from "@/components/icons";
+import { Cell, Notice, plural } from "@/components/ui";
+import { IconCheck, IconDoor, IconNavigate } from "@/components/icons";
 import { whenLabel } from "@/lib/doors";
 import type { LatLng } from "@/lib/geo/area";
 import { shapePoints, type Shape } from "@/lib/geo/shape";
@@ -265,12 +265,13 @@ export function TerritoryWorkspace({ area, doors, streets }: Props) {
 
   /* ------------------------------- Ansicht ------------------------------- */
 
-  const filters: Array<{ key: Filter; label: string }> = [
-    { key: "todo", label: "Offen" },
-    { key: "retry", label: "Nochmal" },
-    { key: "appointment", label: "Termine" },
-    { key: "sale", label: "Abschlüsse" },
-    { key: "finished", label: "Erledigt" },
+  // Das Zeichen im Filter ist zugleich die Legende - gleiche Form wie auf der Karte.
+  const filters: Array<{ key: Filter; label: string; swatch?: string }> = [
+    { key: "todo", label: "Offen", swatch: "bg-surface ring-2 ring-inset ring-[var(--ink)]" },
+    { key: "retry", label: "Nochmal", swatch: "bg-[#8e8e93]" },
+    { key: "appointment", label: "Termine", swatch: "bg-ink" },
+    { key: "sale", label: "Abschlüsse", swatch: "bg-accent" },
+    { key: "finished", label: "Erledigt", swatch: "bg-[#aeaeb2] scale-75" },
     { key: "all", label: "Alle" },
   ];
 
@@ -295,6 +296,7 @@ export function TerritoryWorkspace({ area, doors, streets }: Props) {
                     aria-pressed={filter === f.key}
                     className="map-chip"
                   >
+                    {f.swatch && <span className={`h-3 w-3 shrink-0 rounded-full ${f.swatch}`} aria-hidden="true" />}
                     {f.label}
                     <span className="font-normal text-ink-2">{counts[f.key]}</span>
                   </button>
@@ -338,6 +340,7 @@ export function TerritoryWorkspace({ area, doors, streets }: Props) {
               <span className="block truncate text-footnote text-muted">
                 Nächste offene Tür · {distanceLabel(next.distance)}
                 {next.door.state === "retry" && ` · ${next.door.attempts}. Versuch`}
+                {next.door.units > 1 && ` · ${next.door.units} WE`}
               </span>
             </span>
             <a
@@ -356,18 +359,25 @@ export function TerritoryWorkspace({ area, doors, streets }: Props) {
         </ul>
       )}
 
+      {doors.length > 0 && todo.length === 0 && (
+        <Notice icon={<IconCheck className="h-4 w-4" />}>Alle Türen erledigt</Notice>
+      )}
+
       {routeOn && route && route.stops.length > 0 && (
-        <ol className="list list-icons">
-          {route.stops.slice(0, 8).map((stop, index) => (
-            <li key={stop.id}>
-              <Cell
-                href={tourLink(stop)}
-                icon={<span className="glyph glyph-round kpi text-subhead">{index + 1}</span>}
-                title={`${stop.street} ${stop.number}`}
-              />
-            </li>
-          ))}
-        </ol>
+        <>
+          <ol className="list list-icons">
+            {route.stops.slice(0, 8).map((stop, index) => (
+              <li key={stop.id}>
+                <Cell
+                  href={tourLink(stop)}
+                  icon={<span className="glyph glyph-round kpi text-subhead">{index + 1}</span>}
+                  title={`${stop.street} ${stop.number}`}
+                />
+              </li>
+            ))}
+          </ol>
+          {route.stops.length > 8 && <p className="list-footer">und {route.stops.length - 8} weitere</p>}
+        </>
       )}
     </div>
   );

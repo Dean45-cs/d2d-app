@@ -145,6 +145,7 @@ export default async function TerritoryDetailPage({
   );
 
   const hours = hourBuckets(territory.id);
+  const hourTotal = hours.reduce((sum, h) => sum + h.total, 0);
   const handover = handoverSummary(territory);
   const hasMap = Boolean(area) || doors.length > 0 || workStreets.length > 0;
   // Losgehen: die erste Strasse, die noch nicht fertig ist.
@@ -252,12 +253,14 @@ export default async function TerritoryDetailPage({
             />
           </section>
 
-          {hours.some((h) => h.total > 0) && (
+          {/* Erst ab ein paar Besuchen aussagekraeftig. */}
+          {hourTotal >= 15 && (
             <section>
               <ListLabel>Antreffquote nach Uhrzeit</ListLabel>
               <div className="surface p-4">
                 <HourBars hours={hours} />
               </div>
+              <p className="list-footer">{hourTotal} Besuche</p>
             </section>
           )}
 

@@ -102,10 +102,11 @@ export function TourClient({
   const [level, setLevel] = useState(initialProgress);
   useEffect(() => setLevel(initialProgress), [initialProgress]);
   const receiveProgress = useCallback(
-    (feedback?: LevelFeedback) => {
+    (feedback?: LevelFeedback, quiet = false) => {
       if (!feedback) return;
       setLevel(feedback.progress);
-      if (feedback.levelUp) {
+      // Nach dem Speichern meldet der Ergebnis-Toast den Aufstieg mit.
+      if (feedback.levelUp && !quiet) {
         toast(`Level ${feedback.progress.level} · ${feedback.progress.title}`, {
           icon: <IconSparkles className="h-5 w-5 text-accent-ink" />,
           duration: 4000,
@@ -123,6 +124,11 @@ export function TourClient({
   const [bellLabel, setBellLabel] = useState("");
   const [product, setProduct] = useState<EnergyType>("BEIDES");
   const [sheet, setSheet] = useState<SheetName | null>(null);
+  const [lastSaved, setLastSaved] = useState<{
+    id: number;
+    door: { number: string; label: string };
+    text: string;
+  } | null>(null);
   /** Was gesperrt werden soll - eine Klingel oder das ganze Haus. */
   const [blockTarget, setBlockTarget] = useState<Bell | "house" | null>(null);
   const [onlyOpen, setOnlyOpen] = useState(false);
@@ -132,7 +138,9 @@ export function TourClient({
   /* Die Uhr des Geraets - erst nach dem Einblenden; "heute" entscheidet die Tuer. */
   const [now, setNow] = useState<Date | null>(null);
 
-  const { pending, online, sendNow } = useQueue(userId, receiveProgress, toast);
+  // Der Toast "nachgesendet" nennt den Aufstieg schon - kein zweiter.
+  const receiveQuietly = useCallback((feedback?: LevelFeedback) => receiveProgress(feedback, true), [receiveProgress]);
+  const { pending, online, sendNow } = useQueue(userId, receiveQuietly, toast);
   const book = useDoorBook(houseNumbers, doorbells, pending);
 
   /* --------------------------- Geraet & Umgebung ------------------------- */
@@ -309,8 +317,8 @@ export function TourClient({
     patch: { buildingType?: "EFH" | "MFH"; doorbells?: DoorbellInput[]; blocked?: boolean; blockedNote?: string },
     label: string,
     rollback?: () => void,
-  ) {
-    if (!streetId || !currentNumber) return;
+  ): Promise<"ok" | "queued" | "error"> {
+    if (!streetId || !currentNumber) return "error";
     const payload = { streetId, houseNumber: currentNumber, ...patch };
     try {
       const response = await fetch("/api/houses", {
@@ -322,16 +330,19 @@ export function TourClient({
       if (!response.ok) {
         rollback?.();
         toast(data.error ?? "Speichern fehlgeschlagen");
-        return;
+        return "error";
       }
       router.refresh();
+      return "ok";
     } catch {
       try {
         enqueue(label, payload, { url: "/api/houses", kind: "house", ownerUserId: userId });
         toast("Offline gemerkt – wird nachgesendet");
+        return "queued";
       } catch (error) {
         rollback?.();
         toast(error instanceof Error ? error.message : "Nicht gespeichert");
+        return "error";
       }
     }
   }
@@ -442,12 +453,13 @@ export function TourClient({
       }
       return;
     }
-    await describeHouse(
+    const outcome = await describeHouse(
       { blocked, blockedNote: note },
       `${street?.name ?? ""} ${currentNumber} · ${blocked ? "gesperrt" : "Sperre aufgehoben"}`,
       undo,
     );
-    toast(blocked ? "Adresse gesperrt" : "Sperre aufgehoben");
+    // Offline und Fehler melden sich schon selbst.
+    if (outcome === "ok") toast(blocked ? "Adresse gesperrt" : "Sperre aufgehoben");
   }
 
   /* ------------------------------ Speichern ------------------------------ */
@@ -526,7 +538,7 @@ export function TourClient({
         toast(data.error ?? "Speichern fehlgeschlagen");
         return { status: "error" };
       }
-      receiveProgress(data.progression);
+      receiveProgress(data.progression, true);
       if (data.deleted || data.id === null) {
         toast("Dieser Eintrag wurde bereits zurückgenommen");
         router.refresh();
@@ -567,8 +579,16 @@ export function TourClient({
     if (result.status === "error") return;
     const base =
       result.status === "saved"
-        ? [text, levelFeedbackText(result.progression)].filter(Boolean).join(" · ")
+        ? [
+            text,
+            levelFeedbackText(result.progression),
+            result.progression?.levelUp ? result.progression.progress.title : null,
+          ]
+            .filter(Boolean)
+            .join(" · ")
         : `${text} · offline gemerkt`;
+    // Rueckgaengig bleibt auch nach dem Toast erreichbar (Tagesblatt).
+    setLastSaved(result.status === "saved" ? { id: result.id, door: result.door, text } : null);
     const line = result.nextBell ? `${base} · weiter: ${result.nextBell}` : result.pickBell ? `${base} · Klingel wählen` : base;
     toast(
       line,
@@ -586,8 +606,10 @@ export function TourClient({
         toast(data.error ?? "Nicht möglich");
         return;
       }
-      receiveProgress(data.progression);
-      toast("Zurückgenommen");
+      setLastSaved(null);
+      receiveProgress(data.progression, true);
+      const xp = Number(data.progression?.awardedXp ?? 0);
+      toast(xp < 0 ? `Zurückgenommen · ${xp.toLocaleString("de-DE").replace("-", "−")} XP` : "Zurückgenommen");
       // Zurueck an die Tuer, an der der Fehltipp passiert ist.
       setHouseNumber(door.number);
       setBellLabel(door.label);
@@ -598,11 +620,13 @@ export function TourClient({
   }
 
   /** Was die Ergebnisknoepfe gerade blockiert - in einem Wort. */
-  const trayHint: string | null = !currentNumber
+  const trayHint: string | null = !street
+    ? "Straße wählen"
+    : !currentNumber
     ? "Hausnummer wählen"
     : doorLocked
       ? "Gesperrt – hier nicht klingeln"
-      : currentType === "" && suggestMfh
+      : currentType === ""
         ? "Erst Haustyp wählen"
         : currentType === "MFH" && currentBells.length === 0
           ? "Erst Klingelschilder anlegen"
@@ -804,7 +828,7 @@ export function TourClient({
       <div className="space-y-4 lg:sticky lg:top-6 lg:col-start-2 lg:row-start-2">
         {dueAppointments.length > 0 && (
           <ul className="list list-icons" aria-label="Termine heute">
-            {dueAppointments.slice(0, 2).map((item) => {
+            {dueAppointments.slice(0, 3).map((item) => {
               const late = slotOverdue(item.follow_up_at, now ?? undefined);
               const phone = item.contact_phone.replace(/[^+\d]/g, "");
               return (
@@ -822,6 +846,7 @@ export function TourClient({
                       <span className="block truncate text-footnote text-muted">
                         {late && <span className="font-semibold text-danger">Überfällig · </span>}
                         {slotLabel(item.follow_up_at, now ?? undefined)} · {item.street_name ?? ""} {item.house_number}
+                        {item.doorbell_label && ` · ${item.doorbell_label}`}
                       </span>
                     </span>
                   </button>
@@ -874,12 +899,22 @@ export function TourClient({
           }
         />
 
-        {currentNumber && currentType === "" && suggestMfh && !doorLocked && (
-          <div className="grid grid-cols-2 gap-2">
-            <button type="button" className="btn btn-secondary" onClick={() => void chooseType("EFH")}>
+        {/* Haustyp einmal festlegen - gilt danach fuers ganze Team. Ohne ihn
+            waere ein Mehrfamilienhaus nach dem ersten Eintrag "erledigt". */}
+        {currentNumber && currentType === "" && !doorLocked && (
+          <div className="grid grid-cols-2 gap-2" role="group" aria-label="Haustyp">
+            <button
+              type="button"
+              className={`btn ${suggestMfh ? "btn-secondary" : "btn-primary"}`}
+              onClick={() => void chooseType("EFH")}
+            >
               Einzeltür
             </button>
-            <button type="button" className="btn btn-primary" onClick={() => void chooseType("MFH")}>
+            <button
+              type="button"
+              className={`btn ${suggestMfh ? "btn-primary" : "btn-secondary"}`}
+              onClick={() => void chooseType("MFH")}
+            >
               Mehrfamilienhaus
             </button>
           </div>
@@ -931,7 +966,11 @@ export function TourClient({
           streets={streetsOfTerritory}
           streetId={streetId}
           progress={progress}
-          onTerritory={(id) => setTerritoryId(id)}
+          onTerritory={(id) => {
+            setTerritoryId(id);
+            // Sonst stuende die Strasse eines anderen Gebiets unter dem neuen Namen.
+            chooseStreet(streets.find((s) => s.territory_id === id)?.id ?? null);
+          }}
           onPick={(id) => {
             chooseStreet(id);
             setSheet(null);
@@ -1014,6 +1053,17 @@ export function TourClient({
           pending={pending}
           online={online}
           recent={recent}
+          last={
+            lastSaved
+              ? {
+                  text: lastSaved.text,
+                  onUndo: () => {
+                    setSheet(null);
+                    void undo(lastSaved.id, lastSaved.door);
+                  },
+                }
+              : null
+          }
           onSend={() => void sendNow()}
           onDiscard={(localId) => {
             if (!removeQueued(localId)) toast("Eintrag konnte nicht entfernt werden");

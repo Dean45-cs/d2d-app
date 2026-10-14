@@ -3,46 +3,112 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-    <title>Keine Verbindung · EP24 Vertrieb</title>
+    <meta name="theme-color" content="#f2f2f7" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)" />
+    <title>Keine Verbindung · Carlsson Sales</title>
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <style>
-      :root { color-scheme: light dark; }
+      /* Ohne Netz geladen: alles steht hier, nichts kommt von aussen.
+         Farben wie in docs/DESIGN.md (hell und dunkel). */
+      :root {
+        color-scheme: light dark;
+        --bg: #f2f2f7;
+        --surface: #ffffff;
+        --ink: #0b0b0d;
+        --muted: #68686f;
+        --accent-ink: #0d6b32;
+        --accent-tint: rgb(47 209 97 / 0.16);
+        --accent-edge: rgb(31 157 76 / 0.34);
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #000000;
+          --surface: #1c1c1e;
+          --ink: #f5f5f7;
+          --muted: #a1a1a8;
+          --accent-ink: #34d66b;
+          --accent-tint: rgb(48 209 88 / 0.2);
+          --accent-edge: rgb(48 209 88 / 0.4);
+        }
+      }
+      * {
+        box-sizing: border-box;
+      }
       body {
         margin: 0;
         min-height: 100dvh;
         display: grid;
         place-items: center;
-        padding: 2rem 1.5rem;
-        background: #0c2f56;
-        color: #fff;
-        font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+        padding: max(24px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right))
+          max(24px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+        background: var(--bg);
+        color: var(--ink);
+        font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, "Segoe UI", Roboto, sans-serif;
+        -webkit-font-smoothing: antialiased;
         text-align: center;
       }
-      .box { max-width: 22rem; }
-      h1 { font-size: 1.35rem; margin: 1.25rem 0 0.5rem; }
-      p { line-height: 1.55; color: rgba(255, 255, 255, 0.72); margin: 0 0 1.5rem; }
-      button {
-        background: #12b76a;
-        color: #fff;
-        border: 0;
-        border-radius: 0.75rem;
-        padding: 0.85rem 1.5rem;
-        font-size: 1rem;
-        font-weight: 600;
-        font-family: inherit;
+      main {
+        width: 100%;
+        max-width: 22rem;
+        padding: 40px 24px 32px;
+        border-radius: 20px;
+        background: var(--surface);
       }
-      img { width: 72px; height: 72px; border-radius: 18px; }
+      svg {
+        display: block;
+        margin: 0 auto 20px;
+        border-radius: 18px;
+      }
+      h1 {
+        margin: 0 0 4px;
+        font-size: 1.375rem;
+        line-height: 1.75rem;
+        font-weight: 700;
+      }
+      p {
+        margin: 0 0 24px;
+        font-size: 0.9375rem;
+        line-height: 1.25rem;
+        color: var(--muted);
+      }
+      button {
+        width: 100%;
+        min-height: 56px;
+        border: 0;
+        border-radius: 9999px;
+        background: var(--accent-tint);
+        box-shadow: inset 0 0 0 1px var(--accent-edge);
+        color: var(--accent-ink);
+        font: inherit;
+        font-size: 1.0625rem;
+        font-weight: 600;
+        cursor: pointer;
+      }
+      button:active {
+        transform: scale(0.97);
+      }
+      button:focus-visible {
+        outline: 3px solid var(--accent-ink);
+        outline-offset: 2px;
+      }
     </style>
   </head>
   <body>
-    <div class="box">
-      <img src="/icon-192.png" alt="" />
-      <h1>Gerade keine Verbindung</h1>
-      <p>
-        Erfasste Türen gehen nicht verloren – sie werden auf dem Gerät gespeichert
-        und automatisch nachgesendet, sobald du wieder Empfang hast.
-      </p>
-      <button onclick="location.reload()">Erneut versuchen</button>
-    </div>
+    <main>
+      <svg width="72" height="72" viewBox="0 0 100 100" aria-hidden="true">
+        <defs>
+          <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0" stop-color="#3ee07e" />
+            <stop offset="1" stop-color="#0e8a43" />
+          </linearGradient>
+        </defs>
+        <rect width="100" height="100" rx="22.4" fill="url(#bg)" />
+        <path d="M80 50A30 30 0 1 1 50 20" fill="none" stroke="#fff" stroke-width="13" stroke-linecap="round" />
+        <circle cx="71.2" cy="28.8" r="6.5" fill="#fff" />
+      </svg>
+      <h1>Keine Verbindung</h1>
+      <p>Erfasste Türen bleiben auf dem Gerät und werden nachgesendet, sobald wieder Netz da ist.</p>
+      <button type="button" onclick="location.reload()">Erneut versuchen</button>
+    </main>
   </body>
 </html>

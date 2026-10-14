@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import type { HouseNumberWithStats, StreetWithStats } from "@/lib/queries";
-import { IconBan, IconCheck, IconDoor, IconNavigate, IconTrash } from "@/components/icons";
+import { IconBan, IconBell, IconCheck, IconDoor, IconNavigate, IconTrash } from "@/components/icons";
 import { Sheet } from "@/components/Sheet";
 import { useToast } from "@/components/Toast";
 import { useConfirm } from "@/components/useConfirm";
@@ -173,6 +173,13 @@ function StreetSheet({
         </div>
       }
     >
+      {!canStatus && (
+        <ul className="list">
+          <li>
+            <Cell title="Status" detail={{ OPEN: "Offen", ACTIVE: "In Arbeit", DONE: "Fertig" }[status] ?? status} />
+          </li>
+        </ul>
+      )}
       {canStatus && (
         <Segmented
           ariaLabel={`Status von ${street.name}`}
@@ -223,9 +230,14 @@ function StreetSheet({
   );
 }
 
-/** Erfasst ist ein Haus, sobald jemand dort war oder es gesperrt ist - wie beim Gebiet. */
+/**
+ * Erfasst ist ein Haus, sobald jemand dort war oder es gesperrt ist - ein
+ * Mehrfamilienhaus erst, wenn jede Klingel durch ist. Wie beim Gebiet.
+ */
 function houseTouched(house: HouseNumberWithStats): boolean {
-  return house.visit_count > 0 || Boolean(house.blocked_at);
+  if (house.blocked_at) return true;
+  if (house.bell_count > 0) return house.bell_done_count >= house.bell_count;
+  return house.visit_count > 0;
 }
 
 function streetProgress(
@@ -282,7 +294,10 @@ function HouseChip({ house }: { house: HouseNumberWithStats }) {
     blocked
       ? `gesperrt${house.blocked_by_name ? ` von ${house.blocked_by_name}` : ""}${house.blocked_note ? ` – ${house.blocked_note}` : ""}`
       : null,
+    mfh ? "Mehrfamilienhaus" : house.building_type === "EFH" ? "Einfamilienhaus" : null,
     mfh && house.bell_count > 0 ? `${house.bell_done_count} von ${house.bell_count} Klingeln` : null,
+    mfh && house.bell_count === 0 ? "Klingelschilder fehlen" : null,
+    house.units > 1 ? `${house.units} Wohneinheiten` : null,
     retry ? `${house.not_home_count} von ${MAX_NOT_HOME_ATTEMPTS} Versuchen` : null,
     house.last_visit_user ? `zuletzt ${house.last_visit_user}, ${whenLabel(house.last_visit_at)}` : null,
   ]
@@ -301,6 +316,8 @@ function HouseChip({ house }: { house: HouseNumberWithStats }) {
         <IconBan className="h-3.5 w-3.5" />
       ) : state === "sale" ? (
         <IconCheck className="h-3.5 w-3.5" />
+      ) : mfh && house.bell_count === 0 ? (
+        <IconBell className="h-3.5 w-3.5 opacity-70" />
       ) : mfh && house.bell_count > 0 && !done ? (
         <span className="text-caption font-medium opacity-70">
           {house.bell_done_count}/{house.bell_count}
