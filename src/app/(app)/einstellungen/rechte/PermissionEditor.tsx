@@ -1,63 +1,264 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Note, PageHeader, Pill } from "@/components/ui";
+import { useToast } from "@/components/Toast";
+import { Avatar, Cell, EmptyState, InlineError, ListLabel, Notice, Segmented, plural } from "@/components/ui";
+import { IconBan, IconUsers } from "@/components/icons";
 import { PERMISSIONS, type Permission, type PermissionOverrides, type PermissionSet } from "@/lib/permission-definitions";
 import type { Role } from "@/lib/types";
 
-type Member = { id: number; name: string; role: Role; active: number; effective: PermissionSet; overrides: PermissionOverrides };
-export function PermissionEditor({ members, grantable }: { members: Member[]; grantable: PermissionSet }) {
-  const router = useRouter();
-  const [selected, setSelected] = useState(members[0]?.id ?? 0);
-  const [changes, setChanges] = useState<Partial<Record<Permission, boolean | null>>>({});
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
-  const [message, setMessage] = useState("");
-  const member = members.find((person) => person.id === selected);
+export interface EditableMember {
+  id: number;
+  name: string;
+  avatar: string;
+  role: Role;
+  active: number;
+  effective: PermissionSet;
+  overrides: PermissionOverrides;
+  /** Ergebnis ohne eigene Abweichung - das bedeutet "Standard". */
+  standard: PermissionSet;
+}
 
-  async function save() {
-    setBusy(true); setError(""); setMessage("");
-    try {
-      const response = await fetch(`/api/team/${selected}/permissions`, { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify({ permissions: changes }) });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error || "Berechtigungen konnten nicht gespeichert werden.");
-      setChanges({}); setMessage("Berechtigungen gespeichert. Die Änderung gilt ab der nächsten Anfrage."); router.refresh();
-    } catch (err) { setError(err instanceof Error ? err.message : "Keine Verbindung. Bitte erneut versuchen."); }
-    finally { setBusy(false); }
+type Mode = "default" | "on" | "off";
+type Changes = Partial<Record<Permission, boolean | null>>;
+
+const MODES: Array<{ value: Mode; label: string }> = [
+  { value: "default", label: "Standard" },
+  { value: "on", label: "An" },
+  { value: "off", label: "Aus" },
+];
+
+const GROUPS = Array.from(new Set(PERMISSIONS.map((item) => item.group)));
+
+function toMode(value: boolean | null | undefined): Mode {
+  return value === true ? "on" : value === false ? "off" : "default";
+}
+
+function fromMode(mode: Mode): boolean | null {
+  return mode === "on" ? true : mode === "off" ? false : null;
+}
+
+function roleLine(member: EditableMember): string {
+  const count = Object.keys(member.overrides).length;
+  return [
+    member.role === "LEADER" ? "Teamleitung" : "Vertrieb",
+    !member.active && "Deaktiviert",
+    count > 0 && plural(count, "Abweichung", "Abweichungen"),
+  ]
+    .filter(Boolean)
+    .join(" · ");
+}
+
+/**
+ * Personenwahl und Rechte. Auf iPad und Rechner nebeneinander, auf dem
+ * Handy erst die Liste, nach dem Antippen die Rechte der Person.
+ */
+export function PermissionEditor({
+  members,
+  selectedId,
+  grantable,
+}: {
+  members: EditableMember[];
+  selectedId: number | null;
+  grantable: PermissionSet;
+}) {
+  if (members.length === 0) {
+    return <EmptyState boxed icon={<IconUsers className="h-6 w-6" />} title="Noch niemand in deiner Struktur" />;
+  }
+  // Ohne Auswahl zeigt der Rechner die erste Person; das Handy die Liste.
+  const shown = members.find((member) => member.id === selectedId) ?? members[0];
+
+  return (
+    <div className="grid gap-8 lg:grid-cols-[minmax(0,320px)_minmax(0,1fr)] lg:items-start">
+      <section className={selectedId ? "hidden lg:block" : ""} aria-label="Personen">
+        <ul className="list list-icons">
+          {members.map((member) => {
+            const current = member.id === shown.id;
+            return (
+              <li key={member.id}>
+                <Cell
+                  href={`/einstellungen/rechte?person=${member.id}`}
+                  icon={<Avatar name={member.name} src={member.avatar} size={32} />}
+                  title={member.name}
+                  subtitle={roleLine(member)}
+                  current={current}
+                  className={current ? "lg:bg-accent-tint" : ""}
+                />
+              </li>
+            );
+          })}
+        </ul>
+      </section>
+
+      <section className={selectedId ? "" : "hidden lg:block"} aria-label={`Rechte von ${shown.name}`}>
+        <MemberRights key={shown.id} member={shown} grantable={grantable} />
+      </section>
+    </div>
+  );
+}
+
+function MemberRights({ member, grantable }: { member: EditableMember; grantable: PermissionSet }) {
+  const router = useRouter();
+  const toast = useToast();
+  const [, startTransition] = useTransition();
+  const [changes, setChanges] = useState<Changes>({});
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const count = Object.keys(changes).length;
+
+  const saved = (key: Permission) => member.overrides[key] ?? null;
+
+  function change(key: Permission, mode: Mode) {
+    if (busy) return;
+    setError(null);
+    setChanges((current) => {
+      const next = { ...current };
+      // Zurueck auf den gespeicherten Stand ist keine Aenderung mehr.
+      if (fromMode(mode) === saved(key)) delete next[key];
+      else next[key] = fromMode(mode);
+      return next;
+    });
   }
 
-  return <div className="mx-auto max-w-3xl space-y-5">
-    <PageHeader title="Berechtigungen" subtitle="Rechte gezielt vergeben und entziehen" />
-    <Note tone="brand">Ab einer aktiven Person in der eigenen Struktur sind eigene Gebiete automatisch erlaubt. Verantwortliche können innerhalb ihrer Struktur Rechte vergeben, die sie selbst besitzen. „Standard“ folgt der Rolle und der aktuellen Struktur; „Entziehen“ hat Vorrang vor automatischen Rechten.</Note>
-    {error && <div role="alert"><Note tone="danger">{error}</Note></div>}
-    {message && <div role="status"><Note tone="success">{message}</Note></div>}
-    {!member ? <p className="muted">In deiner verwaltbaren Struktur gibt es noch keine anderen Mitglieder.</p> : <>
-      <div className="card p-5">
-        <label className="label" htmlFor="permission-member">Person</label>
-        <select id="permission-member" className="select" value={selected} disabled={busy} onChange={(event) => { setSelected(Number(event.target.value)); setChanges({}); setError(""); setMessage(""); }}>
-          {members.map((person) => <option key={person.id} value={person.id}>{person.name}{person.active ? "" : " (deaktiviert)"}</option>)}
-        </select>
-      </div>
-      {Array.from(new Set(PERMISSIONS.map((item) => item.group))).map((group) => <section key={group} className="card p-5">
-        <h2 className="mb-3 font-semibold">{group}</h2>
-        <div className="divide-y divide-[var(--line)]">{PERMISSIONS.filter((item) => item.group === group).map(({ key, label, description }) => {
-          const value = key in changes ? changes[key] : member.overrides[key];
-          return <div key={key} className="flex flex-col gap-3 py-3 sm:flex-row sm:items-start sm:justify-between">
-            <div className="min-w-0 flex-1"><label className="font-medium text-sm" htmlFor={`permission-${key}`}>{label}</label><p className="muted mt-1 text-xs leading-relaxed">{description}</p>
-              <div className="mt-2"><Pill tone={member.effective[key] ? "success" : "neutral"}>Aktuell {member.effective[key] ? "erlaubt" : "nicht erlaubt"}</Pill></div>
+  async function send(permissions: Changes): Promise<string | null> {
+    try {
+      const response = await fetch(`/api/team/${member.id}/permissions`, {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ permissions }),
+      });
+      if (response.ok) return null;
+      const data = await response.json().catch(() => ({}));
+      return data.error || "Rechte nicht gespeichert.";
+    } catch {
+      return "Keine Verbindung.";
+    }
+  }
+
+  async function save() {
+    const previous = Object.fromEntries(
+      (Object.keys(changes) as Permission[]).map((key) => [key, saved(key)]),
+    ) as Changes;
+    setBusy(true);
+    setError(null);
+    const failure = await send(changes);
+    setBusy(false);
+    if (failure) {
+      setError(failure);
+      return;
+    }
+    // Auswahl erst mit den neuen Daten leeren - sonst springt sie kurz zurueck.
+    startTransition(() => {
+      setChanges({});
+      router.refresh();
+    });
+    toast("Rechte gespeichert", {
+      action: {
+        label: "Rückgängig",
+        onClick: () => {
+          void send(previous).then((undoFailure) => {
+            toast(undoFailure ?? "Rückgängig gemacht");
+            router.refresh();
+          });
+        },
+      },
+    });
+  }
+
+  return (
+    <>
+      <ul className="list list-icons lg:hidden">
+        <li>
+          <Cell
+            href="/einstellungen/rechte"
+            icon={<Avatar name={member.name} src={member.avatar} size={32} />}
+            title={member.name}
+            subtitle={roleLine(member)}
+            detail="Wechseln"
+          />
+        </li>
+      </ul>
+      <h2 className="hidden px-1 text-title-2 lg:block">{member.name}</h2>
+
+      {!member.active && (
+        <div className="mt-4">
+          <Notice icon={<IconBan className="h-5 w-5" />}>Deaktiviert – keine Rechte aktiv</Notice>
+        </div>
+      )}
+
+      {GROUPS.map((group) => (
+        <div key={group} className="mt-6">
+          <ListLabel>{group}</ListLabel>
+          <ul className="list">
+            {PERMISSIONS.filter((item) => item.group === group).map(({ key, label }) => {
+              const value = key in changes ? changes[key] : saved(key);
+              const rolesOnly = key === "team.roles" && member.role !== "LEADER";
+              const editable = grantable[key] && !rolesOnly;
+              if (!editable) {
+                return (
+                  <li key={key}>
+                    <Cell
+                      title={label}
+                      subtitle={rolesOnly ? "Nur für Teamleitungen" : "Nicht vergebbar"}
+                      detail={member.effective[key] ? "Erlaubt" : "Nicht erlaubt"}
+                    />
+                  </li>
+                );
+              }
+              return (
+                <li
+                  key={key}
+                  className="cell flex-col items-stretch gap-2 py-3 sm:flex-row sm:items-center sm:gap-4"
+                >
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-body">{label}</span>
+                    <span className="block text-footnote text-muted">
+                      Standard: {member.standard[key] ? "erlaubt" : "nicht erlaubt"}
+                    </span>
+                  </span>
+                  <Segmented
+                    ariaLabel={label}
+                    options={MODES}
+                    value={toMode(value)}
+                    onChange={(mode) => change(key, mode)}
+                    className="shrink-0 sm:w-64"
+                  />
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      ))}
+
+      {count > 0 && (
+        <div className="glass sticky bottom-(--tabbar-space) z-30 mt-6 rounded-2xl p-2 md:bottom-6" role="region" aria-label="Änderungen">
+          {error && (
+            <div className="px-1 pb-2 pt-1">
+              <InlineError>{error}</InlineError>
             </div>
-            <select id={`permission-${key}`} className="select w-full shrink-0 sm:w-40" disabled={busy || !grantable[key] || (key === "team.roles" && member.role !== "LEADER")} value={value === true ? "allow" : value === false ? "deny" : "default"}
-              onChange={(event) => setChanges((current) => ({ ...current, [key]: event.target.value === "default" ? null : event.target.value === "allow" }))}>
-              <option value="default">Standard</option><option value="allow">Erlauben</option><option value="deny">Entziehen</option>
-            </select>
-          </div>;
-        })}</div>
-      </section>)}
-      <div className="sticky bottom-24 flex items-center justify-end gap-3 rounded-[var(--r-lg)] border border-[var(--line)] bg-[var(--card)] p-4 lg:bottom-4">
-        <button className="btn btn-ghost" disabled={busy || !Object.keys(changes).length} onClick={() => setChanges({})}>Verwerfen</button>
-        <button className="btn btn-primary" disabled={busy || !Object.keys(changes).length} onClick={() => void save()}>{busy ? "Speichern …" : "Rechte speichern"}</button>
-      </div>
-    </>}
-  </div>;
+          )}
+          <div className="flex items-center gap-2">
+            <span className="min-w-0 flex-1 truncate pl-2 text-subhead font-semibold">
+              {plural(count, "Änderung", "Änderungen")}
+            </span>
+            <button
+              type="button"
+              className="btn btn-plain"
+              disabled={busy}
+              onClick={() => {
+                setChanges({});
+                setError(null);
+              }}
+            >
+              Verwerfen
+            </button>
+            <button type="button" className="btn btn-primary" disabled={busy} onClick={() => void save()}>
+              {busy ? "Speichern …" : "Speichern"}
+            </button>
+          </div>
+        </div>
+      )}
+    </>
+  );
 }

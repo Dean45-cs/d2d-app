@@ -2,142 +2,311 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { IconChevronDown, IconChevronUp, IconPlus } from "@/components/icons";
-import { Note, SectionHeader, Switch } from "@/components/ui";
+import { Sheet } from "@/components/Sheet";
+import { useToast } from "@/components/Toast";
+import { IconChat, IconChevronDown, IconChevronUp, IconPlus } from "@/components/icons";
+import { Cell, EmptyState, InlineError, ListLabel, PageHeader, Switch } from "@/components/ui";
 import type { RejectionReason } from "@/lib/types";
 
+type Patch = { label?: string; emoji?: string; active?: number; sortOrder?: number };
+
+async function patchReason(id: number, body: Patch): Promise<string | null> {
+  try {
+    const response = await fetch(`/api/reasons/${id}`, {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    if (response.ok) return null;
+    const data = await response.json().catch(() => ({}));
+    return data.error ?? "Nicht gespeichert.";
+  } catch {
+    return "Keine Verbindung.";
+  }
+}
+
+function Glyph({ emoji }: { emoji: string }) {
+  return (
+    <span className="glyph glyph-round" aria-hidden="true">
+      {emoji || <IconChat className="h-4 w-4" />}
+    </span>
+  );
+}
+
+/**
+ * Die Gruende, die das Team an der Tuer antippt - in der Reihenfolge der
+ * Ergebnisleiste. Antippen bearbeitet, "Sortieren" verschiebt, "+" legt an.
+ */
 export function ReasonSettings({ reasons }: { reasons: RejectionReason[] }) {
   const router = useRouter();
-  const [label, setLabel] = useState("");
-  const [emoji, setEmoji] = useState("");
-  const [busy, setBusy] = useState(false);
+  const toast = useToast();
+  // Verschieben zeigt sofort die neue Reihenfolge; neue Serverdaten ersetzen sie.
+  const [items, setItems] = useState(reasons);
+  const [source, setSource] = useState(reasons);
+  if (source !== reasons) {
+    setSource(reasons);
+    setItems(reasons);
+  }
+  const [sorting, setSorting] = useState(false);
   const [pending, setPending] = useState<number | null>(null);
+  const [sheet, setSheet] = useState<RejectionReason | "new" | null>(null);
+
+  const active = items.filter((reason) => reason.active);
+  const hidden = items.filter((reason) => !reason.active);
+
+  /** Zwischen die Nachbarn der Gruppe schieben - ein einziger Aufruf. */
+  async function move(group: RejectionReason[], index: number, step: -1 | 1) {
+    const target = index + step;
+    if (target < 0 || target >= group.length || pending !== null) return;
+    const near = group[target].sort_order;
+    const far = group[target + step]?.sort_order;
+    const sortOrder = far === undefined ? near + step : (near + far) / 2;
+    const reason = group[index];
+    const previous = items;
+    setItems(
+      items
+        .map((item) => (item.id === reason.id ? { ...item, sort_order: sortOrder } : item))
+        .sort((a, b) => a.sort_order - b.sort_order || a.label.localeCompare(b.label, "de")),
+    );
+    setPending(reason.id);
+    const failure = await patchReason(reason.id, { sortOrder });
+    setPending(null);
+    if (failure) {
+      setItems(previous);
+      toast(failure);
+      return;
+    }
+    router.refresh();
+  }
+
+  function rows(group: RejectionReason[]) {
+    return group.map((reason, index) => (
+      <li key={reason.id}>
+        {sorting ? (
+          <Cell
+            icon={<Glyph emoji={reason.emoji} />}
+            title={reason.label}
+            trailing={
+              <span className="-mr-2 flex shrink-0">
+                <button
+                  type="button"
+                  className="icon-btn"
+                  onClick={() => void move(group, index, -1)}
+                  disabled={index === 0 || pending !== null}
+                  aria-label={`${reason.label} nach oben`}
+                >
+                  <IconChevronUp className="h-5 w-5" />
+                </button>
+                <button
+                  type="button"
+                  className="icon-btn"
+                  onClick={() => void move(group, index, 1)}
+                  disabled={index === group.length - 1 || pending !== null}
+                  aria-label={`${reason.label} nach unten`}
+                >
+                  <IconChevronDown className="h-5 w-5" />
+                </button>
+              </span>
+            }
+          />
+        ) : (
+          <Cell
+            onClick={() => setSheet(reason)}
+            icon={<Glyph emoji={reason.emoji} />}
+            title={reason.label}
+            subtitle={reason.hint || undefined}
+            chevron
+          />
+        )}
+      </li>
+    ));
+  }
+
+  return (
+    <div className="page-narrow">
+      <PageHeader
+        back={{ href: "/profil", label: "Profil" }}
+        title="Ablehnungsgründe"
+        subtitle={[`${active.length} an der Tür`, hidden.length > 0 && `${hidden.length} ausgeblendet`]
+          .filter(Boolean)
+          .join(" · ")}
+        actions={
+          <>
+            {items.length > 1 && (
+              <button
+                type="button"
+                className="btn btn-plain btn-sm"
+                aria-pressed={sorting}
+                onClick={() => setSorting((on) => !on)}
+              >
+                {sorting ? "Fertig" : "Sortieren"}
+              </button>
+            )}
+            {!sorting && (
+              <button
+                type="button"
+                className="icon-btn icon-btn-accent"
+                aria-label="Grund hinzufügen"
+                onClick={() => setSheet("new")}
+              >
+                <IconPlus className="h-5 w-5" />
+              </button>
+            )}
+          </>
+        }
+      />
+
+      {items.length === 0 ? (
+        <EmptyState boxed icon={<IconChat className="h-6 w-6" />} title="Noch keine Gründe" />
+      ) : (
+        <>
+          {active.length > 0 && (
+            <>
+              <ListLabel>An der Tür</ListLabel>
+              <ul className="list list-icons">{rows(active)}</ul>
+            </>
+          )}
+          {hidden.length > 0 && (
+            <>
+              <ListLabel>Ausgeblendet</ListLabel>
+              <ul className="list list-icons">{rows(hidden)}</ul>
+            </>
+          )}
+        </>
+      )}
+
+      {sheet && (
+        <ReasonSheet reason={sheet === "new" ? null : sheet} onClose={() => setSheet(null)} />
+      )}
+    </div>
+  );
+}
+
+/** Anlegen oder bearbeiten: Zeichen, Bezeichnung, an der Tuer sichtbar. */
+function ReasonSheet({ reason, onClose }: { reason: RejectionReason | null; onClose: () => void }) {
+  const router = useRouter();
+  const toast = useToast();
+  const [emoji, setEmoji] = useState(reason?.emoji ?? "");
+  const [label, setLabel] = useState(reason?.label ?? "");
+  const [active, setActive] = useState(reason ? Boolean(reason.active) : true);
+  const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  async function add(event: React.FormEvent) {
-    event.preventDefault();
-    setBusy(true);
-    setError(null);
+  // Nur Geaendertes geht an den Server - und kann so auch zurueck.
+  const patch: Patch = {};
+  if (reason) {
+    if (label.trim() !== reason.label) patch.label = label.trim();
+    if (emoji.trim() !== reason.emoji) patch.emoji = emoji.trim();
+    if (active !== Boolean(reason.active)) patch.active = active ? 1 : 0;
+  }
+  const changed = reason ? Object.keys(patch).length > 0 : true;
+  const ready = label.trim().length > 0 && changed;
+
+  async function create() {
     try {
       const response = await fetch("/api/reasons", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ label, emoji }),
       });
-      const data = await response.json();
-      if (!response.ok) {
-        setError(data.error ?? "Grund konnte nicht angelegt werden.");
-        return;
-      }
-      setLabel("");
-      setEmoji("");
-      router.refresh();
+      if (response.ok) return null;
+      const data = await response.json().catch(() => ({}));
+      return (data.error as string | undefined) ?? "Grund nicht angelegt.";
     } catch {
-      setError("Keine Verbindung – bitte gleich noch einmal versuchen.");
-    } finally {
-      setBusy(false);
+      return "Keine Verbindung.";
     }
   }
 
-  async function update(reason: RejectionReason, body: Record<string, unknown>) {
-    setPending(reason.id);
-    try {
-      await fetch(`/api/reasons/${reason.id}`, {
-        method: "PATCH",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify(body),
+  async function submit(event: React.FormEvent) {
+    event.preventDefault();
+    if (!ready || busy) return;
+    setBusy(true);
+    setError(null);
+    const failure = reason ? await patchReason(reason.id, patch) : await create();
+    setBusy(false);
+    if (failure) {
+      setError(failure);
+      return;
+    }
+    if (reason) {
+      const previous: Patch = {};
+      if (patch.label !== undefined) previous.label = reason.label;
+      if (patch.emoji !== undefined) previous.emoji = reason.emoji;
+      if (patch.active !== undefined) previous.active = reason.active ? 1 : 0;
+      toast("Grund gespeichert", {
+        action: {
+          label: "Rückgängig",
+          onClick: () => {
+            void patchReason(reason.id, previous).then((undoFailure) => {
+              toast(undoFailure ?? "Rückgängig gemacht");
+              router.refresh();
+            });
+          },
+        },
       });
-      router.refresh();
-    } finally {
-      setPending(null);
+    } else {
+      toast("Grund angelegt");
     }
+    onClose();
+    router.refresh();
   }
-
-  const visible = reasons.filter((r) => r.active).length;
 
   return (
-    <section className="card p-5">
-      <SectionHeader title="Ablehnungsgründe" count={visible} className="mb-1" />
-      <p className="muted mb-4 text-[13px] leading-snug">
-        Diese Gründe sieht das Team an der Tür. Acht bis zwölf lassen sich gut mit einem Daumen
-        bedienen.
-      </p>
-
-      <ul className="list mb-4">
-        {reasons.map((reason, index) => (
-          <li key={reason.id} className="flex items-center gap-2.5 px-3 py-2.5 sm:gap-3">
-            <span
-              className={`tile-icon h-8 w-8 shrink-0 text-[16px] sm:h-9 sm:w-9 sm:text-[18px] ${reason.active ? "" : "opacity-40"}`}
-              style={{ background: "color-mix(in srgb, var(--ink) 6%, transparent)" }}
-              aria-hidden
-            >
-              {reason.emoji || "·"}
-            </span>
-            <span className={`min-w-0 flex-1 ${reason.active ? "" : "opacity-50"}`}>
-              <span className="line-clamp-2 block text-[14px] font-medium leading-snug">
-                {reason.label}
-              </span>
-              {reason.hint && (
-                <span className="muted block truncate text-[12px]">{reason.hint}</span>
-              )}
-            </span>
-            <span className="flex shrink-0 items-center">
-              <button
-                type="button"
-                onClick={() => update(reason, { sortOrder: reason.sort_order - 1.5 })}
-                disabled={index === 0 || pending === reason.id}
-                className="icon-btn h-8 w-8"
-                aria-label={`${reason.label} nach oben`}
-                title="Nach oben"
-              >
-                <IconChevronUp className="h-4 w-4" />
-              </button>
-              <button
-                type="button"
-                onClick={() => update(reason, { sortOrder: reason.sort_order + 1.5 })}
-                disabled={index === reasons.length - 1 || pending === reason.id}
-                className="icon-btn h-8 w-8"
-                aria-label={`${reason.label} nach unten`}
-                title="Nach unten"
-              >
-                <IconChevronDown className="h-4 w-4" />
-              </button>
-            </span>
-            <Switch
-              checked={Boolean(reason.active)}
-              onChange={(on) => update(reason, { active: on ? 1 : 0 })}
-              label={`${reason.label} an der Tür anzeigen`}
-              disabled={pending === reason.id}
-            />
-          </li>
-        ))}
-      </ul>
-
-      <form onSubmit={add} className="flex gap-2">
-        <input
-          className="input w-14 shrink-0 px-0 text-center"
-          placeholder="🙂"
-          value={emoji}
-          onChange={(e) => setEmoji(e.target.value)}
-          aria-label="Symbol"
-        />
-        <input
-          className="input min-w-0 flex-1"
-          placeholder="Neuer Grund, z. B. „Wohnt zur Untermiete“"
-          value={label}
-          onChange={(e) => setLabel(e.target.value)}
-          required
-        />
-        <button className="btn btn-primary shrink-0" disabled={busy} aria-label="Grund hinzufügen">
-          <IconPlus className="h-4 w-4" />
-          <span className="hidden sm:inline">Hinzufügen</span>
-        </button>
-      </form>
-      {error && (
-        <div className="mt-2">
-          <Note tone="danger">{error}</Note>
+    <Sheet
+      title={reason ? "Grund bearbeiten" : "Neuer Grund"}
+      onClose={onClose}
+      footer={
+        <div className="space-y-3">
+          {error && <InlineError>{error}</InlineError>}
+          <button type="submit" form="reason-form" className="btn btn-primary btn-lg btn-block" disabled={busy || !ready}>
+            {busy ? "Speichern …" : reason ? "Speichern" : "Anlegen"}
+          </button>
         </div>
-      )}
-    </section>
+      }
+    >
+      <form id="reason-form" onSubmit={submit} className="space-y-6">
+        <div className="flex gap-3">
+          <div className="w-20 shrink-0">
+            <label className="label" htmlFor="reason-emoji">
+              Zeichen
+            </label>
+            <input
+              id="reason-emoji"
+              className="field px-2 text-center"
+              placeholder="🙂"
+              maxLength={8}
+              autoComplete="off"
+              value={emoji}
+              onChange={(e) => setEmoji(e.target.value)}
+            />
+          </div>
+          <div className="min-w-0 flex-1">
+            <label className="label" htmlFor="reason-label">
+              Bezeichnung
+            </label>
+            <input
+              id="reason-label"
+              className="field"
+              placeholder="z. B. Wohnt zur Untermiete"
+              maxLength={80}
+              autoComplete="off"
+              value={label}
+              onChange={(e) => setLabel(e.target.value)}
+              required
+            />
+          </div>
+        </div>
+        {reason && (
+          <ul className="list">
+            <li>
+              <Cell
+                title="An der Tür zeigen"
+                trailing={<Switch checked={active} onChange={setActive} label="An der Tür zeigen" />}
+              />
+            </li>
+          </ul>
+        )}
+      </form>
+    </Sheet>
   );
 }
