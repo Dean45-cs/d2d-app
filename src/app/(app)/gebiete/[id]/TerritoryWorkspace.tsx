@@ -4,16 +4,16 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { MapView, type UserLocation } from "@/components/map/MapView";
 import { badgeMarker } from "@/components/map/markers";
 import type { MapEngine, MapLayer } from "@/components/map/types";
-import { cssColor } from "@/components/map-colors";
-import { plural } from "@/components/ui";
-import { IconNavigate } from "@/components/icons";
+import { cssColor, doorStyle, progressColor, type DoorState } from "@/components/map-colors";
+import { Cell, plural } from "@/components/ui";
+import { IconDoor, IconNavigate } from "@/components/icons";
 import { whenLabel } from "@/lib/doors";
 import type { LatLng } from "@/lib/geo/area";
 import { shapePoints, type Shape } from "@/lib/geo/shape";
 import { distanceLabel, durationLabel, meters, planRoute } from "@/lib/geo/route";
 import { routeUrl } from "@/lib/map";
 
-export type DoorState = "open" | "retry" | "appointment" | "sale" | "done" | "blocked";
+export type { DoorState };
 
 /** Eine Tuer (Hausnummer) auf der Arbeitskarte. */
 export interface WorkDoor {
@@ -53,7 +53,6 @@ interface Props {
   area: Shape | null;
   doors: WorkDoor[];
   streets: WorkStreet[];
-  hours: HourBucket[];
 }
 
 type Filter = "all" | "todo" | "retry" | "appointment" | "sale" | "finished";
@@ -66,18 +65,6 @@ const STATE_LABEL: Record<DoorState, string> = {
   done: "Erledigt",
   blocked: "Gesperrt",
 };
-
-/** Farben der Tueren - kraeftig fuer "hier lohnt es sich", blass fuer "erledigt". */
-function stateColors(): Record<DoorState, string> {
-  return {
-    open: cssColor("--tint", "#0a84ff"),
-    retry: "#ff9f0a",
-    appointment: "#bf5af2",
-    sale: cssColor("--ok-ink", "#30a14e"),
-    done: "#a1a1aa",
-    blocked: cssColor("--danger-ink", "#e5484d"),
-  };
-}
 
 const TODO: DoorState[] = ["open", "retry"];
 
@@ -107,7 +94,7 @@ function tourLink(door: WorkDoor): string {
  * ihrem Stand, der eigene Standort, die naechste offene Tuer und eine
  * Laufroute durch alles, was noch offen ist.
  */
-export function TerritoryWorkspace({ area, doors, streets, hours }: Props) {
+export function TerritoryWorkspace({ area, doors, streets }: Props) {
   const [engine, setEngine] = useState<MapEngine | null>(null);
   const [layers, setLayers] = useState<{ base: MapLayer; route: MapLayer; doors: MapLayer } | null>(null);
   const [filter, setFilter] = useState<Filter>("todo");
@@ -196,14 +183,13 @@ export function TerritoryWorkspace({ area, doors, streets, hours }: Props) {
   useEffect(() => {
     const layer = layers?.base;
     if (!layer) return;
-    const tint = cssColor("--tint", "#0a84ff");
+    const outline = cssColor("--accent", "#1f9d4c");
     for (const polygon of area ?? []) {
-      layer.polygon(polygon, { color: tint, weight: 2.5, fillOpacity: 0.07 });
+      layer.polygon(polygon, { color: outline, weight: 2.5, fillOpacity: 0.06 });
     }
-    const colors = { open: stateColors().open, active: "#ff9f0a", done: stateColors().done };
     for (const street of streets) {
       layer.dot([street.lat, street.lng], {
-        color: colors[street.state],
+        color: progressColor(street.state),
         radius: 8,
         ring: true,
         title: street.name,
@@ -221,9 +207,9 @@ export function TerritoryWorkspace({ area, doors, streets, hours }: Props) {
   useEffect(() => {
     const layer = layers?.doors;
     if (!layer) return;
-    const colors = stateColors();
     for (const door of doors) {
       const shown = matches(door.state, filter);
+      const style = doorStyle(door.state);
       const lines = [
         door.state === "retry"
           ? `${door.attempts}. Versuch ohne Erfolg – nochmal klingeln`
@@ -236,10 +222,12 @@ export function TerritoryWorkspace({ area, doors, streets, hours }: Props) {
         door.lastAt ? `Zuletzt: ${door.lastBy ?? "?"} · ${whenLabel(door.lastAt)}` : "",
       ].filter(Boolean);
       layer.dot([door.lat, door.lng], {
-        color: colors[door.state],
-        radius: shown ? (door.state === "sale" || door.state === "appointment" ? 7 : 6) : 3,
-        opacity: shown ? 0.95 : 0.25,
+        color: style.color,
+        radius: shown ? style.radius : 3,
+        opacity: shown ? 1 : 0.25,
         ring: shown,
+        ringColor: style.ringColor,
+        ringWidth: style.ringWidth,
         title: `${door.street} ${door.number}`,
         subtitle: lines.join("\n"),
         actions: shown
@@ -257,7 +245,7 @@ export function TerritoryWorkspace({ area, doors, streets, hours }: Props) {
   useEffect(() => {
     const layer = layers?.route;
     if (!layer || !route || route.stops.length === 0) return;
-    const tint = cssColor("--tint", "#0a84ff");
+    const tint = cssColor("--ink", "#0b0b0d");
     const path: LatLng[] = [
       ...(nearby && routeOn ? [nearby] : []),
       ...route.stops.map((s) => [s.lat, s.lng] as LatLng),
@@ -277,179 +265,109 @@ export function TerritoryWorkspace({ area, doors, streets, hours }: Props) {
 
   /* ------------------------------- Ansicht ------------------------------- */
 
-  const filters: Array<{ key: Filter; label: string; color?: string }> = [
-    { key: "todo", label: "Offen", color: "var(--tint)" },
-    { key: "retry", label: "Nochmal", color: "#ff9f0a" },
-    { key: "appointment", label: "Termine", color: "#bf5af2" },
-    { key: "sale", label: "Abschlüsse", color: "var(--ok-ink)" },
-    { key: "finished", label: "Erledigt", color: "#a1a1aa" },
+  const filters: Array<{ key: Filter; label: string }> = [
+    { key: "todo", label: "Offen" },
+    { key: "retry", label: "Nochmal" },
+    { key: "appointment", label: "Termine" },
+    { key: "sale", label: "Abschlüsse" },
+    { key: "finished", label: "Erledigt" },
     { key: "all", label: "Alle" },
   ];
 
-  const bestHour = hours.reduce<HourBucket | null>(
-    (best, h) => (h.total >= 5 && (!best || h.met / h.total > best.met / best.total) ? h : best),
-    null,
-  );
-  const hourTotal = hours.reduce((sum, h) => sum + h.total, 0);
-
   return (
-    <div className="space-y-3">
-      {doors.length > 0 && (
-        <div className="-mx-1 flex gap-1.5 overflow-x-auto px-1 pb-0.5" role="group" aria-label="Türen filtern">
-          {filters.map((f) => (
-            <button
-              key={f.key}
-              type="button"
-              onClick={() => setFilter(f.key)}
-              aria-pressed={filter === f.key}
-              className={`map-filter ${filter === f.key ? "is-active" : ""}`}
-            >
-              {f.color && <span className="h-2 w-2 rounded-full" style={{ background: f.color }} aria-hidden />}
-              {f.label}
-              <span className="tabular-nums opacity-70">{counts[f.key]}</span>
-            </button>
-          ))}
-        </div>
-      )}
-
-      <div className="overflow-hidden rounded-[var(--r-md)] border" style={{ borderColor: "var(--line)" }}>
+    <div className="space-y-4">
+      <div className="relative overflow-hidden rounded-xl">
         <MapView
-          className="h-[58vh] min-h-[320px] w-full"
+          className="h-[52vh] min-h-80 w-full lg:h-[calc(100dvh-260px)]"
           onEngine={setEngine}
           onFit={allPoints.length > 0 ? () => fitAll(true) : undefined}
           autoLocate
           onLocation={setLocation}
         >
-          {todo.length > 1 && (
-            <div className="pointer-events-none absolute inset-x-2 top-2 z-[500] flex flex-col items-start gap-1.5">
-              <button
-                type="button"
-                className={`map-chip pointer-events-auto flex items-center gap-1.5 px-3 py-1.5 text-[12.5px] ${
-                  routeOn ? "!bg-[var(--tint)] !text-white" : "text-[var(--ink)]"
-                }`}
-                onClick={toggleRoute}
-                aria-pressed={routeOn}
-              >
-                <IconNavigate className="h-3.5 w-3.5" />
-                {routeOn ? "Route beenden" : "Laufroute planen"}
-              </button>
-              {routeOn && route && (
-                <span className="map-chip pointer-events-auto px-3 py-1.5 text-[12px] text-[var(--ink)] tabular-nums">
-                  {plural(route.stops.length, "Tür", "Türen")} · {distanceLabel(route.meters)} · ca.&nbsp;
-                  {durationLabel(route.minutes)}
-                </span>
-              )}
-            </div>
-          )}
+          <div className="pointer-events-none absolute inset-x-0 top-2 z-[500] space-y-2">
+            {doors.length > 0 && (
+              <div className="chips pointer-events-auto px-2" role="group" aria-label="Türen filtern">
+                {filters.map((f) => (
+                  <button
+                    key={f.key}
+                    type="button"
+                    onClick={() => setFilter(f.key)}
+                    aria-pressed={filter === f.key}
+                    className="map-chip"
+                  >
+                    {f.label}
+                    <span className="font-normal text-ink-2">{counts[f.key]}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+            {todo.length > 1 && (
+              <div className="flex flex-wrap gap-2 px-2">
+                <button
+                  type="button"
+                  className="map-chip pointer-events-auto"
+                  onClick={toggleRoute}
+                  aria-pressed={routeOn}
+                >
+                  <IconNavigate className="h-4 w-4" />
+                  {routeOn ? "Route beenden" : "Laufroute"}
+                </button>
+                {routeOn && route && (
+                  <span className="map-chip pointer-events-auto">
+                    {plural(route.stops.length, "Tür", "Türen")} · {distanceLabel(route.meters)} · ca.{" "}
+                    {durationLabel(route.minutes)}
+                  </span>
+                )}
+              </div>
+            )}
+          </div>
         </MapView>
       </div>
 
       {/* Naechste Tuer: das Wichtigste unterwegs, direkt unter der Karte. */}
-      {next ? (
-        <div className="rounded-[var(--r-md)] border px-3.5 py-3" style={{ borderColor: "var(--line)" }}>
-          <div className="flex items-center gap-3">
-            <span
-              className="grid h-10 w-10 shrink-0 place-items-center rounded-full text-white"
-              style={{ background: stateColors()[next.door.state] }}
-              aria-hidden
-            >
-              <IconNavigate className="h-4 w-4" />
+      {next && (
+        <ul className="list list-icons">
+          <li className="cell pr-2">
+            <span className="glyph glyph-round">
+              <IconDoor className="h-4 w-4" />
             </span>
-            <div className="min-w-0 flex-1">
-              <p className="muted text-[11.5px] font-semibold">
-                Nächste offene Tür · {distanceLabel(next.distance)}
-              </p>
-              <p className="truncate text-[15px] font-semibold">
+            <span className="min-w-0 flex-1">
+              <span className="block truncate text-body">
                 {next.door.street} {next.door.number}
-              </p>
-              <p className="muted truncate text-[12px]">
-                {next.door.state === "retry"
-                  ? `${next.door.attempts}. Versuch war erfolglos`
-                  : "Noch nicht besucht"}
-                {next.door.units > 1 && ` · ${next.door.units} Wohneinheiten`}
-              </p>
-            </div>
-          </div>
-          <div className="mt-3 grid grid-cols-2 gap-2">
+              </span>
+              <span className="block truncate text-footnote text-muted">
+                Nächste offene Tür · {distanceLabel(next.distance)}
+                {next.door.state === "retry" && ` · ${next.door.attempts}. Versuch`}
+              </span>
+            </span>
             <a
               href={routeUrl(next.door.lat, next.door.lng, "walk")}
               target="_blank"
               rel="noreferrer"
-              className="btn btn-ghost btn-sm btn-pill"
+              className="icon-btn icon-btn-fill"
+              aria-label="Route zur nächsten Tür"
             >
-              Route
+              <IconNavigate className="h-5 w-5" />
             </a>
-            <a href={tourLink(next.door)} className="btn btn-primary btn-sm btn-pill">
-              Hier klingeln
+            <a href={tourLink(next.door)} className="btn btn-primary btn-sm">
+              Klingeln
             </a>
-          </div>
-        </div>
-      ) : todo.length > 0 ? (
-        <p className="muted px-1 text-[12px]">
-          Mit freigegebenem Standort zeigt die Karte hier die nächste offene Tür – Knopf mit dem
-          Pfeil auf der Karte.
-        </p>
-      ) : doors.length > 0 ? (
-        <p className="px-1 text-[13px] font-semibold text-ok">Alle Türen in diesem Gebiet sind erledigt.</p>
-      ) : null}
-
-      {routeOn && route && route.stops.length > 0 && (
-        <ol className="rounded-[var(--r-md)] border px-3.5 py-2" style={{ borderColor: "var(--line)" }}>
-          {route.stops.slice(0, 8).map((stop, index) => (
-            <li key={stop.id} className="flex items-center gap-2.5 border-t py-2 text-[13.5px] first:border-t-0" style={{ borderColor: "var(--line)" }}>
-              <span className="grid h-5 w-5 shrink-0 place-items-center rounded-full bg-[var(--tint)] text-[11px] font-bold text-white">
-                {index + 1}
-              </span>
-              <span className="min-w-0 flex-1 truncate">
-                {stop.street} {stop.number}
-              </span>
-              <a href={tourLink(stop)} className="text-[12.5px] font-semibold text-tint">
-                Klingeln
-              </a>
-            </li>
-          ))}
-          {route.stops.length > 8 && (
-            <li className="muted border-t py-2 text-[12px]" style={{ borderColor: "var(--line)" }}>
-              … und {route.stops.length - 8} weitere – die Nummern auf der Karte zeigen die Reihenfolge.
-            </li>
-          )}
-        </ol>
+          </li>
+        </ul>
       )}
 
-      {/* Wann macht hier jemand auf? Aus den bisherigen Besuchen im Gebiet. */}
-      {hourTotal >= 15 && (
-        <div className="rounded-[var(--r-md)] border px-3.5 py-3" style={{ borderColor: "var(--line)" }}>
-          <p className="text-[13px] font-semibold">Wann trifft man hier jemanden an?</p>
-          {bestHour && (
-            <p className="muted mb-2 text-[12px]">
-              Am besten {bestHour.label} Uhr – {Math.round((bestHour.met / bestHour.total) * 100)} % machen auf.
-            </p>
-          )}
-          <div className="grid grid-cols-4 gap-2">
-            {hours.map((h) => {
-              const rate = h.total ? h.met / h.total : 0;
-              return (
-                <div key={h.label} className="text-center">
-                  <div className="mx-auto flex h-16 w-full max-w-[3.5rem] items-end overflow-hidden rounded-md bg-[var(--card-inset)]">
-                    <div
-                      className="w-full rounded-md"
-                      style={{
-                        height: `${Math.max(4, rate * 100)}%`,
-                        background: h === bestHour ? "var(--ok-ink)" : "var(--tint)",
-                        opacity: h.total ? 1 : 0.2,
-                      }}
-                    />
-                  </div>
-                  <p className="mt-1 text-[11.5px] font-semibold tabular-nums">
-                    {h.total ? `${Math.round(rate * 100)} %` : "–"}
-                  </p>
-                  <p className="muted text-[10.5px]">{h.label}</p>
-                </div>
-              );
-            })}
-          </div>
-          <p className="muted mt-2 text-[10.5px]">Anteil der Türen, an denen jemand geöffnet hat · {hourTotal} Besuche</p>
-        </div>
+      {routeOn && route && route.stops.length > 0 && (
+        <ol className="list list-icons">
+          {route.stops.slice(0, 8).map((stop, index) => (
+            <li key={stop.id}>
+              <Cell
+                href={tourLink(stop)}
+                icon={<span className="glyph glyph-round kpi text-subhead">{index + 1}</span>}
+                title={`${stop.street} ${stop.number}`}
+              />
+            </li>
+          ))}
+        </ol>
       )}
     </div>
   );

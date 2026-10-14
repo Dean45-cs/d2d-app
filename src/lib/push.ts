@@ -283,7 +283,7 @@ export async function notifySale(visitId: number): Promise<void> {
   await pushToUsers(recipients, {
     title: `${post.user.name} hat einen Vertrag gemacht 🎉`,
     body: `${where || "Neuer Abschluss"}${milestone} – jetzt gratulieren!`,
-    url: `/feed/${postId}`,
+    url: `/team/beitrag/${postId}`,
     tag: `post-${postId}`,
   });
 }
@@ -304,7 +304,7 @@ export async function notifyComment(
         ? `${author.name} hat deinen Abschluss kommentiert`
         : `${author.name} hat deinen Beitrag kommentiert`,
     body: text.length > 140 ? `${text.slice(0, 139)}…` : text,
-    url: `/feed/${postId}`,
+    url: `/team/beitrag/${postId}`,
     tag: `comment-${postId}`,
   });
 }

@@ -1,7 +1,6 @@
 "use client";
 
 import { Children, useState, type ReactNode } from "react";
-import { IconChevronDown } from "./icons";
 
 /**
  * Eine lange Liste zeigt erst die ersten Eintraege - der Rest kommt auf
@@ -14,7 +13,7 @@ export function ShowMore({
 }: {
   children: ReactNode;
   initial?: number;
-  /** Klassen der Liste (<ul>) */
+  /** Klassen der Liste (<ul>). */
   className?: string;
 }) {
   const [all, setAll] = useState(false);
@@ -24,13 +23,8 @@ export function ShowMore({
     <>
       <ul className={className}>{all ? items : items.slice(0, initial)}</ul>
       {hidden > 0 && !all && (
-        <button
-          type="button"
-          className="btn btn-plain btn-sm mt-2 w-full"
-          onClick={() => setAll(true)}
-        >
-          {hidden} weitere anzeigen
-          <IconChevronDown className="h-4 w-4" />
+        <button type="button" className="btn btn-plain btn-sm mt-2" onClick={() => setAll(true)}>
+          {hidden} weitere
         </button>
       )}
     </>

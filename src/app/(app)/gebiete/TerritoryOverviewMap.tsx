@@ -2,9 +2,9 @@
 
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
-import { AreaMap, TONE_LEGEND, type AreaTone, type MapArea } from "@/components/AreaMap";
+import { AreaMap, type AreaTone, type MapArea } from "@/components/AreaMap";
+import { IconChevronDown } from "@/components/icons";
 import { plural } from "@/components/ui";
-import { IconChevronDown, IconMap } from "@/components/icons";
 import type { Shape } from "@/lib/geo/shape";
 
 export interface OverviewTerritory {
@@ -14,41 +14,31 @@ export interface OverviewTerritory {
   status: string;
   assignee: string | null;
   streets: number;
-  doors: number;
-  units: number;
+  /** "12 von 30 Häusern" */
+  progress: string;
 }
 
-const TONES: Record<string, AreaTone> = {
-  ACTIVE: "brand",
-  DONE: "success",
-  PAUSED: "warn",
-  OPEN: "muted",
-};
-
-const STATUS_LABEL: Record<string, string> = {
-  ACTIVE: "In Arbeit",
-  DONE: "Fertig",
-  PAUSED: "Pausiert",
-  OPEN: "Offen",
-};
+const TONES: Record<string, AreaTone> = { ACTIVE: "active", DONE: "done", PAUSED: "paused", OPEN: "open" };
+const STATUS_LABEL: Record<string, string> = { ACTIVE: "In Arbeit", DONE: "Fertig", PAUSED: "Pausiert", OPEN: "Offen" };
 
 /**
- * Alle gezeichneten Gebiete auf einen Blick: Farbe = Status, Kuerzel = wer
- * dran ist. Zeigt sofort, was noch frei ist und wo jemand zwei Gebiete hat.
+ * Alle gezeichneten Gebiete auf einen Blick: gruen ist in Arbeit, das
+ * Kuerzel sagt, wer dran ist. Ein Tipp oeffnet das Gebiet.
  */
 export function TerritoryOverviewMap({
   territories,
+  className,
 }: {
   territories: OverviewTerritory[];
+  className?: string;
 }) {
   const router = useRouter();
-  const [open, setOpen] = useState(true);
   const [person, setPerson] = useState("");
 
   const people = useMemo(
     () =>
-      Array.from(new Set(territories.map((t) => t.assignee).filter((a): a is string => !!a))).sort(
-        (a, b) => a.localeCompare(b, "de-DE"),
+      Array.from(new Set(territories.map((t) => t.assignee).filter((a): a is string => !!a))).sort((a, b) =>
+        a.localeCompare(b, "de-DE"),
       ),
     [territories],
   );
@@ -70,12 +60,12 @@ export function TerritoryOverviewMap({
         id: t.id,
         name: t.name,
         area: t.area,
-        tone: TONES[t.status] ?? "muted",
+        tone: TONES[t.status] ?? "open",
         badge: initials(t.assignee),
         hint: [
           STATUS_LABEL[t.status] ?? t.status,
           plural(t.streets, "Straße", "Straßen"),
-          t.units > 0 ? `${t.doors} von ${t.units} Türen` : `${t.doors} Türen erfasst`,
+          t.progress,
           t.assignee ?? "nicht zugeteilt",
         ].join(" · "),
       })),
@@ -85,66 +75,37 @@ export function TerritoryOverviewMap({
   if (territories.length === 0) return null;
 
   return (
-    <div className="card mb-4 overflow-hidden">
-      <div className="flex flex-wrap items-center gap-2 px-4 py-3">
-        <IconMap className="h-4 w-4 shrink-0 text-tint" />
-        <p className="flex-1 text-[14px] font-semibold">
-          Karte{" "}
-          <span className="muted font-normal tabular-nums">
-            ({shown.length}
-            {shown.length !== territories.length && ` von ${territories.length}`})
-          </span>
-        </p>
-        {open && people.length > 1 && (
+    <AreaMap
+      areas={areas}
+      className={className}
+      legend={[
+        { tone: "active", label: "In Arbeit" },
+        { tone: "done", label: "Fertig" },
+        { tone: "open", label: "Offen" },
+      ]}
+      onSelect={(id) => router.push(`/gebiete/${id}`)}
+    >
+      {people.length > 1 && (
+        <label className="map-chip pointer-events-auto relative pr-8">
+          <span className="sr-only">Karte nach Person filtern</span>
           <select
-            className="select w-auto px-2.5 py-1 text-[12px]"
+            className="absolute inset-0 cursor-pointer opacity-0"
             value={person}
             onChange={(e) => setPerson(e.target.value)}
-            aria-label="Karte nach Mitarbeiter filtern"
           >
-            <option value="">alle Gebiete</option>
-            <option value="-">nicht zugeteilt</option>
+            <option value="">Alle Gebiete</option>
+            <option value="-">Nicht zugeteilt</option>
             {people.map((name) => (
               <option key={name} value={name}>
                 {name}
               </option>
             ))}
           </select>
-        )}
-        <button
-          type="button"
-          className="icon-btn shrink-0"
-          onClick={() => setOpen((v) => !v)}
-          aria-expanded={open}
-          aria-label={open ? "Karte ausblenden" : "Karte anzeigen"}
-        >
-          <IconChevronDown
-            className={`h-4 w-4 transition-transform ${open ? "rotate-180" : ""}`}
-          />
-        </button>
-      </div>
-
-      {open && (
-        <div className="px-3 pb-3">
-          <div
-            className="overflow-hidden rounded-[var(--r-md)] border"
-            style={{ borderColor: "var(--line)" }}
-          >
-            <AreaMap
-              areas={areas}
-              legend={[
-                { color: TONE_LEGEND.brand, label: "in Arbeit" },
-                { color: TONE_LEGEND.success, label: "fertig" },
-                { color: TONE_LEGEND.warn, label: "pausiert" },
-                { color: TONE_LEGEND.muted, label: "offen" },
-              ]}
-              className="h-[40vh] min-h-[240px] w-full"
-              onSelect={(id) => router.push(`/gebiete/${id}`)}
-            />
-          </div>
-        </div>
+          {person === "" ? "Alle Gebiete" : person === "-" ? "Nicht zugeteilt" : person}
+          <IconChevronDown className="absolute right-3 h-4 w-4" />
+        </label>
       )}
-    </div>
+    </AreaMap>
   );
 }
 

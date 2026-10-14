@@ -1,79 +1,77 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { AppointmentRow } from "@/lib/queries";
-import {
-  Avatar,
-  EmptyState,
-  Note,
-  PageHeader,
-  Segmented,
-  SkeletonRows,
-  plural,
-} from "@/components/ui";
-import { IconCalendar, IconCheck, IconNavigate, IconPhone, IconUndo } from "@/components/icons";
+import { Avatar, Cell, EmptyState, ListLabel, PageHeader, Segmented, SkeletonList } from "@/components/ui";
+import { Sheet } from "@/components/Sheet";
+import { useToast } from "@/components/Toast";
+import { IconCalendar, IconCheck, IconDoor, IconNavigate, IconPhone, IconUndo } from "@/components/icons";
 import { routeUrl } from "@/lib/map";
-import { parseSlot, slotDate, slotOverdue, toSlot } from "@/lib/appointments";
+import { parseSlot, slotDate, slotLabel, slotOverdue, toSlot } from "@/lib/appointments";
 
 type View = "open" | "done";
 
 /**
- * Vereinbarte Termine - der Rückweg des Tages.
- *
- * Ein Termin ist die zweitbeste Sache nach dem Abschluss, verfällt aber, wenn
- * ihn niemand mehr sieht. Deshalb stehen überfällige oben und lassen sich von
- * hier aus direkt anrufen.
+ * Vereinbarte Termine - der Rueckweg des Tages. Ueberfaellige stehen oben,
+ * ein Tipp hakt ab (mit "Rückgängig"), die Zeile oeffnet Anruf, Route und
+ * die Tuer selbst.
  */
 export function AppointmentList({
   appointments,
   isLeader,
   faces,
+  back,
 }: {
   appointments: AppointmentRow[];
   isLeader: boolean;
   /** Profilbilder je Mitarbeiter-ID - nur fuer die Teamleitung. */
   faces: Record<number, string>;
+  back: { href: string; label: string };
 }) {
   const router = useRouter();
-  const [busy, setBusy] = useState<number | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const toast = useToast();
   const [view, setView] = useState<View>("open");
-  /* Was "heute" ist, entscheidet die Uhr des Geräts - nicht die des Servers. */
+  const [busy, setBusy] = useState<number | null>(null);
+  const [detail, setDetail] = useState<AppointmentRow | null>(null);
+  /* Was "heute" ist, entscheidet die Uhr des Geraets - nicht die des Servers. */
   const [now, setNow] = useState<Date | null>(null);
-  const focusedAppointment = useRef<string | null>(null);
+
   useEffect(() => {
     setNow(new Date());
-    const id = new URLSearchParams(window.location.search).get("termin");
-    if (id && /^\d+$/.test(id)) {
-      focusedAppointment.current = id;
-      if (appointments.find((item) => item.id === Number(id))?.follow_up_done_at) setView("done");
+    // Aus der Push-Erinnerung: /termine?termin=12 oeffnet genau diesen Termin.
+    const id = Number(new URLSearchParams(window.location.search).get("termin"));
+    const target = appointments.find((item) => item.id === id);
+    if (target) {
+      if (target.follow_up_done_at) setView("done");
+      setDetail(target);
     }
   }, [appointments]);
-  useEffect(() => {
-    if (!now || !focusedAppointment.current) return;
-    const target = document.getElementById(`appointment-${focusedAppointment.current}`);
-    target?.scrollIntoView({ block: "center" });
-    target?.focus();
-  }, [now, view]);
 
-  async function setDone(id: number, done: boolean) {
-    setBusy(id);
-    setError(null);
+  async function setDone(item: AppointmentRow, done: boolean) {
+    setBusy(item.id);
     try {
-      const response = await fetch(`/api/visits/${id}`, {
+      const response = await fetch(`/api/visits/${item.id}`, {
         method: "PATCH",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ done }),
       });
       if (!response.ok) {
-        const data = await response.json();
-        setError(data.error ?? "Konnte nicht gespeichert werden.");
+        const data = await response.json().catch(() => ({}));
+        toast(data.error ?? "Nicht gespeichert");
         return;
+      }
+      setDetail(null);
+      if (done) {
+        toast(`${item.contact_name || "Termin"} erledigt`, {
+          action: { label: "Rückgängig", onClick: () => void setDone(item, false) },
+        });
+      } else {
+        toast("Wieder offen");
       }
       router.refresh();
     } catch {
-      setError("Keine Verbindung – bitte gleich noch einmal versuchen.");
+      toast("Keine Verbindung");
     } finally {
       setBusy(null);
     }
@@ -83,21 +81,12 @@ export function AppointmentList({
   const done = appointments.filter((item) => item.follow_up_done_at);
   const overdue = now ? open.filter((item) => slotOverdue(item.follow_up_at, now)) : [];
 
-  const summary = [
-    plural(open.length, "offener Termin", "offene Termine"),
-    overdue.length > 0 && `${overdue.length} überfällig`,
-  ]
-    .filter(Boolean)
-    .join(" · ");
-
-  /* Offene Termine nach Tag - überfällige zuerst, egal von wann. */
+  // Offene Termine nach Tag - ueberfaellige zuerst, egal von wann.
   const groups: Array<{ key: string; title: string; late: boolean; items: AppointmentRow[] }> = [];
   if (now) {
     const today = toSlot(now).slice(0, 10);
     const tomorrow = toSlot(new Date(now.getTime() + 86_400_000)).slice(0, 10);
-    if (overdue.length > 0) {
-      groups.push({ key: "late", title: "Überfällig", late: true, items: overdue });
-    }
+    if (overdue.length > 0) groups.push({ key: "late", title: "Überfällig", late: true, items: overdue });
     for (const item of open) {
       if (slotOverdue(item.follow_up_at, now)) continue;
       const day = slotDate(item.follow_up_at) || "ohne";
@@ -115,61 +104,75 @@ export function AppointmentList({
     }
   }
 
-  return (
-    <div>
-      <PageHeader
-        title={isLeader ? "Termine" : "Meine Termine"}
-        subtitle={summary}
-        action={
-          <Segmented<View>
-            ariaLabel="Termine filtern"
-            value={view}
-            onChange={setView}
-            options={[
-              { value: "open", label: "Offen" },
-              { value: "done", label: `Erledigt${done.length ? ` · ${done.length}` : ""}` },
-            ]}
-          />
-        }
-      />
+  const summary = [`${open.length} offen`, overdue.length > 0 && `${overdue.length} überfällig`].filter(Boolean).join(" · ");
 
-      {error && (
-        <div className="mb-4" role="alert">
-          <Note tone="danger">{error}</Note>
-        </div>
-      )}
+  return (
+    <div className="page-narrow">
+      <PageHeader title={isLeader ? "Termine" : "Meine Termine"} subtitle={summary} back={back}>
+        <Segmented<View>
+          ariaLabel="Termine filtern"
+          value={view}
+          onChange={setView}
+          options={[
+            { value: "open", label: "Offen" },
+            { value: "done", label: `Erledigt${done.length ? ` · ${done.length}` : ""}` },
+          ]}
+        />
+      </PageHeader>
 
       {view === "open" ? (
         open.length === 0 ? (
           <EmptyState
-            icon={<IconCalendar className="h-7 w-7" />}
+            boxed
+            icon={<IconCalendar className="h-6 w-6" />}
             title="Keine offenen Termine"
-            text="Termine entstehen an der Tür über „Termin vereinbart“ und erscheinen dann hier."
+            text="Termine entstehen an der Tür."
           />
         ) : !now ? (
-          <SkeletonRows rows={5} />
+          <SkeletonList rows={4} />
         ) : (
           <div className="space-y-6">
             {groups.map((group) => (
               <section key={group.key}>
-                <h2
-                  className="mb-2 ml-1 flex items-center gap-2 text-[13px] font-semibold"
-                  style={{ color: group.late ? "var(--danger-ink)" : "var(--ink-2)" }}
-                >
-                  {group.title}
-                  <span className="muted font-medium tabular-nums">{group.items.length}</span>
-                </h2>
-                <ul className="list">
+                <p className={`list-label ${group.late ? "text-danger" : ""}`}>
+                  {group.title} · {group.items.length}
+                </p>
+                <ul className="list list-icons">
                   {group.items.map((item) => (
-                    <AppointmentItem
-                      key={item.id}
-                      item={item}
-                      late={group.late}
-                      isLeader={isLeader}
-                      face={faces[item.user_id]}
-                      busy={busy === item.id}
-                      onDone={() => void setDone(item.id, true)}
-                    />
+                    <li key={item.id} className="cell pr-2">
+                      <button
+                        type="button"
+                        className="flex min-w-0 flex-1 items-center gap-3 text-left"
+                        onClick={() => setDetail(item)}
+                      >
+                        <TimeBlock slot={item.follow_up_at} late={group.late} />
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate text-body">{item.contact_name || "Ohne Namen"}</span>
+                          <span className="flex min-w-0 items-center gap-2 text-footnote text-muted">
+                            {isLeader && <Avatar name={item.user_name} src={faces[item.user_id]} size={16} />}
+                            <span className="truncate">{address(item)}</span>
+                          </span>
+                        </span>
+                      </button>
+                      {item.contact_phone && (
+                        <a
+                          href={`tel:${item.contact_phone.replace(/[^+\d]/g, "")}`}
+                          className="icon-btn icon-btn-fill"
+                          aria-label={`${item.contact_name || "Kontakt"} anrufen`}
+                        >
+                          <IconPhone className="h-5 w-5" />
+                        </a>
+                      )}
+                      <button
+                        type="button"
+                        disabled={busy === item.id}
+                        onClick={() => void setDone(item, true)}
+                        className="icon-btn icon-btn-accent"
+                        aria-label={`${item.contact_name || "Termin"} als erledigt abhaken`}
+                      >
+                        <IconCheck className="h-5 w-5" />
+                      </button>
+                    </li>
                   ))}
                 </ul>
               </section>
@@ -177,162 +180,103 @@ export function AppointmentList({
           </div>
         )
       ) : done.length === 0 ? (
-        <EmptyState
-          icon={<IconCheck className="h-7 w-7" />}
-          title="Noch nichts erledigt"
-          text="Abgehakte Termine landen hier und lassen sich jederzeit wieder öffnen."
-        />
+        <EmptyState boxed icon={<IconCheck className="h-6 w-6" />} title="Noch nichts erledigt" />
       ) : (
-        <ul className="list">
+        <ul className="list list-icons">
           {done.map((item) => (
-            <li key={item.id} id={`appointment-${item.id}`} tabIndex={-1} className="list-row focus:outline-2 focus:outline-offset-2">
-              <SlotBlock slot={item.follow_up_at} showDay muted />
+            <li key={item.id} className="cell pr-2">
+              <TimeBlock slot={item.follow_up_at} muted />
               <span className="min-w-0 flex-1">
-                <span className="block truncate text-[14px] font-medium line-through decoration-[var(--line-strong)]">
-                  {item.contact_name || "Ohne Namen"}
-                </span>
-                <span className="muted block truncate text-[12.5px]">
+                <span className="block truncate text-body text-muted line-through">{item.contact_name || "Ohne Namen"}</span>
+                <span className="block truncate text-footnote text-muted">
                   {address(item)}
                   {isLeader && ` · ${item.user_name}`}
                 </span>
               </span>
               <button
                 type="button"
-                className="icon-btn icon-btn-outline shrink-0"
+                className="icon-btn"
                 disabled={busy === item.id}
-                onClick={() => void setDone(item.id, false)}
+                onClick={() => void setDone(item, false)}
                 aria-label="Wieder öffnen"
-                title="Wieder öffnen"
               >
-                <IconUndo className="h-4 w-4" />
+                <IconUndo className="h-5 w-5" />
               </button>
             </li>
           ))}
         </ul>
       )}
+
+      {detail && (
+        <Sheet
+          title={detail.contact_name || "Termin"}
+          subtitle={`${slotLabel(detail.follow_up_at, now ?? undefined)} · ${address(detail)}`}
+          onClose={() => setDetail(null)}
+        >
+          {detail.reason_note && <p className="mb-4 rounded-xl bg-surface px-4 py-3 text-body">„{detail.reason_note}“</p>}
+          <ul className="list list-icons">
+            {detail.contact_phone && (
+              <li>
+                <Cell
+                  href={`tel:${detail.contact_phone.replace(/[^+\d]/g, "")}`}
+                  external
+                  icon={<span className="glyph glyph-round"><IconPhone className="h-4 w-4" /></span>}
+                  title="Anrufen"
+                  subtitle={detail.contact_phone}
+                />
+              </li>
+            )}
+            {detail.lat !== null && detail.lng !== null && (
+              <li>
+                <Cell
+                  href={routeUrl(detail.lat, detail.lng)}
+                  external
+                  icon={<span className="glyph glyph-round"><IconNavigate className="h-4 w-4" /></span>}
+                  title="Route"
+                />
+              </li>
+            )}
+            {detail.street_id && (
+              <li>
+                <Cell
+                  href={`/tour?street=${detail.street_id}&house=${encodeURIComponent(detail.house_number)}`}
+                  icon={<span className="glyph glyph-round"><IconDoor className="h-4 w-4" /></span>}
+                  title="An der Tür öffnen"
+                />
+              </li>
+            )}
+            {isLeader && <li><Cell title="Verantwortlich" detail={detail.user_name} /></li>}
+          </ul>
+          <button
+            type="button"
+            className={`btn btn-lg btn-block mt-4 ${detail.follow_up_done_at ? "btn-secondary" : "btn-primary"}`}
+            disabled={busy === detail.id}
+            onClick={() => void setDone(detail, !detail.follow_up_done_at)}
+          >
+            {detail.follow_up_done_at ? "Wieder öffnen" : "Erledigt"}
+          </button>
+        </Sheet>
+      )}
     </div>
   );
 }
 
-function AppointmentItem({
-  item,
-  late,
-  isLeader,
-  face,
-  busy,
-  onDone,
-}: {
-  item: AppointmentRow;
-  late: boolean;
-  isLeader: boolean;
-  face: string | undefined;
-  busy: boolean;
-  onDone: () => void;
-}) {
-  const phone = item.contact_phone.replace(/[^+\d]/g, "");
-  return (
-    <li id={`appointment-${item.id}`} tabIndex={-1} className="list-row items-start py-3 focus:outline-2 focus:outline-offset-2 sm:items-center">
-      <SlotBlock slot={item.follow_up_at} showDay={late} late={late} />
-      <div className="min-w-0 flex-1">
-        <p className="truncate text-[14.5px] font-semibold">{item.contact_name || "Ohne Namen"}</p>
-        <p className="muted truncate text-[12.5px]">{address(item)}</p>
-        {(isLeader || item.reason_note) && (
-          <p className="muted mt-1 flex min-w-0 items-center gap-1.5 text-[12px]">
-            {isLeader && (
-              <>
-                <Avatar name={item.user_name} src={face} size={18} />
-                <span className="shrink-0">{item.user_name}</span>
-              </>
-            )}
-            {isLeader && item.reason_note && <span aria-hidden>·</span>}
-            {item.reason_note && <span className="truncate">„{item.reason_note}“</span>}
-          </p>
-        )}
-      </div>
-      <div className="flex shrink-0 items-center gap-1.5 self-center">
-        {phone && (
-          <a
-            href={`tel:${phone}`}
-            className="icon-btn icon-btn-outline"
-            aria-label={`${item.contact_name || "Kontakt"} anrufen`}
-            title={item.contact_phone}
-          >
-            <IconPhone className="h-4 w-4" />
-          </a>
-        )}
-        {item.lat !== null && item.lng !== null && (
-          <a
-            href={routeUrl(item.lat, item.lng)}
-            target="_blank"
-            rel="noreferrer"
-            className="icon-btn icon-btn-outline"
-            aria-label="Route öffnen"
-            title="Route"
-          >
-            <IconNavigate className="h-4 w-4" />
-          </a>
-        )}
-        <button
-          type="button"
-          disabled={busy}
-          onClick={onDone}
-          className="icon-btn"
-          style={{
-            background: "color-mix(in srgb, var(--energy-500) 14%, transparent)",
-            color: "var(--ok-ink)",
-          }}
-          aria-label="Als erledigt abhaken"
-          title="Erledigt"
-        >
-          <IconCheck className="h-4 w-4" />
-        </button>
-      </div>
-    </li>
-  );
-}
-
-/** Uhrzeit als Block links in der Zeile, auf Wunsch mit Tag darüber. */
-function SlotBlock({
-  slot,
-  showDay = false,
-  late = false,
-  muted = false,
-}: {
-  slot: string;
-  showDay?: boolean;
-  late?: boolean;
-  muted?: boolean;
-}) {
+/** Uhrzeit als Block links in der Zeile; ueberfaellig mit Tag. */
+function TimeBlock({ slot, late = false, muted = false }: { slot: string; late?: boolean; muted?: boolean }) {
   const date = parseSlot(slot);
-  const time = date
-    ? `${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`
-    : "–";
-  const day = date
-    ? `${date.toLocaleDateString("de-DE", { weekday: "short" }).replace(".", "")} ${date.toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit" })}`
-    : "";
+  const time = date ? `${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}` : "–";
   return (
-    <span
-      className="grid w-[3.75rem] shrink-0 place-items-center rounded-[var(--r-sm)] py-1.5 leading-tight"
-      style={{
-        background: late
-          ? "color-mix(in srgb, var(--signal-500) 11%, transparent)"
-          : "var(--card-inset)",
-        color: late ? "var(--danger-ink)" : muted ? "var(--ink-muted)" : "var(--ink)",
-      }}
-    >
-      {showDay && <span className="text-[10.5px] font-semibold opacity-80">{day}</span>}
-      <span className="text-[14px] font-bold tabular-nums">{time}</span>
+    <span className={`glyph glyph-lg flex-col gap-0 leading-none ${late ? "bg-danger-tint text-danger" : ""}`}>
+      {(late || muted) && date && (
+        <span className="text-caption-2">{date.toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit" })}</span>
+      )}
+      <span className={`text-caption font-bold ${muted ? "text-muted" : late ? "" : "text-ink"}`}>{time}</span>
     </span>
   );
 }
 
 function address(item: AppointmentRow): string {
-  return [
-    `${item.street_name ?? ""} ${item.house_number}`.trim(),
-    item.doorbell_label,
-  ]
-    .filter(Boolean)
-    .join(" · ");
+  return [`${item.street_name ?? ""} ${item.house_number}`.trim(), item.doorbell_label].filter(Boolean).join(" · ");
 }
 
 /** "Dienstag, 29. September" */

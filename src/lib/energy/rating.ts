@@ -20,11 +20,21 @@ export interface PriceLevel {
   pitch: string;
 }
 
-/** Farbskala: gruen = guenstig, rot = teuer (= bestes Wechselargument). */
-export const PRICE_SCALE = ["#16a34a", "#84cc16", "#eab308", "#f97316", "#dc2626"] as const;
+/**
+ * Farbskala als CSS-Variablen (brand.css): sequenziell von grau (kaum
+ * Wechselargument) bis tiefgruen (starkes Argument). Die Helligkeit steigt
+ * stetig - lesbar auch ohne Farbsehen, in Hell und Dunkel eigens abgestimmt.
+ */
+export const PRICE_SCALE = [
+  "var(--price-0)",
+  "var(--price-1)",
+  "var(--price-2)",
+  "var(--price-3)",
+  "var(--price-4)",
+] as const;
 
 /** Farbe eines Ortes, fuer den noch kein Preis vorliegt. */
-export const NO_PRICE_COLOR = "#94a3b8";
+export const NO_PRICE_COLOR = "var(--price-none)";
 
 export const PRICE_LEVELS: readonly PriceLevel[] = [
   { step: 0, label: "sehr günstig", pitch: "Kaum Wechselargument über den Preis" },

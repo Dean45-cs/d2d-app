@@ -1,39 +1,29 @@
-import { hasPermission } from "@/lib/permissions";
 import { redirect } from "next/navigation";
+import type { Metadata } from "next";
+import { hasPermission } from "@/lib/permissions";
 import { getCurrentUser } from "@/lib/auth";
+import { LogoMark } from "@/components/Logo";
 import { LoginForm } from "./LoginForm";
-import { Logo } from "@/components/Logo";
 
 export const dynamic = "force-dynamic";
+export const metadata: Metadata = { title: "Anmelden · Carlsson Sales" };
 
 export default async function LoginPage() {
   const user = await getCurrentUser();
   if (user) redirect(hasPermission(user, "reports.team") ? "/start" : "/tour");
 
   return (
-    <main className="flex min-h-dvh flex-col bg-[var(--surface)]">
-      <header className="border-b border-white/10 bg-brand-900 px-5 pb-5 pt-[max(1.25rem,env(safe-area-inset-top))] text-white md:px-8">
-        <Logo size={34} />
-      </header>
-
-      <section className="flex flex-1 items-start justify-center px-5 py-12 sm:items-center sm:py-16">
-        <div className="w-full max-w-sm">
-          <h1 className="text-[26px] font-bold">Anmelden</h1>
-          <p className="muted mt-2 text-[14px]">Zugang für den Außendienst von Energie Partner 24.</p>
-
-          <div className="mt-7">
-            <LoginForm />
-          </div>
-
-          <p className="muted mt-6 border-t border-[var(--line)] pt-5 text-[13px]">
-            Zugangsdaten erhältst du von deiner Teamleitung.
-          </p>
+    <main className="flex min-h-dvh flex-col px-4 pb-[max(24px,env(safe-area-inset-bottom))] pt-[max(48px,env(safe-area-inset-top))]">
+      <section className="mx-auto flex w-full max-w-sm flex-1 flex-col justify-center">
+        <div className="mb-8 flex flex-col items-center text-center">
+          <LogoMark size={72} className="drop-shadow-sm" />
+          <h1 className="mt-6 text-title-1">Carlsson Sales</h1>
+          <p className="mt-1 text-subhead text-muted">Melde dich mit deinem Team-Zugang an.</p>
         </div>
+        <LoginForm />
+        <p className="mt-6 text-center text-footnote text-muted">Zugang gibt’s bei deiner Teamleitung.</p>
       </section>
-
-      <footer className="muted px-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] text-center text-[12px]">
-        © {new Date().getFullYear()} Energie Partner 24
-      </footer>
+      <p className="text-center text-caption text-muted">© {new Date().getFullYear()} Carlsson Sales</p>
     </main>
   );
 }

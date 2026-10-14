@@ -91,7 +91,7 @@ export default async function TourPage() {
       streets={streets}
       houseNumbers={houseNumbers}
       doorbells={doorbells}
-      isLeader={hasPermission(user, "doors.unblock")}
+      canUnblock={hasPermission(user, "doors.unblock")}
       team={team}
       reasons={listReasons(user.team_id)}
       todayTotals={todayTotals}

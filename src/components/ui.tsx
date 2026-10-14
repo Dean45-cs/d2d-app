@@ -1,64 +1,31 @@
-import type { CSSProperties, ReactNode } from "react";
+import type { ReactNode } from "react";
 import Link from "next/link";
 import {
   IconCalendar,
   IconChat,
   IconCheck,
-  IconChevronLeft,
   IconChevronRight,
   IconDoor,
+  IconExternal,
 } from "./icons";
 
-/**
- * Kopf einer Seite: grosser Titel, darunter eine Zeile mit dem, was gerade
- * gilt (Datum, Anzahl, Zeitraum) - keine Erklaerung, was die Seite kann.
- */
-export function PageHeader({
-  title,
-  subtitle,
-  action,
-  back,
-}: {
-  title: string;
-  subtitle?: ReactNode;
-  action?: ReactNode;
-  /** Ruecksprung ueber dem Titel, etwa "Alle Gebiete". */
-  back?: { href: string; label: string };
-}) {
-  return (
-    <header className="mb-6">
-      {back && (
-        <Link href={back.href} className="link -ml-1 mb-2 px-1 py-0.5">
-          <IconChevronLeft className="h-4 w-4" />
-          {back.label}
-        </Link>
-      )}
-      <div className="flex flex-wrap items-end justify-between gap-x-4 gap-y-3">
-        <div className="min-w-0">
-          <h1 className="text-[28px] font-bold leading-[1.15] tracking-[-0.025em] md:text-[30px]">
-            {title}
-          </h1>
-          {subtitle && (
-            <p className="muted mt-1 text-[14px] leading-snug">{subtitle}</p>
-          )}
-        </div>
-        {action && <div className="flex shrink-0 flex-wrap items-center gap-2">{action}</div>}
-      </div>
-    </header>
-  );
-}
+export { PageHeader } from "./PageHeader";
 
-/**
- * Kopf eines Abschnitts: Titel, auf Wunsch mit Anzahl, rechts ein Verweis
- * oder eine eigene Aktion.
+/*
+ * Bausteine ohne Zustand - laufen in Server- und Client-Komponenten.
+ * Gestaltet ueber die Klassen in globals.css; hier steht nur Aufbau.
  */
+
+/* ------------------------------ Abschnitte ------------------------------ */
+
+/** Kopf eines Abschnitts: Titel, auf Wunsch Anzahl, rechts Verweis oder Aktion. */
 export function SectionHeader({
   title,
   count,
   href,
-  linkLabel = "Alle anzeigen",
+  linkLabel = "Alle",
   action,
-  className = "mb-3",
+  className = "",
 }: {
   title: ReactNode;
   count?: number;
@@ -68,335 +35,321 @@ export function SectionHeader({
   className?: string;
 }) {
   return (
-    <div className={`section-head ${className}`}>
+    <div className={`mb-2 flex min-h-11 items-end justify-between gap-4 px-1 ${className}`}>
       <h2 className="section-title min-w-0 truncate">
         {title}
         {count !== undefined && (
-          <span className="muted ml-1.5 font-medium tabular-nums">{count}</span>
+          <span className="ml-2 font-normal text-muted">{count}</span>
         )}
       </h2>
       {href ? (
-        <Link href={href} className="link shrink-0">
+        <Link href={href} className="link min-h-11 shrink-0 text-subhead">
           {linkLabel}
           <IconChevronRight className="h-3.5 w-3.5" />
         </Link>
       ) : (
-        action
+        action && <div className="flex shrink-0 items-center gap-2">{action}</div>
       )}
     </div>
   );
 }
 
-const TONE_INK: Record<string, string> = {
-  neutral: "var(--ink)",
-  brand: "var(--tint)",
-  success: "var(--ok-ink)",
-  warn: "var(--warn-ink)",
-  danger: "var(--danger-ink)",
-};
+/** Kleine Gruppenueberschrift ueber einer Liste (iOS-Einstellungen). */
+export function ListLabel({ children }: { children: ReactNode }) {
+  return <p className="list-label">{children}</p>;
+}
 
-const TONE_DOT: Record<string, string> = {
-  neutral: "var(--ink-muted)",
-  brand: "var(--brand-500)",
-  success: "var(--energy-500)",
-  warn: "var(--gas-500)",
-  danger: "var(--signal-500)",
-};
+/* -------------------------------- Zeilen -------------------------------- */
 
-export type Tone = keyof typeof TONE_INK;
+interface CellProps {
+  href?: string;
+  /** Fuehrt aus der App hinaus (Tarifrechner, Route). */
+  external?: boolean;
+  onClick?: () => void;
+  icon?: ReactNode;
+  title: ReactNode;
+  subtitle?: ReactNode;
+  /** Wert rechts, leise (z. B. "3 offen"). */
+  detail?: ReactNode;
+  /** Eigenes Element rechts (Schalter, Knopf, Plakette). */
+  trailing?: ReactNode;
+  /** Pfeil nach rechts - Standard bei Verweisen. */
+  chevron?: boolean;
+  tone?: "danger" | "accent";
+  disabled?: boolean;
+  className?: string;
+  ariaLabel?: string;
+  current?: boolean;
+}
 
 /**
- * Eine Kennzahl. Die Zahl bleibt dunkel - Farbe traegt nur, was gut oder
- * schlecht ist (Abschluss, ueberfaellig). Der Punkt vor der Beschriftung
- * verbindet die Kachel mit derselben Farbe in Diagrammen und Listen.
+ * Eine Zeile der gruppierten Liste. Hoehe ergibt sich aus dem Inhalt:
+ * 48 pt mit einer Zeile, 60 pt mit Untertitel - ueberall gleich.
  */
-export function StatTile({
-  label,
-  value,
-  hint,
-  tone = "neutral",
-}: {
+export function Cell({
+  href,
+  external,
+  onClick,
+  icon,
+  title,
+  subtitle,
+  detail,
+  trailing,
+  chevron,
+  tone,
+  disabled,
+  className = "",
+  ariaLabel,
+  current,
+}: CellProps) {
+  const color = tone === "danger" ? "text-danger" : tone === "accent" ? "text-accent-ink" : "";
+  const inner = (
+    <>
+      {icon}
+      <span className="min-w-0 flex-1">
+        <span className={`block truncate text-body ${color}`}>{title}</span>
+        {subtitle && <span className="block truncate text-footnote text-muted">{subtitle}</span>}
+      </span>
+      {detail !== undefined && detail !== null && detail !== false && (
+        <span className="shrink-0 text-subhead text-muted">{detail}</span>
+      )}
+      {trailing}
+      {external ? (
+        <IconExternal className="h-4 w-4 shrink-0 text-muted" />
+      ) : (
+        (chevron ?? Boolean(href)) && <IconChevronRight className="cell-chevron" />
+      )}
+    </>
+  );
+  const classes = `cell ${href || onClick ? "cell-tap" : ""} ${className}`;
+  if (href && external) {
+    return (
+      <a href={href} target="_blank" rel="noreferrer" className={classes} aria-label={ariaLabel}>
+        {inner}
+      </a>
+    );
+  }
+  if (href) {
+    return (
+      <Link href={href} className={classes} aria-label={ariaLabel} aria-current={current ? "page" : undefined}>
+        {inner}
+      </Link>
+    );
+  }
+  if (onClick) {
+    return (
+      <button type="button" onClick={onClick} disabled={disabled} className={classes} aria-label={ariaLabel}>
+        {inner}
+      </button>
+    );
+  }
+  return <div className={classes}>{inner}</div>;
+}
+
+/* ------------------------------- Kennzahlen ----------------------------- */
+
+export interface StatItem {
   label: string;
   value: string | number;
-  hint?: string;
-  tone?: Tone;
-}) {
-  const colored = tone === "success" || tone === "danger";
-  return (
-    <div className="card min-w-0 px-4 py-3.5">
-      <p className="muted flex items-center gap-1.5 truncate text-[12.5px] font-medium">
-        {tone !== "neutral" && (
-          <span
-            className="h-1.5 w-1.5 shrink-0 rounded-full"
-            style={{ background: TONE_DOT[tone] }}
-            aria-hidden
-          />
-        )}
-        {label}
-      </p>
-      <p
-        className="mt-1.5 truncate text-[26px] font-bold leading-none tabular-nums md:text-[28px]"
-        style={{ color: colored ? TONE_INK[tone] : "var(--ink)", letterSpacing: "-0.025em" }}
-      >
-        {value}
-      </p>
-      {hint && <p className="muted mt-1.5 truncate text-[12px]">{hint}</p>}
-    </div>
-  );
+  hint?: ReactNode;
+  /** Abschluesse: die Zahl im Akzent. */
+  accent?: boolean;
 }
 
 /**
- * Mehrere Zahlen in einer Karte, durch Haarlinien getrennt - ruhiger als
- * einzelne Kacheln, wenn die Werte zusammen gelesen werden.
+ * Kennzahlen auf einer gemeinsamen Flaeche, durch Haarlinien getrennt -
+ * grosse, ruhige Zahlen wie in Fitness, kleine leise Beschriftung.
  */
-export function StatGroup({
+export function StatGrid({
   items,
+  columns,
+  size = "md",
 }: {
-  items: Array<{ label: string; value: string | number; hint?: string; tone?: Tone }>;
+  items: StatItem[];
+  /** Spalten ab Tablet; auf dem Handy hoechstens zwei bzw. drei. */
+  columns?: 2 | 3 | 4;
+  size?: "md" | "lg";
 }) {
+  const cols = columns ?? (items.length >= 4 ? 4 : (items.length as 2 | 3));
+  const grid =
+    cols === 4
+      ? "grid-cols-2 md:grid-cols-4"
+      : cols === 3
+        ? "grid-cols-3"
+        : "grid-cols-2";
   return (
-    <div
-      className="card grid divide-x overflow-hidden"
-      style={{
-        gridTemplateColumns: `repeat(${items.length}, minmax(0, 1fr))`,
-        borderColor: "var(--line)",
-      }}
-    >
+    <dl className={`grid gap-px overflow-hidden rounded-xl bg-separator ${grid}`}>
       {items.map((item) => (
-        <div key={item.label} className="px-3 py-3 text-center" style={{ borderColor: "var(--line)" }}>
-          <p
-            className="text-[27px] font-bold leading-none tabular-nums"
-            style={{ color: TONE_INK[item.tone ?? "neutral"], letterSpacing: "-0.02em" }}
+        <div key={item.label} className="flex min-w-0 flex-col-reverse bg-surface px-4 py-3">
+          {item.hint && <dd className="order-first truncate text-footnote text-muted">{item.hint}</dd>}
+          <dd
+            className={`kpi truncate ${size === "lg" ? "text-large-title" : "text-title-1"} ${
+              item.accent ? "text-accent-ink" : "text-ink"
+            }`}
           >
             {item.value}
-          </p>
-          <p className="muted mt-1 text-[11px] font-semibold leading-tight">{item.label}</p>
-          {item.hint && <p className="muted text-[10px] leading-tight">{item.hint}</p>}
+          </dd>
+          <dt className="truncate text-footnote font-semibold text-ink-2">{item.label}</dt>
         </div>
       ))}
-    </div>
+    </dl>
   );
 }
 
+/** Schmaler Fortschrittsbalken im Akzent. */
 export function ProgressBar({
   value,
   max,
-  tone = "brand",
-  size = "md",
+  label,
+  className = "",
 }: {
   value: number;
   max: number;
-  tone?: "brand" | "success" | "warn";
-  size?: "sm" | "md";
+  label?: string;
+  className?: string;
 }) {
   const pct = max > 0 ? Math.min(100, Math.round((value / max) * 100)) : 0;
-  const fill =
-    tone === "success"
-      ? "var(--energy-500)"
-      : tone === "warn"
-        ? "var(--gas-500)"
-        : "var(--brand-500)";
   return (
     <div
-      className={`${size === "sm" ? "h-1.5" : "h-2"} w-full overflow-hidden rounded-full`}
-      style={{ background: "color-mix(in srgb, var(--ink) 10%, transparent)" }}
+      className={`h-1 w-full overflow-hidden rounded-full bg-fill-strong ${className}`}
       role="progressbar"
+      aria-label={label}
       aria-valuenow={pct}
       aria-valuemin={0}
       aria-valuemax={100}
     >
       <div
-        className="h-full rounded-full transition-[width] duration-500"
-        style={{
-          width: `${pct}%`,
-          background: fill,
-          transitionTimingFunction: "var(--ease-spring)",
-        }}
+        className="h-full rounded-full bg-accent transition-[width] duration-500 ease-spring"
+        style={{ width: `${pct}%` }}
       />
     </div>
   );
 }
 
 /**
- * Fortschritt als Ring - er steht neben einer Zahl, wo ein Balken die Zeile
- * sprengen wuerde. Die Zahl in der Mitte bleibt die eigentliche Aussage.
+ * Fortschritt als Ring - wie die Ringe in Fitness. Die Mitte traegt die
+ * eigentliche Aussage (Prozent, Level, 3/8).
  */
 export function ProgressRing({
   value,
   max,
   size = 44,
-  tone = "brand",
+  stroke,
+  label,
   children,
 }: {
   value: number;
   max: number;
   size?: number;
-  tone?: "brand" | "success";
+  stroke?: number;
+  label?: string;
   children?: ReactNode;
 }) {
   const pct = max > 0 ? Math.min(1, value / max) : 0;
-  const stroke = size >= 40 ? 4 : 3.5;
-  const radius = (size - stroke) / 2;
+  const width = stroke ?? Math.max(3, Math.round(size / 9));
+  const radius = (size - width) / 2;
   const circumference = 2 * Math.PI * radius;
-  const color = tone === "success" ? "var(--energy-500)" : "var(--brand-500)";
   return (
-    <span className="relative inline-grid shrink-0 place-items-center" style={{ width: size, height: size }}>
-      <svg width={size} height={size} className="-rotate-90" aria-hidden>
+    <span
+      className="relative inline-grid shrink-0 place-items-center"
+      style={{ width: size, height: size }}
+      role={label ? "img" : undefined}
+      aria-label={label}
+    >
+      <svg width={size} height={size} className="-rotate-90" aria-hidden="true">
+        <circle cx={size / 2} cy={size / 2} r={radius} fill="none" strokeWidth={width} className="stroke-fill-strong" />
         <circle
           cx={size / 2}
           cy={size / 2}
           r={radius}
           fill="none"
-          strokeWidth={stroke}
-          stroke="color-mix(in srgb, var(--ink) 12%, transparent)"
-        />
-        <circle
-          cx={size / 2}
-          cy={size / 2}
-          r={radius}
-          fill="none"
-          strokeWidth={stroke}
-          stroke={color}
+          strokeWidth={width}
           strokeLinecap="round"
+          className="stroke-accent transition-[stroke-dashoffset] duration-500 ease-spring"
           strokeDasharray={circumference}
           strokeDashoffset={circumference * (1 - pct)}
-          style={{ transition: "stroke-dashoffset .5s var(--ease-spring)" }}
         />
       </svg>
-      <span className="absolute text-[11px] font-bold tabular-nums">{children}</span>
+      {children !== undefined && (
+        <span className="kpi absolute text-caption font-bold">{children}</span>
+      )}
     </span>
   );
 }
 
-const STATUS_STYLES: Record<string, { label: string; bg: string; fg: string }> = {
-  OPEN: { label: "Offen", bg: "color-mix(in srgb, var(--ink) 9%, transparent)", fg: "var(--ink-muted)" },
-  ACTIVE: { label: "In Arbeit", bg: "color-mix(in srgb, var(--brand-500) 15%, transparent)", fg: "var(--tint)" },
-  DONE: { label: "Fertig", bg: "color-mix(in srgb, var(--energy-500) 18%, transparent)", fg: "var(--ok-ink)" },
-  PAUSED: { label: "Pausiert", bg: "color-mix(in srgb, var(--gas-500) 20%, transparent)", fg: "var(--warn-ink)" },
+/* -------------------------------- Plaketten ----------------------------- */
+
+export type Tone = "neutral" | "accent" | "danger" | "warn" | "ink";
+
+/** Kleine Plakette. Farbe nur als Zusatz zum Wort. */
+export function Pill({ tone = "neutral", children }: { tone?: Tone; children: ReactNode }) {
+  const cls =
+    tone === "accent"
+      ? "badge badge-accent"
+      : tone === "danger"
+        ? "badge badge-danger"
+        : tone === "warn"
+          ? "badge badge-warn"
+          : tone === "ink"
+            ? "badge badge-ink"
+            : "badge";
+  return <span className={cls}>{children}</span>;
+}
+
+const STATUS: Record<string, { label: string; tone: Tone; check?: boolean }> = {
+  OPEN: { label: "Offen", tone: "neutral" },
+  ACTIVE: { label: "In Arbeit", tone: "accent" },
+  PAUSED: { label: "Pausiert", tone: "neutral" },
+  DONE: { label: "Fertig", tone: "neutral", check: true },
 };
 
 export function StatusBadge({ status }: { status: string }) {
-  const style = STATUS_STYLES[status] ?? STATUS_STYLES.OPEN;
+  const style = STATUS[status] ?? STATUS.OPEN;
   return (
-    <span className="badge" style={{ background: style.bg, color: style.fg }}>
-      <span
-        className="h-1.5 w-1.5 rounded-full"
-        style={{ background: style.fg }}
-        aria-hidden
-      />
+    <Pill tone={style.tone}>
+      {style.check && <IconCheck className="h-3 w-3" />}
       {style.label}
-    </span>
+    </Pill>
   );
 }
 
-/** Farbige Plakette mit Ton aus der Markenpalette. */
-export function Pill({
-  tone = "neutral",
-  children,
-  style,
-}: {
-  tone?: Tone;
-  children: ReactNode;
-  style?: CSSProperties;
-}) {
-  const base: Record<string, { bg: string; fg: string }> = {
-    neutral: { bg: "color-mix(in srgb, var(--ink) 8%, transparent)", fg: "var(--ink-muted)" },
-    brand: { bg: "color-mix(in srgb, var(--brand-500) 14%, transparent)", fg: "var(--tint)" },
-    success: { bg: "color-mix(in srgb, var(--energy-500) 17%, transparent)", fg: "var(--ok-ink)" },
-    warn: { bg: "color-mix(in srgb, var(--gas-500) 20%, transparent)", fg: "var(--warn-ink)" },
-    danger: { bg: "color-mix(in srgb, var(--signal-500) 15%, transparent)", fg: "var(--danger-ink)" },
-  };
-  const t = base[tone];
-  return (
-    <span className="badge" style={{ background: t.bg, color: t.fg, ...style }}>
-      {children}
-    </span>
-  );
-}
+/* --------------------------------- Person ------------------------------- */
 
-/**
- * Eine Wahl aus wenigen Moeglichkeiten - wie der Schalter oben in den
- * iOS-Einstellungen. Ab drei Woertern wird daraus schnell eine Zeile zu
- * viel, deshalb bleiben die Beschriftungen kurz.
- */
-export function Segmented<T extends string>({
-  options,
-  value,
-  onChange,
-  tone = "plain",
-  ariaLabel,
-}: {
-  options: Array<{ value: T; label: string; icon?: ReactNode }>;
-  value: T;
-  onChange: (value: T) => void;
-  tone?: "plain" | "brand";
-  ariaLabel?: string;
-}) {
-  return (
-    <div className={`seg ${tone === "brand" ? "seg-brand" : ""}`} role="group" aria-label={ariaLabel}>
-      {options.map((option) => (
-        <button
-          key={option.value}
-          type="button"
-          aria-pressed={value === option.value}
-          onClick={() => onChange(option.value)}
-        >
-          {option.icon}
-          {option.label}
-        </button>
-      ))}
-    </div>
-  );
-}
-
-/**
- * Eine Person im Kreis: das Profilbild, sonst das Kuerzel des Namens
- * („Alex Krüger“ wird zu „AK“).
- */
+/** Profilbild oder Kuerzel ("Alex Krüger" wird "AK") im neutralen Kreis. */
 export function Avatar({
   name,
   src,
-  size = 28,
-  tone = "brand",
+  size = 32,
   loading = false,
+  className = "",
 }: {
   name: string | null;
-  /** Profilbild als Data-URL; ohne Bild erscheint das Kuerzel. */
   src?: string | null;
   size?: number;
-  /** "light" fuer dunkle Flaechen wie die Seitenleiste. */
-  tone?: "brand" | "muted" | "light";
-  /** Zeigt einen Platzhalter, solange das Bild noch entsteht. */
   loading?: boolean;
+  className?: string;
 }) {
   if (loading) {
     return (
       <span
-        className="skeleton inline-block shrink-0 rounded-full"
+        className={`skeleton inline-block shrink-0 rounded-full ${className}`}
         style={{ width: size, height: size }}
-        aria-hidden
+        aria-hidden="true"
       />
     );
   }
-
   if (src) {
     return (
-      // Das Bild steckt als Data-URL in den Teamdaten - kein Netzweg, den
-      // next/image optimieren koennte.
+      // Das Bild steckt als Data-URL in den Teamdaten - nichts fuer next/image.
       // eslint-disable-next-line @next/next/no-img-element
       <img
         src={src}
         alt=""
-        className="shrink-0 rounded-full object-cover"
-        style={{
-          width: size,
-          height: size,
-          boxShadow: "inset 0 0 0 1px rgb(11 21 36 / 0.08)",
-        }}
+        className={`shrink-0 rounded-full object-cover ring-1 ring-separator ${className}`}
+        style={{ width: size, height: size }}
       />
     );
   }
-
   const short = name
     ? name
         .trim()
@@ -404,184 +357,98 @@ export function Avatar({
         .slice(0, 2)
         .map((part) => part[0]?.toLocaleUpperCase("de-DE") ?? "")
         .join("")
-    : "–";
+    : "";
   return (
     <span
-      className="inline-grid shrink-0 place-items-center rounded-full font-bold"
-      style={{
-        width: size,
-        height: size,
-        fontSize: size * 0.4,
-        background:
-          tone === "brand"
-            ? "color-mix(in srgb, var(--brand-500) 16%, transparent)"
-            : tone === "light"
-              ? "rgb(255 255 255 / 0.16)"
-              : "color-mix(in srgb, var(--ink) 9%, transparent)",
-        color:
-          tone === "brand" ? "var(--tint)" : tone === "light" ? "#fff" : "var(--ink-muted)",
-      }}
-      title={name ?? "nicht zugeteilt"}
-      aria-hidden
+      className={`inline-grid shrink-0 place-items-center rounded-full bg-fill-strong font-semibold text-ink-2 ${className}`}
+      style={{ width: size, height: size, fontSize: Math.round(size * 0.38) }}
+      aria-hidden="true"
     >
       {short || "–"}
     </span>
   );
 }
 
-/** Hinweiszeile mit Symbol - fuer Erklaerungen, die nicht im Weg stehen sollen. */
-export function Note({
-  icon,
-  children,
-  tone = "neutral",
-}: {
-  icon?: ReactNode;
-  children: ReactNode;
-  tone?: Tone;
-}) {
-  const bg: Record<string, string> = {
-    neutral: "color-mix(in srgb, var(--ink) 5%, transparent)",
-    brand: "color-mix(in srgb, var(--brand-500) 9%, transparent)",
-    success: "color-mix(in srgb, var(--energy-500) 11%, transparent)",
-    warn: "color-mix(in srgb, var(--gas-500) 13%, transparent)",
-    danger: "color-mix(in srgb, var(--signal-500) 11%, transparent)",
-  };
-  return (
-    <div
-      className="flex items-start gap-2.5 rounded-[var(--r-md)] px-3 py-2.5 text-[12px] leading-snug"
-      style={{ background: bg[tone], color: tone === "neutral" ? "var(--ink-muted)" : TONE_INK[tone] }}
-    >
-      {icon && <span className="mt-px shrink-0">{icon}</span>}
-      <span className="min-w-0 flex-1">{children}</span>
-    </div>
-  );
-}
+/* ------------------------------- Zustaende ------------------------------ */
 
-/** Ueberschrift einer Gruppe - klein, in Grossbuchstaben, wie in iOS-Listen. */
-export function GroupLabel({ children }: { children: ReactNode }) {
-  return (
-    <p className="muted mb-2 ml-1 text-[12px] font-semibold uppercase tracking-[0.05em]">
-      {children}
-    </p>
-  );
-}
-
+/** Leerer Zustand: ein Zeichen, ein Satz, hoechstens eine Aktion. */
 export function EmptyState({
   title,
   text,
   icon,
   action,
-  bare = false,
+  boxed = false,
 }: {
   title: string;
-  text?: string;
+  text?: ReactNode;
   icon?: ReactNode;
   action?: ReactNode;
-  /** Ohne eigene Karte - fuer leere Abschnitte innerhalb einer Karte. */
-  bare?: boolean;
+  /** Auf eigener Flaeche - wenn der Zustand allein auf der Seite steht. */
+  boxed?: boolean;
 }) {
-  if (bare) {
-    return (
-      <div className="flex flex-col items-center gap-1.5 px-4 py-8 text-center">
-        {icon && (
-          <span
-            className="mb-1 grid h-11 w-11 place-items-center rounded-full"
-            style={{
-              background: "color-mix(in srgb, var(--ink) 6%, transparent)",
-              color: "var(--ink-muted)",
-            }}
-          >
-            {icon}
-          </span>
-        )}
-        <p className="text-[14px] font-semibold">{title}</p>
-        {text && <p className="muted max-w-xs text-[13px] leading-snug">{text}</p>}
-        {action && <div className="mt-2">{action}</div>}
-      </div>
-    );
-  }
   return (
-    <div className="card flex flex-col items-center gap-2 px-6 py-14 text-center">
-      {icon && (
-        <span
-          className="mb-1 grid h-14 w-14 place-items-center rounded-full"
-          style={{
-            background: "color-mix(in srgb, var(--brand-500) 10%, transparent)",
-            color: "var(--tint)",
-          }}
-        >
-          {icon}
-        </span>
-      )}
-      <p className="text-[17px] font-semibold">{title}</p>
-      {text && <p className="muted max-w-sm text-sm leading-relaxed">{text}</p>}
-      {action && <div className="mt-3">{action}</div>}
+    <div
+      className={`flex flex-col items-center px-6 text-center ${
+        boxed ? "rounded-xl bg-surface py-12" : "py-8"
+      }`}
+    >
+      {icon && <span className="glyph glyph-lg glyph-round mb-4 text-muted">{icon}</span>}
+      <p className="text-headline">{title}</p>
+      {text && <p className="mt-1 max-w-sm text-subhead text-muted">{text}</p>}
+      {action && <div className="mt-4">{action}</div>}
     </div>
   );
 }
 
-/* ------------------------------ Ladezustaende ---------------------------- */
+/** Kurze Fehlermeldung unter einem Formular oder Knopf. */
+export function InlineError({ children }: { children: ReactNode }) {
+  return (
+    <p className="rounded-lg bg-danger-tint px-4 py-2 text-footnote font-semibold text-danger" role="alert">
+      {children}
+    </p>
+  );
+}
 
-/**
- * Ein grauer Balken, der die Stelle eines Textes einnimmt.
- *
- * Die Rundung kommt als Wert und nicht als Klasse: so laesst sie sich fuer
- * groessere Flaechen (Karte, Kachel) ueberschreiben, ohne dass zwei
- * Rundungs-Klassen um den Vorrang streiten.
- */
+/** Ruhiger Hinweis, wenn er wirklich gebraucht wird (kein Erklaertext). */
+export function Notice({ children, icon }: { children: ReactNode; icon?: ReactNode }) {
+  return (
+    <div className="flex items-center gap-3 rounded-xl bg-surface px-4 py-3 text-subhead text-ink-2">
+      {icon && <span className="shrink-0 text-muted">{icon}</span>}
+      <span className="min-w-0 flex-1">{children}</span>
+    </div>
+  );
+}
+
+/* ------------------------------ Ladezustaende --------------------------- */
+
 export function SkeletonLine({
   width = "100%",
   height = 12,
-  radius = 999,
   className = "",
 }: {
   width?: string | number;
   height?: number;
-  radius?: number;
   className?: string;
 }) {
   return (
     <span
-      className={`skeleton block ${className}`}
-      style={{ width, height, borderRadius: radius }}
-      aria-hidden
+      className={`skeleton block rounded-full ${className}`}
+      style={{ width, height }}
+      aria-hidden="true"
     />
   );
 }
 
-/**
- * Platzhalter-Karte, solange die Daten unterwegs sind.
- *
- * Besser als ein Kreisel: die Seite steht schon an ihrem Platz und springt
- * nicht, wenn die Inhalte eintreffen.
- */
-export function SkeletonCard({
-  lines = 3,
-  className = "",
-}: {
-  lines?: number;
-  className?: string;
-}) {
+/** Platzhalter einer gruppierten Liste - Kreis und zwei Balken je Zeile. */
+export function SkeletonList({ rows = 4, icon = true }: { rows?: number; icon?: boolean }) {
   return (
-    <div className={`card space-y-2.5 p-4 ${className}`} aria-hidden>
-      <SkeletonLine width="55%" height={14} />
-      {Array.from({ length: lines }, (_, i) => (
-        <SkeletonLine key={i} width={i === lines - 1 ? "70%" : "100%"} />
-      ))}
-    </div>
-  );
-}
-
-/** Mehrere Platzhalter-Zeilen in einer Liste, je mit Kreis und zwei Balken. */
-export function SkeletonRows({ rows = 4 }: { rows?: number }) {
-  return (
-    <div className="list" aria-hidden>
+    <div className="list" aria-hidden="true">
       {Array.from({ length: rows }, (_, i) => (
-        <div key={i} className="flex items-center gap-3 px-3.5 py-3">
-          <span className="skeleton h-9 w-9 shrink-0 rounded-full" />
-          <span className="min-w-0 flex-1 space-y-1.5">
-            <SkeletonLine width={`${70 - i * 7}%`} height={13} />
-            <SkeletonLine width={`${45 - i * 4}%`} height={10} />
+        <div key={i} className="cell min-h-15">
+          {icon && <span className="skeleton h-8 w-8 shrink-0 rounded-full" />}
+          <span className="min-w-0 flex-1 space-y-2">
+            <SkeletonLine width={`${72 - i * 8}%`} height={12} />
+            <SkeletonLine width={`${44 - i * 4}%`} height={8} />
           </span>
         </div>
       ))}
@@ -589,7 +456,33 @@ export function SkeletonRows({ rows = 4 }: { rows?: number }) {
   );
 }
 
-/* ------------------------------ Ergebnisse ------------------------------ */
+/** Platzhalter einer Seite mit grossem Titel. */
+export function SkeletonHeader() {
+  return (
+    <div className="space-y-2 pb-4 pt-12" aria-hidden="true">
+      <SkeletonLine width="44%" height={32} className="rounded-lg" />
+      <SkeletonLine width="28%" height={12} />
+    </div>
+  );
+}
+
+export function SkeletonStats({ count = 4 }: { count?: number }) {
+  return (
+    <div
+      className={`grid gap-px overflow-hidden rounded-xl bg-separator ${count >= 4 ? "grid-cols-2 md:grid-cols-4" : "grid-cols-3"}`}
+      aria-hidden="true"
+    >
+      {Array.from({ length: count }, (_, i) => (
+        <div key={i} className="space-y-2 bg-surface px-4 py-4">
+          <SkeletonLine width="50%" height={10} />
+          <SkeletonLine width="40%" height={24} className="rounded-md" />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/* -------------------------------- Ergebnisse ---------------------------- */
 
 export const OUTCOME_LABEL: Record<string, string> = {
   SALE: "Abschluss",
@@ -598,38 +491,34 @@ export const OUTCOME_LABEL: Record<string, string> = {
   NOT_HOME: "Nicht angetroffen",
 };
 
-/** Farbe eines Ergebnisses - dieselbe in Listen, Klingelbrett und Verlauf. */
-export function outcomeColor(outcome: string): string {
-  if (outcome === "SALE") return "var(--ok-ink)";
-  if (outcome === "APPOINTMENT") return "var(--tint)";
-  if (outcome === "NOT_HOME") return "var(--ink-muted)";
-  return "var(--danger-ink)";
-}
-
-/** Das Ergebnis eines Besuchs als farbiger Kreis mit Zeichen. */
-export function OutcomeIcon({ outcome, size = 30 }: { outcome: string; size?: number }) {
-  const color = outcomeColor(outcome);
-  const glyph = size >= 30 ? "h-4 w-4" : "h-3.5 w-3.5";
+/**
+ * Das Ergebnis eines Besuchs als Zeichen. Nur der Abschluss ist gefuellt
+ * gruen mit Haekchen; alles andere bleibt neutral und traegt sein Zeichen
+ * (bei Ablehnungen das Emoji des Grundes).
+ */
+export function OutcomeGlyph({
+  outcome,
+  emoji,
+  size = "md",
+}: {
+  outcome: string;
+  emoji?: string | null;
+  size?: "sm" | "md";
+}) {
+  const cls = `glyph glyph-round ${size === "sm" ? "glyph-sm" : ""} ${outcome === "SALE" ? "glyph-result" : ""}`;
+  const icon = size === "sm" ? "h-3.5 w-3.5" : "h-4 w-4";
   return (
-    <span
-      className="tile-icon shrink-0"
-      style={{
-        width: size,
-        height: size,
-        background: `color-mix(in srgb, ${color} 13%, transparent)`,
-        color,
-      }}
-      title={OUTCOME_LABEL[outcome]}
-      aria-hidden
-    >
+    <span className={cls} title={OUTCOME_LABEL[outcome]} aria-hidden="true">
       {outcome === "SALE" ? (
-        <IconCheck className={glyph} />
+        <IconCheck className={icon} />
       ) : outcome === "APPOINTMENT" ? (
-        <IconCalendar className={glyph} />
+        <IconCalendar className={icon} />
       ) : outcome === "NOT_HOME" ? (
-        <IconDoor className={glyph} />
+        <IconDoor className={icon} />
+      ) : emoji ? (
+        <span>{emoji}</span>
       ) : (
-        <IconChat className={glyph} />
+        <IconChat className={icon} />
       )}
     </span>
   );
@@ -660,9 +549,74 @@ export function Switch({
   );
 }
 
+/** Wahl aus wenigen Moeglichkeiten - die Leiste aus den iOS-Einstellungen. */
+export function Segmented<T extends string>({
+  options,
+  value,
+  onChange,
+  ariaLabel,
+  glass = false,
+  className = "",
+}: {
+  options: Array<{ value: T; label: string; icon?: ReactNode }>;
+  value: T;
+  onChange: (value: T) => void;
+  ariaLabel: string;
+  glass?: boolean;
+  className?: string;
+}) {
+  return (
+    <div className={`seg ${glass ? "seg-glass" : ""} ${className}`} role="group" aria-label={ariaLabel}>
+      {options.map((option) => (
+        <button
+          key={option.value}
+          type="button"
+          aria-pressed={value === option.value}
+          onClick={() => onChange(option.value)}
+        >
+          {option.icon}
+          <span>{option.label}</span>
+        </button>
+      ))}
+    </div>
+  );
+}
+
+/** Dieselbe Leiste als Navigation zwischen Seiten. */
+export function SegmentedLinks({
+  options,
+  current,
+  ariaLabel,
+  glass = false,
+  className = "",
+}: {
+  options: Array<{ href: string; label: string; key: string }>;
+  current: string;
+  ariaLabel: string;
+  glass?: boolean;
+  className?: string;
+}) {
+  return (
+    <nav className={`seg ${glass ? "seg-glass" : ""} ${className}`} aria-label={ariaLabel}>
+      {options.map((option) => (
+        <Link
+          key={option.key}
+          href={option.href}
+          scroll={false}
+          aria-current={option.key === current ? "page" : undefined}
+        >
+          <span>{option.label}</span>
+        </Link>
+      ))}
+    </nav>
+  );
+}
+
+/* --------------------------------- Format ------------------------------- */
+
 /** "1 Straße" statt "1 Straßen". */
 export function plural(count: number, one: string, many: string): string {
-  return `${count} ${count === 1 ? one : many}`;
+  return `${count.toLocaleString("de-DE")} ${count === 1 ? one : many}`;
 }
 
 export function percent(part: number, total: number): string {

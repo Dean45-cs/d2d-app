@@ -3,28 +3,29 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
+  Cell,
   EmptyState,
-  Note,
+  InlineError,
+  ListLabel,
   PageHeader,
-  SectionHeader,
   Segmented,
-  StatTile,
+  SegmentedLinks,
+  StatGrid,
+  ct,
   euro,
+  plural,
 } from "@/components/ui";
-import { IconBolt, IconInfo, IconList, IconPlus, IconRefresh, IconSearch } from "@/components/icons";
+import { IconBolt, IconList, IconPencil, IconPlus, IconRefresh, IconSearch, IconTrash } from "@/components/icons";
+import { Menu, MenuItem } from "@/components/Menu";
 import { PriceBadge } from "@/components/ProviderRating";
+import { Sheet } from "@/components/Sheet";
 import { ShowMore } from "@/components/ShowMore";
+import { useToast } from "@/components/Toast";
 import { useConfirm } from "@/components/useConfirm";
 import { MapView } from "@/components/map/MapView";
 import { priceMarker } from "@/components/map/markers";
 import type { LatLng, MapEngine } from "@/components/map/types";
-import {
-  NO_PRICE_COLOR,
-  PRICE_LEVELS,
-  PRICE_SCALE,
-  referenceStep,
-  type Energy,
-} from "@/lib/energy/rating";
+import { NO_PRICE_COLOR, PRICE_LEVELS, PRICE_SCALE, referenceStep, type Energy } from "@/lib/energy/rating";
 import {
   EMPTY_DRAFT,
   dateLabel,
@@ -37,6 +38,7 @@ import {
 } from "./data";
 import { PriceSheet, type SavedPrice } from "./PriceSheet";
 import { ImportSheet } from "./ImportSheet";
+import { MAP_VIEWS } from "../gebiete/views";
 
 interface Props {
   prices: MapPoint[];
@@ -70,6 +72,11 @@ function located(point: { lat: number | null; lng: number | null }): LatLng | nu
   return point.lat !== null && point.lng !== null ? [point.lat, point.lng] : null;
 }
 
+/**
+ * Preise der Grundversorger auf der Karte: je teurer, desto kraeftiger das
+ * Gruen - dort lohnt das Klingeln. Ein Tipp auf einen Ort oeffnet ihn im
+ * Blatt; die Teamleitung traegt dort Preise ein.
+ */
 export function EnergyMapClient({
   prices,
   open,
@@ -81,6 +88,7 @@ export function EnergyMapClient({
   initialDraft,
 }: Props) {
   const router = useRouter();
+  const toast = useToast();
   const { confirm, dialog } = useConfirm();
   const [engine, setEngine] = useState<MapEngine | null>(null);
 
@@ -89,7 +97,6 @@ export function EnergyMapClient({
   const [draft, setDraft] = useState<PriceDraft | null>(initialDraft);
   const [importing, setImporting] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [message, setMessage] = useState<string | null>(null);
 
   // Der Link aus dem Gebiet soll beim Neuladen nicht wieder das Formular oeffnen.
   useEffect(() => {
@@ -108,8 +115,6 @@ export function EnergyMapClient({
     return value === null ? NO_PRICE_COLOR : PRICE_SCALE[referenceStep(value, ref)];
   }
 
-  /* ----------------------------- Kennzahlen ----------------------------- */
-
   const ranked = useMemo(
     () =>
       prices
@@ -121,8 +126,6 @@ export function EnergyMapClient({
         ),
     [prices, energy],
   );
-  const priciest = ranked[0] ?? null;
-  const cheapest = ranked.length > 1 ? ranked[ranked.length - 1] : null;
 
   const selectedPrice = prices.find((p) => p.key === selectedKey) ?? null;
   const selectedOpen = open.find((p) => p.key === selectedKey) ?? null;
@@ -130,8 +133,7 @@ export function EnergyMapClient({
   /* -------------------------------- Karte -------------------------------- */
 
   const allPoints = useMemo(
-    () =>
-      [...prices, ...open].map(located).filter((p): p is LatLng => p !== null),
+    () => [...prices, ...open].map(located).filter((p): p is LatLng => p !== null),
     [prices, open],
   );
 
@@ -161,9 +163,6 @@ export function EnergyMapClient({
       layer.marker(at, {
         ...priceMarker(colorOf(point), Math.round(diameter), isSelected),
         title: point.city || point.plz,
-        subtitle: `${point.provider || "Grundversorger unbekannt"} · ${
-          value !== null ? `${euro(value)} / Jahr` : `kein ${label}preis`
-        }`,
         priority: isSelected ? 5 : 2,
         onClick: () => setSelectedKey(point.key),
       });
@@ -175,7 +174,6 @@ export function EnergyMapClient({
       layer.marker(at, {
         ...priceMarker(NO_PRICE_COLOR, 12, isSelected, true),
         title: place.city || place.plz || "Ohne Ort",
-        subtitle: "Noch kein Preis – antippen zum Eintragen",
         priority: isSelected ? 5 : 1,
         onClick: () => setSelectedKey(place.key),
       });
@@ -194,12 +192,8 @@ export function EnergyMapClient({
   function saved(result: SavedPrice) {
     setDraft(null);
     const place = [result.postalCode, result.city].filter(Boolean).join(" ");
-    setMessage(
-      result.located
-        ? `Preis für ${place} gespeichert.`
-        : `Preis für ${place} gespeichert. Die Lage des Ortes ist unbekannt – er gilt für Gebiete mit dieser PLZ, erscheint aber nicht auf der Karte.`,
-    );
-    setSelectedKey(`p:${result.postalCode}`);
+    toast(result.located ? `Preis für ${place} gespeichert` : `${place} gespeichert – ohne Kartenpunkt`);
+    setSelectedKey(null);
     router.refresh();
   }
 
@@ -207,35 +201,30 @@ export function EnergyMapClient({
     if (point.id === null) return;
     const ok = await confirm({
       title: `Preis für ${point.plz} ${point.city} löschen?`,
-      text: "Gebiete in diesem Ort stehen danach wieder ohne Preis da.",
+      text: "Gebiete in diesem Ort stehen danach ohne Preis da.",
       confirmLabel: "Löschen",
       danger: true,
     });
     if (!ok) return;
-    const response = await fetch(`/api/provider-prices/${point.id}`, { method: "DELETE" });
-    if (!response.ok) {
-      setMessage("Der Preis konnte nicht gelöscht werden.");
+    const response = await fetch(`/api/provider-prices/${point.id}`, { method: "DELETE" }).catch(() => null);
+    if (!response?.ok) {
+      toast("Preis nicht gelöscht");
       return;
     }
     setSelectedKey(null);
-    setMessage(`Preis für ${point.plz} ${point.city} gelöscht.`);
+    toast("Preis gelöscht");
     router.refresh();
   }
 
   async function refreshFeed() {
     setBusy(true);
-    setMessage(null);
     try {
       const response = await fetch("/api/energy/refresh", { method: "POST" });
       const data = await response.json();
-      setMessage(
-        response.ok
-          ? `Tagesquelle abgerufen – ${data.rowCount} Orte.`
-          : (data.error ?? data.message ?? "Abruf fehlgeschlagen"),
-      );
+      toast(response.ok ? `${plural(data.rowCount, "Ort", "Orte")} abgerufen` : (data.error ?? data.message ?? "Abruf fehlgeschlagen"));
       if (response.ok) router.refresh();
     } catch {
-      setMessage("Keine Verbindung – bitte noch einmal versuchen.");
+      toast("Keine Verbindung");
     } finally {
       setBusy(false);
     }
@@ -245,297 +234,246 @@ export function EnergyMapClient({
 
   const refresh = feed?.refresh ?? null;
   const stand = refresh?.finished_at
-    ? `Tagesquelle vom ${new Date(refresh.finished_at).toLocaleDateString("de-DE", {
-        day: "2-digit",
-        month: "2-digit",
-        year: "numeric",
-      })}`
+    ? `Stand ${new Date(refresh.finished_at).toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit" })}`
     : null;
-
   const nothing = prices.length === 0 && open.length === 0;
+  const showMenu = isLeader || (canRefresh && feed);
 
   return (
-    <div className="mx-auto max-w-6xl">
+    <div className="page">
       <PageHeader
-        title="Energiekarte"
+        title="Karte"
         subtitle={[
-          prices.length > 0 ? `${prices.length} ${prices.length === 1 ? "Ort" : "Orte"} mit Preis` : "Noch keine Preise",
-          `Musterhaushalt ${consumption[energy].toLocaleString("de-DE")} kWh ${label}`,
+          prices.length > 0 ? plural(prices.length, "Ort", "Orte") : "Noch keine Preise",
+          `${consumption[energy].toLocaleString("de-DE")} kWh ${label}`,
           stand,
         ]
           .filter(Boolean)
           .join(" · ")}
-        action={
+        actions={
           <>
-            {prices.length > 0 && (
-              <Segmented<Energy>
-                ariaLabel="Energieart"
-                value={energy}
-                onChange={setEnergy}
-                options={[
-                  { value: "strom", label: "Strom" },
-                  { value: "gas", label: "Gas" },
-                ]}
-              />
-            )}
-            {canRefresh && feed && (
-              <button
-                className="icon-btn icon-btn-outline h-10 w-10"
-                onClick={refreshFeed}
-                disabled={busy}
-                aria-label="Tagesquelle jetzt abrufen"
-                title="Tagesquelle jetzt abrufen"
-              >
-                <IconRefresh className={`h-[18px] w-[18px] ${busy ? "animate-spin" : ""}`} />
-              </button>
+            {showMenu && (
+              <Menu label="Preise verwalten">
+                {isLeader && (
+                  <MenuItem icon={<IconList className="h-5 w-5" />} onSelect={() => setImporting(true)}>
+                    Tabelle importieren
+                  </MenuItem>
+                )}
+                {canRefresh && feed && (
+                  <MenuItem icon={<IconRefresh className={`h-5 w-5 ${busy ? "spin" : ""}`} />} onSelect={() => void refreshFeed()}>
+                    Tagesquelle abrufen
+                  </MenuItem>
+                )}
+              </Menu>
             )}
             {isLeader && (
-              <>
-                {/* Auf dem Handy kurz beschriftet - sonst passt die Zeile nicht in die Breite. */}
-                <button
-                  type="button"
-                  className="btn btn-ghost"
-                  onClick={() => setImporting(true)}
-                  aria-label="Preise als Tabelle"
-                  title="Preise als Tabelle"
-                >
-                  <IconList className="h-4 w-4" />
-                  <span className="hidden sm:inline">Tabelle</span>
-                </button>
-                <button type="button" className="btn btn-primary" onClick={() => setDraft(EMPTY_DRAFT)}>
-                  <IconPlus className="h-4 w-4" />
-                  <span className="sm:hidden">Preis</span>
-                  <span className="hidden sm:inline">Preis eintragen</span>
-                </button>
-              </>
+              <button
+                type="button"
+                className="icon-btn icon-btn-accent"
+                onClick={() => setDraft(EMPTY_DRAFT)}
+                aria-label="Preis eintragen"
+              >
+                <IconPlus className="h-5 w-5" />
+              </button>
             )}
           </>
         }
-      />
+      >
+        <SegmentedLinks ariaLabel="Ansicht der Karte" current="preise" options={MAP_VIEWS} className="max-w-xs" />
+      </PageHeader>
 
-      {message && (
-        <div className="mb-4">
-          <Note tone="brand" icon={<IconInfo className="h-4 w-4" />}>
-            {message}
-          </Note>
-        </div>
-      )}
       {refresh && refresh.status !== "ok" && (
         <div className="mb-4">
-          <Note tone="danger" icon={<IconInfo className="h-4 w-4" />}>
-            Letzter Abruf der Tagesquelle fehlgeschlagen: {refresh.message}
-          </Note>
+          <InlineError>Tagesquelle fehlgeschlagen: {refresh.message}</InlineError>
         </div>
       )}
 
       {nothing ? (
         <EmptyState
-          icon={<IconBolt className="h-7 w-7" />}
-          title="Noch keine Preise eingetragen"
-          text={
-            isLeader
-              ? "Für Grundversorger-Preise gibt es keine freie Schnittstelle – aber jeder Grundversorger muss sein Preisblatt online stellen. Einmal abtippen, danach bewertet die App jedes Gebiet damit."
-              : "Sobald die Teamleitung Preise einträgt, erscheinen sie hier."
-          }
+          boxed
+          icon={<IconBolt className="h-6 w-6" />}
+          title="Noch keine Preise"
+          text={isLeader ? "Preisblatt des Grundversorgers abtippen – danach ist jedes Gebiet bewertet." : undefined}
           action={
             isLeader && (
               <div className="flex flex-wrap justify-center gap-2">
                 <button type="button" className="btn btn-primary" onClick={() => setDraft(EMPTY_DRAFT)}>
-                  Ersten Ort eintragen
+                  Preis eintragen
                 </button>
-                <button type="button" className="btn btn-ghost" onClick={() => setImporting(true)}>
-                  Tabelle importieren
+                <button type="button" className="btn btn-secondary" onClick={() => setImporting(true)}>
+                  Tabelle
                 </button>
               </div>
             )
           }
         />
       ) : (
-        <>
-          {isLeader && prices.length === 0 && (
-            <div className="mb-4">
-              <Note tone="brand" icon={<IconInfo className="h-4 w-4" />}>
-                <span className="font-semibold">So füllt sich die Karte:</span> Grauen Punkt oder
-                „Eintragen“ antippen, im Formular das Preisblatt öffnen und Arbeits- und
-                Grundpreis abtippen. Viele Orte auf einmal: „Tabelle“ – Vorlage herunterladen, in
-                Excel ausfüllen, einfügen.
-              </Note>
-            </div>
-          )}
-
-          {prices.length > 0 && (
-            <div className="mb-4 grid grid-cols-2 gap-3 md:grid-cols-4">
-              <StatTile
-                label="Orte mit Preis"
-                value={prices.length}
-                hint={isLeader && open.length > 0 ? `${open.length} Gebietsorte noch offen` : undefined}
-              />
-              <StatTile label="Bundesschnitt" value={euro(ref)} hint="Musterhaushalt pro Jahr" />
-              <StatTile
-                label="Teuerster Ort"
-                value={priciest?.city || priciest?.plz || "–"}
-                hint={priciest ? deltaHint(valueOf(priciest), ref) : undefined}
-                tone={priciest ? deltaTone(valueOf(priciest), ref) : "neutral"}
-              />
-              <StatTile
-                label="Günstigster Ort"
-                value={cheapest?.city || cheapest?.plz || "–"}
-                hint={cheapest ? deltaHint(valueOf(cheapest), ref) : undefined}
-                tone={cheapest ? deltaTone(valueOf(cheapest), ref) : "neutral"}
-              />
-            </div>
-          )}
-
-          <div className="grid items-start gap-4 lg:grid-cols-[1fr_20rem]">
-            <div className="card overflow-hidden">
+        <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,380px)] lg:items-start">
+          <div className="lg:sticky lg:top-16">
+            <div className="relative overflow-hidden rounded-xl">
               <MapView
-                className="h-[62vh] min-h-[380px] w-full"
+                className="h-[56vh] min-h-80 w-full lg:h-[calc(100dvh-220px)]"
                 onEngine={setEngine}
                 onFit={() => fitAll(true)}
-              />
-              <div className="border-t px-4 pb-3 pt-3 hairline">
-                <div className="flex h-2 overflow-hidden rounded-full">
-                  {PRICE_SCALE.map((color) => (
-                    <span key={color} className="flex-1" style={{ background: color }} />
-                  ))}
-                </div>
-                <div className="muted mt-1.5 grid grid-cols-5 text-center text-[11px] font-medium">
-                  {PRICE_LEVELS.map((level) => (
-                    <span key={level.step}>{level.label}</span>
-                  ))}
-                </div>
-                <p className="muted mt-1 text-center text-[11px]">
-                  Gemessen am Bundesschnitt der Grundversorgung ({euro(ref)} im Jahr) – größere
-                  Punkte liegen weiter davon entfernt.
-                  {open.length > 0 && " Gestrichelt: Gebietsort ohne Preis."}
-                </p>
-              </div>
-            </div>
-
-            <div className="space-y-4">
-              {selectedPrice && (
-                <PriceDetail
-                  point={selectedPrice}
-                  energy={energy}
-                  reference={ref}
-                  isLeader={isLeader}
-                  onEdit={() => setDraft(draftFromPoint(selectedPrice))}
-                  onDelete={() => void remove(selectedPrice)}
-                />
-              )}
-
-              {selectedOpen && (
-                <div className="card p-5">
-                  <p className="muted text-[12.5px] font-medium">
-                    {[selectedOpen.plz, "noch kein Preis"].filter(Boolean).join(" · ")}
-                  </p>
-                  <p className="text-lg font-bold">{selectedOpen.city || "Ohne Ortsangabe"}</p>
-                  <p className="muted mb-3 text-sm">
-                    {selectedOpen.territories.join(", ")}
-                    {selectedOpen.provider && ` · Vorschlag: ${selectedOpen.provider}`}
-                  </p>
-                  {(selectedOpen.provider || selectedOpen.city) && (
-                    <p className="muted mb-3 flex items-center gap-1.5 text-[12.5px]">
-                      <IconSearch className="h-3.5 w-3.5 shrink-0" />
-                      Preisblatt:{" "}
-                      <a
-                        className="font-semibold text-tint"
-                        href={sheetSearch(selectedOpen.provider, selectedOpen.city, "Strom")}
-                        target="_blank"
-                        rel="noreferrer"
-                      >
-                        Strom
-                      </a>
-                      ·
-                      <a
-                        className="font-semibold text-tint"
-                        href={sheetSearch(selectedOpen.provider, selectedOpen.city, "Gas")}
-                        target="_blank"
-                        rel="noreferrer"
-                      >
-                        Gas
-                      </a>
-                    </p>
-                  )}
-                  <button
-                    type="button"
-                    className="btn btn-primary w-full"
-                    onClick={() => setDraft(draftFromOpen(selectedOpen))}
-                  >
-                    Preis eintragen
-                  </button>
-                </div>
-              )}
-
-              {open.length > 0 && (
-                <div className="card p-5">
-                  <SectionHeader title="Noch ohne Preis" count={open.length} className="mb-1" />
-                  <p className="muted mb-2 text-[12.5px] leading-snug">
-                    Orte eurer Gebiete – hier lohnt sich das Eintragen zuerst.
-                  </p>
-                  <ShowMore initial={5} className="-mx-2 space-y-0.5">
-                    {open.map((place) => (
-                      <li key={place.key} className="flex items-center gap-2 rounded-[var(--r-xs)] px-2 py-1.5">
-                        <button
-                          type="button"
-                          className="min-w-0 flex-1 text-left"
-                          onClick={() => focus(place.key, located(place))}
-                          aria-current={selectedKey === place.key ? "true" : undefined}
-                        >
-                          <span className="block truncate text-[13.5px] font-medium">
-                            {[place.plz, place.city].filter(Boolean).join(" ") || "Ohne Ortsangabe"}
-                          </span>
-                          <span className="muted block truncate text-[11.5px]">
-                            {place.territories.join(", ")}
-                          </span>
-                        </button>
-                        <button
-                          type="button"
-                          className="btn btn-ghost btn-sm btn-pill shrink-0"
-                          onClick={() => setDraft(draftFromOpen(place))}
-                        >
-                          Eintragen
-                        </button>
-                      </li>
+              >
+                {prices.length > 0 && (
+                  <div className="pointer-events-none absolute left-2 top-2 z-[500]">
+                    <Segmented<Energy>
+                      glass
+                      ariaLabel="Energieart"
+                      value={energy}
+                      onChange={setEnergy}
+                      className="pointer-events-auto w-40"
+                      options={[
+                        { value: "strom", label: "Strom" },
+                        { value: "gas", label: "Gas" },
+                      ]}
+                    />
+                  </div>
+                )}
+                <div className="map-chip pointer-events-none absolute bottom-2 left-2 z-[500] flex-col items-stretch gap-1 py-2">
+                  <div className="flex h-2 w-40 overflow-hidden rounded-full" aria-hidden="true">
+                    {PRICE_SCALE.map((color) => (
+                      <span key={color} className="flex-1" style={{ background: color }} />
                     ))}
-                  </ShowMore>
+                  </div>
+                  <div className="flex justify-between text-caption-2 text-ink-2">
+                    <span>{PRICE_LEVELS[0].label}</span>
+                    <span>{PRICE_LEVELS[4].label}</span>
+                  </div>
                 </div>
-              )}
-
-              {ranked.length > 0 && (
-                <div className="card p-5">
-                  <SectionHeader title={`Teuerste Orte · ${label}`} className="mb-2" />
-                  <ShowMore initial={10} className="-mx-2 space-y-0.5">
-                    {ranked.map((point, index) => (
-                      <li key={point.key}>
-                        <button
-                          onClick={() => focus(point.key, located(point))}
-                          className="flex w-full items-center gap-2.5 rounded-[var(--r-xs)] px-2 py-1.5 text-left text-[13.5px] transition-colors hover:bg-[var(--hover)]"
-                          aria-current={selectedKey === point.key ? "true" : undefined}
-                        >
-                          <span className="muted w-5 text-right text-[12px] tabular-nums">{index + 1}</span>
-                          <span
-                            className="h-2.5 w-2.5 shrink-0 rounded-full"
-                            style={{ background: colorOf(point) }}
-                          />
-                          <span className="min-w-0 flex-1 truncate">
-                            {point.city || point.plz}
-                            {point.stale && (
-                              <span className="ml-1.5 text-[11px] font-semibold text-warn">prüfen</span>
-                            )}
-                          </span>
-                          <span className="shrink-0 text-xs font-semibold tabular-nums">
-                            {euro(valueOf(point))}
-                          </span>
-                        </button>
-                      </li>
-                    ))}
-                  </ShowMore>
-                </div>
-              )}
+              </MapView>
             </div>
           </div>
-        </>
+
+          <div className="space-y-8">
+            {prices.length > 0 && (
+              <StatGrid
+                columns={2}
+                items={[
+                  { label: "Bundesschnitt", value: euro(ref), hint: "pro Jahr" },
+                  {
+                    label: "Orte",
+                    value: prices.length,
+                    hint: isLeader && open.length > 0 ? `${open.length} ohne Preis` : "mit Preis",
+                  },
+                ]}
+              />
+            )}
+
+            {open.length > 0 && (
+              <section>
+                <ListLabel>Ohne Preis</ListLabel>
+                <ShowMore initial={5} className="list">
+                  {open.map((place) => (
+                    <li key={place.key}>
+                      <Cell
+                        onClick={() => focus(place.key, located(place))}
+                        title={[place.plz, place.city].filter(Boolean).join(" ") || "Ohne Ort"}
+                        subtitle={place.territories.join(", ")}
+                        chevron
+                      />
+                    </li>
+                  ))}
+                </ShowMore>
+              </section>
+            )}
+
+            {ranked.length > 0 && (
+              <section>
+                <ListLabel>{`Teuerste Orte · ${label}`}</ListLabel>
+                <ShowMore initial={8} className="list list-icons">
+                  {ranked.map((point, index) => (
+                    <li key={point.key}>
+                      <Cell
+                        onClick={() => focus(point.key, located(point))}
+                        icon={
+                          <span className="glyph glyph-round relative">
+                            <span className="kpi text-footnote">{index + 1}</span>
+                            <span
+                              className="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full ring-2 ring-[var(--surface)]"
+                              style={{ background: colorOf(point) }}
+                              aria-hidden="true"
+                            />
+                          </span>
+                        }
+                        title={point.city || point.plz}
+                        subtitle={[point.provider || null, point.stale ? "prüfen" : null].filter(Boolean).join(" · ")}
+                        detail={<span className="kpi">{euro(valueOf(point))}</span>}
+                        chevron
+                      />
+                    </li>
+                  ))}
+                </ShowMore>
+              </section>
+            )}
+          </div>
+        </div>
+      )}
+
+      {selectedPrice && (
+        <PriceDetail
+          point={selectedPrice}
+          energy={energy}
+          reference={ref}
+          isLeader={isLeader}
+          onClose={() => setSelectedKey(null)}
+          onEdit={() => {
+            setDraft(draftFromPoint(selectedPrice));
+            setSelectedKey(null);
+          }}
+          onDelete={() => void remove(selectedPrice)}
+        />
+      )}
+
+      {selectedOpen && (
+        <Sheet
+          title={selectedOpen.city || "Ohne Ort"}
+          subtitle={[selectedOpen.plz, "noch kein Preis"].filter(Boolean).join(" · ")}
+          onClose={() => setSelectedKey(null)}
+          footer={
+            isLeader && (
+              <button
+                type="button"
+                className="btn btn-primary btn-lg btn-block"
+                onClick={() => {
+                  setDraft(draftFromOpen(selectedOpen));
+                  setSelectedKey(null);
+                }}
+              >
+                Preis eintragen
+              </button>
+            )
+          }
+        >
+          <ul className="list">
+            <li>
+              <Cell title="Gebiete" detail={selectedOpen.territories.join(", ")} />
+            </li>
+            {selectedOpen.provider && (
+              <li>
+                <Cell title="Vorschlag" detail={selectedOpen.provider} />
+              </li>
+            )}
+          </ul>
+          <ListLabel>Preisblatt suchen</ListLabel>
+          <ul className="list list-icons">
+            {(["Strom", "Gas"] as const).map((kind) => (
+              <li key={kind}>
+                <Cell
+                  href={sheetSearch(selectedOpen.provider, selectedOpen.city, kind)}
+                  external
+                  icon={
+                    <span className="glyph">
+                      <IconSearch className="h-4 w-4" />
+                    </span>
+                  }
+                  title={kind}
+                />
+              </li>
+            ))}
+          </ul>
+        </Sheet>
       )}
 
       {draft && (
@@ -553,7 +491,7 @@ export function EnergyMapClient({
           onClose={() => setImporting(false)}
           onDone={(text) => {
             setImporting(false);
-            setMessage(text);
+            toast(text, { duration: 6000 });
             router.refresh();
           }}
         />
@@ -563,25 +501,13 @@ export function EnergyMapClient({
   );
 }
 
-/** Rot nur, was wirklich ueber dem Schnitt liegt - auch der teuerste Ort kann guenstig sein. */
-function deltaTone(value: number | null, reference: number): "danger" | "success" | "neutral" {
-  if (value === null) return "neutral";
-  return value > reference ? "danger" : "success";
-}
-
-/** "+49 € ggü. Schnitt" */
-function deltaHint(value: number | null, reference: number): string | undefined {
-  if (value === null) return undefined;
-  const delta = Math.round(value - reference);
-  return `${delta > 0 ? "+" : ""}${euro(delta)} ggü. Schnitt`;
-}
-
 /** Alles zu einem Ort mit Preis - und fuer die Teamleitung: bearbeiten, loeschen. */
 function PriceDetail({
   point,
   energy,
   reference,
   isLeader,
+  onClose,
   onEdit,
   onDelete,
 }: {
@@ -589,6 +515,7 @@ function PriceDetail({
   energy: Energy;
   reference: number;
   isLeader: boolean;
+  onClose: () => void;
   onEdit: () => void;
   onDelete: () => void;
 }) {
@@ -597,109 +524,92 @@ function PriceDetail({
   const year = energy === "strom" ? point.stromYear : point.gasYear;
   const delta = year !== null ? Math.round(year - reference) : null;
   const provider = energy === "gas" && point.gasProvider ? point.gasProvider : point.provider;
+  const step = year !== null ? referenceStep(year, reference) : null;
 
   return (
-    <div className="card p-5">
-      <p className="muted text-[12.5px] font-medium">
-        {point.plz} · {point.id !== null ? "Preisblatt" : "Tagesquelle"}
-        {point.validFrom && `, gültig ab ${dateLabel(point.validFrom)}`}
-      </p>
-      <div className="flex items-start justify-between gap-2">
-        <p className="text-lg font-bold">{point.city || point.plz}</p>
-        {year !== null && <PriceBadge step={referenceStep(year, reference)} />}
-      </div>
-      <p className="muted mb-3 text-sm">{provider || "Grundversorger unbekannt"}</p>
-
-      {year === null ? (
-        <p className="muted text-sm">
-          Für {energy === "strom" ? "Strom" : "Gas"} ist hier kein Preis eingetragen.
-        </p>
-      ) : (
-        <dl className="space-y-1.5 text-sm">
-          <Row
-            label="Arbeitspreis"
-            value={`${ctValue!.toLocaleString("de-DE", { minimumFractionDigits: 2, maximumFractionDigits: 3 })} ct/kWh`}
-          />
-          <Row
-            label="Grundpreis"
-            value={
-              base !== null
-                ? `${base.toLocaleString("de-DE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} € / Monat`
-                : "–"
-            }
-          />
-          <Row label="Jahreskosten Musterhaushalt" value={euro(year)} />
-          <Row
-            label="ggü. Bundesschnitt"
-            value={delta === null ? "–" : `${delta > 0 ? "+" : ""}${euro(delta)} pro Jahr`}
-            tone={delta !== null && delta > 0 ? "danger" : "success"}
-          />
-        </dl>
-      )}
-
-      {delta !== null && delta > 0 && (
-        <div className="mt-3">
-          <Note tone="success">
-            Guter Ort zum Klingeln: Der Grundversorger liegt {euro(delta)} pro Jahr über dem
-            Bundesschnitt.
-          </Note>
-        </div>
-      )}
-      {point.stale && (
-        <p className="mt-3 text-[12px] font-semibold text-warn">
-          Älter als ein halbes Jahr – bitte mit dem aktuellen Preisblatt prüfen.
-        </p>
-      )}
-      {isLeader && point.id !== null && (point.lat === null || point.lng === null) && (
-        <p className="muted mt-3 text-[12px]">
-          Lage unbekannt – der Ort erscheint nicht auf der Karte. Einmal speichern versucht es
-          erneut.
-        </p>
-      )}
-      {point.sourceUrl && (
-        <a
-          href={point.sourceUrl}
-          target="_blank"
-          rel="noreferrer"
-          className="mt-3 inline-block text-[13px] font-semibold text-tint"
-        >
-          Preisblatt öffnen
-        </a>
-      )}
-
-      {isLeader && (
-        <div className="mt-4 flex gap-2">
-          <button type="button" className="btn btn-ghost btn-sm flex-1" onClick={onEdit}>
+    <Sheet
+      title={point.city || point.plz}
+      subtitle={[
+        point.plz,
+        point.id !== null ? "Preisblatt" : "Tagesquelle",
+        point.validFrom ? `ab ${dateLabel(point.validFrom)}` : null,
+      ]
+        .filter(Boolean)
+        .join(" · ")}
+      action={step !== null ? <PriceBadge step={step} /> : undefined}
+      onClose={onClose}
+      footer={
+        isLeader && (
+          <button type="button" className="btn btn-primary btn-lg btn-block" onClick={onEdit}>
+            <IconPencil className="h-5 w-5" />
             {point.id !== null ? "Bearbeiten" : "Eigenen Preis eintragen"}
           </button>
-          {point.id !== null && (
-            <button type="button" className="btn btn-ghost btn-sm text-danger" onClick={onDelete}>
-              Löschen
-            </button>
-          )}
+        )
+      }
+    >
+      {year !== null && delta !== null && (
+        <div className="mb-4 rounded-xl bg-surface px-4 py-4">
+          <p className="text-footnote font-semibold text-ink-2">Musterhaushalt · {energy === "strom" ? "Strom" : "Gas"}</p>
+          <p className="kpi text-large-title">{euro(year)}</p>
+          <p className={`text-subhead font-semibold ${delta > 0 ? "text-accent-ink" : "text-muted"}`}>
+            {delta > 0 ? "+" : ""}
+            {euro(delta)} ggü. Schnitt
+          </p>
         </div>
       )}
-    </div>
+      <ul className="list">
+        <li>
+          <Cell title="Grundversorger" detail={provider || "unbekannt"} />
+        </li>
+        {year === null ? (
+          <li>
+            <Cell title={`Kein ${energy === "strom" ? "Strom" : "Gas"}preis`} />
+          </li>
+        ) : (
+          <>
+            <li>
+              <Cell title="Arbeitspreis" detail={<span className="kpi">{ct(ctValue)}/kWh</span>} />
+            </li>
+            <li>
+              <Cell
+                title="Grundpreis"
+                detail={<span className="kpi">{base !== null ? `${euro2(base)} / Monat` : "–"}</span>}
+              />
+            </li>
+          </>
+        )}
+        {point.stale && (
+          <li>
+            <Cell title="Älter als ein halbes Jahr" subtitle="Mit aktuellem Preisblatt prüfen" tone="danger" />
+          </li>
+        )}
+        {isLeader && point.id !== null && (point.lat === null || point.lng === null) && (
+          <li>
+            <Cell title="Ohne Kartenpunkt" subtitle="Lage unbekannt – Speichern versucht es erneut" />
+          </li>
+        )}
+        {point.sourceUrl && (
+          <li>
+            <Cell href={point.sourceUrl} external title="Preisblatt öffnen" />
+          </li>
+        )}
+      </ul>
+      {isLeader && point.id !== null && (
+        <ul className="list mt-6">
+          <li>
+            <Cell
+              onClick={onDelete}
+              icon={<IconTrash className="h-5 w-5 text-danger" />}
+              title="Preis löschen"
+              tone="danger"
+            />
+          </li>
+        </ul>
+      )}
+    </Sheet>
   );
 }
 
-function Row({
-  label,
-  value,
-  tone,
-}: {
-  label: string;
-  value: string;
-  tone?: "danger" | "success";
-}) {
-  const color =
-    tone === "danger" ? "var(--danger-ink)" : tone === "success" ? "var(--ok-ink)" : undefined;
-  return (
-    <div className="flex items-baseline justify-between gap-3">
-      <dt className="muted">{label}</dt>
-      <dd className="font-semibold tabular-nums" style={{ color }}>
-        {value}
-      </dd>
-    </div>
-  );
+function euro2(value: number): string {
+  return value.toLocaleString("de-DE", { style: "currency", currency: "EUR", minimumFractionDigits: 2 });
 }

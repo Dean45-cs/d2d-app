@@ -1,8 +1,8 @@
 "use client";
 
 import type { User } from "@/lib/types";
-import { GroupLabel, Note, Segmented, SkeletonLine, plural } from "@/components/ui";
-import { IconCheck, IconInfo, IconList, IconPin, IconSplit } from "@/components/icons";
+import { EmptyState, ListLabel, Segmented, SkeletonLine, SkeletonList, plural } from "@/components/ui";
+import { IconCheck, IconPin } from "@/components/icons";
 import { MAX_PLOTS } from "@/lib/geo/split";
 
 export interface FoundAddress {
@@ -74,108 +74,75 @@ export function StreetResult({
   const splitting = plotCount > 1;
 
   if (streets.length === 0) {
-    return (
-      <Note icon={<IconInfo className="h-4 w-4" />}>
-        In dieser Fläche sind keine Straßen hinterlegt. Zeichne etwas größer oder trage die
-        Straßen über „Liste einfügen“ von Hand ein.
-      </Note>
-    );
+    return <EmptyState title="Keine Straßen in dieser Fläche" text="Größer zeichnen oder als Liste einfügen." />;
   }
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-6">
       {/* --------------------------- Was gefunden wurde --------------------- */}
-      <div className="inset flex items-center gap-3 px-3.5 py-3">
-        <span
-          className="tile-icon h-10 w-10 shrink-0"
-          style={{
-            background: "color-mix(in srgb, var(--brand-500) 13%, transparent)",
-            color: "var(--tint)",
-          }}
-          aria-hidden
-        >
-          <IconList className="h-5 w-5" />
-        </span>
-        <div className="min-w-0 flex-1">
-          <p className="text-[15px] font-semibold tabular-nums">
+      <div className="flex items-end justify-between gap-4 px-1">
+        <div className="min-w-0">
+          <p className="kpi text-title-2">
             {plural(selected.length, "Straße", "Straßen")} · {plural(doors, "Tür", "Türen")}
           </p>
-          <p className="muted text-[12px] tabular-nums">
-            {streets.length} gefunden, {addressCount} Adressen aus OpenStreetMap
+          <p className="text-footnote text-muted">
+            {streets.length} gefunden · {addressCount} Adressen aus OpenStreetMap
           </p>
         </div>
-        <div className="flex shrink-0 gap-1">
-          <button
-            type="button"
-            className="btn btn-ghost btn-sm btn-pill"
-            onClick={() => onChooseAll(true)}
-          >
-            alle
+        <div className="flex shrink-0 gap-2">
+          <button type="button" className="chip min-h-8" onClick={() => onChooseAll(true)}>
+            Alle
           </button>
-          <button
-            type="button"
-            className="btn btn-ghost btn-sm btn-pill"
-            onClick={() => onChooseAll(false)}
-          >
-            keine
+          <button type="button" className="chip min-h-8" onClick={() => onChooseAll(false)}>
+            Keine
           </button>
         </div>
       </div>
 
       {/* ------------------------------ Aufteilen ---------------------------- */}
       <div>
-        <div className="mb-2 flex items-center gap-2">
-          <IconSplit className="muted h-4 w-4" />
-          <GroupLabel>Auf wie viele Leute aufteilen?</GroupLabel>
-        </div>
+        <ListLabel>Aufteilen</ListLabel>
         <Segmented
           options={Array.from({ length: MAX_PLOTS }, (_, i) => ({
             value: String(i + 1),
-            label: i === 0 ? "1 Person" : `${i + 1} Pakete`,
+            label: i === 0 ? "Ganz" : `${i + 1} Teile`,
           }))}
           value={String(plotCount)}
           onChange={(value) => onPlotCount(Number(value))}
-          tone="brand"
           ariaLabel="Gebiet aufteilen"
         />
-        <p className="muted mt-1.5 px-0.5 text-[11px]">
-          {splitting
-            ? `${plots.length || plotCount} Pakete, nach Türen ausgewogen – jedes bekommt eine eigene Farbe auf der Karte.`
-            : "Ein Gebiet für eine Person."}
-        </p>
-
         {splitting && plots.length > 0 && (
-          <ul className="list mt-2.5">
+          <ul className="list list-icons mt-4">
             {plots.map((plot, index) => (
-              <li key={plot.label} className="flex flex-wrap items-center gap-2 px-3 py-2.5">
+              <li key={plot.label} className="cell">
                 <span
-                  className="grid h-7 w-7 shrink-0 place-items-center rounded-full text-[13px] font-bold text-white"
+                  className="kpi grid h-8 w-8 shrink-0 place-items-center rounded-full text-subhead text-white"
                   style={{ background: plot.color }}
-                  aria-hidden
+                  aria-hidden="true"
                 >
                   {plot.label}
                 </span>
-                <span className="muted min-w-[8rem] flex-1 text-[12px] tabular-nums">
+                <span className="min-w-0 flex-1 text-footnote text-muted">
+                  <span className="block text-subhead font-semibold text-ink">{plural(plot.doors, "Tür", "Türen")}</span>
                   {plural(plot.streets.length, "Straße", "Straßen")}
-                  <span className="block font-semibold text-[var(--ink)]">
-                    {plural(plot.doors, "Tür", "Türen")}
-                  </span>
                 </span>
-                <select
-                  className="select w-full min-w-[9rem] px-2.5 py-1.5 text-[13px] sm:w-auto sm:flex-1"
-                  value={assignees[index] ?? ""}
-                  onChange={(e) => onAssignee(index, e.target.value)}
-                  aria-label={`Teilgebiet ${plot.label} zuteilen an`}
-                >
-                  <option value="">– später zuteilen –</option>
-                  {members
-                    .filter((m) => m.active)
-                    .map((m) => (
-                      <option key={m.id} value={m.id}>
-                        {m.name}
-                      </option>
-                    ))}
-                </select>
+                {members.length > 0 && (
+                  <select
+                    className="field w-40 shrink-0 py-2"
+                    value={assignees[index] ?? ""}
+                    onChange={(e) => onAssignee(index, e.target.value)}
+                    aria-label={`Teilgebiet ${plot.label} zuteilen an`}
+                  >
+                    <option value="">Später</option>
+                    {members
+                      .filter((m) => m.active)
+                      .map((m) => (
+                        <option key={m.id} value={m.id}>
+                          {m.name}
+                        </option>
+                      ))}
+                  </select>
+                )}
               </li>
             ))}
           </ul>
@@ -184,23 +151,15 @@ export function StreetResult({
 
       {/* ----------------------------- Straßenliste -------------------------- */}
       <div>
-        <GroupLabel>Straßen im Gebiet</GroupLabel>
-        <ul className="list max-h-72 overflow-y-auto">
+        <ListLabel>Straßen</ListLabel>
+        <ul className="list max-h-80 overflow-y-auto">
           {streets.map((street) => {
             const isChosen = chosen.has(street.name);
             const plotIndex = plotOf.get(street.name);
             const plot = plotIndex !== undefined ? plots[plotIndex] : undefined;
             return (
-              <li
-                key={street.name}
-                className="flex items-center gap-2.5 px-3 py-2"
-                style={
-                  focus === street.name
-                    ? { background: "color-mix(in srgb, var(--brand-500) 9%, transparent)" }
-                    : undefined
-                }
-              >
-                <label className="shrink-0 cursor-pointer p-1">
+              <li key={street.name} className={`cell gap-2 py-1 pr-4 ${focus === street.name ? "bg-accent-tint" : ""}`}>
+                <label className="grid h-11 w-11 shrink-0 cursor-pointer place-items-center">
                   <input
                     type="checkbox"
                     className="sr-only"
@@ -209,66 +168,40 @@ export function StreetResult({
                     aria-label={`${street.name} ins Gebiet übernehmen`}
                   />
                   <span
-                    className="grid h-6 w-6 place-items-center rounded-full border transition"
-                    style={
-                      isChosen
-                        ? {
-                            background: "var(--brand-600)",
-                            borderColor: "transparent",
-                            color: "#fff",
-                          }
-                        : { borderColor: "var(--line-strong)" }
-                    }
-                    aria-hidden
+                    className={`grid h-6 w-6 place-items-center rounded-full ${
+                      isChosen ? "text-accent-ink ring-2 ring-accent" : "ring-2 ring-fill-strong"
+                    }`}
+                    aria-hidden="true"
                   >
                     {isChosen && <IconCheck className="h-3.5 w-3.5" />}
                   </span>
                 </label>
-
                 {splitting && isChosen && plot && (
                   <span
-                    className="grid h-5 w-5 shrink-0 place-items-center rounded-full text-[11px] font-bold text-white"
+                    className="kpi grid h-6 w-6 shrink-0 place-items-center rounded-full text-caption text-white"
                     style={{ background: plot.color }}
                     title={`Teilgebiet ${plot.label}`}
                   >
                     {plot.label}
                   </span>
                 )}
-
                 <button
                   type="button"
                   onClick={() => onFocus(street.name)}
-                  className="min-w-0 flex-1 py-1 text-left"
-                  title="Auf der Karte zeigen"
+                  className="min-w-0 flex-1 py-2 text-left"
+                  aria-label={`${street.name} auf der Karte zeigen`}
                 >
-                  <span
-                    className={`block truncate text-[14px] ${
-                      isChosen ? "font-semibold" : "muted"
-                    }`}
-                  >
-                    {street.name}
-                  </span>
-                  <span className="muted block truncate text-[11px]">
-                    {street.numbers.length > 0
-                      ? `${plural(street.numbers.length, "Hausnummer", "Hausnummern")}: ${preview(street)}`
-                      : "keine Hausnummern hinterlegt"}
-                    {street.units > street.numbers.length
-                      ? ` · ${plural(street.units, "Wohneinheit", "Wohneinheiten")}`
-                      : ""}
+                  <span className={`block truncate text-body ${isChosen ? "" : "text-muted"}`}>{street.name}</span>
+                  <span className="block truncate text-footnote text-muted">
+                    {street.numbers.length > 0 ? `Nr. ${preview(street)}` : "ohne Hausnummern"}
+                    {street.units > street.numbers.length ? ` · ${plural(street.units, "WE", "WE")}` : ""}
                   </span>
                 </button>
-
-                <span className="muted shrink-0 pr-1" aria-hidden>
-                  <IconPin className="h-4 w-4" />
-                </span>
+                <IconPin className="h-4 w-4 shrink-0 text-muted" />
               </li>
             );
           })}
         </ul>
-        <p className="muted mt-1.5 px-0.5 text-[11px] leading-snug">
-          Die Zahlen stammen aus OpenStreetMap und lassen sich später anpassen. Ein Tipp auf
-          eine Zeile zeigt die Straße auf der Karte.
-        </p>
       </div>
     </div>
   );
@@ -292,34 +225,16 @@ function preview(street: FoundStreet): string {
   return street.numbers.length > 6 ? `${first} …` : first;
 }
 
-/**
- * Platzhalter, solange OpenStreetMap antwortet.
- *
- * Die Abfrage dauert je nach Groesse der Flaeche ein paar Sekunden - in der
- * Zeit steht die Liste schon da, statt dass der Schritt leer bleibt.
- */
+/** Platzhalter, solange OpenStreetMap antwortet - der Schritt bleibt nie leer. */
 export function StreetResultSkeleton() {
   return (
-    <div className="space-y-3" aria-busy="true" aria-label="Straßen werden gesucht">
-      <div className="inset flex items-center gap-3 px-3.5 py-3">
-        <span className="skeleton h-10 w-10 shrink-0 rounded-full" />
-        <span className="min-w-0 flex-1 space-y-2">
-          <SkeletonLine width="55%" height={14} />
-          <SkeletonLine width="35%" height={11} />
-        </span>
+    <div className="space-y-6" aria-busy="true" aria-label="Straßen werden gesucht">
+      <div className="space-y-2 px-1">
+        <SkeletonLine width="60%" height={20} className="rounded-md" />
+        <SkeletonLine width="40%" height={10} />
       </div>
-      <SkeletonLine height={34} />
-      <div className="list">
-        {Array.from({ length: 5 }, (_, i) => (
-          <div key={i} className="flex items-center gap-3 px-3 py-2.5">
-            <span className="skeleton h-6 w-6 shrink-0 rounded-full" />
-            <span className="min-w-0 flex-1 space-y-1.5">
-              <SkeletonLine width={`${65 - i * 7}%`} height={13} />
-              <SkeletonLine width={`${40 - i * 4}%`} height={10} />
-            </span>
-          </div>
-        ))}
-      </div>
+      <SkeletonLine height={44} />
+      <SkeletonList rows={5} icon={false} />
     </div>
   );
 }

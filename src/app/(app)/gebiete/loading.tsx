@@ -1,26 +1,16 @@
-import { SkeletonCard, SkeletonLine } from "@/components/ui";
+import { SkeletonHeader, SkeletonList } from "@/components/ui";
 
-/** Platzhalter der Gebietsuebersicht: Kopf, Karte, Gebietskarten. */
+/** Platzhalter der Karte - Segmentleiste, Liste, Karte. */
 export default function LoadingTerritories() {
   return (
-    <div className="mx-auto max-w-5xl" aria-busy="true" aria-label="Gebiete werden geladen">
-      <div className="mb-5 space-y-2">
-        <SkeletonLine width="42%" height={28} />
-        <SkeletonLine width="70%" height={13} />
-      </div>
-
-      <div className="card mb-4 overflow-hidden">
-        <div className="flex items-center gap-2 px-4 py-3">
-          <SkeletonLine width="35%" height={13} />
+    <div className="page" aria-busy="true" aria-label="Gebiete werden geladen">
+      <SkeletonHeader />
+      <div className="skeleton mb-6 h-8 max-w-xs rounded-full" aria-hidden="true" />
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,400px)_minmax(0,1fr)]">
+        <div className="skeleton h-[44vh] min-h-64 rounded-xl lg:col-start-2 lg:h-[calc(100dvh-220px)]" aria-hidden="true" />
+        <div className="lg:col-start-1 lg:row-start-1">
+          <SkeletonList rows={6} />
         </div>
-        <div className="px-3 pb-3">
-          <SkeletonLine height={240} radius={15} />
-        </div>
-      </div>
-
-      <div className="grid gap-3 md:grid-cols-2">
-        <SkeletonCard lines={3} />
-        <SkeletonCard lines={3} />
       </div>
     </div>
   );

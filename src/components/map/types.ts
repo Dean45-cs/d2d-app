@@ -54,8 +54,11 @@ export interface DotOptions {
   /** Radius in Pixeln - bleibt beim Zoomen gleich gross */
   radius: number;
   opacity?: number;
-  /** Weisser Rand wie bei Apple-Karten-Pins */
+  /** Rand wie bei Apple-Karten-Pins (weiss, wenn keine Farbe angegeben). */
   ring?: boolean;
+  /** Farbe und Breite des Rands - etwa hohl fuer "noch offen". */
+  ringColor?: string;
+  ringWidth?: number;
   title?: string;
   subtitle?: string;
   /** Knoepfe in der Sprechblase (nicht bei Apple Karten) */

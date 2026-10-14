@@ -1,109 +1,158 @@
 "use client";
 
-import { useEffect, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import { IconX } from "./icons";
 
 interface Props {
-  /** Ueberschrift des Blattes - kurz, in der Sprache der Tuer. */
+  /** Ueberschrift - kurz, in der Sprache der Tuer. */
   title: ReactNode;
   subtitle?: ReactNode;
-  /** Schliessen ueber Schleier, Kreuz und Escape. */
+  /** Schliessen ueber Schleier, Kreuz, Escape und Herunterziehen. */
   onClose: () => void;
   children: ReactNode;
-  /** Bleibt beim Rollen unten stehen - dort sitzt die Hauptaktion. */
+  /** Bleibt unten stehen - dort sitzt die Hauptaktion. */
   footer?: ReactNode;
-  /** Zusaetzlicher Knopf rechts neben der Ueberschrift. */
+  /** Zusaetzlicher Knopf rechts neben dem Titel. */
   action?: ReactNode;
-  /** Breite auf dem Rechner; auf dem Handy fuellt das Blatt immer die Breite. */
+  /** Breite auf dem iPad/Rechner. */
   width?: "md" | "lg";
 }
 
+const CLOSE_MS = 220;
+
 /**
- * Ein Blatt, das von unten hereinfaehrt.
+ * Ein Blatt aus Glas, das von unten hereingleitet.
  *
- * Auf dem Handy sitzt es am unteren Rand - dort, wo der Daumen ist - und
- * bringt einen Griff mit, damit sichtbar ist, dass es sich wegschieben
- * laesst. Auf dem Rechner wird daraus ein mittiger Dialog.
- *
- * Der Inhalt rollt fuer sich, Kopf und Fuss bleiben stehen: die Hauptaktion
- * ist damit immer erreichbar, egal wie lang die Liste darueber wird.
+ * Auf dem Handy schwebt es knapp ueber dem unteren Rand - dort, wo der
+ * Daumen ist - und laesst sich am Griff nach unten wegziehen. Auf iPad und
+ * Rechner wird daraus ein mittiger Dialog. Inhalt rollt fuer sich, Kopf
+ * und Fuss bleiben stehen.
  */
-export function Sheet({
-  title,
-  subtitle,
-  onClose,
-  children,
-  footer,
-  action,
-  width = "md",
-}: Props) {
-  // Escape schliesst, und der Hintergrund darf nicht mitrollen - sonst
-  // verliert man beim Wischen im Blatt die Stelle darunter.
+export function Sheet({ title, subtitle, onClose, children, footer, action, width = "md" }: Props) {
+  const [mounted, setMounted] = useState(false);
+  const [closing, setClosing] = useState(false);
+  const [drag, setDrag] = useState(0);
+  const sheetRef = useRef<HTMLDivElement>(null);
+  const bodyRef = useRef<HTMLDivElement>(null);
+  const start = useRef<{ y: number; t: number; fromBody: boolean } | null>(null);
+  const closeRef = useRef(onClose);
+  closeRef.current = onClose;
+
+  const requestClose = useCallback(() => {
+    setClosing((already) => {
+      if (already) return already;
+      const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      window.setTimeout(() => closeRef.current(), reduce ? 0 : CLOSE_MS);
+      return true;
+    });
+  }, []);
+
+  useEffect(() => setMounted(true), []);
+
+  // Escape schliesst, der Hintergrund rollt nicht mit, der Fokus kommt
+  // danach dorthin zurueck, wo er war.
   useEffect(() => {
+    if (!mounted) return;
+    const previousFocus = document.activeElement as HTMLElement | null;
     const onKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape") onClose();
+      if (event.key === "Escape") requestClose();
     };
     window.addEventListener("keydown", onKey);
-    const previous = document.body.style.overflow;
+    const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
+    const first = sheetRef.current?.querySelector<HTMLElement>(
+      "[autofocus], input:not([type=hidden]), textarea, select",
+    );
+    if (first && window.matchMedia("(min-width: 768px)").matches) first.focus();
+    else sheetRef.current?.focus();
     return () => {
       window.removeEventListener("keydown", onKey);
-      document.body.style.overflow = previous;
+      document.body.style.overflow = previousOverflow;
+      previousFocus?.focus?.();
     };
-  }, [onClose]);
+  }, [mounted, requestClose]);
 
-  return (
-    <div
-      className="scrim z-30 flex items-end md:items-center md:justify-center"
-      onClick={onClose}
-      role="presentation"
-    >
+  /* ---------------------------- Herunterziehen --------------------------- */
+
+  function onPointerDown(event: React.PointerEvent) {
+    if (window.matchMedia("(min-width: 768px)").matches) return;
+    if (event.pointerType === "mouse" && event.button !== 0) return;
+    const target = event.target as HTMLElement;
+    if (target.closest("input, textarea, select, button, a, [data-no-drag]")) return;
+    const fromBody = Boolean(bodyRef.current?.contains(target));
+    // Im Inhalt nur ziehen, wenn er ganz oben steht - sonst rollt er.
+    if (fromBody && (bodyRef.current?.scrollTop ?? 0) > 0) return;
+    start.current = { y: event.clientY, t: performance.now(), fromBody };
+  }
+
+  function onPointerMove(event: React.PointerEvent) {
+    if (!start.current) return;
+    const delta = event.clientY - start.current.y;
+    if (delta <= 0) {
+      setDrag(0);
+      return;
+    }
+    if (start.current.fromBody && delta < 8) return;
+    setDrag(delta);
+  }
+
+  function onPointerUp(event: React.PointerEvent) {
+    if (!start.current) return;
+    const delta = event.clientY - start.current.y;
+    const velocity = delta / Math.max(1, performance.now() - start.current.t);
+    start.current = null;
+    if (delta > 120 || (delta > 40 && velocity > 0.6)) requestClose();
+    else setDrag(0);
+  }
+
+  if (!mounted) return null;
+
+  const dragging = drag > 0;
+  return createPortal(
+    <div className="fixed inset-0 z-50" role="presentation">
+      <div className="scrim" data-closing={closing || undefined} onClick={requestClose} aria-hidden="true" />
       <div
-        className={`sheet ${width === "lg" ? "md:max-w-2xl" : "md:max-w-lg"}`}
-        onClick={(event) => event.stopPropagation()}
+        ref={sheetRef}
+        className={`sheet ${width === "lg" ? "sheet-wide" : ""}`}
         role="dialog"
         aria-modal="true"
+        aria-label={typeof title === "string" ? title : undefined}
+        tabIndex={-1}
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={onPointerUp}
+        onPointerCancel={onPointerUp}
+        data-closing={closing || undefined}
+        style={dragging ? { transform: `translateY(${drag}px)`, transition: "none" } : undefined}
       >
-        <div className="flex justify-center pb-1 pt-2.5 md:hidden">
-          <span className="sheet-grip" aria-hidden />
+        <div className="flex justify-center pt-2 md:hidden" aria-hidden="true">
+          <span className="sheet-grip" />
         </div>
 
-        <div className="flex items-start gap-3 px-5 pb-3 pt-2 md:pt-5">
-          <div className="min-w-0 flex-1">
-            <h2 className="truncate text-[17px] font-bold">{title}</h2>
-            {subtitle && (
-              <p className="muted mt-0.5 text-[13px] leading-snug">{subtitle}</p>
-            )}
+        <div className="flex items-start gap-2 px-4 pb-2 pt-2 md:pt-4">
+          <div className="min-w-0 flex-1 pl-1 pt-2">
+            <h2 className="text-title-3">{title}</h2>
+            {subtitle && <p className="mt-1 text-subhead text-muted">{subtitle}</p>}
           </div>
           {action}
-          <button
-            type="button"
-            onClick={onClose}
-            className="icon-btn -mr-1.5 -mt-1 shrink-0"
-            aria-label="Schließen"
-            style={{ background: "color-mix(in srgb, var(--ink) 6%, transparent)" }}
-          >
+          <button type="button" onClick={requestClose} className="icon-btn icon-btn-fill" aria-label="Schließen">
             <IconX className="h-4 w-4" />
           </button>
         </div>
 
         <div
-          className={`sheet-body px-5 ${
-            footer ? "pb-4" : "pb-[max(1.5rem,env(safe-area-inset-bottom))]"
-          }`}
+          ref={bodyRef}
+          className={`sheet-body flex-1 px-4 ${footer ? "pb-4" : "pb-6"}`}
         >
           {children}
         </div>
 
         {footer && (
-          <div
-            className="glass border-t px-5 pb-[max(1rem,env(safe-area-inset-bottom))] pt-3"
-            style={{ borderColor: "var(--line)" }}
-          >
-            {footer}
-          </div>
+          <div className="border-t border-separator px-4 pb-4 pt-4">{footer}</div>
         )}
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

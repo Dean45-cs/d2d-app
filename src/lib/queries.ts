@@ -37,6 +37,9 @@ export interface TerritoryWithStats extends Territory {
   visit_count: number;
   met_count: number;
   sale_count: number;
+  /** Hinterlegte Hausnummern - und wie viele davon schon erfasst oder gesperrt sind. */
+  house_count: number;
+  house_touched_count: number;
 }
 
 const TERRITORY_STATS_SQL = `
@@ -48,7 +51,14 @@ const TERRITORY_STATS_SQL = `
          (SELECT COUNT(*) FROM visits v WHERE v.territory_id = t.id
             AND v.outcome IN ('MET_NO_SALE','APPOINTMENT','SALE'))                 AS met_count,
          (SELECT COUNT(*) FROM visits v WHERE v.territory_id = t.id
-            AND v.outcome = 'SALE')                                                AS sale_count
+            AND v.outcome = 'SALE')                                                AS sale_count,
+         (SELECT COUNT(*) FROM house_numbers h JOIN streets s ON s.id = h.street_id
+           WHERE s.territory_id = t.id)                                           AS house_count,
+         (SELECT COUNT(*) FROM house_numbers h JOIN streets s ON s.id = h.street_id
+           WHERE s.territory_id = t.id
+             AND (h.blocked_at IS NOT NULL OR EXISTS (
+               SELECT 1 FROM visits v WHERE v.street_id = h.street_id
+                 AND lower(replace(v.house_number, ' ', '')) = lower(h.number)))) AS house_touched_count
     FROM territories t
     LEFT JOIN users u ON u.id = t.assigned_user_id
 `;

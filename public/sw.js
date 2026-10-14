@@ -1,5 +1,5 @@
 /*
- * Service Worker der D2D-App.
+ * Service Worker von Carlsson Sales.
  *
  * Bewusst zurückhaltend: Es werden nur unveränderliche Dateien
  * (JavaScript, CSS, Icons) zwischengespeichert – niemals HTML-Seiten mit
@@ -15,7 +15,7 @@
  * passende Seite. Versendet werden sie in src/lib/push.ts.
  */
 
-const VERSION = "v1";
+const VERSION = "v2";
 const SHELL_CACHE = `d2d-shell-${VERSION}`;
 const ASSET_CACHE = `d2d-assets-${VERSION}`;
 
@@ -112,7 +112,7 @@ self.addEventListener("push", (event) => {
     data = { body: event.data ? event.data.text() : "" };
   }
   event.waitUntil(
-    self.registration.showNotification(data.title || "EP24 Vertrieb", {
+    self.registration.showNotification(data.title || "Carlsson Sales", {
       body: data.body || "",
       icon: "/icon-192.png",
       tag: data.tag,
@@ -121,7 +121,7 @@ self.addEventListener("push", (event) => {
         url:
           typeof data.url === "string" && data.url.startsWith("/") && !data.url.startsWith("//")
             ? data.url
-            : "/feed",
+            : "/team",
       },
     }),
   );
@@ -129,7 +129,7 @@ self.addEventListener("push", (event) => {
 
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
-  const url = new URL(event.notification.data?.url || "/feed", self.location.origin).href;
+  const url = new URL(event.notification.data?.url || "/team", self.location.origin).href;
   event.waitUntil(
     self.clients.matchAll({ type: "window", includeUncontrolled: true }).then(async (windows) => {
       // Ist die App schon offen, dorthin springen statt ein zweites Fenster zu oeffnen.

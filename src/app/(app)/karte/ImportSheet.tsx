@@ -2,8 +2,7 @@
 
 import { useMemo, useState, type ReactNode } from "react";
 import { Sheet } from "@/components/Sheet";
-import { Note, Pill, plural } from "@/components/ui";
-import { IconInfo } from "@/components/icons";
+import { Cell, InlineError, ListLabel, Pill, plural } from "@/components/ui";
 import { checkPrice, readPriceTable, TABLE_COLUMNS, type TableRow } from "@/lib/energy/table";
 
 interface ImportResult {
@@ -126,15 +125,15 @@ export function ImportSheet({
   return (
     <Sheet
       title="Preise als Tabelle"
-      subtitle="Viele Orte auf einmal – aus Excel oder Google Tabellen."
+      subtitle="Aus Excel oder Google Tabellen"
       onClose={onClose}
       width="lg"
       footer={
-        <div className="space-y-2">
-          {error && <p className="text-[12px] font-semibold text-danger">{error}</p>}
+        <div className="space-y-3">
+          {error && <InlineError>{error}</InlineError>}
           <button
             type="button"
-            className="btn btn-primary w-full"
+            className="btn btn-primary btn-lg btn-block"
             onClick={submit}
             disabled={busy || parsed.ready.length === 0}
           >
@@ -147,28 +146,26 @@ export function ImportSheet({
         </div>
       }
     >
-      <ol className="space-y-4">
-        <Step number={1} title="Vorlage herunterladen">
-          <p className="muted text-[12.5px] leading-snug">
-            Enthält eure Gebiete ohne Preis – PLZ, Ort und Namensvorschlag stehen schon drin –
-            und alle bereits eingetragenen Orte.
-          </p>
-          <a href="/api/provider-prices/export" download className="btn btn-ghost btn-sm btn-pill mt-2">
-            Vorlage herunterladen (CSV)
+      <ol className="space-y-6">
+        <Step number={1} title="Vorlage laden">
+          <a href="/api/provider-prices/export" download className="btn btn-secondary btn-sm">
+            Vorlage laden (CSV)
           </a>
+          <p className="mt-2 text-footnote text-muted">Gebiete ohne Preis stehen schon drin.</p>
         </Step>
 
-        <Step number={2} title="Preise vom Preisblatt ergänzen">
-          <p className="muted text-[12.5px] leading-snug">
-            In Excel oder Google Tabellen öffnen. Arbeitspreis in ct/kWh, Grundpreis in €/Monat,
-            brutto. Zeilen ohne Preis werden übersprungen – ihr müsst nicht alles auf einmal füllen.
-          </p>
+        <Step number={2} title="Preise ergänzen">
+          <p className="text-footnote text-muted">ct/kWh und €/Monat, brutto. Leere Zeilen werden übersprungen.</p>
         </Step>
 
         <Step number={3} title="Hier einfügen">
+          <label className="sr-only" htmlFor="import-table">
+            Tabelle
+          </label>
           <textarea
-            className="input min-h-32 font-mono text-[12px] leading-snug"
-            placeholder={`Alle Zellen markieren, kopieren, hier einfügen.\n\n${TABLE_COLUMNS.slice(0, 5)
+            id="import-table"
+            className="field min-h-32 font-mono"
+            placeholder={`${TABLE_COLUMNS.slice(0, 5)
               .map((c) => c.label)
               .join(" | ")} | …`}
             value={text}
@@ -178,7 +175,7 @@ export function ImportSheet({
             }}
             spellCheck={false}
           />
-          <label className="link mt-1.5 inline-flex cursor-pointer">
+          <label className="link mt-2 inline-flex min-h-11 cursor-pointer items-center">
             <input
               type="file"
               accept=".csv,.tsv,.txt,text/csv,text/plain"
@@ -188,79 +185,61 @@ export function ImportSheet({
                 e.target.value = "";
               }}
             />
-            {fileName ? `Datei: ${fileName}` : "oder CSV-Datei wählen"}
+            {fileName ? `Datei: ${fileName}` : "CSV-Datei wählen"}
           </label>
         </Step>
       </ol>
 
-      {hasInput && (
-        <div className="mt-5 border-t pt-4 hairline">
-          {parsed.error ? (
-            <Note tone="danger" icon={<IconInfo className="h-4 w-4" />}>
-              {parsed.error}
-            </Note>
-          ) : (
-            <>
-              <div className="mb-2 flex flex-wrap gap-1.5">
-                <Pill tone="success">{plural(parsed.ready.length, "Ort", "Orte")} bereit</Pill>
-                {parsed.empty > 0 && <Pill>{parsed.empty} ohne Preis</Pill>}
-                {parsed.problems.length > 0 && (
-                  <Pill tone="danger">{plural(parsed.problems.length, "Fehler", "Fehler")}</Pill>
-                )}
-              </div>
-              {parsed.problems.length > 0 && (
-                <ul className="mb-2 space-y-1">
-                  {parsed.problems.slice(0, PREVIEW_ROWS).map((problem) => (
-                    <li key={problem.line} className="text-[12px] font-medium text-danger">
-                      Zeile {problem.line}: {problem.error}
-                    </li>
-                  ))}
-                </ul>
-              )}
-              <ul className="divide-y divide-[var(--line)] rounded-[var(--r-md)] border border-[var(--line)]">
-                {parsed.ready.slice(0, PREVIEW_ROWS).map((row) => (
-                  <li key={row.line} className="flex items-center gap-3 px-3 py-2">
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-[13px] font-semibold">{row.label}</p>
-                      <p className="muted truncate text-[12px] tabular-nums">{row.detail}</p>
-                    </div>
-                    <Pill tone={row.isNew ? "brand" : "neutral"}>{row.isNew ? "neu" : "ersetzt"}</Pill>
+      {hasInput &&
+        (parsed.error ? (
+          <div className="mt-6">
+            <InlineError>{parsed.error}</InlineError>
+          </div>
+        ) : (
+          <>
+            <ListLabel>Vorschau</ListLabel>
+            <div className="mb-2 flex flex-wrap gap-2 px-1">
+              <Pill tone="accent">{plural(parsed.ready.length, "Ort", "Orte")} bereit</Pill>
+              {parsed.empty > 0 && <Pill>{parsed.empty} ohne Preis</Pill>}
+              {parsed.problems.length > 0 && <Pill tone="danger">{plural(parsed.problems.length, "Fehler", "Fehler")}</Pill>}
+            </div>
+            {parsed.problems.length > 0 && (
+              <ul className="mb-2 space-y-1 px-1">
+                {parsed.problems.slice(0, PREVIEW_ROWS).map((problem) => (
+                  <li key={problem.line} className="text-footnote font-semibold text-danger">
+                    Zeile {problem.line}: {problem.error}
                   </li>
                 ))}
               </ul>
-              {parsed.ready.length > PREVIEW_ROWS && (
-                <p className="muted mt-1.5 text-[12px]">
-                  … und {parsed.ready.length - PREVIEW_ROWS} weitere
-                </p>
-              )}
-            </>
-          )}
-        </div>
-      )}
+            )}
+            <ul className="list">
+              {parsed.ready.slice(0, PREVIEW_ROWS).map((row) => (
+                <li key={row.line}>
+                  <Cell
+                    title={row.label}
+                    subtitle={row.detail}
+                    trailing={<Pill tone={row.isNew ? "accent" : "neutral"}>{row.isNew ? "neu" : "ersetzt"}</Pill>}
+                  />
+                </li>
+              ))}
+            </ul>
+            {parsed.ready.length > PREVIEW_ROWS && (
+              <p className="list-footer">… und {parsed.ready.length - PREVIEW_ROWS} weitere</p>
+            )}
+          </>
+        ))}
     </Sheet>
   );
 }
 
-function Step({
-  number,
-  title,
-  children,
-}: {
-  number: number;
-  title: string;
-  children: ReactNode;
-}) {
+function Step({ number, title, children }: { number: number; title: string; children: ReactNode }) {
   return (
     <li className="flex gap-3">
-      <span
-        className="grid h-6 w-6 shrink-0 place-items-center rounded-full text-[12px] font-bold"
-        style={{ background: "color-mix(in srgb, var(--brand-500) 14%, transparent)", color: "var(--tint)" }}
-        aria-hidden
-      >
+      <span className="glyph glyph-sm glyph-round kpi text-footnote font-bold" aria-hidden="true">
         {number}
       </span>
       <div className="min-w-0 flex-1">
-        <p className="mb-1 text-[14px] font-semibold">{title}</p>
+        <p className="mb-2 text-headline">{title}</p>
         {children}
       </div>
     </li>

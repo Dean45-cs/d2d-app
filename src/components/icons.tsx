@@ -1,538 +1,681 @@
+import type { ReactNode } from "react";
+
+/*
+ * Die Zeichen der App - eine Familie im Geist von SF Symbols: 24er-Raster,
+ * Strichstaerke 1.75, runde Enden und Ecken, gleiche optische Groesse.
+ * Fuer den aktiven Reiter gibt es gefuellte Varianten (…Fill).
+ * Alle Zeichen sind dekorativ (aria-hidden); die Bedeutung traegt immer
+ * die Beschriftung des Knopfs.
+ */
+
 type IconProps = { className?: string };
 
-const base = "h-5 w-5 shrink-0";
+const BASE = "h-5 w-5 shrink-0";
 
-export function IconDoor({ className = base }: IconProps) {
+function Line({ className = BASE, children }: IconProps & { children: ReactNode }) {
   return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M4 21h16" /><path d="M6 21V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v17" /><circle cx="14.5" cy="12.5" r="1" fill="currentColor" stroke="none" />
+    <svg
+      className={className}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.75}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+      focusable="false"
+    >
+      {children}
     </svg>
   );
 }
-export function IconMap({ className = base }: IconProps) {
+
+function Solid({ className = BASE, children }: IconProps & { children: ReactNode }) {
   return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-      <path d="m9 4-6 2.5v13L9 17l6 2.5 6-2.5v-13L15 7 9 4Z" /><path d="M9 4v13" /><path d="M15 7v12.5" />
+    <svg className={className} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false">
+      {children}
     </svg>
   );
 }
-export function IconBolt({ className = base }: IconProps) {
+
+/* ------------------------------ Reiter -------------------------------- */
+
+export function IconDoor(props: IconProps) {
   return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M13 2 4 14h7l-1 8 9-12h-7l1-8Z" />
-    </svg>
+    <Line {...props}>
+      <path d="M5.5 21V4.75A1.75 1.75 0 0 1 7.25 3h9.5a1.75 1.75 0 0 1 1.75 1.75V21" />
+      <path d="M3.5 21h17" />
+      <circle cx="15" cy="12.5" r="1.1" fill="currentColor" stroke="none" />
+    </Line>
   );
 }
-export function IconChart({ className = base }: IconProps) {
+export function IconDoorFill(props: IconProps) {
   return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M3 3v18h18" /><rect x="7" y="11" width="3" height="7" rx="1" /><rect x="12.5" y="7" width="3" height="11" rx="1" /><rect x="18" y="13" width="3" height="5" rx="1" />
-    </svg>
+    <Solid {...props}>
+      <path
+        fillRule="evenodd"
+        d="M7.25 2.25A2.5 2.5 0 0 0 4.75 4.75v15.5H3.5a.75.75 0 0 0 0 1.5h17a.75.75 0 0 0 0-1.5h-1.25V4.75a2.5 2.5 0 0 0-2.5-2.5h-9.5ZM15 13.75a1.25 1.25 0 1 0 0-2.5 1.25 1.25 0 0 0 0 2.5Z"
+      />
+    </Solid>
   );
 }
-export function IconUsers({ className = base }: IconProps) {
+
+export function IconMap(props: IconProps) {
   return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-      <circle cx="9" cy="8" r="3.2" /><path d="M2.8 20a6.2 6.2 0 0 1 12.4 0" /><path d="M16.5 5.6a3.2 3.2 0 0 1 0 6.3" /><path d="M17.8 14.4A6.2 6.2 0 0 1 21.6 20" />
-    </svg>
+    <Line {...props}>
+      <path d="m9 4.5-5.5 2.1v13.1L9 17.6l6 2.4 5.5-2.1V4.8L15 6.9 9 4.5Z" />
+      <path d="M9 4.5v13.1" />
+      <path d="M15 6.9V20" />
+    </Line>
   );
 }
-export function IconHome({ className = base }: IconProps) {
+export function IconMapFill(props: IconProps) {
   return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-      <path d="m3 10.5 9-7 9 7" /><path d="M5.5 9.5V20h13V9.5" /><path d="M10 20v-5h4v5" />
-    </svg>
+    <Solid {...props}>
+      <path d="M8.25 3.55v13.6l-4.48 1.71A.95.95 0 0 1 2.5 17.97V6.6c0-.39.24-.75.61-.89L8.25 3.55Z" />
+      <path d="M9.75 3.6l4.5 1.8v14.95l-4.5-1.8V3.6Z" />
+      <path d="M15.75 5.4l4.48-1.72c.62-.24 1.27.22 1.27.89V17.4c0 .39-.24.75-.61.89l-5.14 1.97V5.4Z" />
+    </Solid>
   );
 }
-export function IconCog({ className = base }: IconProps) {
+
+export function IconUsers(props: IconProps) {
   return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <Line {...props}>
+      <circle cx="9" cy="8" r="3.25" />
+      <path d="M3 19.5c.55-3 2.95-5 6-5s5.45 2 6 5" />
+      <path d="M15.75 4.9a3.25 3.25 0 0 1 0 6.2" />
+      <path d="M17.75 14.6c1.75.75 2.9 2.4 3.25 4.9" />
+    </Line>
+  );
+}
+export function IconUsersFill(props: IconProps) {
+  return (
+    <Solid {...props}>
+      <circle cx="9" cy="7.75" r="3.75" />
+      <path d="M2.27 19.33C2.86 15.86 5.6 13.75 9 13.75s6.14 2.11 6.73 5.58A1 1 0 0 1 14.75 20.5H3.25a1 1 0 0 1-.98-1.17Z" />
+      <path d="M15.6 4.1a3.9 3.9 0 0 1 0 7.55 5.4 5.4 0 0 0 1.15-3.8 5.4 5.4 0 0 0-1.15-3.75Z" />
+      <path d="M17.66 13.9c2.36.8 3.87 2.86 4.24 5.43a1 1 0 0 1-.99 1.17h-3.36a6.9 6.9 0 0 0-.01-.54 8.2 8.2 0 0 0-2.43-5.82c.87-.16 1.7-.24 2.55-.24Z" />
+    </Solid>
+  );
+}
+
+export function IconChart(props: IconProps) {
+  return (
+    <Line {...props}>
+      <rect x="4" y="12.5" width="4" height="7.5" rx="1.25" />
+      <rect x="10" y="7.5" width="4" height="12.5" rx="1.25" />
+      <rect x="16" y="4" width="4" height="16" rx="1.25" />
+    </Line>
+  );
+}
+export function IconChartFill(props: IconProps) {
+  return (
+    <Solid {...props}>
+      <rect x="3.25" y="11.75" width="5.5" height="9" rx="1.75" />
+      <rect x="9.25" y="6.75" width="5.5" height="14" rx="1.75" />
+      <rect x="15.25" y="3.25" width="5.5" height="17.5" rx="1.75" />
+    </Solid>
+  );
+}
+
+export function IconPersonCircle(props: IconProps) {
+  return (
+    <Line {...props}>
+      <circle cx="12" cy="12" r="9" />
+      <circle cx="12" cy="10" r="3" />
+      <path d="M6.3 18.3c1.3-1.9 3.3-3 5.7-3s4.4 1.1 5.7 3" />
+    </Line>
+  );
+}
+
+/* --------------------------- Allgemein ------------------------------- */
+
+export function IconHome(props: IconProps) {
+  return (
+    <Line {...props}>
+      <path d="m3.5 10.5 8.5-7 8.5 7" />
+      <path d="M5.75 9v10.25c0 .41.34.75.75.75H10v-5.25h4V20h3.5c.41 0 .75-.34.75-.75V9" />
+    </Line>
+  );
+}
+export function IconBuilding(props: IconProps) {
+  return (
+    <Line {...props}>
+      <path d="M4.5 21V5a1.5 1.5 0 0 1 1.5-1.5h7.5A1.5 1.5 0 0 1 15 5v16" />
+      <path d="M15 9.5h3a1.5 1.5 0 0 1 1.5 1.5v10" />
+      <path d="M3 21h18" />
+      <path d="M8 7.5h3M8 11h3M8 14.5h3" />
+    </Line>
+  );
+}
+export function IconBolt(props: IconProps) {
+  return (
+    <Line {...props}>
+      <path d="M13.25 2.75 5 13.25h6.25l-.75 8 8.25-10.5H12.5l.75-8Z" />
+    </Line>
+  );
+}
+export function IconCog(props: IconProps) {
+  return (
+    <Line {...props}>
       <circle cx="12" cy="12" r="3" />
-      <path d="M12 2.8v2.4M12 18.8v2.4M4.5 12H2.1M21.9 12h-2.4M6.4 6.4 4.7 4.7M19.3 19.3l-1.7-1.7M17.6 6.4l1.7-1.7M4.7 19.3l1.7-1.7" />
-    </svg>
+      <path d="M19.4 13.4a7.7 7.7 0 0 0 0-2.8l1.9-1.5-1.9-3.3-2.3.9a7.4 7.4 0 0 0-2.4-1.4L14.3 3h-3.8l-.4 2.3a7.4 7.4 0 0 0-2.4 1.4l-2.3-.9-1.9 3.3 1.9 1.5a7.7 7.7 0 0 0 0 2.8l-1.9 1.5 1.9 3.3 2.3-.9a7.4 7.4 0 0 0 2.4 1.4l.4 2.3h3.8l.4-2.3a7.4 7.4 0 0 0 2.4-1.4l2.3.9 1.9-3.3-1.9-1.5Z" />
+    </Line>
   );
 }
-export function IconLogout({ className = base }: IconProps) {
+export function IconLogout(props: IconProps) {
   return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3" /><path d="M10 16l-4-4 4-4" /><path d="M6 12h10" />
-    </svg>
+    <Line {...props}>
+      <path d="M14 4h3.25A2.75 2.75 0 0 1 20 6.75v10.5A2.75 2.75 0 0 1 17.25 20H14" />
+      <path d="m9.5 8-4 4 4 4" />
+      <path d="M5.5 12H15" />
+    </Line>
   );
 }
-export function IconCalendar({ className = base }: IconProps) {
+export function IconCalendar(props: IconProps) {
   return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-      <rect x="3" y="5" width="18" height="16" rx="2" /><path d="M8 3v4" /><path d="M16 3v4" /><path d="M3 10h18" /><path d="M8 14h3" />
-    </svg>
+    <Line {...props}>
+      <rect x="3.5" y="5" width="17" height="15.5" rx="3" />
+      <path d="M8 3v4M16 3v4M3.5 10h17" />
+    </Line>
   );
 }
-export function IconPlus({ className = base }: IconProps) {
+export function IconClock(props: IconProps) {
   return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+    <Line {...props}>
+      <circle cx="12" cy="12" r="8.75" />
+      <path d="M12 7.25V12l3 2" />
+    </Line>
+  );
+}
+export function IconHistory(props: IconProps) {
+  return (
+    <Line {...props}>
+      <path d="M3.75 12a8.25 8.25 0 1 0 2.4-5.82" />
+      <path d="M3.5 4.5v3.5H7" />
+      <path d="M12 8v4l2.75 1.75" />
+    </Line>
+  );
+}
+export function IconPlus(props: IconProps) {
+  return (
+    <Line {...props}>
       <path d="M12 5v14M5 12h14" />
-    </svg>
+    </Line>
   );
 }
-export function IconCheck({ className = base }: IconProps) {
+export function IconMinus(props: IconProps) {
   return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="m4.5 12.5 5 5 10-11" />
-    </svg>
-  );
-}
-export function IconArrowRight({ className = base }: IconProps) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M5 12h13" /><path d="m13 6 6 6-6 6" />
-    </svg>
-  );
-}
-
-/* ==========================================================================
-   Symbole der Tuer-Erfassung und der Gebietsplanung.
-
-   Alle im selben Raster gezeichnet: 24er-Feld, Strichstaerke 1.8, runde
-   Enden. Dadurch stehen sie nebeneinander ruhig - anders als Emoji, die
-   auf jedem Geraet anders aussehen.
-   ========================================================================== */
-
-export function IconBell({ className = base }: IconProps) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M18 8.5a6 6 0 1 0-12 0c0 5-2 6.5-2 6.5h16s-2-1.5-2-6.5Z" /><path d="M13.7 19a2 2 0 0 1-3.4 0" />
-    </svg>
-  );
-}
-
-export function IconBuilding({ className = base }: IconProps) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M4 21V5.5A1.5 1.5 0 0 1 5.5 4h8A1.5 1.5 0 0 1 15 5.5V21" /><path d="M15 10h3.5A1.5 1.5 0 0 1 20 11.5V21" /><path d="M3 21h18" />
-      <path d="M7.5 8h1.5M11 8h1.5M7.5 12h1.5M11 12h1.5M7.5 16h1.5M11 16h1.5M18 14h-1M18 17.5h-1" />
-    </svg>
-  );
-}
-
-export function IconPerson({ className = base }: IconProps) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-      <circle cx="12" cy="8" r="3.4" /><path d="M4.8 20a7.2 7.2 0 0 1 14.4 0" />
-    </svg>
-  );
-}
-
-export function IconBan({ className = base }: IconProps) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-      <circle cx="12" cy="12" r="8.5" /><path d="m6.2 6.2 11.6 11.6" />
-    </svg>
-  );
-}
-
-export function IconClock({ className = base }: IconProps) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-      <circle cx="12" cy="12" r="8.5" /><path d="M12 7.5V12l3 2" />
-    </svg>
-  );
-}
-
-export function IconPhone({ className = base }: IconProps) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M7.5 3.5 9.8 8l-2 1.7a12.5 12.5 0 0 0 6.5 6.5l1.7-2 4.5 2.3-1 3.2a2 2 0 0 1-2.2 1.3C11 20.1 3.9 13 3 7.7A2 2 0 0 1 4.3 5.5l3.2-2Z" />
-    </svg>
-  );
-}
-
-export function IconNavigate({ className = base }: IconProps) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M20.5 3.5 3.8 10.1a.6.6 0 0 0 .05 1.12l7.03 2.4 2.4 7.03a.6.6 0 0 0 1.12.05L20.5 3.5Z" />
-    </svg>
-  );
-}
-
-export function IconCrosshair({ className = base }: IconProps) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-      <circle cx="12" cy="12" r="7" /><circle cx="12" cy="12" r="2.2" fill="currentColor" stroke="none" /><path d="M12 2v2.8M12 19.2V22M2 12h2.8M19.2 12H22" />
-    </svg>
-  );
-}
-
-export function IconSearch({ className = base }: IconProps) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-      <circle cx="11" cy="11" r="6.5" /><path d="m16 16 4.5 4.5" />
-    </svg>
-  );
-}
-
-export function IconPin({ className = base }: IconProps) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M12 21s6.5-5.6 6.5-11a6.5 6.5 0 1 0-13 0c0 5.4 6.5 11 6.5 11Z" /><circle cx="12" cy="10" r="2.4" />
-    </svg>
-  );
-}
-
-/** Umkreis abstecken: Mittelpunkt mit Radius. */
-export function IconCircleArea({ className = base }: IconProps) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-      <circle cx="12" cy="12" r="8" strokeDasharray="3 3" /><circle cx="12" cy="12" r="1.8" fill="currentColor" stroke="none" /><path d="M12 12h8" />
-    </svg>
-  );
-}
-
-/** Flaeche zeichnen: Vieleck mit Eckpunkten. */
-export function IconPolygonArea({ className = base }: IconProps) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-      <path d="m5 7 7-3.5L20 8l-2.5 9L9 20 5 7Z" />
-      <circle cx="5" cy="7" r="1.6" fill="currentColor" stroke="none" /><circle cx="12" cy="3.5" r="1.6" fill="currentColor" stroke="none" />
-      <circle cx="20" cy="8" r="1.6" fill="currentColor" stroke="none" /><circle cx="9" cy="20" r="1.6" fill="currentColor" stroke="none" />
-    </svg>
-  );
-}
-
-export function IconSplit({ className = base }: IconProps) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M4 5h6a2 2 0 0 1 2 2v10a2 2 0 0 0 2 2h6" /><path d="M20 5h-6a2 2 0 0 0-2 2" /><path d="m17 2 3 3-3 3M17 16l3 3-3 3" />
-    </svg>
-  );
-}
-
-export function IconList({ className = base }: IconProps) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M9 6h11M9 12h11M9 18h11" /><circle cx="4.5" cy="6" r="1.3" fill="currentColor" stroke="none" /><circle cx="4.5" cy="12" r="1.3" fill="currentColor" stroke="none" /><circle cx="4.5" cy="18" r="1.3" fill="currentColor" stroke="none" />
-    </svg>
-  );
-}
-
-export function IconChevronRight({ className = base }: IconProps) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="m9.5 5 7 7-7 7" />
-    </svg>
-  );
-}
-
-export function IconChevronLeft({ className = base }: IconProps) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="m14.5 5-7 7 7 7" />
-    </svg>
-  );
-}
-
-export function IconChevronDown({ className = base }: IconProps) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="m5 9.5 7 7 7-7" />
-    </svg>
-  );
-}
-
-export function IconX({ className = base }: IconProps) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-      <path d="M6 6l12 12M18 6 6 18" />
-    </svg>
-  );
-}
-
-export function IconMinus({ className = base }: IconProps) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+    <Line {...props}>
       <path d="M5 12h14" />
-    </svg>
+    </Line>
+  );
+}
+export function IconCheck(props: IconProps) {
+  return (
+    <Line {...props}>
+      <path d="m4.75 12.75 4.5 4.5L19.25 6.75" strokeWidth={2.25} />
+    </Line>
+  );
+}
+export function IconX(props: IconProps) {
+  return (
+    <Line {...props}>
+      <path d="M6.5 6.5l11 11M17.5 6.5l-11 11" strokeWidth={2} />
+    </Line>
+  );
+}
+export function IconChevronRight(props: IconProps) {
+  return (
+    <Line {...props}>
+      <path d="m9.5 5.5 6.5 6.5-6.5 6.5" strokeWidth={2.25} />
+    </Line>
+  );
+}
+export function IconChevronLeft(props: IconProps) {
+  return (
+    <Line {...props}>
+      <path d="m14.5 5.5-6.5 6.5 6.5 6.5" strokeWidth={2.25} />
+    </Line>
+  );
+}
+export function IconChevronDown(props: IconProps) {
+  return (
+    <Line {...props}>
+      <path d="m5.5 9.5 6.5 6.5 6.5-6.5" strokeWidth={2.25} />
+    </Line>
+  );
+}
+export function IconChevronUp(props: IconProps) {
+  return (
+    <Line {...props}>
+      <path d="m5.5 14.5 6.5-6.5 6.5 6.5" strokeWidth={2.25} />
+    </Line>
+  );
+}
+export function IconChevronUpDown(props: IconProps) {
+  return (
+    <Line {...props}>
+      <path d="m8 9 4-4 4 4M8 15l4 4 4-4" strokeWidth={2} />
+    </Line>
+  );
+}
+export function IconArrowRight(props: IconProps) {
+  return (
+    <Line {...props}>
+      <path d="M4.5 12h14" />
+      <path d="m13 6 6 6-6 6" />
+    </Line>
+  );
+}
+export function IconMore(props: IconProps) {
+  return (
+    <Solid {...props}>
+      <circle cx="5.5" cy="12" r="1.75" />
+      <circle cx="12" cy="12" r="1.75" />
+      <circle cx="18.5" cy="12" r="1.75" />
+    </Solid>
+  );
+}
+export function IconSidebar(props: IconProps) {
+  return (
+    <Line {...props}>
+      <rect x="3" y="4.5" width="18" height="15" rx="3.25" />
+      <path d="M9.5 4.5v15" />
+      <path d="M5.75 8h1.5M5.75 11h1.5" />
+    </Line>
+  );
+}
+export function IconInfo(props: IconProps) {
+  return (
+    <Line {...props}>
+      <circle cx="12" cy="12" r="8.75" />
+      <path d="M12 11v5.25" />
+      <circle cx="12" cy="7.75" r="1.1" fill="currentColor" stroke="none" />
+    </Line>
+  );
+}
+export function IconSearch(props: IconProps) {
+  return (
+    <Line {...props}>
+      <circle cx="10.75" cy="10.75" r="6.25" />
+      <path d="m15.5 15.5 5 5" />
+    </Line>
+  );
+}
+export function IconPencil(props: IconProps) {
+  return (
+    <Line {...props}>
+      <path d="M4 20h4.25L19.4 8.85a2.12 2.12 0 0 0-3-3L5.25 17v3" />
+      <path d="m14.75 7.5 3 3" />
+    </Line>
+  );
+}
+export function IconTrash(props: IconProps) {
+  return (
+    <Line {...props}>
+      <path d="M4 6.75h16" />
+      <path d="M9.5 6.75v-2a1.25 1.25 0 0 1 1.25-1.25h2.5a1.25 1.25 0 0 1 1.25 1.25v2" />
+      <path d="m6 6.75.9 12.4A1.75 1.75 0 0 0 8.65 20.8h6.7a1.75 1.75 0 0 0 1.75-1.65L18 6.75" />
+      <path d="M10 11v5.5M14 11v5.5" />
+    </Line>
+  );
+}
+export function IconUndo(props: IconProps) {
+  return (
+    <Line {...props}>
+      <path d="M4.5 9h10.25a5 5 0 0 1 0 10H10" />
+      <path d="m8.5 5-4 4 4 4" />
+    </Line>
+  );
+}
+export function IconRefresh(props: IconProps) {
+  return (
+    <Line {...props}>
+      <path d="M20 11.5a8 8 0 0 0-14.1-4.6L4 9" />
+      <path d="M4 4.5V9h4.5" />
+      <path d="M4 12.5a8 8 0 0 0 14.1 4.6L20 15" />
+      <path d="M20 19.5V15h-4.5" />
+    </Line>
+  );
+}
+export function IconExternal(props: IconProps) {
+  return (
+    <Line {...props}>
+      <path d="M14 4h6v6" />
+      <path d="M20 4 11 13" />
+      <path d="M18 14v3.75A2.25 2.25 0 0 1 15.75 20h-9.5A2.25 2.25 0 0 1 4 17.75v-9.5A2.25 2.25 0 0 1 6.25 6H10" />
+    </Line>
+  );
+}
+export function IconShare(props: IconProps) {
+  return (
+    <Line {...props}>
+      <path d="M12 14.5V3.5" />
+      <path d="m8 7 4-4 4 4" />
+      <path d="M7.5 10.5H6.25A2.25 2.25 0 0 0 4 12.75v5A2.25 2.25 0 0 0 6.25 20h11.5A2.25 2.25 0 0 0 20 17.75v-5a2.25 2.25 0 0 0-2.25-2.25H16.5" />
+    </Line>
+  );
+}
+export function IconLink(props: IconProps) {
+  return (
+    <Line {...props}>
+      <path d="M10 14a4 4 0 0 0 5.66 0l3-3a4 4 0 0 0-5.66-5.66l-.75.75" />
+      <path d="M14 10a4 4 0 0 0-5.66 0l-3 3a4 4 0 0 0 5.66 5.66l.75-.75" />
+    </Line>
+  );
+}
+export function IconEye(props: IconProps) {
+  return (
+    <Line {...props}>
+      <path d="M2.75 12S6.25 5.75 12 5.75 21.25 12 21.25 12 17.75 18.25 12 18.25 2.75 12 2.75 12Z" />
+      <circle cx="12" cy="12" r="3" />
+    </Line>
+  );
+}
+export function IconEyeOff(props: IconProps) {
+  return (
+    <Line {...props}>
+      <path d="M10.6 5.85a9.4 9.4 0 0 1 1.4-.1c5.75 0 9.25 6.25 9.25 6.25a16 16 0 0 1-2.55 3.3" />
+      <path d="M6.6 6.6C4.1 8.3 2.75 12 2.75 12s3.5 6.25 9.25 6.25a9 9 0 0 0 5.2-1.6" />
+      <path d="M9.9 9.9a3 3 0 0 0 4.2 4.2" />
+      <path d="m3.5 3.5 17 17" />
+    </Line>
+  );
+}
+export function IconLayers(props: IconProps) {
+  return (
+    <Line {...props}>
+      <path d="m12 3.5 8.75 4.5L12 12.5 3.25 8 12 3.5Z" />
+      <path d="m3.25 12 8.75 4.5 8.75-4.5" />
+      <path d="m3.25 16 8.75 4.5 8.75-4.5" />
+    </Line>
+  );
+}
+export function IconFit(props: IconProps) {
+  return (
+    <Line {...props}>
+      <path d="M4 9V5.5A1.5 1.5 0 0 1 5.5 4H9" />
+      <path d="M15 4h3.5A1.5 1.5 0 0 1 20 5.5V9" />
+      <path d="M20 15v3.5a1.5 1.5 0 0 1-1.5 1.5H15" />
+      <path d="M9 20H5.5A1.5 1.5 0 0 1 4 18.5V15" />
+    </Line>
+  );
+}
+export function IconImage(props: IconProps) {
+  return (
+    <Line {...props}>
+      <rect x="3.5" y="4.5" width="17" height="15" rx="3" />
+      <circle cx="9" cy="10" r="1.6" />
+      <path d="m20.5 15.5-4.5-4.5-8.5 8.5" />
+    </Line>
+  );
+}
+export function IconList(props: IconProps) {
+  return (
+    <Line {...props}>
+      <path d="M9 6.5h11M9 12h11M9 17.5h11" />
+      <circle cx="4.75" cy="6.5" r="1.25" fill="currentColor" stroke="none" />
+      <circle cx="4.75" cy="12" r="1.25" fill="currentColor" stroke="none" />
+      <circle cx="4.75" cy="17.5" r="1.25" fill="currentColor" stroke="none" />
+    </Line>
+  );
+}
+export function IconKeypad(props: IconProps) {
+  return (
+    <Line {...props}>
+      <path d="M9.5 3.5 7.5 20.5M16.5 3.5l-2 17M4 8.5h16.5M3.5 15.5H20" />
+    </Line>
   );
 }
 
-export function IconPencil({ className = base }: IconProps) {
+/* ------------------------------ Personen ------------------------------ */
+
+export function IconPerson(props: IconProps) {
   return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M4 20h4L19.5 8.5a2.1 2.1 0 0 0-3-3L5 17v3Z" /><path d="m14.5 6.5 3 3" />
-    </svg>
+    <Line {...props}>
+      <circle cx="12" cy="8" r="3.5" />
+      <path d="M4.75 20c.7-3.6 3.6-6 7.25-6s6.55 2.4 7.25 6" />
+    </Line>
+  );
+}
+export function IconUserPlus(props: IconProps) {
+  return (
+    <Line {...props}>
+      <circle cx="10" cy="8" r="3.5" />
+      <path d="M3.5 20c.65-3.5 3.25-5.75 6.5-5.75 1.45 0 2.75.45 3.8 1.25" />
+      <path d="M18.5 13v6M15.5 16h6" />
+    </Line>
+  );
+}
+export function IconKey(props: IconProps) {
+  return (
+    <Line {...props}>
+      <circle cx="8" cy="15" r="4" />
+      <path d="m10.85 12.15 8.65-8.65" />
+      <path d="m16.5 6.5 2.5 2.5M14 9l2 2" />
+    </Line>
+  );
+}
+export function IconShield(props: IconProps) {
+  return (
+    <Line {...props}>
+      <path d="M12 3.25 5 6v5.5c0 4.3 2.95 7.85 7 9.25 4.05-1.4 7-4.95 7-9.25V6l-7-2.75Z" />
+      <path d="m9 12 2.1 2.1L15 10.2" />
+    </Line>
+  );
+}
+export function IconMail(props: IconProps) {
+  return (
+    <Line {...props}>
+      <rect x="3" y="5" width="18" height="14" rx="3" />
+      <path d="m3.75 7.5 8.25 5.75 8.25-5.75" />
+    </Line>
   );
 }
 
-export function IconUndo({ className = base }: IconProps) {
+/* ------------------------------ An der Tuer ---------------------------- */
+
+export function IconBell(props: IconProps) {
   return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M4 9h11a5 5 0 0 1 0 10h-5" /><path d="m8 5-4 4 4 4" />
-    </svg>
+    <Line {...props}>
+      <path d="M18 9a6 6 0 1 0-12 0c0 4.75-2 6.25-2 6.25h16S18 13.75 18 9Z" />
+      <path d="M13.75 19a2 2 0 0 1-3.5 0" />
+    </Line>
+  );
+}
+export function IconBellCheck(props: IconProps) {
+  return (
+    <Line {...props}>
+      <path d="M18 9a6 6 0 1 0-12 0c0 4.75-2 6.25-2 6.25h16S18 13.75 18 9Z" />
+      <path d="M13.75 19a2 2 0 0 1-3.5 0" />
+      <path d="m9.5 9.75 1.8 1.8 3.2-3.3" />
+    </Line>
+  );
+}
+export function IconBan(props: IconProps) {
+  return (
+    <Line {...props}>
+      <circle cx="12" cy="12" r="8.75" />
+      <path d="m5.8 5.8 12.4 12.4" />
+    </Line>
+  );
+}
+export function IconPhone(props: IconProps) {
+  return (
+    <Line {...props}>
+      <path d="M7.6 3.5 9.9 8l-2 1.7a12.6 12.6 0 0 0 6.4 6.4l1.7-2 4.5 2.3-.95 3.15a2 2 0 0 1-2.2 1.35C10.95 20.05 3.95 13.05 3.1 6.75A2 2 0 0 1 4.45 4.55L7.6 3.5Z" />
+    </Line>
+  );
+}
+export function IconNavigate(props: IconProps) {
+  return (
+    <Line {...props}>
+      <path d="M20.25 3.75 3.9 10.1a.6.6 0 0 0 .05 1.13l6.95 2.12 2.12 6.95a.6.6 0 0 0 1.13.05L20.25 3.75Z" />
+    </Line>
+  );
+}
+export function IconCrosshair(props: IconProps) {
+  return (
+    <Line {...props}>
+      <circle cx="12" cy="12" r="7" />
+      <circle cx="12" cy="12" r="2.25" fill="currentColor" stroke="none" />
+      <path d="M12 2v3M12 19v3M2 12h3M19 12h3" />
+    </Line>
+  );
+}
+export function IconPin(props: IconProps) {
+  return (
+    <Line {...props}>
+      <path d="M12 21s6.5-5.6 6.5-11a6.5 6.5 0 1 0-13 0c0 5.4 6.5 11 6.5 11Z" />
+      <circle cx="12" cy="10" r="2.4" />
+    </Line>
+  );
+}
+export function IconCircleArea(props: IconProps) {
+  return (
+    <Line {...props}>
+      <circle cx="12" cy="12" r="8" strokeDasharray="3 3" />
+      <circle cx="12" cy="12" r="1.8" fill="currentColor" stroke="none" />
+      <path d="M12 12h8" />
+    </Line>
+  );
+}
+export function IconPolygonArea(props: IconProps) {
+  return (
+    <Line {...props}>
+      <path d="m5 7 7-3.5L20 8l-2.5 9L9 20 5 7Z" />
+      <circle cx="5" cy="7" r="1.6" fill="currentColor" stroke="none" />
+      <circle cx="12" cy="3.5" r="1.6" fill="currentColor" stroke="none" />
+      <circle cx="20" cy="8" r="1.6" fill="currentColor" stroke="none" />
+      <circle cx="9" cy="20" r="1.6" fill="currentColor" stroke="none" />
+    </Line>
+  );
+}
+export function IconSplit(props: IconProps) {
+  return (
+    <Line {...props}>
+      <path d="M4 5h6a2 2 0 0 1 2 2v10a2 2 0 0 0 2 2h6" />
+      <path d="M20 5h-6a2 2 0 0 0-2 2" />
+      <path d="m17 2 3 3-3 3M17 16l3 3-3 3" />
+    </Line>
+  );
+}
+export function IconOffline(props: IconProps) {
+  return (
+    <Line {...props}>
+      <path d="M2.75 8.75A15 15 0 0 1 7.6 5.6M12 4.75c3.3 0 6.45 1.25 9.25 3.75" />
+      <path d="M6 12.25a10 10 0 0 1 3-1.75M15.2 10.6a10 10 0 0 1 2.8 1.65" />
+      <path d="M9.4 15.75a5 5 0 0 1 5.2 0" />
+      <circle cx="12" cy="19.25" r="1.2" fill="currentColor" stroke="none" />
+      <path d="m3.5 3.5 17 17" />
+    </Line>
+  );
+}
+export function IconCloudUp(props: IconProps) {
+  return (
+    <Line {...props}>
+      <path d="M7 18.5a4 4 0 0 1-.5-7.97 5.5 5.5 0 0 1 10.6-1.23A3.8 3.8 0 0 1 18 18.5h-1" />
+      <path d="M12 20.5v-7.5" />
+      <path d="m9 15.5 3-3 3 3" />
+    </Line>
+  );
+}
+export function IconChat(props: IconProps) {
+  return (
+    <Line {...props}>
+      <path d="M5 18.5 3.5 21l.7-4A8 8 0 1 1 7.5 19.3" />
+      <path d="M8.5 11h7M8.5 14h4" />
+    </Line>
+  );
+}
+export function IconCheckCircle(props: IconProps) {
+  return (
+    <Line {...props}>
+      <circle cx="12" cy="12" r="8.75" />
+      <path d="m8 12.4 2.8 2.8 5.2-5.7" />
+    </Line>
+  );
+}
+export function IconTarget(props: IconProps) {
+  return (
+    <Line {...props}>
+      <circle cx="12" cy="12" r="8.75" />
+      <circle cx="12" cy="12" r="4.75" />
+      <circle cx="12" cy="12" r="1.25" fill="currentColor" stroke="none" />
+    </Line>
   );
 }
 
-export function IconOffline({ className = base }: IconProps) {
+/* ---------------------------- Team & Feed ----------------------------- */
+
+export function IconTrophy(props: IconProps) {
   return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M2.5 8.5a15.5 15.5 0 0 1 5-3.1M12 4.5c3.4 0 6.6 1.3 9.5 3.9" /><path d="M6 12.2a10 10 0 0 1 3-1.8M15.2 10.6a10 10 0 0 1 2.8 1.6" /><path d="M9.4 15.8a5 5 0 0 1 5.2 0" /><circle cx="12" cy="19.3" r="1.2" fill="currentColor" stroke="none" /><path d="m3 3 18 18" />
-    </svg>
+    <Line {...props}>
+      <path d="M7.5 4h9v5a4.5 4.5 0 0 1-9 0V4Z" />
+      <path d="M7.5 6H4.75v1.25A3.25 3.25 0 0 0 7.7 10.5" />
+      <path d="M16.5 6h2.75v1.25a3.25 3.25 0 0 1-2.95 3.25" />
+      <path d="M12 13.5V17M8.5 20.5h7M9.75 17h4.5" />
+    </Line>
   );
 }
-
-export function IconCloudUp({ className = base }: IconProps) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M7 18.5a4 4 0 0 1-.5-8 5.5 5.5 0 0 1 10.6-1.2A3.8 3.8 0 0 1 18 18.5h-1" /><path d="M12 21v-8" /><path d="m9 15.5 3-3 3 3" />
-    </svg>
+export function IconHeart({ className, filled = false }: IconProps & { filled?: boolean }) {
+  const d =
+    "M12 20s-7.5-4.6-7.5-10.2A4.3 4.3 0 0 1 12 7.2a4.3 4.3 0 0 1 7.5 2.6C19.5 15.4 12 20 12 20Z";
+  return filled ? (
+    <Solid className={className}>
+      <path d={d} />
+    </Solid>
+  ) : (
+    <Line className={className}>
+      <path d={d} />
+    </Line>
   );
 }
-
-export function IconInfo({ className = base }: IconProps) {
+export function IconComment(props: IconProps) {
   return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-      <circle cx="12" cy="12" r="8.5" /><path d="M12 11v5" /><circle cx="12" cy="8" r="1.1" fill="currentColor" stroke="none" />
-    </svg>
-  );
-}
-
-export function IconSignature({ className = base }: IconProps) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M3 17c3.5 0 4-11 7-11s1.8 9 4.5 9c1.6 0 2-2.5 3.5-2.5 1 0 1.6 1 3 1" /><path d="M3 21h18" />
-    </svg>
-  );
-}
-
-export function IconTarget({ className = base }: IconProps) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-      <circle cx="12" cy="12" r="8.5" /><circle cx="12" cy="12" r="4.8" /><circle cx="12" cy="12" r="1.3" fill="currentColor" stroke="none" />
-    </svg>
-  );
-}
-
-/** Kartenebenen - wechselt zwischen Karte und Satellit. */
-export function IconLayers({ className = base }: IconProps) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-      <path d="m12 3 9 4.5-9 4.5-9-4.5L12 3Z" /><path d="m3 12 9 4.5 9-4.5" /><path d="m3 16.5 9 4.5 9-4.5" />
-    </svg>
-  );
-}
-
-/** Rahmen mit Pfeilen - holt den ganzen Inhalt zurueck ins Bild. */
-export function IconFit({ className = base }: IconProps) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M4 9V5a1 1 0 0 1 1-1h4" /><path d="M15 4h4a1 1 0 0 1 1 1v4" /><path d="M20 15v4a1 1 0 0 1-1 1h-4" /><path d="M9 20H5a1 1 0 0 1-1-1v-4" />
-    </svg>
-  );
-}
-
-export function IconChevronUp({ className = base }: IconProps) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="m5 14.5 7-7 7 7" />
-    </svg>
-  );
-}
-
-/** Drei Punkte - oeffnet ein Menue mit weiteren Aktionen. */
-export function IconMore({ className = base }: IconProps) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="currentColor">
-      <circle cx="5.5" cy="12" r="1.7" /><circle cx="12" cy="12" r="1.7" /><circle cx="18.5" cy="12" r="1.7" />
-    </svg>
-  );
-}
-
-/** Vier Kacheln - der Reiter "Mehr" am unteren Rand. */
-export function IconGrid({ className = base }: IconProps) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-      <rect x="3.5" y="3.5" width="7" height="7" rx="2" /><rect x="13.5" y="3.5" width="7" height="7" rx="2" /><rect x="3.5" y="13.5" width="7" height="7" rx="2" /><rect x="13.5" y="13.5" width="7" height="7" rx="2" />
-    </svg>
-  );
-}
-
-/** Pfeil aus dem Kasten - der Verweis fuehrt aus der App hinaus. */
-export function IconExternal({ className = base }: IconProps) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M14 4h6v6" /><path d="M20 4 11 13" /><path d="M18 14v4a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4" />
-    </svg>
-  );
-}
-
-export function IconKey({ className = base }: IconProps) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-      <circle cx="8" cy="15" r="4" /><path d="m10.8 12.2 8.7-8.7" /><path d="m16.5 6.5 2.5 2.5" /><path d="m14 9 2 2" />
-    </svg>
-  );
-}
-
-export function IconShield({ className = base }: IconProps) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M12 3 5 6v5.5c0 4.3 3 7.9 7 9.5 4-1.6 7-5.2 7-9.5V6l-7-3Z" /><path d="m9 12 2 2 4-4" />
-    </svg>
-  );
-}
-
-export function IconImage({ className = base }: IconProps) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-      <rect x="3.5" y="4.5" width="17" height="15" rx="2.5" /><circle cx="9" cy="10" r="1.6" /><path d="m20.5 15.5-4.5-4.5-8.5 8.5" />
-    </svg>
-  );
-}
-
-export function IconRefresh({ className = base }: IconProps) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M20 11a8 8 0 0 0-14.3-4.9L4 8" /><path d="M4 4v4h4" /><path d="M4 13a8 8 0 0 0 14.3 4.9L20 16" /><path d="M20 20v-4h-4" />
-    </svg>
-  );
-}
-
-export function IconEye({ className = base }: IconProps) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12Z" /><circle cx="12" cy="12" r="3" />
-    </svg>
-  );
-}
-
-export function IconEyeOff({ className = base }: IconProps) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M10.6 5.6A9.6 9.6 0 0 1 12 5.5c6 0 9.5 6.5 9.5 6.5a16 16 0 0 1-2.6 3.4" /><path d="M6.6 6.6C4 8.3 2.5 12 2.5 12s3.5 6.5 9.5 6.5a9 9 0 0 0 5.4-1.7" /><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2" /><path d="m3 3 18 18" />
-    </svg>
-  );
-}
-
-export function IconUserPlus({ className = base }: IconProps) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-      <circle cx="10" cy="8" r="3.5" /><path d="M3.5 20a6.5 6.5 0 0 1 13 0" /><path d="M19 8v6" /><path d="M16 11h6" />
-    </svg>
-  );
-}
-
-export function IconMail({ className = base }: IconProps) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-      <rect x="3" y="5" width="18" height="14" rx="2.5" /><path d="m3.5 7 8.5 6 8.5-6" />
-    </svg>
-  );
-}
-
-export function IconTrash({ className = base }: IconProps) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M4 7h16" /><path d="M9.5 7V4.5h5V7" /><path d="M6 7l1 12.5A1.5 1.5 0 0 0 8.5 21h7a1.5 1.5 0 0 0 1.5-1.5L18 7" /><path d="M10 11v6M14 11v6" />
-    </svg>
-  );
-}
-
-/** Abgeschlossener Verkauf - Haekchen im Kreis. */
-export function IconCheckCircle({ className = base }: IconProps) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-      <circle cx="12" cy="12" r="9" /><path d="m8 12.5 2.8 2.8L16.2 9.5" />
-    </svg>
-  );
-}
-
-/** Sprechblase - ein Gespraech ohne Abschluss. */
-export function IconChat({ className = base }: IconProps) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M5 18.5 3.5 21l.7-4A8 8 0 1 1 7.5 19.3" /><path d="M8.5 11h7M8.5 14h4" />
-    </svg>
-  );
-}
-
-/* ==========================================================================
-   Feed, Vergleich und Profil.
-   ========================================================================== */
-
-/** Feed - gestapelte Beitraege. */
-export function IconFeed({ className = base }: IconProps) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-      <rect x="4" y="3.5" width="16" height="7" rx="2" /><rect x="4" y="13.5" width="16" height="7" rx="2" /><path d="M7.5 7h5M7.5 17h8" />
-    </svg>
-  );
-}
-
-/** Pokal - die Rangliste. */
-export function IconTrophy({ className = base }: IconProps) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M7.5 4h9v5a4.5 4.5 0 0 1-9 0V4Z" /><path d="M7.5 6H4.5v1.5A3 3 0 0 0 7.6 10.5" /><path d="M16.5 6h3v1.5a3 3 0 0 1-3.1 3" /><path d="M12 13.5V17" /><path d="M8.5 20.5h7" />
-    </svg>
-  );
-}
-
-/** Herz - "Gefällt mir". Gefuellt, sobald man es gesetzt hat. */
-export function IconHeart({ className = base, filled = false }: IconProps & { filled?: boolean }) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill={filled ? "currentColor" : "none"} stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M12 20s-7.5-4.6-7.5-10.2A4.3 4.3 0 0 1 12 7.2a4.3 4.3 0 0 1 7.5 2.6C19.5 15.4 12 20 12 20Z" />
-    </svg>
-  );
-}
-
-/** Sprechblase ohne Zeilen - Kommentare. */
-export function IconComment({ className = base }: IconProps) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <Line {...props}>
       <path d="M4.5 12a7.5 7.5 0 1 1 3.4 6.3L4 19.5l1.2-3.6A7.4 7.4 0 0 1 4.5 12Z" />
-    </svg>
+    </Line>
   );
 }
-
-/** Papierflieger - absenden. */
-export function IconSend({ className = base }: IconProps) {
+export function IconSend(props: IconProps) {
   return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M20.5 3.5 10 14" /><path d="m20.5 3.5-6.5 17-4-6.5-6.5-4 17-6.5Z" />
-    </svg>
+    <Line {...props}>
+      <path d="M12 19.5V5" />
+      <path d="m6 11 6-6 6 6" />
+    </Line>
   );
 }
-
-/** Glocke mit Haken - abonniert, Push kommt. */
-export function IconBellCheck({ className = base }: IconProps) {
+export function IconFlame(props: IconProps) {
   return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M18 8.5a6 6 0 1 0-12 0c0 5-2 6.5-2 6.5h16s-2-1.5-2-6.5Z" /><path d="M13.7 19a2 2 0 0 1-3.4 0" /><path d="m9.5 9.5 1.8 1.8 3.2-3.3" />
-    </svg>
-  );
-}
-
-/** Flamme - Serie von Tagen mit Abschluss. */
-export function IconFlame({ className = base }: IconProps) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <Line {...props}>
       <path d="M12 21a6.5 6.5 0 0 0 6.5-6.5c0-4.5-4-6.5-4.5-11-2.5 2-4.5 4.5-4.5 7.5-1-.5-1.8-1.6-2-2.8C6.3 9.8 5.5 12 5.5 14.5A6.5 6.5 0 0 0 12 21Z" />
-    </svg>
+    </Line>
   );
 }
-
-/** Pfeil nach oben - Platz gewonnen. */
-export function IconTrendUp({ className = base }: IconProps) {
+export function IconTrendUp(props: IconProps) {
   return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M12 19V5" /><path d="m6 11 6-6 6 6" />
-    </svg>
+    <Line {...props}>
+      <path d="M12 19V5.5" />
+      <path d="m6.5 11 5.5-5.5 5.5 5.5" />
+    </Line>
   );
 }
-
-/** Pfeil nach unten - Platz verloren. */
-export function IconTrendDown({ className = base }: IconProps) {
+export function IconTrendDown(props: IconProps) {
   return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M12 5v14" /><path d="m6 13 6 6 6-6" />
-    </svg>
+    <Line {...props}>
+      <path d="M12 5v13.5" />
+      <path d="m6.5 13 5.5 5.5 5.5-5.5" />
+    </Line>
+  );
+}
+export function IconSparkles(props: IconProps) {
+  return (
+    <Line {...props}>
+      <path d="M10 3.5 11.6 8a2 2 0 0 0 1.2 1.2l4.45 1.55-4.45 1.6a2 2 0 0 0-1.2 1.2L10 18l-1.6-4.45a2 2 0 0 0-1.2-1.2L2.75 10.75 7.2 9.2a2 2 0 0 0 1.2-1.2L10 3.5Z" />
+      <path d="M18 14.5v5M15.5 17h5" />
+    </Line>
   );
 }

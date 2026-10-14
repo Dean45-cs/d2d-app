@@ -1,33 +1,149 @@
-import type { HandoverSummary } from "@/lib/territory-handover";
+"use client";
 
+import { useState } from "react";
+import { slotLabel } from "@/lib/appointments";
+import type { HandoverSummary } from "@/lib/territory-handover";
+import { Sheet } from "./Sheet";
+import { Cell, ListLabel, Notice } from "./ui";
+import { IconBan, IconBell, IconCalendar, IconDoor, IconHistory, IconInfo, IconRefresh } from "./icons";
+
+type Detail = "retry" | "blocked" | "appointments" | "latest" | null;
+
+/**
+ * Arbeitsstand eines Gebiets - was jemand wissen muss, der es uebernimmt:
+ * offene und gesperrte Tueren, offene Termine, die letzte Uebergabe.
+ * Einzelheiten stehen jeweils in einem Blatt.
+ */
 export function TerritoryHandover({ summary }: { summary: HandoverSummary }) {
-  return <section className="card mb-4 p-5" aria-label="Gebietsübergabe">
-    <h2 className="text-[16px] font-semibold">Gebietsübergabe · Arbeitsstand</h2>
-    <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
-      {[["Offene Türen", summary.openDoors], ["Davon erneut offen", summary.retryDoors],
-        ["Gesperrte Türen", summary.blockedDoors], ["Versuche bisher", summary.attempts]].map(([label, value]) =>
-        <div key={label}><p className="muted text-[12px]">{label}</p><p className="text-[22px] font-semibold">{value}</p></div>)}
-    </div>
-    <p className="muted mt-2 text-[12px]">Die Türzahlen beziehen sich auf hinterlegte Häuser und Klingeln.</p>
-    {summary.unknownBuildings > 0 && <p className="muted mt-1 text-[12px]">Bei {summary.unknownBuildings} Mehrfamilienhäusern fehlen noch die Klingelschilder.</p>}
-    {summary.notes && <p className="mt-3 whitespace-pre-wrap text-[14px]"><strong>Teamnotiz: </strong>{summary.notes}</p>}
-    {summary.details.length > 0 && <details className="mt-3 text-[13px]">
-      <summary className="cursor-pointer font-semibold">Bisherige Versuche und Sperren · {summary.details.length}</summary>
-      <ul className="mt-2 space-y-2">{summary.details.map((door, index) => <li key={index}>
-        <strong>{door.label}</strong> · {door.state === "BLOCKED" ? "Gesperrt – nicht klingeln" : `${door.attempts} erfolglose Versuche`}
-        {door.note && <span className="muted"> · {door.note}</span>}
-      </li>)}</ul>
-    </details>}
-    <details className="mt-3 text-[13px]" open={summary.appointments.length > 0}>
-      <summary className="cursor-pointer font-semibold">Offene Termine · {summary.appointments.length}</summary>
-      <ul className="mt-2 space-y-2">{summary.appointments.map((item) => <li key={item.id}>
-        <strong>{item.slot}</strong> · {item.address}<br /><span className="muted">Verantwortlich: {item.owner_name}</span>
-      </li>)}</ul>
-    </details>
-    {summary.latest && <div className="mt-4 border-t pt-3 text-[13px]" style={{ borderColor: "var(--line)" }}>
-      <p className="font-semibold">Letzte Übergabe: {summary.latest.from_name ?? "Unzugeteilt"} → {summary.latest.to_name ?? "Unzugeteilt"}</p>
-      <p className="muted">{summary.latest.appointments_transferred} Termine übergeben</p>
-      {summary.latest.note && <p className="mt-1 whitespace-pre-wrap">{summary.latest.note}</p>}
-    </div>}
-  </section>;
+  const [open, setOpen] = useState<Detail>(null);
+  const retry = summary.details.filter((d) => d.state === "RETRY");
+  const blocked = summary.details.filter((d) => d.state === "BLOCKED");
+
+  return (
+    <section>
+      <ListLabel>Arbeitsstand</ListLabel>
+      <ul className="list list-icons">
+        <li>
+          <Cell icon={<Glyph icon={<IconDoor className="h-4 w-4" />} />} title="Offene Türen" detail={summary.openDoors} />
+        </li>
+        {summary.retryDoors > 0 && (
+          <li>
+            <Cell
+              onClick={() => setOpen("retry")}
+              icon={<Glyph icon={<IconRefresh className="h-4 w-4" />} />}
+              title="Nochmal klingeln"
+              detail={summary.retryDoors}
+              chevron
+            />
+          </li>
+        )}
+        {summary.blockedDoors > 0 && (
+          <li>
+            <Cell
+              onClick={() => setOpen("blocked")}
+              icon={<Glyph icon={<IconBan className="h-4 w-4" />} />}
+              title="Gesperrt"
+              detail={summary.blockedDoors}
+              chevron
+            />
+          </li>
+        )}
+        {summary.unknownBuildings > 0 && (
+          <li>
+            <Cell
+              icon={<Glyph icon={<IconBell className="h-4 w-4" />} />}
+              title="Klingelschilder fehlen"
+              detail={summary.unknownBuildings}
+            />
+          </li>
+        )}
+        <li>
+          <Cell
+            onClick={summary.appointments.length > 0 ? () => setOpen("appointments") : undefined}
+            icon={<Glyph icon={<IconCalendar className="h-4 w-4" />} />}
+            title="Offene Termine"
+            detail={summary.appointments.length}
+            chevron={summary.appointments.length > 0}
+          />
+        </li>
+        {summary.latest && (
+          <li>
+            <Cell
+              onClick={() => setOpen("latest")}
+              icon={<Glyph icon={<IconHistory className="h-4 w-4" />} />}
+              title="Letzte Übergabe"
+              subtitle={`${summary.latest.from_name ?? "Niemand"} → ${summary.latest.to_name ?? "Niemand"}`}
+              chevron
+            />
+          </li>
+        )}
+      </ul>
+      {summary.notes && (
+        <div className="mt-2">
+          <Notice icon={<IconInfo className="h-4 w-4" />}>
+            <span className="whitespace-pre-wrap">{summary.notes}</span>
+          </Notice>
+        </div>
+      )}
+
+      {(open === "retry" || open === "blocked") && (
+        <Sheet title={open === "retry" ? "Nochmal klingeln" : "Gesperrt"} onClose={() => setOpen(null)}>
+          <ul className="list">
+            {(open === "retry" ? retry : blocked).map((door, index) => (
+              <li key={index}>
+                <Cell
+                  title={door.label}
+                  subtitle={
+                    [open === "retry" ? `${door.attempts}× nicht angetroffen` : "Nicht klingeln", door.note || null]
+                      .filter(Boolean)
+                      .join(" · ")
+                  }
+                />
+              </li>
+            ))}
+          </ul>
+        </Sheet>
+      )}
+
+      {open === "appointments" && (
+        <Sheet title="Offene Termine" onClose={() => setOpen(null)}>
+          <ul className="list">
+            {summary.appointments.map((item) => (
+              <li key={item.id}>
+                <Cell
+                  href={`/termine?termin=${item.id}`}
+                  title={item.address}
+                  subtitle={`${slotLabel(item.slot)} · ${item.owner_name}`}
+                />
+              </li>
+            ))}
+          </ul>
+        </Sheet>
+      )}
+
+      {open === "latest" && summary.latest && (
+        <Sheet
+          title="Letzte Übergabe"
+          subtitle={`${summary.latest.from_name ?? "Niemand"} → ${summary.latest.to_name ?? "Niemand"}`}
+          onClose={() => setOpen(null)}
+        >
+          <ul className="list">
+            <li>
+              <Cell title="Termine übergeben" detail={summary.latest.appointments_transferred} />
+            </li>
+            <li>
+              <Cell title="Datum" detail={new Date(`${summary.latest.created_at.replace(" ", "T")}Z`).toLocaleDateString("de-DE")} />
+            </li>
+          </ul>
+          {summary.latest.note && (
+            <p className="mt-4 whitespace-pre-wrap px-1 text-body">{summary.latest.note}</p>
+          )}
+        </Sheet>
+      )}
+    </section>
+  );
+}
+
+function Glyph({ icon }: { icon: React.ReactNode }) {
+  return <span className="glyph">{icon}</span>;
 }

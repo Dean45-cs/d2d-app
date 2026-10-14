@@ -347,13 +347,13 @@ export function MapView({
       )}
 
       {(locateNote || (fallbackNote && engine)) && (
-        <p className="map-chip pointer-events-none absolute bottom-2 left-2 right-14 z-[500] mx-auto w-fit max-w-full text-center text-[10.5px]">
+        <p className="map-chip pointer-events-none absolute bottom-2 left-2 right-14 z-[500] mx-auto w-fit max-w-full text-center text-caption-2">
           {locateNote ?? `${fallbackNote} – Ersatzkarte wird gezeigt`}
         </p>
       )}
 
       {!engine && (
-        <div className="absolute inset-0 z-[600] grid place-items-center bg-[var(--card-inset)]">
+        <div className="absolute inset-0 z-[600] grid place-items-center bg-surface-2">
           <div className="map-loading" aria-hidden />
           <p className="sr-only">Karte wird geladen</p>
         </div>

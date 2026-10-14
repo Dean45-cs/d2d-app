@@ -2,8 +2,8 @@
 
 import { useState } from "react";
 import { Sheet } from "@/components/Sheet";
-import { Note, Segmented, euro } from "@/components/ui";
-import { IconInfo, IconSearch } from "@/components/icons";
+import { Cell, InlineError, ListLabel, Segmented, euro } from "@/components/ui";
+import { IconSearch } from "@/components/icons";
 import { PriceBadge } from "@/components/ProviderRating";
 import { findCity } from "@/lib/energy/cities";
 import { referenceStep, type Energy } from "@/lib/energy/rating";
@@ -126,153 +126,129 @@ export function PriceSheet({
   return (
     <Sheet
       title={place ? `Preis für ${place}` : "Preis eintragen"}
-      subtitle="Werte vom Preisblatt abtippen – brutto, inkl. MwSt."
+      subtitle="Brutto, wie auf dem Preisblatt"
       onClose={onClose}
       footer={
-        <div className="space-y-2">
-          {error && <p className="text-[12px] font-semibold text-danger">{error}</p>}
-          <button type="button" className="btn btn-primary w-full" onClick={save} disabled={busy}>
+        <div className="space-y-3">
+          {error && <InlineError>{error}</InlineError>}
+          <button type="button" className="btn btn-primary btn-lg btn-block" onClick={save} disabled={busy}>
             {busy ? "Speichern …" : "Speichern"}
           </button>
         </div>
       }
     >
-      <div className="space-y-3">
-        <div className="grid grid-cols-[7rem_1fr] gap-2">
-          <label className="block">
-            <span className="label">PLZ</span>
-            <input
-              className="input tabular-nums"
-              inputMode="numeric"
-              maxLength={5}
-              value={form.postalCode}
-              onChange={(e) => set("postalCode", e.target.value)}
-            />
-          </label>
-          <label className="block">
-            <span className="label">Ort</span>
-            <input className="input" value={form.city} onChange={(e) => set("city", e.target.value)} />
-          </label>
-        </div>
-
-        <div>
-          <label className="label" htmlFor="pp-provider">Grundversorger Strom</label>
+      <div className="grid grid-cols-[7rem_minmax(0,1fr)] gap-2">
+        <label className="block">
+          <span className="label">PLZ</span>
           <input
-            id="pp-provider"
-            className="input"
-            placeholder="z. B. Stadtwerke Kiel"
-            value={form.provider}
-            onChange={(e) => set("provider", e.target.value)}
+            className="field tabular-nums"
+            inputMode="numeric"
+            maxLength={5}
+            value={form.postalCode}
+            onChange={(e) => set("postalCode", e.target.value)}
           />
-          {!form.provider.trim() && suggestion && (
-            <button
-              type="button"
-              className="btn btn-ghost btn-sm btn-pill mt-1.5"
-              onClick={() => set("provider", suggestion)}
-            >
-              Vorschlag: {suggestion}
-            </button>
-          )}
+        </label>
+        <label className="block">
+          <span className="label">Ort</span>
+          <input className="field" value={form.city} onChange={(e) => set("city", e.target.value)} />
+        </label>
+      </div>
+
+      <label className="mt-4 block" htmlFor="pp-provider">
+        <span className="label">Grundversorger</span>
+      </label>
+      <input
+        id="pp-provider"
+        className="field"
+        placeholder="z. B. Stadtwerke Kiel"
+        value={form.provider}
+        onChange={(e) => set("provider", e.target.value)}
+      />
+      {!form.provider.trim() && suggestion && (
+        <button type="button" className="btn btn-secondary btn-sm mt-2" onClick={() => set("provider", suggestion)}>
+          {suggestion}
+        </button>
+      )}
+
+      {(form.provider || form.city) && (
+        <>
+          <ListLabel>Preisblatt suchen</ListLabel>
+          <ul className="list list-icons">
+            {(["Strom", "Gas"] as const).map((kind) => (
+              <li key={kind}>
+                <Cell
+                  href={sheetSearch(kind === "Gas" ? form.gasProvider || form.provider : form.provider, form.city, kind)}
+                  external
+                  icon={
+                    <span className="glyph">
+                      <IconSearch className="h-4 w-4" />
+                    </span>
+                  }
+                  title={kind}
+                />
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
+
+      <ListLabel>Grundpreis pro</ListLabel>
+      <Segmented<BaseUnit>
+        ariaLabel="Grundpreis pro"
+        value={unit}
+        onChange={switchUnit}
+        options={[
+          { value: "month", label: "Monat" },
+          { value: "year", label: "Jahr" },
+        ]}
+      />
+
+      <fieldset className="mt-6">
+        <legend className="list-label">Strom</legend>
+        <div className="grid grid-cols-2 gap-2">
+          <NumberField label="ct/kWh" value={form.stromCt} onChange={(v) => set("stromCt", v)} />
+          <NumberField label={unitLabel} value={form.stromBaseMonth} onChange={(v) => set("stromBaseMonth", v)} />
         </div>
+        <Preview result={preview("strom")} reference={reference.strom} />
+      </fieldset>
 
-        {(form.provider || form.city) && (
-          <Note icon={<IconSearch className="h-4 w-4" />}>
-            Preisblatt suchen:{" "}
-            <a
-              className="font-semibold text-tint"
-              href={sheetSearch(form.provider, form.city, "Strom")}
-              target="_blank"
-              rel="noreferrer"
-            >
-              Strom
-            </a>
-            {" · "}
-            <a
-              className="font-semibold text-tint"
-              href={sheetSearch(form.gasProvider || form.provider, form.city, "Gas")}
-              target="_blank"
-              rel="noreferrer"
-            >
-              Gas
-            </a>
-            <span className="block text-[11px]">
-              Den Namen des Grundversorgers auf dem Preisblatt prüfen – der Vorschlag kann
-              danebenliegen.
-            </span>
-          </Note>
-        )}
-
-        <div className="flex items-center justify-between gap-3">
-          <span className="muted text-[12px]">Grundpreis steht auf dem Blatt pro</span>
-          <Segmented<BaseUnit>
-            ariaLabel="Grundpreis pro"
-            value={unit}
-            onChange={switchUnit}
-            options={[
-              { value: "month", label: "Monat" },
-              { value: "year", label: "Jahr" },
-            ]}
-          />
+      <fieldset className="mt-6">
+        <legend className="list-label">Gas</legend>
+        <input
+          className="field mb-2"
+          aria-label="Grundversorger Gas"
+          placeholder="Versorger – leer = derselbe"
+          value={form.gasProvider}
+          onChange={(e) => set("gasProvider", e.target.value)}
+        />
+        <div className="grid grid-cols-2 gap-2">
+          <NumberField label="ct/kWh" value={form.gasCt} onChange={(v) => set("gasCt", v)} />
+          <NumberField label={unitLabel} value={form.gasBaseMonth} onChange={(v) => set("gasBaseMonth", v)} />
         </div>
+        <Preview result={preview("gas")} reference={reference.gas} />
+      </fieldset>
 
-        <fieldset className="space-y-2">
-          <legend className="mb-1.5 text-[13px] font-semibold">Strom</legend>
-          <div className="grid grid-cols-2 gap-2">
-            <NumberField label="Arbeitspreis ct/kWh" value={form.stromCt} onChange={(v) => set("stromCt", v)} />
-            <NumberField label={`Grundpreis ${unitLabel}`} value={form.stromBaseMonth} onChange={(v) => set("stromBaseMonth", v)} />
-          </div>
-          <Preview result={preview("strom")} reference={reference.strom} />
-        </fieldset>
-
-        <fieldset className="space-y-2">
-          <legend className="mb-1.5 text-[13px] font-semibold">Gas</legend>
+      <div className="mt-6 grid grid-cols-[10rem_minmax(0,1fr)] gap-2">
+        <label className="block">
+          <span className="label">Gültig ab</span>
+          <input type="date" className="field" value={form.validFrom} onChange={(e) => set("validFrom", e.target.value)} />
+        </label>
+        <label className="block">
+          <span className="label">Link zum Preisblatt</span>
           <input
-            className="input"
-            aria-label="Grundversorger Gas"
-            placeholder="Grundversorger Gas – leer = derselbe"
-            value={form.gasProvider}
-            onChange={(e) => set("gasProvider", e.target.value)}
+            className="field"
+            inputMode="url"
+            placeholder="https://…"
+            value={form.sourceUrl}
+            onChange={(e) => set("sourceUrl", e.target.value)}
           />
-          <div className="grid grid-cols-2 gap-2">
-            <NumberField label="Arbeitspreis ct/kWh" value={form.gasCt} onChange={(v) => set("gasCt", v)} />
-            <NumberField label={`Grundpreis ${unitLabel}`} value={form.gasBaseMonth} onChange={(v) => set("gasBaseMonth", v)} />
-          </div>
-          <Preview result={preview("gas")} reference={reference.gas} />
-        </fieldset>
-
-        <div className="grid grid-cols-[9.5rem_1fr] gap-2">
-          <label className="block">
-            <span className="label">Gültig ab</span>
-            <input
-              type="date"
-              className="input"
-              value={form.validFrom}
-              onChange={(e) => set("validFrom", e.target.value)}
-            />
-          </label>
-          <label className="block">
-            <span className="label">Link zum Preisblatt</span>
-            <input
-              className="input"
-              inputMode="url"
-              placeholder="https://…"
-              value={form.sourceUrl}
-              onChange={(e) => set("sourceUrl", e.target.value)}
-            />
-          </label>
-        </div>
-
-        <p className="muted flex gap-1.5 text-[11px]">
-          <IconInfo className="h-3.5 w-3.5 shrink-0" />
-          Mindestens Strom oder Gas ausfüllen. Der Link ist der Beleg, falls an der Tür jemand
-          nachfragt.
-        </p>
+        </label>
       </div>
     </Sheet>
   );
 }
 
-/** Was der eingetippte Preis fuer den Musterhaushalt bedeutet. */
+/** Was der eingetippte Preis fuer den Musterhaushalt bedeutet - Tippfehler fallen sofort auf. */
 function Preview({
   result,
   reference,
@@ -282,17 +258,13 @@ function Preview({
 }) {
   if (!result) return null;
   return (
-    <div className="flex items-center justify-between gap-2 text-[12px]">
-      <span className="muted tabular-nums">
+    <div className="mt-2 flex items-center justify-between gap-2 px-1 text-footnote">
+      <span className="kpi text-muted">
         {euro(result.year)} im Jahr ·{" "}
-        <span
-          className="font-semibold"
-          style={{ color: result.delta > 0 ? "var(--danger-ink)" : "var(--ok-ink)" }}
-        >
+        <span className={`font-semibold ${result.delta > 0 ? "text-accent-ink" : "text-ink-2"}`}>
           {result.delta > 0 ? "+" : ""}
           {euro(result.delta)}
-        </span>{" "}
-        ggü. Bundesschnitt
+        </span>
       </span>
       <PriceBadge step={referenceStep(result.year, reference)} size="sm" />
     </div>
@@ -311,12 +283,7 @@ function NumberField({
   return (
     <label className="block">
       <span className="label">{label}</span>
-      <input
-        className="input tabular-nums"
-        inputMode="decimal"
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-      />
+      <input className="field tabular-nums" inputMode="decimal" value={value} onChange={(e) => onChange(e.target.value)} />
     </label>
   );
 }

@@ -20,7 +20,7 @@ export function OpponentPicker({
       </label>
       <select
         id="opponent"
-        className="select select-sm"
+        className="field min-h-11 w-auto max-w-44 py-2 text-subhead"
         value={current}
         onChange={(event) => {
           const next = new URLSearchParams(params);

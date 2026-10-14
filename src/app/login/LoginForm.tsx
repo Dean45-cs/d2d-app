@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { IconEye, IconEyeOff } from "@/components/icons";
-import { Note } from "@/components/ui";
+import { InlineError } from "@/components/ui";
 
 export function LoginForm() {
   const router = useRouter();
@@ -33,76 +33,60 @@ export function LoginForm() {
       router.push(data.redirect);
       router.refresh();
     } catch {
-      setError("Keine Verbindung zum Server. Bitte prüfe deinen Empfang.");
+      setError("Keine Verbindung. Bitte Empfang prüfen.");
       setBusy(false);
     }
   }
 
   return (
     <form onSubmit={submit} className="space-y-4">
-      <div>
-        <label className="label" htmlFor="email">
-          E-Mail
+      <div className="list">
+        <label className="cell">
+          <span className="w-24 shrink-0 text-body">E-Mail</span>
+          <input
+            id="email"
+            className="field field-bare min-w-0 flex-1"
+            type="email"
+            autoComplete="username"
+            inputMode="email"
+            autoCapitalize="none"
+            spellCheck={false}
+            placeholder="name@firma.de"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            required
+          />
         </label>
-        <input
-          id="email"
-          className="input"
-          type="email"
-          autoComplete="username"
-          inputMode="email"
-          autoCapitalize="none"
-          spellCheck={false}
-          placeholder="name@firma.de"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          required
-        />
-      </div>
-      <div>
-        <label className="label" htmlFor="password">
-          Passwort
-        </label>
-        <div className="relative">
+        <label className="cell pr-1">
+          <span className="w-24 shrink-0 text-body">Passwort</span>
           <input
             id="password"
-            className="input pr-12"
+            className="field field-bare min-w-0 flex-1"
             type={reveal ? "text" : "password"}
             autoComplete="current-password"
+            placeholder="Erforderlich"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             required
           />
           <button
             type="button"
-            className="icon-btn absolute right-1.5 top-1/2 -translate-y-1/2"
+            className="icon-btn"
             onClick={() => setReveal((v) => !v)}
             aria-label={reveal ? "Passwort verbergen" : "Passwort anzeigen"}
             aria-pressed={reveal}
           >
-            {reveal ? <IconEyeOff className="h-[18px] w-[18px]" /> : <IconEye className="h-[18px] w-[18px]" />}
+            {reveal ? <IconEyeOff className="h-5 w-5" /> : <IconEye className="h-5 w-5" />}
           </button>
-        </div>
+        </label>
       </div>
 
-      {error && (
-        <div role="alert">
-          <Note tone="danger">{error}</Note>
-        </div>
-      )}
+      {error && <InlineError>{error}</InlineError>}
 
-      <button className="btn btn-primary btn-lg w-full" disabled={busy}>
-        {busy && <Spinner />}
+      <button className="btn btn-primary btn-lg btn-block" disabled={busy}>
+        {busy && <span className="spin h-4 w-4 rounded-full border-2 border-current border-r-transparent" aria-hidden="true" />}
         {busy ? "Anmelden …" : "Anmelden"}
       </button>
     </form>
-  );
-}
-
-function Spinner() {
-  return (
-    <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none" aria-hidden>
-      <circle cx="12" cy="12" r="9" stroke="currentColor" strokeOpacity="0.3" strokeWidth="3" />
-      <path d="M21 12a9 9 0 0 0-9-9" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
-    </svg>
   );
 }

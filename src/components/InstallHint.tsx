@@ -1,145 +1,80 @@
 "use client";
 
 import { useEffect, useState } from "react";
-
-/**
- * Hinweis zum Installieren auf dem Home-Bildschirm.
- *
- * Auf iPhone und iPad gibt es keinen Installations-Dialog wie bei Android –
- * dort führt der Weg über "Teilen → Zum Home-Bildschirm". Deshalb zeigen wir
- * dort eine kurze Anleitung, sonst den nativen Installations-Button.
- * Läuft die App bereits vom Home-Bildschirm, erscheint gar nichts.
- */
-
-const DISMISS_KEY = "d2d_install_hint_dismissed";
+import { IconShare } from "./icons";
+import { LogoMark } from "./Logo";
+import { Sheet } from "./Sheet";
 
 interface InstallPromptEvent extends Event {
   prompt: () => Promise<void>;
   userChoice: Promise<{ outcome: "accepted" | "dismissed" }>;
 }
 
-export function InstallHint() {
+/**
+ * "Als App installieren" als Zeile im Profil - solange die App noch im
+ * Browser laeuft. Android/Chrome zeigt den eigenen Dialog, auf iPhone und
+ * iPad fuehrt eine kurze Anleitung durch Teilen -> "Zum Home-Bildschirm".
+ */
+export function InstallCell() {
   const [show, setShow] = useState(false);
-  const [isIos, setIsIos] = useState(false);
+  const [guide, setGuide] = useState(false);
   const [promptEvent, setPromptEvent] = useState<InstallPromptEvent | null>(null);
 
   useEffect(() => {
-    // Bereits als App installiert? Dann nichts anzeigen.
     const standalone =
       window.matchMedia("(display-mode: standalone)").matches ||
       (window.navigator as Navigator & { standalone?: boolean }).standalone === true;
     if (standalone) return;
-
-    try {
-      if (window.localStorage.getItem(DISMISS_KEY) === "1") return;
-    } catch {
-      // Speicher gesperrt – dann eben jedes Mal anzeigen.
-    }
-
-    const ua = window.navigator.userAgent;
-    // iPadOS meldet sich als Macintosh, lässt sich aber am Touch erkennen.
-    const ios =
-      /iPad|iPhone|iPod/.test(ua) ||
-      (ua.includes("Macintosh") && navigator.maxTouchPoints > 1);
-    setIsIos(ios);
-    if (ios) setShow(true);
-
+    setShow(true);
     const onPrompt = (event: Event) => {
       event.preventDefault();
       setPromptEvent(event as InstallPromptEvent);
-      setShow(true);
     };
     window.addEventListener("beforeinstallprompt", onPrompt);
     return () => window.removeEventListener("beforeinstallprompt", onPrompt);
   }, []);
 
-  function dismiss() {
-    setShow(false);
-    try {
-      window.localStorage.setItem(DISMISS_KEY, "1");
-    } catch {
-      // egal
-    }
-  }
-
   async function install() {
-    if (!promptEvent) return;
+    if (!promptEvent) {
+      setGuide(true);
+      return;
+    }
     await promptEvent.prompt();
-    await promptEvent.userChoice;
+    const choice = await promptEvent.userChoice;
     setPromptEvent(null);
-    dismiss();
+    if (choice.outcome === "accepted") setShow(false);
   }
 
   if (!show) return null;
 
+  // Eine eigene Zeile der Liste - verschwindet ganz, wenn die App schon installiert ist.
   return (
-    <div className="card mb-5 p-4">
-      <div className="flex items-start gap-3">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src="/icon-192.png"
-          alt=""
-          width={44}
-          height={44}
-          className="shrink-0 rounded-xl"
-        />
-        <div className="min-w-0 flex-1">
-          <p className="text-[15px] font-semibold">Als App auf den Home-Bildschirm</p>
-          {isIos ? (
-            <ol className="muted mt-1.5 space-y-1 text-sm">
-              <li>
-                1. Unten (iPhone) bzw. oben (iPad) auf das Teilen-Symbol{" "}
-                <ShareIcon /> tippen
-              </li>
-              <li>
-                2. In der Liste <strong>„Zum Home-Bildschirm“</strong> wählen
-              </li>
-              <li>
-                3. Oben rechts auf <strong>„Hinzufügen“</strong>
-              </li>
-            </ol>
-          ) : (
-            <p className="muted mt-1 text-sm">
-              Dann startet die App ohne Browserleiste und liegt als eigenes
-              Symbol auf dem Bildschirm.
-            </p>
-          )}
-
-          <div className="mt-3 flex gap-2">
-            {promptEvent && (
-              <button className="btn btn-primary btn-sm" onClick={install}>
-                Installieren
-              </button>
-            )}
-            <button className="btn btn-ghost btn-sm" onClick={dismiss}>
-              Verstanden
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-/** Das Teilen-Symbol von iOS, damit klar ist, welcher Knopf gemeint ist. */
-function ShareIcon() {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      width="16"
-      height="16"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.9"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      className="inline-block -mt-0.5 align-middle text-tint"
-      aria-label="Teilen"
-      role="img"
-    >
-      <path d="M12 15V3" />
-      <path d="m8 6.5 4-4 4 4" />
-      <path d="M6 11H5a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-8a1 1 0 0 0-1-1h-1" />
-    </svg>
+    <li>
+      <button type="button" className="cell cell-tap" onClick={() => void install()}>
+        <LogoMark size={32} />
+        <span className="min-w-0 flex-1 truncate text-body">Als App installieren</span>
+      </button>
+      {guide && (
+        <Sheet title="Zum Home-Bildschirm" onClose={() => setGuide(false)}>
+          <ol className="list">
+            <li className="cell">
+              <span className="glyph">1</span>
+              <span className="flex flex-1 items-center gap-2 text-body">
+                <IconShare className="h-5 w-5 text-accent-ink" />
+                Teilen antippen
+              </span>
+            </li>
+            <li className="cell">
+              <span className="glyph">2</span>
+              <span className="flex-1 text-body">„Zum Home-Bildschirm“</span>
+            </li>
+            <li className="cell">
+              <span className="glyph">3</span>
+              <span className="flex-1 text-body">„Hinzufügen“</span>
+            </li>
+          </ol>
+        </Sheet>
+      )}
+    </li>
   );
 }
