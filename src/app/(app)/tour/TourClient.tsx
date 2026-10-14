@@ -1,14 +1,12 @@
 "use client";
 
-import { PendingSales } from "@/components/PendingSales";
-import { beginSaleDraft } from "@/lib/sale-drafts-client";
-
-import Link from "next/link";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { routeUrl } from "@/lib/map";
-import type { ProviderInfo } from "@/lib/energy/provider";
-import { ProviderLine } from "@/components/ProviderRating";
+import { PendingSales } from "@/components/PendingSales";
+import { useToast } from "@/components/Toast";
+import { EmptyState, OutcomeGlyph } from "@/components/ui";
+import { IconBan, IconCalendar, IconCheck, IconMap, IconPhone, IconSparkles } from "@/components/icons";
+import { beginSaleDraft } from "@/lib/sale-drafts-client";
 import type {
   AppointmentRow,
   DoorbellWithStats,
@@ -17,136 +15,44 @@ import type {
   Totals,
   VisitRow,
 } from "@/lib/queries";
-import type { BuildingType, RejectionReason, TeamFace, VisitOutcome } from "@/lib/types";
+import type { RejectionReason, TeamFace, VisitOutcome } from "@/lib/types";
 import { BUILDING_TYPE_LABEL, OUTCOME_LABEL } from "@/lib/types";
-import {
-  bellKey,
-  hasNamedBells,
-  numberedBells,
-  parseDoorbellLines,
-  type DoorbellInput,
-} from "@/lib/doorbells";
-import {
-  doorFinished,
-  doorStatus,
-  MAX_NOT_HOME_ATTEMPTS,
-  whenLabel,
-  type DoorFacts,
-} from "@/lib/doors";
-import {
-  IconArrowRight,
-  IconBan,
-  IconBell,
-  IconBuilding,
-  IconCalendar,
-  IconChat,
-  IconCheck,
-  IconChevronDown,
-  IconChevronLeft,
-  IconChevronRight,
-  IconClock,
-  IconCloudUp,
-  IconDoor,
-  IconHome,
-  IconInfo,
-  IconMap,
-  IconNavigate,
-  IconOffline,
-  IconPencil,
-  IconPerson,
-  IconPhone,
-  IconPlus,
-  IconSearch,
-  IconUndo,
-  IconX,
-} from "@/components/icons";
-import { Sheet } from "@/components/Sheet";
-import {
-  Avatar,
-  EmptyState,
-  GroupLabel,
-  Note,
-  Pill,
-  ProgressRing,
-  Segmented,
-  StatGroup,
-} from "@/components/ui";
-import {
-  normalizeSlot,
-  quickSlots,
-  toSlot,
-  slotDate,
-  slotLabel,
-  slotOverdue,
-  slotTime,
-  slotToday,
-} from "@/lib/appointments";
-import { readDraft, writeDraft, type LocalVisits } from "@/lib/tour-draft";
-import {
-  enqueue,
-  createVisitRequestId,
-  flush,
-  getQueue,
-  remove as removeQueued,
-  startAutoFlush,
-  subscribe,
-  type QueuedWrite,
-} from "@/lib/offline-queue";
+import { bellKey, hasNamedBells, numberedBells, type DoorbellInput } from "@/lib/doorbells";
+import { MAX_NOT_HOME_ATTEMPTS, doorFinished, doorStatus, whenLabel, type DoorFacts } from "@/lib/doors";
+import { slotLabel, slotOverdue, slotToday } from "@/lib/appointments";
+import { createVisitRequestId, enqueue, flush, remove as removeQueued } from "@/lib/offline-queue";
+import { routeUrl } from "@/lib/map";
+import { firstName } from "@/lib/ranking";
 import type { LevelProgress } from "@/lib/levels";
 import { levelFeedbackText, type LevelFeedback } from "@/lib/level-feedback";
-import { LevelCard } from "@/components/levels/LevelCard";
-import { LevelUpNotice } from "@/components/levels/LevelUpNotice";
-
-type TerritoryLite = {
-  id: number;
-  name: string;
-  city: string;
-  postal_code: string;
-  provider: ProviderInfo | null;
-};
-
-type EnergyType = "STROM" | "GAS" | "BEIDES";
-
-/**
- * Eine Klingel, so wie die Oberflaeche sie braucht. Ein Schild, das gerade
- * erst - womoeglich ohne Netz - angelegt wurde, hat noch keine ID vom Server.
- */
-interface Bell {
-  id: number | null;
-  label: string;
-  floor: string;
-  visit_count: number;
-  not_home_count: number;
-  met_count: number;
-  last_outcome: VisitOutcome | null;
-  last_reason_emoji: string | null;
-  last_visit_at: string | null;
-  last_visit_user: string | null;
-  /** Wer zuletzt hier geklingelt hat - dazu gehoert das Profilbild. */
-  last_visit_user_id: number | null;
-  blocked_at: string | null;
-  blocked_by_name: string | null;
-}
-
-/** Eine frisch angelegte Klingel - noch nichts passiert. */
-const NEW_BELL = {
-  id: null,
-  visit_count: 0,
-  not_home_count: 0,
-  met_count: 0,
-  last_outcome: null,
-  last_reason_emoji: null,
-  last_visit_at: null,
-  last_visit_user: null,
-  last_visit_user_id: null,
-  blocked_at: null,
-  blocked_by_name: null,
-} as const;
-
-type SaveResult =
-  | { status: "saved"; id: number; nextBell: string | null; pickBell?: boolean; progression?: LevelFeedback }
-  | { status: "queued"; nextBell: string | null; pickBell?: boolean }
-  | { status: "error" };
+import { BellBoard, type BellRow } from "./BellBoard";
+import { DoorHero, type DoorStatusLine } from "./DoorHero";
+import { HouseStrip, type ChipState, type HouseChip } from "./HouseStrip";
+import { OutcomeTray } from "./OutcomeTray";
+import { TourHeader } from "./TourHeader";
+import {
+  AppointmentSheet,
+  BlockSheet,
+  DaySheet,
+  HouseSheet,
+  NumberSheet,
+  ReasonSheet,
+  SaleSheet,
+  StreetSheet,
+} from "./sheets";
+import {
+  bellSlot,
+  doneKey,
+  numberSuggestions,
+  sameNumber,
+  type Bell,
+  type EnergyType,
+  type SaveResult,
+  type SheetName,
+  type TerritoryLite,
+} from "./model";
+import { useDoorBook } from "./useDoorBook";
+import { useQueue } from "./useQueue";
 
 interface Props {
   userId: number;
@@ -156,23 +62,23 @@ interface Props {
   houseNumbers: HouseNumberWithStats[];
   doorbells: DoorbellWithStats[];
   reasons: RejectionReason[];
-  /** Nur die Teamleitung darf eine Sperre wieder aufheben. */
-  isLeader: boolean;
+  /** Darf Sperren wieder aufheben ("doors.unblock"). */
+  canUnblock: boolean;
   /** Name und Profilbild der Kollegen - fuer "zuletzt hier war ...". */
   team: TeamFace[];
   todayTotals: Totals;
   recent: VisitRow[];
-  /** Offene Termine von heute und aelter - der Rueckweg des Tages. */
+  /** Offene eigene Termine - was davon heute ist, entscheidet das Geraet. */
   appointments: AppointmentRow[];
   tarifrechnerUrl: string;
 }
 
-const PRODUCTS: Array<{ value: EnergyType; label: string }> = [
-  { value: "STROM", label: "Strom" },
-  { value: "GAS", label: "Gas" },
-  { value: "BEIDES", label: "Beides" },
-];
-
+/**
+ * Klinken - die Tuer. Ein Bildschirm fuer eine Hand: oben, wo man ist;
+ * in der Mitte die Hausnummer; unten im Daumenbereich die vier Ergebnisse.
+ * Nach dem Speichern springt die App zur naechsten offenen Tuer, ein
+ * Fehltipp laesst sich im Toast zuruecknehmen.
+ */
 export function TourClient({
   userId,
   initialProgress,
@@ -181,7 +87,7 @@ export function TourClient({
   houseNumbers,
   doorbells,
   reasons,
-  isLeader,
+  canUnblock,
   team,
   todayTotals,
   recent,
@@ -189,100 +95,62 @@ export function TourClient({
   tarifrechnerUrl,
 }: Props) {
   const router = useRouter();
-  const [level, setLevel] = useState(initialProgress);
-  const [levelUp, setLevelUp] = useState<LevelFeedback | null>(null);
-  const dismissLevelUp = useCallback(() => setLevelUp(null), []);
-  useEffect(() => setLevel(initialProgress), [initialProgress]);
-  const receiveProgress = useCallback((feedback?: LevelFeedback) => {
-    if (!feedback) return;
-    setLevel(feedback.progress);
-    if (feedback.levelUp) setLevelUp(feedback);
-  }, []);
+  const toast = useToast();
 
-  const [territoryId, setTerritoryId] = useState<number | null>(
-    territories[0]?.id ?? null,
+  /* ------------------------------ Level --------------------------------- */
+
+  const [level, setLevel] = useState(initialProgress);
+  useEffect(() => setLevel(initialProgress), [initialProgress]);
+  const receiveProgress = useCallback(
+    (feedback?: LevelFeedback) => {
+      if (!feedback) return;
+      setLevel(feedback.progress);
+      if (feedback.levelUp) {
+        toast(`Level ${feedback.progress.level} · ${feedback.progress.title}`, {
+          icon: <IconSparkles className="h-5 w-5 text-accent-ink" />,
+          duration: 4000,
+        });
+      }
+    },
+    [toast],
   );
+
+  /* ------------------------------ Auswahl -------------------------------- */
+
+  const [territoryId, setTerritoryId] = useState<number | null>(territories[0]?.id ?? null);
   const [streetId, setStreetId] = useState<number | null>(null);
   const [houseNumber, setHouseNumber] = useState("");
-  const [product, setProduct] = useState<EnergyType>("BEIDES");
-  const [sheet, setSheet] = useState<
-    null | "street" | "reason" | "block" | "appointment"
-  >(null);
-  /*
-   * Der Haus-Bildschirm. An einer Hausnummer geht die Liste der
-   * Klingelschilder auf - ein eigener Bildschirm statt eines Blattes ueber
-   * der Strasse: im Treppenhaus arbeitet man sich durch dieses Haus, und
-   * alles andere waere dabei nur im Weg.
-   */
-  const [houseOpen, setHouseOpen] = useState(false);
-  /** Das Feld zum Nachtragen von Schildern - zugeklappt, bis es gebraucht wird. */
-  const [addBellsOpen, setAddBellsOpen] = useState(false);
-  /*
-   * Die Haustyp-Wahl. Sie geht beim ersten Mal von selbst auf und danach nur
-   * noch auf Tipp: der Typ gilt fuers ganze Team, ein Umschalten aus Versehen
-   * waere fuer alle sichtbar.
-   */
-  const [typeChoice, setTypeChoice] = useState(false);
-  /** Suchfeld im Blatt der Strassenwahl - erst ab vielen Strassen sichtbar. */
-  const [streetQuery, setStreetQuery] = useState("");
-  /** Blendet abgearbeitete Hausnummern aus, wenn die Strasse lang wird. */
-  const [onlyOpen, setOnlyOpen] = useState(false);
-  /*
-   * Umbenennen, Sperren und Loeschen liegen hinter einem Schalter. An der Tuer
-   * wird nur getippt - ein Kreuz neben jeder Zeile waere dort ein Loeschen aus
-   * Versehen, und drei Symbole je Klingel machen die Liste unruhig.
-   */
-  const [bellEdit, setBellEdit] = useState(false);
-  const [note, setNote] = useState("");
-  /** Name der gerade gewaehlten Klingel - leer im Einfamilienhaus. */
   const [bellLabel, setBellLabel] = useState("");
-  const [bellDraft, setBellDraft] = useState("");
-  const [bellCount, setBellCount] = useState("");
-  const [blockNote, setBlockNote] = useState("");
-  /** Termin: Ortszeit "2026-09-21 18:00", dazu der Ansprechpartner. */
-  const [slot, setSlot] = useState("");
-  const [contactName, setContactName] = useState("");
-  const [contactPhone, setContactPhone] = useState("");
-  const [editing, setEditing] = useState<
-    { id: number; original: string; label: string; floor: string } | null
-  >(null);
+  const [product, setProduct] = useState<EnergyType>("BEIDES");
+  const [sheet, setSheet] = useState<SheetName | null>(null);
+  /** Was gesperrt werden soll - eine Klingel oder das ganze Haus. */
+  const [blockTarget, setBlockTarget] = useState<Bell | "house" | null>(null);
+  const [onlyOpen, setOnlyOpen] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [toast, setToastState] = useState<{ text: string; undo: boolean } | null>(null);
-  /** Kurze Rueckmeldung. Die Aufrufe bleiben schlicht: setToast("..."). */
-  const setToast = useCallback(
-    (text: string) => setToastState({ text, undo: false }),
-    [],
-  );
-  const [lastVisitId, setLastVisitId] = useState<number | null>(null);
+  const [lastTyped, setLastTyped] = useState("");
   const [position, setPosition] = useState<{ lat: number; lng: number } | null>(null);
-  const [pending, setPending] = useState<QueuedWrite[]>([]);
-  const [online, setOnline] = useState(true);
-  const [draftLoaded, setDraftLoaded] = useState(false);
-  /*
-   * Die Uhr des Geraets - erst nach dem Einblenden gesetzt. Auf dem Server
-   * gibt es sie nicht, und "heute" wuerde dort womoeglich anders ausfallen
-   * als hier vor der Tuer.
-   */
+  /* Die Uhr des Geraets - erst nach dem Einblenden; "heute" entscheidet die Tuer. */
   const [now, setNow] = useState<Date | null>(null);
 
-  /* --------------------------- Gerät & Umgebung --------------------------- */
+  const { pending, online, sendNow } = useQueue(userId, receiveProgress, toast);
+  const book = useDoorBook(houseNumbers, doorbells, pending);
 
-  // Zuletzt gewähltes Produkt und Straße merken – spart Taps an der Tür.
+  /* --------------------------- Geraet & Umgebung ------------------------- */
+
   useEffect(() => {
     const storedProduct = window.localStorage.getItem("d2d_product");
-    if (storedProduct === "STROM" || storedProduct === "GAS" || storedProduct === "BEIDES") {
-      setProduct(storedProduct);
-    }
+    if (storedProduct === "STROM" || storedProduct === "GAS" || storedProduct === "BEIDES") setProduct(storedProduct);
     const storedStreet = Number(window.localStorage.getItem("d2d_street"));
-    if (storedStreet && streets.some((s) => s.id === storedStreet)) {
-      setStreetId(storedStreet);
-      const street = streets.find((s) => s.id === storedStreet);
-      if (street) setTerritoryId(street.territory_id);
+    const remembered = streets.find((s) => s.id === storedStreet);
+    if (remembered) {
+      setStreetId(remembered.id);
+      setTerritoryId(remembered.territory_id);
+    } else if (streets.length > 0) {
+      const first = streets.find((s) => s.territory_id === (territories[0]?.id ?? null)) ?? streets[0];
+      setStreetId(first.id);
+      setTerritoryId(first.territory_id);
     }
-
-    // "Hier klingeln" auf der Gebietskarte: /tour?street=12&house=7a oeffnet
-    // genau dieses Haus. Danach verschwindet der Zusatz aus der Adresse, damit
-    // ein Neuladen nicht wieder dorthin springt.
+    // "Hier klingeln" von der Karte: /tour?street=12&house=7a oeffnet genau dieses Haus.
     const params = new URLSearchParams(window.location.search);
     const linked = streets.find((s) => s.id === Number(params.get("street")));
     if (linked) {
@@ -290,17 +158,13 @@ export function TourClient({
       setStreetId(linked.id);
       window.localStorage.setItem("d2d_street", String(linked.id));
       const house = params.get("house");
-      if (house) {
-        setHouseNumber(house);
-        setHouseOpen(true);
-      }
+      if (house) setHouseNumber(house);
       window.history.replaceState(null, "", window.location.pathname);
     }
-  }, [streets]);
+  }, [streets, territories]);
 
   useEffect(() => {
     setNow(new Date());
-    // Ueber einen langen Vormittag darf die Liste nicht einfrieren.
     const timer = window.setInterval(() => setNow(new Date()), 60_000);
     return () => window.clearInterval(timer);
   }, []);
@@ -314,252 +178,52 @@ export function TourClient({
     );
   }, []);
 
+  // Der Toast steht ueber der Ergebnisleiste, solange diese Seite offen ist.
   useEffect(() => {
-    if (!toast) return;
-    // Mit Rueckgaengig-Knopf laenger stehen lassen - ein Fehltipp faellt
-    // erst auf, wenn man den Namen nochmal liest.
-    const timer = setTimeout(() => setToastState(null), toast.undo ? 5200 : 2600);
-    return () => clearTimeout(timer);
-  }, [toast]);
-
-  // Warteschlange beobachten und automatisch nachsenden
-  useEffect(() => {
-    setPending(getQueue(userId));
-    setOnline(navigator.onLine);
-
-    const unsubscribe = subscribe(setPending, userId);
-    const stopAutoFlush = startAutoFlush((result) => {
-      if (result.sent > 0) {
-        receiveProgress(result.progression);
-        setToast(
-          (result.sent === 1
-            ? "1 gepufferter Eintrag wurde gesendet"
-            : `${result.sent} gepufferte Einträge wurden gesendet`) +
-            (levelFeedbackText(result.progression) ? ` · ${levelFeedbackText(result.progression)}` : ""),
-        );
-      }
-      if (result.rejected > 0) {
-        setToast(`${result.rejected} Eintrag/Einträge konnten nicht gespeichert werden`);
-      }
-      // Den lokalen Zuschlag raeumt der Effekt an der Warteschlange ab.
-      router.refresh();
-    }, userId);
-
-    const update = () => setOnline(navigator.onLine);
-    window.addEventListener("online", update);
-    window.addEventListener("offline", update);
-
+    document.documentElement.dataset.tray = "on";
     return () => {
-      unsubscribe();
-      stopAutoFlush();
-      window.removeEventListener("online", update);
-      window.removeEventListener("offline", update);
+      delete document.documentElement.dataset.tray;
     };
-  }, [router, userId, receiveProgress, setToast]);
+  }, []);
 
-  /* -------------------------------- Auswahl ------------------------------- */
+  /* ---------------------------- Abgeleitetes ----------------------------- */
 
-  /** Kollege zu einer Nutzer-ID - fuer Name und Profilbild an der Tuer. */
   const faces = useMemo(() => new Map(team.map((person) => [person.id, person])), [team]);
-  const faceOf = useCallback(
-    (userId: number | null | undefined) => (userId ? (faces.get(userId) ?? null) : null),
-    [faces],
-  );
+  const faceOf = useCallback((id: number | null | undefined) => (id ? (faces.get(id) ?? null) : null), [faces]);
 
+  const territory = territories.find((t) => t.id === territoryId) ?? null;
+  const street = useMemo(() => streets.find((s) => s.id === streetId) ?? null, [streets, streetId]);
   const streetsOfTerritory = useMemo(
     () => streets.filter((s) => s.territory_id === territoryId),
     [streets, territoryId],
   );
-  const street = useMemo(
-    () => streets.find((s) => s.id === streetId) ?? null,
-    [streets, streetId],
-  );
-
-  /** Die Hausnummern der gewaehlten Strasse, in Reihenfolge. */
   const houses = useMemo(
     () => (streetId ? houseNumbers.filter((h) => h.street_id === streetId) : []),
     [houseNumbers, streetId],
   );
 
-  /**
-   * In dieser Sitzung erfasste Versuche und gesetzte Sperren, als Zuschlag auf
-   * den Serverstand. Der Server weiss davon erst nach dem Neuladen, ohne Netz
-   * gar nicht - deshalb wird hier mitgezaehlt, damit die Plakette sofort
-   * umspringt.
-   */
-  const [localVisits, setLocalVisits] = useState<Map<string, LocalVisits>>(new Map());
-  const [localBlocked, setLocalBlocked] = useState<Set<string>>(new Set());
-
-  /*
-   * Wartet kein Tuereintrag mehr, kennt der Server alles - dann muss der
-   * lokale Zuschlag weg, sonst zaehlt ein Versuch doppelt. Gleich, wer die
-   * Warteschlange geleert hat: das Nachsenden hier, "Offene Auftraege"
-   * (sendet dieselbe Schlange mit) oder "verwerfen".
-   */
-  const hadQueuedDoors = useRef(false);
-  useEffect(() => {
-    const queued = pending.some((item) => item.url !== "/api/sale-drafts");
-    if (hadQueuedDoors.current && !queued) {
-      setLocalVisits(new Map());
-      setLocalBlocked(new Set());
-    }
-    hadQueuedDoors.current = queued;
-  }, [pending]);
-
-  /**
-   * Gerade online gespeicherte Eintraege, bis der Server sie zurueckmeldet.
-   *
-   * Getrennt von der gepufferten Liste oben: sobald frische Serverdaten da
-   * sind, stecken diese Eintraege dort drin. Der Zuschlag muss deshalb in
-   * derselben Render-Runde verschwinden, in der die neuen Daten ankommen -
-   * sonst zaehlt ein Versuch doppelt und die Tuer waere zu frueh durch.
-   */
-  const [fresh, setFresh] = useState<{
-    from: HouseNumberWithStats[];
-    visits: Map<string, LocalVisits>;
-  }>(() => ({ from: houseNumbers, visits: EMPTY_VISITS }));
-  const freshVisits = fresh.from === houseNumbers ? fresh.visits : EMPTY_VISITS;
-  const [lastDone, setLastDone] = useState<
-    { key: string; notHome: boolean; houseNumber: string; label: string } | null
-  >(null);
-
-  /**
-   * Haustyp und Klingelschilder, die gerade erst entstanden sind. Steckt der
-   * Eintrag noch in der Warteschlange, kennt der Server sie nicht - angezeigt
-   * werden muessen sie trotzdem sofort.
-   */
-  const [localTypes, setLocalTypes] = useState<Map<string, BuildingType>>(new Map());
-  const [localBells, setLocalBells] = useState<Map<string, DoorbellInput[]>>(new Map());
-
-  /*
-   * Zwischenstand aus dem Geraet holen und danach bei jeder Aenderung
-   * sichern. Erst nach dem Lesen schreiben, sonst wuerde der leere
-   * Anfangszustand den gespeicherten Stand ueberbuegeln.
-   */
-  useEffect(() => {
-    const draft = readDraft();
-    if (draft) {
-      setLocalTypes(new Map(draft.types));
-      setLocalBells(new Map(draft.bells));
-      setLocalVisits(new Map(draft.visits));
-      setLocalBlocked(new Set(draft.blocked));
-    }
-    setDraftLoaded(true);
-  }, []);
-
-  useEffect(() => {
-    if (!draftLoaded) return;
-    writeDraft({
-      types: [...localTypes],
-      bells: [...localBells],
-      visits: [...localVisits],
-      blocked: [...localBlocked],
-    });
-  }, [draftLoaded, localTypes, localBells, localVisits, localBlocked]);
-
-  /** Klingeln je Hausnummer, einmal vorsortiert statt je Plakette gesucht. */
-  const serverBells = useMemo(() => {
-    const map = new Map<number, Bell[]>();
-    for (const bell of doorbells) {
-      const list = map.get(bell.house_number_id) ?? [];
-      list.push({
-        id: bell.id,
-        label: bell.label,
-        floor: bell.floor,
-        visit_count: bell.visit_count,
-        not_home_count: bell.not_home_count,
-        met_count: bell.met_count,
-        last_outcome: bell.last_outcome,
-        last_reason_emoji: bell.last_reason_emoji,
-        last_visit_at: bell.last_visit_at,
-        last_visit_user: bell.last_visit_user,
-        last_visit_user_id: bell.last_visit_user_id,
-        blocked_at: bell.blocked_at,
-        blocked_by_name: bell.blocked_by_name,
-      });
-      map.set(bell.house_number_id, list);
+  /** Offen/gesamt je Strasse - fuer die Strassenwahl. */
+  const progress = useMemo(() => {
+    const map = new Map<number, { open: number; total: number }>();
+    for (const house of houseNumbers) {
+      const entry = map.get(house.street_id) ?? { open: 0, total: 0 };
+      entry.total += 1;
+      if (!book.isDone(house)) entry.open += 1;
+      map.set(house.street_id, entry);
     }
     return map;
-  }, [doorbells]);
+  }, [houseNumbers, book]);
 
-  const typeOf = useCallback(
-    (house: HouseNumberWithStats): BuildingType =>
-      localTypes.get(doneKey(house.street_id, house.number)) ?? house.building_type,
-    [localTypes],
-  );
+  const openHouses = houses.filter((h) => !book.isDone(h));
 
-  /** Alle Klingeln eines Hauses: was der Server kennt und was lokal dazukam. */
-  const bellsOf = useCallback(
-    (key: string, houseNumberId: number | null): Bell[] => {
-      const out: Bell[] = [];
-      const seen = new Set<string>();
-      for (const bell of (houseNumberId === null ? [] : serverBells.get(houseNumberId)) ?? []) {
-        seen.add(bellKey(bell.label));
-        out.push(bell);
-      }
-      for (const entry of localBells.get(key) ?? []) {
-        if (seen.has(bellKey(entry.label))) continue;
-        seen.add(bellKey(entry.label));
-        out.push({ ...NEW_BELL, label: entry.label, floor: entry.floor });
-      }
-      return out;
-    },
-    [serverBells, localBells],
-  );
-
-  /**
-   * Serverstand plus das, was in dieser Sitzung dazukam. Daraus ergibt sich
-   * der Bearbeitungsstand der Tuer - auch ohne Netz.
-   */
-  const factsOf = useCallback(
-    (key: string, base: DoorFacts): DoorFacts => {
-      const queued = localVisits.get(key);
-      const online = freshVisits.get(key);
-      return {
-        blocked_at: localBlocked.has(key) ? (base.blocked_at ?? "lokal") : base.blocked_at,
-        not_home_count:
-          base.not_home_count + (queued?.notHome ?? 0) + (online?.notHome ?? 0),
-        met_count: base.met_count + (queued?.met ?? 0) + (online?.met ?? 0),
-      };
-    },
-    [localVisits, freshVisits, localBlocked],
-  );
-
-  const bellFacts = useCallback(
-    (key: string, bell: Bell) => factsOf(bellSlot(key, bell.label), bell),
-    [factsOf],
-  );
-
-  const isBellDone = useCallback(
-    (key: string, bell: Bell) => doorFinished(bellFacts(key, bell)),
-    [bellFacts],
-  );
-
-  /**
-   * Ein Mehrfamilienhaus ist erst fertig, wenn jede Klingel dran war - und
-   * solange noch gar kein Schild angelegt ist, erst recht nicht.
-   */
-  const isDone = useCallback(
-    (house: HouseNumberWithStats) => {
-      const key = doneKey(house.street_id, house.number);
-      if (typeOf(house) === "MFH") {
-        const bells = bellsOf(key, house.id);
-        return bells.length > 0 && bells.every((bell) => isBellDone(key, bell));
-      }
-      return doorFinished(factsOf(key, house));
-    },
-    [typeOf, bellsOf, isBellDone, factsOf],
-  );
-
-  /** Termine, die heute anstehen oder schon ueberfaellig sind. */
-  const dueAppointments = useMemo(() => {
-    if (!now) return [];
-    return appointments.filter(
-      (item) => slotToday(item.follow_up_at, now) || slotOverdue(item.follow_up_at, now),
-    );
-  }, [appointments, now]);
-
-  /* ------------------------- das gerade offene Haus ----------------------- */
+  // Keine Nummer gewaehlt: die erste offene Tuer der Strasse steht bereit.
+  useEffect(() => {
+    if (houseNumber || houses.length === 0) return;
+    const first = houses.find((h) => !book.isDone(h));
+    if (first) setHouseNumber(first.number);
+    // Nur beim Wechsel der Strasse oder wenn die Auswahl leer wurde.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [houseNumber, houses]);
 
   const currentHouse = useMemo(
     () => houses.find((h) => sameNumber(h.number, houseNumber)) ?? null,
@@ -568,80 +232,84 @@ export function TourClient({
   /** Schreibweise aus der Liste gewinnt, damit "12 A" und "12a" eins bleiben. */
   const currentNumber = currentHouse?.number ?? houseNumber.trim();
   const currentKey = streetId && currentNumber ? doneKey(streetId, currentNumber) : "";
-  const currentType: BuildingType = currentKey
-    ? (localTypes.get(currentKey) ?? currentHouse?.building_type ?? "")
-    : "";
+  const currentType = currentKey ? (book.localTypes.get(currentKey) ?? currentHouse?.building_type ?? "") : "";
   const currentBells = useMemo(
-    () => (currentKey ? bellsOf(currentKey, currentHouse?.id ?? null) : []),
-    [currentKey, currentHouse, bellsOf],
+    () => (currentKey ? book.bellsOf(currentKey, currentHouse?.id ?? null) : []),
+    [currentKey, currentHouse, book],
   );
-  const doneBellCount = currentBells.filter((bell) => isBellDone(currentKey, bell)).length;
-  const activeBell =
-    currentBells.find((bell) => bellKey(bell.label) === bellKey(bellLabel)) ?? null;
-  /** Kennt die Karte mehrere Wohneinheiten, ist Mehrfamilienhaus das Naheliegende. */
+  const activeBell = currentBells.find((bell) => bellKey(bell.label) === bellKey(bellLabel)) ?? null;
   const suggestMfh = (currentHouse?.units ?? 0) > 1;
-  /** Stehen am Brett Namen statt "Klingel 1, 2, 3 ..."? */
   const namedBells = hasNamedBells(currentBells.map((bell) => bell.label));
-  /*
-   * Die Klingel, bei der es weitergeht - im Sheet hervorgehoben.
-   *
-   * Nur bei durchnummerierten Schildern: wo Namen stehen, weiss die App nicht,
-   * wo der Verkaeufer gerade klingelt, und darf auch nichts vorschlagen.
-   */
-  const nextOpenBell = namedBells
-    ? null
-    : (currentBells.find((bell) => !isBellDone(currentKey, bell)) ?? null);
+  const nextOpenBell = namedBells ? null : (currentBells.find((bell) => !book.isBellDone(currentKey, bell)) ?? null);
 
-  /** Stand der Tuer, an der man gerade steht - Haus oder gewaehlte Klingel. */
-  const currentHouseFacts: DoorFacts = currentKey
-    ? factsOf(currentKey, currentHouse ?? { blocked_at: null, not_home_count: 0, met_count: 0 })
+  const houseFacts: DoorFacts = currentKey
+    ? book.factsOf(currentKey, currentHouse ?? { blocked_at: null, not_home_count: 0, met_count: 0 })
     : { blocked_at: null, not_home_count: 0, met_count: 0 };
-  const currentDoorFacts: DoorFacts =
-    activeBell && currentKey ? bellFacts(currentKey, activeBell) : currentHouseFacts;
-  const currentDoorStatus = doorStatus(currentDoorFacts);
-  /** Gesperrt ist gesperrt - auch wenn nur das Haus gesperrt wurde. */
-  const doorLocked = currentDoorStatus === "BLOCKED" || Boolean(currentHouseFacts.blocked_at);
-  const lastAt = activeBell ? activeBell.last_visit_at : (currentHouse?.last_visit_at ?? null);
-  const lastBy = activeBell ? activeBell.last_visit_user : (currentHouse?.last_visit_user ?? null);
-  const lastWhat = activeBell ? activeBell.last_outcome : (currentHouse?.last_outcome ?? null);
-  const blockedBy = activeBell
-    ? (activeBell.blocked_by_name ?? currentHouse?.blocked_by_name ?? null)
-    : (currentHouse?.blocked_by_name ?? null);
+  const doorFacts: DoorFacts = activeBell && currentKey ? book.bellFacts(currentKey, activeBell) : houseFacts;
+  const doorLocked = doorStatus(doorFacts) === "BLOCKED" || Boolean(houseFacts.blocked_at);
 
-  /** Naechste noch offene Hausnummer - der Weg die Strasse hinauf. */
-  function nextHouse(): string | null {
-    if (houses.length === 0) return null;
-    const current = houses.findIndex((h) => sameNumber(h.number, houseNumber));
-    const rest = current >= 0 ? houses.slice(current + 1) : houses;
-    return (rest.find((h) => !isDone(h)) ?? rest[0] ?? null)?.number ?? null;
-  }
-  const territory = territories.find((t) => t.id === territoryId) ?? null;
+  const dueAppointments = useMemo(
+    () =>
+      now
+        ? appointments.filter((item) => slotToday(item.follow_up_at, now) || slotOverdue(item.follow_up_at, now))
+        : [],
+    [appointments, now],
+  );
 
-  const chooseStreet = useCallback((value: number | null) => {
-    setStreetId(value);
-    if (value) window.localStorage.setItem("d2d_street", String(value));
+  /* ------------------------------ Auswahl -------------------------------- */
+
+  const chooseStreet = useCallback((id: number | null) => {
+    setStreetId(id);
+    setHouseNumber("");
+    setBellLabel("");
+    if (id) window.localStorage.setItem("d2d_street", String(id));
     else window.localStorage.removeItem("d2d_street");
   }, []);
 
-  /* ------------------------ Haustyp und Klingeln -------------------------- */
+  function pickHouse(number: string) {
+    setHouseNumber(number);
+    setBellLabel("");
+  }
+
+  const currentIndex = houses.findIndex((h) => sameNumber(h.number, currentNumber));
+  function step(delta: 1 | -1) {
+    if (houses.length === 0) return;
+    const index = currentIndex < 0 ? (delta > 0 ? -1 : houses.length) : currentIndex;
+    const target = houses[index + delta];
+    if (target) pickHouse(target.number);
+  }
+
+  /** Naechste offene Tuer nach der aktuellen - der Weg die Strasse hinauf. */
+  function nextOpenAfter(number: string): string | null {
+    const index = houses.findIndex((h) => sameNumber(h.number, number));
+    const after = houses.slice(index + 1).find((h) => !book.isDone(h));
+    const before = houses.slice(0, Math.max(0, index)).find((h) => !book.isDone(h));
+    return (after ?? before)?.number ?? null;
+  }
+
+  function goToAppointment(item: AppointmentRow) {
+    const target = item.street_id ? streets.find((s) => s.id === item.street_id) : null;
+    if (target) {
+      setTerritoryId(target.territory_id);
+      setStreetId(target.id);
+      window.localStorage.setItem("d2d_street", String(target.id));
+    }
+    setHouseNumber(item.house_number);
+    setBellLabel(item.doorbell_label ?? "");
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  /* -------------------------- Haus beschreiben --------------------------- */
 
   /**
-   * Haus beschreiben - Haustyp, neue Klingelschilder oder beides.
-   *
-   * Der Aufruf kennt keine IDs, sondern nur Strasse, Hausnummer und Namen.
-   * Deshalb darf er gefahrlos in der Warteschlange landen und spaeter
-   * nachgesendet werden, ohne dass etwas doppelt entsteht.
+   * Haustyp, Schilder, Sperre. Der Aufruf kennt nur Strasse, Hausnummer und
+   * Namen - deshalb darf er gefahrlos in die Warteschlange.
    */
   async function describeHouse(
-    patch: {
-      buildingType?: BuildingType;
-      doorbells?: DoorbellInput[];
-      blocked?: boolean;
-      blockedNote?: string;
-    },
+    patch: { buildingType?: "EFH" | "MFH"; doorbells?: DoorbellInput[]; blocked?: boolean; blockedNote?: string },
     label: string,
     rollback?: () => void,
-  ): Promise<void> {
+  ) {
     if (!streetId || !currentNumber) return;
     const payload = { streetId, houseNumber: currentNumber, ...patch };
     try {
@@ -652,47 +320,34 @@ export function TourClient({
       });
       const data = await response.json();
       if (!response.ok) {
-        // Der Server hat abgelehnt - dann darf auch lokal nichts stehen
-        // bleiben, sonst zeigt die Liste Schilder, die es nirgends gibt.
         rollback?.();
-        setToast(data.error ?? "Speichern fehlgeschlagen");
+        toast(data.error ?? "Speichern fehlgeschlagen");
         return;
       }
       router.refresh();
     } catch {
       try {
         enqueue(label, payload, { url: "/api/houses", kind: "house", ownerUserId: userId });
-        setToast("Kein Netz – gemerkt, wird automatisch nachgesendet");
+        toast("Offline gemerkt – wird nachgesendet");
       } catch (error) {
         rollback?.();
-        setToast(error instanceof Error ? error.message : "Nicht gespeichert. Bitte erneut versuchen.");
+        toast(error instanceof Error ? error.message : "Nicht gespeichert");
       }
     }
   }
 
-  /** Beim ersten Antippen: Ein- oder Mehrfamilienhaus. */
-  async function chooseBuildingType(type: "EFH" | "MFH") {
+  async function chooseType(type: "EFH" | "MFH") {
     if (!currentKey) return;
-    const key = currentKey;
-    const before = localTypes.get(key);
-    setLocalTypes((prev) => new Map(prev).set(key, type));
+    const rollback = book.setType(currentKey, type);
     setBellLabel("");
-    setTypeChoice(false);
-    setAddBellsOpen(type === "MFH" && currentBells.length === 0);
+    if (type === "MFH" && currentBells.length === 0) setSheet("house");
     await describeHouse(
       { buildingType: type },
       `${street?.name ?? ""} ${currentNumber} · ${BUILDING_TYPE_LABEL[type]}`,
-      () =>
-        setLocalTypes((prev) => {
-          const next = new Map(prev);
-          if (before === undefined) next.delete(key);
-          else next.set(key, before);
-          return next;
-        }),
+      rollback,
     );
   }
 
-  /** Neue Schilder ans Klingelbrett - lokal sofort, auf dem Server sobald es geht. */
   async function addBells(entries: DoorbellInput[]) {
     if (!currentKey || entries.length === 0) return;
     const known = new Set(currentBells.map((bell) => bellKey(bell.label)));
@@ -703,150 +358,69 @@ export function TourClient({
       return true;
     });
     if (fresh.length === 0) {
-      setToast("Diese Namen stehen schon am Brett");
+      toast("Diese Namen stehen schon am Brett");
       return;
     }
-
-    setLocalBells((prev) => {
-      const next = new Map(prev);
-      next.set(currentKey, [...(next.get(currentKey) ?? []), ...fresh]);
-      return next;
-    });
-    // Der Haustyp faehrt mit: dann steht er auch dann richtig, wenn der
-    // Aufruf von vorhin die Verbindung nicht mehr erwischt hat.
-    const key = currentKey;
+    const rollback = book.addBells(currentKey, fresh);
+    // Der Haustyp faehrt mit - falls der Aufruf von vorhin das Netz verpasst hat.
     await describeHouse(
       { buildingType: "MFH", doorbells: fresh },
       `${street?.name ?? ""} ${currentNumber} · ${fresh.length} Klingelschilder`,
-      () => {
-        const rejected = new Set(fresh.map((entry) => bellKey(entry.label)));
-        setLocalBells((prev) => {
-          const next = new Map(prev);
-          next.set(
-            key,
-            (next.get(key) ?? []).filter((entry) => !rejected.has(bellKey(entry.label))),
-          );
-          return next;
-        });
-      },
+      rollback,
     );
-  }
-
-  function submitBellDraft() {
-    const entries = parseDoorbellLines(bellDraft);
-    if (entries.length === 0) {
-      setToast("Bitte mindestens einen Namen eintragen");
-      return;
-    }
-    setBellDraft("");
-    setAddBellsOpen(false);
-    void addBells(entries);
-  }
-
-  function submitBellCount() {
-    const wanted = Number(bellCount);
-    if (!Number.isFinite(wanted) || wanted < 1) {
-      setToast("Bitte eine Anzahl eintragen");
-      return;
-    }
-    const entries = numberedBells(
-      wanted,
-      currentBells.map((bell) => bell.label),
-    );
-    setBellCount("");
-    setAddBellsOpen(false);
-    void addBells(entries);
-  }
-
-  /** Klingel waehlen - die Ergebnis-Kacheln darunter meinen ab jetzt sie. */
-  function chooseBell(bell: Bell) {
-    setBellLabel(bell.label);
-    setEditing(null);
-    setAddBellsOpen(false);
   }
 
   async function removeBell(bell: Bell) {
-    if (isBellDone(currentKey, bell)) {
-      setToast("An dieser Klingel hängen schon Einträge");
+    if (book.isBellDone(currentKey, bell)) {
+      toast("An dieser Klingel hängen schon Einträge");
       return;
     }
-    setLocalBells((prev) => {
-      const next = new Map(prev);
-      next.set(
-        currentKey,
-        (next.get(currentKey) ?? []).filter(
-          (entry) => bellKey(entry.label) !== bellKey(bell.label),
-        ),
-      );
-      return next;
-    });
+    book.dropBell(currentKey, bell.label);
     if (bellKey(bell.label) === bellKey(bellLabel)) setBellLabel("");
     if (bell.id === null) return;
-
     try {
       const response = await fetch(`/api/doorbells/${bell.id}`, { method: "DELETE" });
       const data = await response.json();
-      if (!response.ok) {
-        setToast(data.error ?? "Nicht möglich");
-        return;
-      }
-      router.refresh();
+      if (!response.ok) toast(data.error ?? "Nicht möglich");
+      else router.refresh();
     } catch {
-      setToast("Ohne Verbindung nicht möglich");
+      toast("Ohne Verbindung nicht möglich");
     }
   }
 
-  async function saveRename() {
-    if (!editing) return;
-    const label = editing.label.trim();
-    if (!label) {
-      setToast("Der Name darf nicht leer sein");
-      return;
-    }
+  async function renameBell(bell: Bell, label: string, floor: string) {
+    if (bell.id === null || !label.trim()) return;
     try {
-      const response = await fetch(`/api/doorbells/${editing.id}`, {
+      const response = await fetch(`/api/doorbells/${bell.id}`, {
         method: "PATCH",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ label, floor: editing.floor.trim() }),
+        body: JSON.stringify({ label: label.trim(), floor: floor.trim() }),
       });
       const data = await response.json();
       if (!response.ok) {
-        setToast(data.error ?? "Nicht möglich");
+        toast(data.error ?? "Nicht möglich");
         return;
       }
-      if (bellKey(bellLabel) === bellKey(editing.original)) setBellLabel(label);
-      setEditing(null);
+      if (bellKey(bellLabel) === bellKey(bell.label)) setBellLabel(label.trim());
       router.refresh();
     } catch {
-      setToast("Ohne Verbindung nicht möglich");
+      toast("Ohne Verbindung nicht möglich");
     }
   }
 
   /**
-   * Tuer sperren oder freigeben.
-   *
-   * Gesperrt wird die gewaehlte Klingel, sonst das ganze Haus - man steht ja
-   * vor genau dieser Tuer. Lokal gilt die Sperre sofort, damit auch ohne Netz
-   * niemand weiterklingelt.
+   * Tuer sperren oder freigeben - die Klingel oder das ganze Haus. Lokal
+   * gilt die Sperre sofort, damit auch ohne Netz niemand weiterklingelt.
    */
-  async function setBlocked(blocked: boolean) {
+  async function setBlocked(target: Bell | "house", blocked: boolean, note = "") {
     if (!streetId || !currentNumber) return;
-    const bell = activeBell;
+    const bell = target === "house" ? null : target;
     const key = bell ? bellSlot(currentKey, bell.label) : currentKey;
-
-    setLocalBlocked((prev) => {
-      const next = new Set(prev);
-      if (blocked) next.add(key);
-      else next.delete(key);
-      return next;
-    });
+    book.setBlocked(key, blocked);
     setSheet(null);
+    setBlockTarget(null);
+    const undo = () => book.setBlocked(key, !blocked);
 
-    const note = blockNote.trim();
-    setBlockNote("");
-
-    // Eine Klingel mit ID laeuft ueber ihre eigene Route, alles andere ueber
-    // das Haus - dort reichen Strasse und Hausnummer, also auch ohne Netz.
     if (bell && bell.id !== null) {
       try {
         const response = await fetch(`/api/doorbells/${bell.id}`, {
@@ -856,103 +430,41 @@ export function TourClient({
         });
         const data = await response.json();
         if (!response.ok) {
-          setLocalBlocked((prev) => {
-            const next = new Set(prev);
-            if (blocked) next.delete(key);
-            else next.add(key);
-            return next;
-          });
-          setToast(data.error ?? "Nicht möglich");
+          undo();
+          toast(data.error ?? "Nicht möglich");
           return;
         }
-        setToast(blocked ? "Klingel gesperrt" : "Sperre aufgehoben");
+        toast(blocked ? "Klingel gesperrt" : "Sperre aufgehoben");
         router.refresh();
       } catch {
-        setToast("Ohne Verbindung nicht möglich");
+        undo();
+        toast("Ohne Verbindung nicht möglich");
       }
       return;
     }
-
     await describeHouse(
       { blocked, blockedNote: note },
       `${street?.name ?? ""} ${currentNumber} · ${blocked ? "gesperrt" : "Sperre aufgehoben"}`,
-      () =>
-        setLocalBlocked((prev) => {
-          const next = new Set(prev);
-          if (blocked) next.delete(key);
-          else next.add(key);
-          return next;
-        }),
+      undo,
     );
-    if (blocked) setToast("Adresse gesperrt");
+    toast(blocked ? "Adresse gesperrt" : "Sperre aufgehoben");
   }
 
-  /** Tipp auf eine Plakette: das Haus geht auf. */
-  function openHouse(house: HouseNumberWithStats) {
-    setHouseNumber(house.number);
-    setBellLabel("");
-    setEditing(null);
-    setBellEdit(false);
-    setAddBellsOpen(false);
-    setTypeChoice(false);
-    setHouseOpen(true);
-  }
-
-  /** Die eingetippte Hausnummer oeffnen. */
-  function openTypedHouse() {
-    if (!streetId || !currentNumber) return;
-    setBellLabel("");
-    setEditing(null);
-    setBellEdit(false);
-    setAddBellsOpen(false);
-    setTypeChoice(false);
-    setHouseOpen(true);
-  }
-
-  /** Zurueck zur Strasse - das Haus bleibt stehen, wo es war. */
-  function closeHouse() {
-    setHouseOpen(false);
-    setEditing(null);
-    setBellEdit(false);
-    setAddBellsOpen(false);
-    setTypeChoice(false);
-  }
-
-  /** Tipp auf einen Termin: Strasse und Hausnummer stehen sofort richtig. */
-  function goToAppointment(item: AppointmentRow) {
-    const target = item.street_id ? streets.find((s) => s.id === item.street_id) : null;
-    if (target) {
-      setTerritoryId(target.territory_id);
-      chooseStreet(target.id);
-    }
-    setHouseNumber(item.house_number);
-    setBellLabel(item.doorbell_label ?? "");
-    setSheet(null);
-    setHouseOpen(true);
-    setToast(`${item.contact_name || "Termin"} · ${slotLabel(item.follow_up_at, now ?? undefined)}`);
-  }
-
-  /* ------------------------------- Speichern ------------------------------ */
+  /* ------------------------------ Speichern ------------------------------ */
 
   async function save(
     outcome: VisitOutcome,
-    extra: {
-      reasonId?: number | null;
-      reasonNote?: string;
-      followUpAt?: string;
-      contactName?: string;
-      contactPhone?: string;
-    } = {},
+    extra: { reasonId?: number | null; reasonNote?: string; followUpAt?: string; contactName?: string; contactPhone?: string } = {},
   ): Promise<SaveResult> {
     const bell = activeBell;
-    /* Echte Namen am Brett? Dann gehoert jeder Eintrag ausdruecklich zugeordnet. */
     const named = hasNamedBells(currentBells.map((item) => item.label));
+    const number = currentNumber;
     const payload = {
       clientRequestId: createVisitRequestId(),
       ownerUserId: userId,
       territoryId,
       streetId,
-      houseNumber: currentNumber,
+      houseNumber: number,
       doorbellLabel: bell?.label ?? "",
       doorbellFloor: bell?.floor ?? "",
       outcome,
@@ -967,47 +479,20 @@ export function TourClient({
       lng: position?.lng ?? null,
     };
 
-    // Die gerade erfasste Tuer gilt sofort als erledigt - im Mehrfamilienhaus
-    // die einzelne Klingel, sonst die Hausnummer.
     const markDone = (queued: boolean) => {
       if (!currentKey) return;
-      const key = bell ? bellSlot(currentKey, bell.label) : currentKey;
-      const notHome = outcome === "NOT_HOME";
-      const add = (prev: Map<string, LocalVisits>) => {
-        const next = new Map(prev);
-        const seen = next.get(key) ?? { notHome: 0, met: 0 };
-        next.set(key, {
-          notHome: seen.notHome + (notHome ? 1 : 0),
-          met: seen.met + (notHome ? 0 : 1),
-        });
-        return next;
-      };
-      // Gepuffert: bleibt liegen, bis die Warteschlange durch ist.
-      // Online: gilt nur bis zur naechsten Antwort des Servers.
-      if (queued) setLocalVisits(add);
-      else setFresh((prev) => ({ from: houseNumbers, visits: add(prev.from === houseNumbers ? prev.visits : EMPTY_VISITS) }));
-      setLastDone({ key, notHome, houseNumber: currentNumber, label: bell?.label ?? "" });
+      book.countVisit(bell ? bellSlot(currentKey, bell.label) : currentKey, outcome === "NOT_HOME", queued);
     };
 
     /*
-     * Im Treppenhaus klingelt man sich durch. Wie es weitergeht, haengt am
-     * Klingelbrett:
-     *
-     *  - Stehen dort Namen, waehlt die App nichts vor. Geklingelt wird in der
-     *    Reihenfolge, die man vorfindet - ein Eintrag beim falschen Namen
-     *    waere schlimmer als ein Tipp mehr. Die Liste geht deshalb wieder auf.
-     *  - Bei "Klingel 1, 2, 3 ..." aus der Schnellanlage sagt die Reihenfolge
-     *    nichts aus, da springt die App wie gehabt zur naechsten offenen.
-     *
-     * Erst wenn keine Klingel mehr offen ist, ist das Haus durch und das Feld
-     * wird frei.
+     * Weiter geht es so: im Mehrfamilienhaus zur naechsten offenen Klingel
+     * (bei Namen am Brett waehlt man selbst), sonst zur naechsten offenen
+     * Hausnummer der Strasse.
      */
     const advance = (): { nextBell: string | null; pickBell: boolean } => {
-      setNote("");
       if (bell) {
         const open = currentBells.filter(
-          (other) =>
-            bellKey(other.label) !== bellKey(bell.label) && !isBellDone(currentKey, other),
+          (other) => bellKey(other.label) !== bellKey(bell.label) && !book.isBellDone(currentKey, other),
         );
         if (open.length > 0) {
           if (named) {
@@ -1018,10 +503,13 @@ export function TourClient({
           return { nextBell: open[0].label, pickBell: false };
         }
       }
-      // Das Haus ist durch - zurueck zur Strasse, dort steht die naechste Nummer.
-      setHouseNumber("");
       setBellLabel("");
-      setHouseOpen(false);
+      if (houses.length === 0) {
+        setLastTyped(number);
+        setHouseNumber("");
+      } else {
+        setHouseNumber(nextOpenAfter(number) ?? "");
+      }
       return { nextBell: null, pickBell: false };
     };
 
@@ -1035,38 +523,37 @@ export function TourClient({
       const data = await response.json();
       if (!response.ok) {
         if (response.status >= 500) throw new Error("Server vorübergehend nicht erreichbar");
-        setToast(data.error ?? "Speichern fehlgeschlagen");
+        toast(data.error ?? "Speichern fehlgeschlagen");
         return { status: "error" };
       }
       receiveProgress(data.progression);
       if (data.deleted || data.id === null) {
-        setToast("Dieser Eintrag wurde bereits rückgängig gemacht.");
+        toast("Dieser Eintrag wurde bereits zurückgenommen");
         router.refresh();
         return { status: "error" };
       }
-      setLastVisitId(data.id);
       markDone(false);
       const { nextBell, pickBell } = advance();
       router.refresh();
-      return { status: "saved", id: data.id as number, nextBell, pickBell, progression: data.progression };
+      return {
+        status: "saved",
+        id: data.id as number,
+        door: { number, label: bell?.label ?? "" },
+        nextBell,
+        pickBell,
+        progression: data.progression,
+      };
     } catch {
-      // Kein Netz: Eintrag lokal puffern, damit nichts verloren geht.
-      const label = [
-        street?.name ?? "",
-        currentNumber,
-        bell ? `· ${bell.label}` : "",
-        "·",
-        OUTCOME_LABEL[outcome],
-      ]
+      // Kein Netz: lokal puffern, damit nichts verloren geht.
+      const label = [street?.name ?? "", number, bell ? `· ${bell.label}` : "", "·", OUTCOME_LABEL[outcome]]
         .filter(Boolean)
         .join(" ");
       try {
         enqueue(label, payload, { ownerUserId: userId });
       } catch (error) {
-        setToast(error instanceof Error ? error.message : "Nicht gespeichert. Bitte erneut versuchen.");
+        toast(error instanceof Error ? error.message : "Nicht gespeichert");
         return { status: "error" };
       }
-      setLastVisitId(null);
       markDone(true);
       const { nextBell, pickBell } = advance();
       return { status: "queued", nextBell, pickBell };
@@ -1075,124 +562,112 @@ export function TourClient({
     }
   }
 
-  function report(result: SaveResult, savedText: string) {
+  /** Rueckmeldung nach dem Speichern - mit "Rückgängig", wenn der Server bestaetigt hat. */
+  function report(result: SaveResult, text: string) {
     if (result.status === "error") return;
     const base =
       result.status === "saved"
-        ? [savedText, levelFeedbackText(result.progression)].filter(Boolean).join(" · ")
-        : "Lokal gespeichert – XP zählen nach dem Nachsenden";
-    const text = result.nextBell
-      ? `${base} · weiter mit ${result.nextBell}`
-      : result.pickBell
-        ? `${base} · nächste Klingel wählen`
-        : base;
-    // Rueckgaengig nur, wenn der Server den Eintrag bestaetigt hat - ohne ID
-    // gibt es nichts zu loeschen.
-    setToastState({ text, undo: result.status === "saved" });
-  }
-
-  /**
-   * Im Mehrfamilienhaus gehoert jeder Eintrag an eine Klingel. Ohne sie waere
-   * die Tuer nirgends zugeordnet und das Klingelbrett kaeme nicht voran -
-   * deshalb fuehrt der Tipp dann zur Liste statt ins Leere.
-   */
-  function bellMissing(): boolean {
-    if (currentType !== "MFH" || activeBell) return false;
-    setHouseOpen(true);
-    setAddBellsOpen(currentBells.length === 0);
-    setToast(
-      currentBells.length === 0
-        ? "Erst die Klingelschilder anlegen"
-        : "An welcher Klingel warst du?",
+        ? [text, levelFeedbackText(result.progression)].filter(Boolean).join(" · ")
+        : `${text} · offline gemerkt`;
+    const line = result.nextBell ? `${base} · weiter: ${result.nextBell}` : result.pickBell ? `${base} · Klingel wählen` : base;
+    toast(
+      line,
+      result.status === "saved"
+        ? { action: { label: "Rückgängig", onClick: () => void undo(result.id, result.door) } }
+        : {},
     );
-    return true;
   }
 
-  async function handleOutcome(outcome: VisitOutcome) {
-    if (bellMissing()) return;
-    if (outcome === "MET_NO_SALE") {
-      setSheet("reason");
-      return;
+  async function undo(id: number, door: { number: string; label: string }) {
+    try {
+      const response = await fetch(`/api/visits/${id}`, { method: "DELETE" });
+      const data = await response.json();
+      if (!response.ok) {
+        toast(data.error ?? "Nicht möglich");
+        return;
+      }
+      receiveProgress(data.progression);
+      toast("Zurückgenommen");
+      // Zurueck an die Tuer, an der der Fehltipp passiert ist.
+      setHouseNumber(door.number);
+      setBellLabel(door.label);
+      router.refresh();
+    } catch {
+      toast("Ohne Verbindung nicht möglich");
     }
-    if (outcome === "APPOINTMENT") {
-      openAppointment();
-      return;
-    }
-    const result = await save(outcome);
-    report(result, "Nicht angetroffen gespeichert");
   }
 
-  /* -------------------------------- Termin -------------------------------- */
+  /** Was die Ergebnisknoepfe gerade blockiert - in einem Wort. */
+  const trayHint: string | null = !currentNumber
+    ? "Hausnummer wählen"
+    : doorLocked
+      ? "Gesperrt – hier nicht klingeln"
+      : currentType === "" && suggestMfh
+        ? "Erst Haustyp wählen"
+        : currentType === "MFH" && currentBells.length === 0
+          ? "Erst Klingelschilder anlegen"
+          : currentType === "MFH" && !activeBell
+            ? "Klingel wählen"
+            : null;
 
-  /**
-   * Ein Termin ohne Uhrzeit ist keiner: er taucht nirgends wieder auf und der
-   * Weg zurueck faellt aus. Deshalb fragt die App hier kurz nach - mit
-   * Vorschlaegen, damit es beim Tippen bleibt.
-   */
-  function openAppointment() {
-    const slots = quickSlots();
-    setSlot(slots[0]?.value ?? "");
-    // Am Klingelbrett steht der Name schon - den muss niemand abtippen.
-    setContactName(activeBell?.label ?? "");
-    setContactPhone("");
-    setNote("");
-    setSheet("appointment");
+  const place = `${street?.name ?? ""} ${currentNumber}${activeBell ? ` · ${activeBell.label}` : ""}`.trim();
+
+  async function notHome() {
+    const result = await save("NOT_HOME");
+    report(result, `Nr. ${currentNumber} nicht da`);
   }
 
-  async function submitAppointment() {
-    if (!slot) {
-      setToast("Bitte Tag und Uhrzeit wählen");
-      return;
-    }
+  async function chooseReason(reason: RejectionReason, note: string) {
+    const result = await save("MET_NO_SALE", { reasonId: reason.id, reasonNote: note });
+    if (result.status === "error") return;
+    setSheet(null);
+    report(result, reason.label);
+  }
+
+  async function submitAppointment(values: { slot: string; name: string; phone: string; note: string }) {
     const result = await save("APPOINTMENT", {
-      followUpAt: slot,
-      contactName: contactName.trim(),
-      contactPhone: contactPhone.trim(),
-      reasonNote: note.trim(),
+      followUpAt: values.slot,
+      contactName: values.name,
+      contactPhone: values.phone,
+      reasonNote: values.note,
     });
     if (result.status === "error") return;
     setSheet(null);
-    report(result, `Termin ${slotLabel(slot)} gespeichert`);
-    setSlot("");
-    setContactName("");
-    setContactPhone("");
+    report(result, `Termin ${slotLabel(values.slot)}`);
   }
 
-  /* -------------------------------- Abschluss ----------------------------- */
-
   /**
-   * Auftrag: zuerst den offenen Vorgang dauerhaft vormerken, dann den
-   * Tarifrechner noch im selben Klick oeffnen. Erst die Bestaetigung erzeugt
-   * den Verkauf; die Vorgangsqueue wird parallel synchronisiert.
-   *
-   * Der Auftrag selbst entsteht dort - Kundendaten, Widerrufsbelehrung und
-   * Unterschrift gehoeren in den Tarifrechner, nicht ein zweites Mal hierher.
+   * Abschluss: den Vorgang dauerhaft vormerken, dann den Tarifrechner im
+   * selben Tipp oeffnen. Erst die Bestaetigung erzeugt den Verkauf.
    */
-  async function handleSale() {
-    // Vor dem Fenster pruefen: ein geoeffneter Tarifrechner ohne Eintrag
-    // waere das Schlimmste, was hier passieren kann.
-    if (bellMissing()) return;
-
-    /*
-     * Ohne "noopener" geoeffnet, damit window.open das Fenster zurueckgibt -
-     * mit der Angabe liefert es laut Standard immer null, und die App waere
-     * dem Ersatzweg unten hinterhergesprungen, obwohl der Tarifrechner schon
-     * offen ist. Die Verbindung wird gleich danach gekappt, damit die fremde
-     * Seite die Tour nicht fernsteuern kann.
-     */
+  function startSale(choice: EnergyType) {
+    setProduct(choice);
+    window.localStorage.setItem("d2d_product", choice);
     try {
-      beginSaleDraft(userId, {
-        territoryId, streetId, houseNumber: currentNumber,
-        doorbellLabel: activeBell?.label ?? "", doorbellFloor: activeBell?.floor ?? "",
-        energyType: product, lat: position?.lat ?? null, lng: position?.lng ?? null,
-      }, `${street?.name ?? ""} ${currentNumber}${activeBell ? ` · ${activeBell.label}` : ""}`);
+      beginSaleDraft(
+        userId,
+        {
+          territoryId,
+          streetId,
+          houseNumber: currentNumber,
+          doorbellLabel: activeBell?.label ?? "",
+          doorbellFloor: activeBell?.floor ?? "",
+          energyType: choice,
+          lat: position?.lat ?? null,
+          lng: position?.lng ?? null,
+        },
+        place,
+      );
     } catch (error) {
-      setToast(error instanceof Error ? error.message : "Auftrag konnte nicht vorgemerkt werden.");
+      toast(error instanceof Error ? error.message : "Auftrag konnte nicht vorgemerkt werden");
       return;
     }
+    // Ohne "noopener", damit window.open das Fenster liefert - die Verbindung
+    // wird gleich danach gekappt.
     const win = window.open(tarifrechnerUrl, "_blank");
     if (win) win.opener = null;
-    setToast("Auftrag vorgemerkt – nach der Erfassung den Abschluss bestätigen.");
+    setSheet(null);
+    toast("Auftrag vorgemerkt – danach bestätigen");
     void flush(userId).then((result) => {
       receiveProgress(result.progression);
       if (result.sent > 0 && navigator.onLine) router.refresh();
@@ -1200,1771 +675,362 @@ export function TourClient({
     if (!win) window.location.href = tarifrechnerUrl;
   }
 
-  async function handleReason(reason: RejectionReason) {
-    if (reason.code === "SONSTIGES" && !note.trim()) {
-      setToast("Bitte kurz eintragen, woran es lag");
-      return;
-    }
-    const result = await save("MET_NO_SALE", {
-      reasonId: reason.id,
-      reasonNote: note.trim(),
-    });
-    if (result.status !== "error") {
-      setSheet(null);
-      report(result, `Gespeichert: ${reason.label}`);
-    }
-  }
-
-  async function undo() {
-    if (!lastVisitId) return;
-    try {
-      const response = await fetch(`/api/visits/${lastVisitId}`, { method: "DELETE" });
-      const data = await response.json();
-      setToast(response.ok ? `Letzter Eintrag entfernt${data.progression?.awardedXp ? ` · ${data.progression.awardedXp} XP` : ""}` : (data.error ?? "Nicht möglich"));
-      if (response.ok) {
-        receiveProgress(data.progression);
-        setLevelUp(null);
-        setLastVisitId(null);
-        // Den Vermerk aus dieser Sitzung mitnehmen, sonst bliebe die Klingel
-        // durchgestrichen, obwohl der Eintrag weg ist.
-        if (lastDone) {
-          // Den Zuschlag muss hier niemand zuruecknehmen: rueckgaengig gibt es
-          // nur fuer online gespeicherte Eintraege, und der Refresh gleich
-          // darunter bringt den Serverstand ohne diesen Eintrag zurueck.
-          // Zurueck an die Tuer, an der der Fehltipp passiert ist - sonst
-          // muesste man sie sich nach dem Auto-Weiter wieder heraussuchen.
-          setHouseNumber(lastDone.houseNumber);
-          setBellLabel(lastDone.label);
-          setHouseOpen(true);
-          setLastDone(null);
-        }
-        router.refresh();
-      }
-    } catch {
-      setToast("Ohne Verbindung nicht möglich");
-    }
-  }
-
-  function chooseProduct(value: EnergyType) {
-    setProduct(value);
-    window.localStorage.setItem("d2d_product", value);
-  }
-
-  async function sendPendingNow() {
-    setToast("Sende …");
-    const result = await flush(userId);
-    if (result.sent > 0) {
-      receiveProgress(result.progression);
-      setToast([`${result.sent} Eintrag/Einträge gesendet`, levelFeedbackText(result.progression)].filter(Boolean).join(" · "));
-    } else if (result.remaining > 0) {
-      setToast("Senden noch nicht möglich – Einträge bleiben gespeichert.");
-    } else if (result.rejected === 0) {
-      setToast("Alle Einträge sind synchronisiert.");
-    }
-    if (result.rejected > 0) {
-      setToast(`${result.rejected} Eintrag/Einträge konnten nicht gespeichert werden`);
-    }
-    if (result.sent > 0 || result.rejected > 0) router.refresh();
-  }
-
-  /* ----------------------------- leeres Gebiet ---------------------------- */
+  /* ------------------------------- Ansicht ------------------------------- */
 
   if (territories.length === 0) {
     return (
-      <div className="mx-auto max-w-md">
+      <div className="page-narrow pt-12">
         <PendingSales userId={userId} onProgress={receiveProgress} />
-        <LevelCard progress={level} compact href="/level" />
         <EmptyState
-          icon={<IconMap className="h-7 w-7" />}
-          title="Noch kein Gebiet zugeteilt"
-          text="Deine Teamleitung muss dir zuerst ein Gebiet mit Straßen zuweisen. Danach erscheint es hier automatisch."
+          boxed
+          icon={<IconMap className="h-6 w-6" />}
+          title="Noch kein Gebiet"
+          text="Sobald dir ein Gebiet zugeteilt ist, geht es hier los."
         />
       </div>
     );
   }
 
-  /* ------------------------ Dinge, die beide Seiten brauchen -------------- */
-
-  const openHouses = houses.filter((house) => !isDone(house)).length;
-  /* Die gerade gewaehlte Nummer bleibt stehen, auch wenn sie durch ist - sonst
-     verschwaende unter dem Daumen die Kachel, auf die eben getippt wurde. */
-  const shownHouses = onlyOpen
-    ? houses.filter((house) => !isDone(house) || sameNumber(house.number, houseNumber))
-    : houses;
-  const needle = streetQuery.trim().toLocaleLowerCase("de-DE");
-  const streetMatches = needle
-    ? streetsOfTerritory.filter((s) => s.name.toLocaleLowerCase("de-DE").includes(needle))
-    : streetsOfTerritory;
-  const nextOpenNumber = houses.find((house) => !isDone(house))?.number ?? null;
-  /** Das ganze Haus ist durch - im Mehrfamilienhaus erst mit der letzten Klingel. */
-  const houseDone =
-    currentType === "MFH"
-      ? currentBells.length > 0 && doneBellCount >= currentBells.length
-      : doorFinished(currentHouseFacts);
-
-  /* ---------------- Blätter und Rückmeldung (auf beiden Seiten) ----------- */
-
-  const overlays = (
-    <>
-      <LevelUpNotice feedback={levelUp} onDismiss={dismissLevelUp} />
-      {/* ========================== Blatt: Straße wählen ==================== */}
-      {sheet === "street" && (
-        <Sheet
-          title="Wo bist du unterwegs?"
-          subtitle="Gebiet und Straße – die Auswahl merkt sich die App."
-          onClose={() => setSheet(null)}
-        >
-          {territories.length > 1 && (
-            <>
-              <GroupLabel>Gebiet</GroupLabel>
-              <ul className="mb-4 flex flex-wrap gap-1.5">
-                {territories.map((t) => (
-                  <li key={t.id}>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setTerritoryId(t.id);
-                        chooseStreet(null);
-                      }}
-                      aria-pressed={territoryId === t.id}
-                      className="btn btn-sm btn-pill"
-                      style={
-                        territoryId === t.id
-                          ? { background: "var(--brand-600)", color: "#fff" }
-                          : {
-                              background: "var(--card)",
-                              borderColor: "var(--line)",
-                              color: "var(--ink)",
-                            }
-                      }
-                    >
-                      {t.name}
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            </>
-          )}
-
-          {streetsOfTerritory.length === 0 ? (
-            <p className="muted py-6 text-center text-sm">
-              In diesem Gebiet sind noch keine Straßen hinterlegt.
-            </p>
-          ) : (
-            <>
-              {streetsOfTerritory.length > 6 && (
-                <div className="relative mb-3">
-                  <IconSearch className="muted pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2" />
-                  <input
-                    className="input pl-9"
-                    placeholder="Straße suchen"
-                    value={streetQuery}
-                    onChange={(e) => setStreetQuery(e.target.value)}
-                    aria-label="Straße suchen"
-                  />
-                </div>
-              )}
-              <GroupLabel>Straßen</GroupLabel>
-              <ul className="list">
-                {streetMatches.map((s) => {
-                  const chosen = s.id === streetId;
-                  return (
-                    <li key={s.id}>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          chooseStreet(s.id);
-                          setHouseNumber("");
-                          setBellLabel("");
-                          setSheet(null);
-                        }}
-                        className="list-row"
-                      >
-                        <span className="min-w-0 flex-1">
-                          <span className="block truncate text-[15px] font-medium">{s.name}</span>
-                          <span className="muted block truncate text-[12px] tabular-nums">
-                            {s.house_numbers || "ohne Hausnummern"}
-                            {s.visit_count ? ` · ${s.visit_count} erfasst` : ""}
-                            {s.sale_count ? ` · ${s.sale_count} Abschl.` : ""}
-                          </span>
-                        </span>
-                        {chosen ? (
-                          <IconCheck className="h-5 w-5 shrink-0 text-tint" />
-                        ) : (
-                          <IconChevronRight className="h-4 w-4 shrink-0 opacity-30" />
-                        )}
-                      </button>
-                    </li>
-                  );
-                })}
-                {streetMatches.length === 0 && (
-                  <li className="muted px-4 py-5 text-center text-sm">Keine Straße gefunden.</li>
-                )}
-              </ul>
-            </>
-          )}
-        </Sheet>
-      )}
-
-      {/* ============================ Blatt: Tür sperren ==================== */}
-      {sheet === "block" && (
-        <Sheet
-          title={
-            activeBell
-              ? `„${activeBell.label}“ sperren?`
-              : `${street?.name ?? ""} ${currentNumber} sperren?`
-          }
-          subtitle="Gilt fürs ganze Team und dauerhaft – hier klingelt danach niemand mehr."
-          onClose={() => {
-            setSheet(null);
-            setBlockNote("");
-          }}
-          footer={
-            <>
-              <button
-                type="button"
-                disabled={busy}
-                className="btn btn-danger btn-lg w-full"
-                onClick={() => void setBlocked(true)}
-              >
-                <IconBan className="h-5 w-5" />
-                Dauerhaft sperren
-              </button>
-              <button
-                type="button"
-                className="btn btn-plain mt-1 w-full"
-                onClick={() => {
-                  setSheet(null);
-                  setBlockNote("");
-                }}
-              >
-                Abbrechen
-              </button>
-            </>
-          }
-        >
-          <Note icon={<IconInfo className="h-4 w-4" />} tone="danger">
-            Richtig, wenn ausdrücklich widersprochen wurde oder ein Schild „Keine Werbung“ bzw.
-            „Für Vertreter verboten“ hängt: ein erkennbares Verbot zu missachten ist eine
-            unzumutbare Belästigung. Aufheben kann die Sperre nur die Teamleitung.
-          </Note>
-
-          <div className="mt-4">
-            <label className="label" htmlFor="block-note">
-              Grund (optional)
-            </label>
-            <input
-              id="block-note"
-              className="input"
-              placeholder="z. B. Schild „Keine Werbung“"
-              value={blockNote}
-              onChange={(e) => setBlockNote(e.target.value.slice(0, 200))}
-            />
-          </div>
-        </Sheet>
-      )}
-
-      {/* ========================= Blatt: Termin vereinbaren ================= */}
-      {sheet === "appointment" && (
-        <Sheet
-          title="Wann passt es?"
-          subtitle={`${street?.name ?? ""} ${currentNumber}${
-            activeBell ? ` · ${activeBell.label}` : ""
-          } – ein Termin ohne Uhrzeit geht unter.`}
-          onClose={() => setSheet(null)}
-          footer={
-            <button
-              type="button"
-              disabled={busy || !slot}
-              className="btn btn-primary btn-lg w-full"
-              onClick={() => void submitAppointment()}
-            >
-              <IconCalendar className="h-5 w-5" />
-              Termin speichern
-              {slot ? ` · ${slotLabel(slot, now ?? undefined)}` : ""}
-            </button>
-          }
-        >
-          <GroupLabel>Vorschläge</GroupLabel>
-          <div className="mb-4 grid grid-cols-2 gap-2">
-            {quickSlots(now ?? undefined).map((option) => {
-              const chosen = slot === option.value;
-              return (
-                <button
-                  key={option.value}
-                  type="button"
-                  onClick={() => setSlot(option.value)}
-                  aria-pressed={chosen}
-                  className="rounded-[var(--r-sm)] border px-3 py-3 text-sm font-semibold transition active:scale-[0.97]"
-                  style={
-                    chosen
-                      ? { background: "var(--brand-600)", color: "#fff", borderColor: "transparent" }
-                      : { borderColor: "var(--line)", background: "var(--card)" }
-                  }
-                >
-                  {option.label}
-                </button>
-              );
-            })}
-          </div>
-
-          <GroupLabel>Genauer Zeitpunkt</GroupLabel>
-          <div className="mb-4 flex gap-2">
-            <div className="min-w-0 flex-1">
-              <label className="label" htmlFor="slot-date">
-                Tag
-              </label>
-              <input
-                id="slot-date"
-                type="date"
-                className="input"
-                value={slotDate(slot)}
-                onChange={(e) =>
-                  setSlot(normalizeSlot(`${e.target.value} ${slotTime(slot) || "18:00"}`))
-                }
-              />
-            </div>
-            <div className="w-32 shrink-0">
-              <label className="label" htmlFor="slot-time">
-                Uhrzeit
-              </label>
-              <input
-                id="slot-time"
-                type="time"
-                className="input"
-                value={slotTime(slot)}
-                onChange={(e) =>
-                  setSlot(
-                    normalizeSlot(
-                      `${slotDate(slot) || toSlot(now ?? new Date()).slice(0, 10)} ${e.target.value}`,
-                    ),
-                  )
-                }
-              />
-            </div>
-          </div>
-
-          <GroupLabel>Ansprechpartner</GroupLabel>
-          <div className="flex gap-2">
-            <div className="min-w-0 flex-1">
-              <label className="label" htmlFor="contact-name">
-                Name
-              </label>
-              <input
-                id="contact-name"
-                className="input"
-                autoComplete="off"
-                placeholder="z. B. Frau Müller"
-                value={contactName}
-                onChange={(e) => setContactName(e.target.value.slice(0, 120))}
-              />
-            </div>
-            <div className="w-40 shrink-0">
-              <label className="label" htmlFor="contact-phone">
-                Telefon
-              </label>
-              <input
-                id="contact-phone"
-                className="input"
-                inputMode="tel"
-                autoComplete="off"
-                placeholder="optional"
-                value={contactPhone}
-                onChange={(e) => setContactPhone(e.target.value.slice(0, 40))}
-              />
-            </div>
-          </div>
-
-          <div className="mt-3">
-            <label className="label" htmlFor="appointment-note">
-              Notiz (optional)
-            </label>
-            <input
-              id="appointment-note"
-              className="input"
-              placeholder="z. B. letzte Abrechnung bereitlegen"
-              value={note}
-              onChange={(e) => setNote(e.target.value)}
-            />
-          </div>
-
-          <p className="muted mt-3 text-[11px] leading-snug">
-            Mit Rufnummer lässt sich der Termin vorher kurz bestätigen – das spart den
-            vergeblichen Weg.
-          </p>
-        </Sheet>
-      )}
-
-      {/* ========================= Blatt: Ablehnungsgrund =================== */}
-      {sheet === "reason" && (
-        <Sheet
-          title="Warum kein Abschluss?"
-          subtitle="Einmal tippen genügt – der Eintrag wird sofort gespeichert."
-          onClose={() => setSheet(null)}
-        >
-          {/* Zeichen links, Text rechts: so passen alle Gründe auf einen
-              Blick, ohne dass die Fläche zum Tippen kleiner wird. */}
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-            {reasons.map((reason) => (
-              <button
-                key={reason.id}
-                type="button"
-                disabled={busy}
-                onClick={() => handleReason(reason)}
-                className="tap-tile flex-row items-center justify-start gap-2.5 px-2.5 text-left text-[13px] leading-tight"
-                style={{ minHeight: "3.75rem" }}
-              >
-                <span
-                  className="tile-icon h-8 w-8 shrink-0 text-[17px]"
-                  style={{ background: "color-mix(in srgb, var(--ink) 6%, transparent)" }}
-                  aria-hidden
-                >
-                  {reason.emoji || <IconChat className="h-4 w-4" />}
-                </span>
-                <span className="min-w-0 flex-1">{reason.label}</span>
-              </button>
-            ))}
-          </div>
-
-          <div className="mt-4 pb-2">
-            <label className="label" htmlFor="note">
-              Notiz (optional)
-            </label>
-            <input
-              id="note"
-              className="input"
-              placeholder="z. B. nächste Woche nochmal"
-              value={note}
-              onChange={(e) => setNote(e.target.value)}
-            />
-          </div>
-        </Sheet>
-      )}
-
-      {/* ---------------------------- Rückmeldung --------------------------- */}
-      {toast && (
-        <div
-          className="glass fixed inset-x-0 bottom-[calc(5.5rem+env(safe-area-inset-bottom))] z-40 mx-auto flex w-fit max-w-[92vw] items-center gap-3 rounded-full border py-2 pl-4 pr-2 text-center text-[13px] font-semibold md:bottom-8"
-          style={{
-            borderColor: "var(--line)",
-            boxShadow: "var(--shadow-3)",
-            animation: "toast-up .32s var(--ease-spring) both",
-          }}
-          role="status"
-        >
-          <span className="min-w-0">{toast.text}</span>
-          {toast.undo && lastVisitId !== null && (
-            <button
-              type="button"
-              onClick={() => void undo()}
-              className="shrink-0 rounded-full px-3 py-1 text-[12px] font-bold"
-              style={{
-                background: "color-mix(in srgb, var(--brand-500) 16%, transparent)",
-                color: "var(--brand-600)",
-              }}
-            >
-              Rückgängig
-            </button>
-          )}
-        </div>
-      )}
-    </>
-  );
-
-  /* ======================================================================== */
-  /*  Haus-Bildschirm: hier wird geklingelt                                   */
-  /* ======================================================================== */
-
-  if (houseOpen && street && currentNumber) {
-    const houseFace = faceOf(currentHouse?.last_visit_user_id);
-    const houseRetry = currentDoorStatus === "RETRY";
-
-    return (
-      <div className="mx-auto max-w-2xl space-y-3">
-        {/* ------------------------------ Kopfzeile ------------------------- */}
-        <div className="card flex items-center gap-2 p-3">
-          <button
-            type="button"
-            onClick={closeHouse}
-            className="icon-btn -ml-1 shrink-0"
-            aria-label="Zurück zur Straße"
-          >
-            <IconChevronLeft className="h-5 w-5" />
-          </button>
-          <div className="min-w-0 flex-1">
-            <p className="truncate text-[18px] font-bold leading-tight">
-              {street.name} {currentNumber}
-            </p>
-            <p className="muted truncate text-[12px]">
-              {[territory?.name, [territory?.postal_code, territory?.city].filter(Boolean).join(" ")]
-                .filter(Boolean)
-                .join(" · ")}
-            </p>
-          </div>
-          {currentType === "MFH" && currentBells.length > 0 && (
-            <ProgressRing
-              value={doneBellCount}
-              max={currentBells.length}
-              size={42}
-              tone={houseDone ? "success" : "brand"}
-            >
-              {`${doneBellCount}/${currentBells.length}`}
-            </ProgressRing>
-          )}
-        </div>
-
-        {/* --------------------------- Angaben zum Haus --------------------- */}
-        <div className="flex flex-wrap items-center gap-2">
-          {currentType === "" ? (
-            <Pill tone="warn">Haustyp offen</Pill>
-          ) : (
-            <button
-              type="button"
-              onClick={() => setTypeChoice((value) => !value)}
-              aria-pressed={typeChoice}
-              className="btn btn-ghost btn-sm btn-pill"
-              title="Haustyp ändern"
-            >
-              {currentType === "EFH" ? (
-                <IconHome className="h-4 w-4" />
-              ) : (
-                <IconBuilding className="h-4 w-4" />
-              )}
-              {currentType === "EFH" ? "Einfamilienhaus" : "Mehrfamilienhaus"}
-              <IconPencil className="muted h-3.5 w-3.5" />
-            </button>
-          )}
-          {(currentHouse?.units ?? 0) > 1 && (
-            <Pill tone="neutral">{currentHouse?.units} Wohneinheiten</Pill>
-          )}
-          <span className="flex-1" />
-          {currentHouse?.lat != null && currentHouse?.lng != null && (
-            <a
-              href={routeUrl(currentHouse.lat, currentHouse.lng)}
-              target="_blank"
-              rel="noreferrer"
-              className="btn btn-ghost btn-sm btn-pill"
-              style={{ color: "var(--brand-600)" }}
-            >
-              <IconNavigate className="h-4 w-4" />
-              Route
-            </a>
-          )}
-          {!doorLocked && (
-            <button
-              type="button"
-              onClick={() => setSheet("block")}
-              className="btn btn-ghost btn-sm btn-pill"
-              style={{ color: "var(--signal-600)" }}
-            >
-              <IconBan className="h-4 w-4" />
-              Sperren
-            </button>
-          )}
-        </div>
-
-        {/* ---------------------- Haustyp beim ersten Mal ------------------- */}
-        {(currentType === "" || typeChoice) && !doorLocked && (
-          <div className="card rise p-4">
-            <p className="text-[15px] font-semibold">Was für ein Haus ist das?</p>
-            <p className="muted mb-3 text-[12px]">
-              Einmal festlegen – dann kennt es die App für das ganze Team.
-            </p>
-            <div className="grid grid-cols-2 gap-2.5">
-              <button
-                type="button"
-                disabled={busy}
-                onClick={() => void chooseBuildingType("EFH")}
-                className="tap-tile"
-                aria-pressed={currentType === "EFH"}
-                style={{
-                  minHeight: "7rem",
-                  borderColor:
-                    currentType === "EFH" || (currentType === "" && !suggestMfh)
-                      ? "var(--brand-500)"
-                      : undefined,
-                  boxShadow:
-                    currentType === "EFH" || (currentType === "" && !suggestMfh)
-                      ? "0 0 0 1px var(--brand-500)"
-                      : undefined,
-                }}
-              >
-                <span
-                  className="tile-icon h-12 w-12"
-                  style={{
-                    background: "color-mix(in srgb, var(--brand-500) 12%, transparent)",
-                    color: "var(--brand-600)",
-                  }}
-                  aria-hidden
-                >
-                  <IconHome className="h-6 w-6" />
-                </span>
-                Einfamilienhaus
-              </button>
-              <button
-                type="button"
-                disabled={busy}
-                onClick={() => void chooseBuildingType("MFH")}
-                className="tap-tile"
-                aria-pressed={currentType === "MFH"}
-                style={{
-                  minHeight: "7rem",
-                  borderColor:
-                    currentType === "MFH" || (currentType === "" && suggestMfh)
-                      ? "var(--brand-500)"
-                      : undefined,
-                  boxShadow:
-                    currentType === "MFH" || (currentType === "" && suggestMfh)
-                      ? "0 0 0 1px var(--brand-500)"
-                      : undefined,
-                }}
-              >
-                <span
-                  className="tile-icon h-12 w-12"
-                  style={{
-                    background: "color-mix(in srgb, var(--brand-500) 12%, transparent)",
-                    color: "var(--brand-600)",
-                  }}
-                  aria-hidden
-                >
-                  <IconBuilding className="h-6 w-6" />
-                </span>
-                Mehrfamilienhaus
-              </button>
-            </div>
-            {suggestMfh && (
-              <div className="mt-3">
-                <Note icon={<IconInfo className="h-4 w-4" />} tone="brand">
-                  Die Karte kennt hier {currentHouse?.units} Wohneinheiten – wahrscheinlich ein
-                  Mehrfamilienhaus.
-                </Note>
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* ------------------------------- gesperrt ------------------------- */}
-        {doorLocked ? (
-          <div
-            className="card p-5 text-center"
-            style={{
-              borderColor: "color-mix(in srgb, var(--signal-500) 45%, var(--line))",
-              background: "color-mix(in srgb, var(--signal-500) 7%, var(--card))",
-            }}
-          >
-            <span
-              className="tile-icon mx-auto mb-2 h-12 w-12"
-              style={{
-                background: "color-mix(in srgb, var(--signal-500) 15%, transparent)",
-                color: "var(--signal-600)",
-              }}
-              aria-hidden
-            >
-              <IconBan className="h-6 w-6" />
-            </span>
-            <p className="text-[17px] font-bold" style={{ color: "var(--signal-600)" }}>
-              Hier nicht mehr klingeln
-            </p>
-            <p className="muted mx-auto mt-1 max-w-sm text-[12px] leading-relaxed">
-              {blockedBy ? `${blockedBy} hat diese Tür gesperrt.` : "Diese Tür ist gesperrt."} Hier
-              wurde ausdrücklich widersprochen – weiteres Anlaufen wäre rechtlich angreifbar.
-            </p>
-            {isLeader && (
-              <button
-                type="button"
-                className="btn btn-ghost mt-4 w-full"
-                onClick={() => void setBlocked(false)}
-              >
-                Sperre aufheben
-              </button>
-            )}
-            <button type="button" className="btn btn-plain mt-1 w-full" onClick={closeHouse}>
-              Zurück zur Straße
-            </button>
-          </div>
-        ) : (
-          <>
-            {/* ====================== Klingelschilder ======================== */}
-            {currentType === "MFH" && (
-              <div className="card overflow-hidden">
-                <div className="flex items-center gap-2 px-4 pb-2 pt-3">
-                  <IconBell className="h-4 w-4 shrink-0 text-tint" />
-                  <p className="min-w-0 flex-1 text-[13px] font-semibold">
-                    Klingelschilder{" "}
-                    <span className="muted font-normal tabular-nums">
-                      ({currentBells.length})
-                    </span>
-                  </p>
-                  {currentBells.length > 0 && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setBellEdit((value) => !value);
-                        setEditing(null);
-                      }}
-                      aria-pressed={bellEdit}
-                      aria-label="Klingeln bearbeiten"
-                      className="icon-btn h-8 w-8 shrink-0"
-                      style={
-                        bellEdit
-                          ? {
-                              background: "color-mix(in srgb, var(--brand-500) 16%, transparent)",
-                              color: "var(--brand-600)",
-                            }
-                          : { background: "color-mix(in srgb, var(--ink) 6%, transparent)" }
-                      }
-                    >
-                      <IconPencil className="h-4 w-4" />
-                    </button>
-                  )}
-                </div>
-
-                {currentBells.length === 0 ? (
-                  <p className="muted px-4 pb-4 text-[13px] leading-snug">
-                    Noch keine Schilder angelegt. Unten die Namen vom Klingelbrett abtippen –
-                    oder einfach die Anzahl eintragen.
-                  </p>
-                ) : (
-                  <ul>
-                    {currentBells.map((bell, index) => {
-                      const bellDone = isBellDone(currentKey, bell);
-                      const chosen = bellKey(bell.label) === bellKey(bellLabel);
-                      const isNext =
-                        !bellDone && nextOpenBell !== null && bell === nextOpenBell && !chosen;
-                      const facts = bellFacts(currentKey, bell);
-                      const bellBlocked = Boolean(facts.blocked_at);
-                      const retry = doorStatus(facts) === "RETRY";
-                      const face = faceOf(bell.last_visit_user_id);
-
-                      if (editing && bell.id !== null && bell.id === editing.id) {
-                        return (
-                          <li
-                            key={`edit-${bell.id}`}
-                            className="flex flex-wrap items-center gap-2 border-t p-2.5"
-                            style={{ borderColor: "var(--line)" }}
-                          >
-                            <input
-                              className="input min-w-0 flex-1"
-                              value={editing.label}
-                              onChange={(e) => setEditing({ ...editing, label: e.target.value })}
-                              placeholder="Name"
-                              aria-label="Name auf dem Schild"
-                            />
-                            <input
-                              className="input w-24 shrink-0"
-                              value={editing.floor}
-                              onChange={(e) => setEditing({ ...editing, floor: e.target.value })}
-                              placeholder="Etage"
-                              aria-label="Etage"
-                            />
-                            <button
-                              type="button"
-                              className="btn btn-success btn-sm"
-                              onClick={() => void saveRename()}
-                            >
-                              Sichern
-                            </button>
-                            <button
-                              type="button"
-                              className="btn btn-ghost btn-sm"
-                              onClick={() => setEditing(null)}
-                            >
-                              Zurück
-                            </button>
-                          </li>
-                        );
-                      }
-
-                      return (
-                        <li
-                          key={bell.id ?? `neu-${bellKey(bell.label)}`}
-                          className="flex items-center gap-0.5 border-t pr-1.5"
-                          style={{
-                            borderColor: "var(--line)",
-                            background: chosen
-                              ? "color-mix(in srgb, var(--brand-500) 10%, transparent)"
-                              : bellBlocked
-                                ? "color-mix(in srgb, var(--signal-500) 8%, transparent)"
-                                : undefined,
-                          }}
-                        >
-                          <button
-                            type="button"
-                            onClick={() => chooseBell(bell)}
-                            className="list-row min-w-0 flex-1 py-2.5"
-                            aria-label={`Klingel ${index + 1}, ${bell.label}${
-                              bell.floor ? `, ${bell.floor}` : ""
-                            }${
-                              bell.last_visit_user
-                                ? `, zuletzt ${bell.last_visit_user}, ${whenLabel(bell.last_visit_at)}`
-                                : ", hier war noch niemand"
-                            }${bellDone ? ", schon erfasst" : isNext ? ", hier geht es weiter" : ""}`}
-                          >
-                            {/* Die Nummer vom Klingelbrett - so findet der Daumen
-                                die Zeile wieder, ohne den Namen zu lesen. */}
-                            <span className="muted w-4 shrink-0 text-right text-[11px] tabular-nums">
-                              {index + 1}
-                            </span>
-
-                            {/* Das Gesicht des Kollegen, der hier zuletzt geklingelt
-                                hat. Ohne Eintrag steht dort das Klingelsymbol. */}
-                            <span className="relative shrink-0" aria-hidden>
-                              {face ? (
-                                <Avatar name={face.name} src={face.avatar} size={38} />
-                              ) : (
-                                <span
-                                  className="tile-icon h-[38px] w-[38px]"
-                                  style={{
-                                    background: bellBlocked
-                                      ? "color-mix(in srgb, var(--signal-500) 14%, transparent)"
-                                      : "color-mix(in srgb, var(--ink) 7%, transparent)",
-                                    color: bellBlocked
-                                      ? "var(--danger-ink)"
-                                      : "var(--ink-muted)",
-                                  }}
-                                >
-                                  {bellBlocked ? (
-                                    <IconBan className="h-[18px] w-[18px]" />
-                                  ) : (
-                                    <IconBell className="h-[18px] w-[18px]" />
-                                  )}
-                                </span>
-                              )}
-                              {(bell.last_outcome || bellBlocked) && (
-                                <span
-                                  className="absolute -bottom-0.5 -right-0.5 grid h-[17px] w-[17px] place-items-center rounded-full border-2 text-white"
-                                  style={{
-                                    background: bellBlocked
-                                      ? "var(--signal-600)"
-                                      : outcomeColor(bell.last_outcome ?? ""),
-                                    borderColor: "var(--card)",
-                                  }}
-                                >
-                                  {bellBlocked ? (
-                                    <IconBan className="h-2.5 w-2.5" />
-                                  ) : (
-                                    <OutcomeGlyph
-                                      outcome={bell.last_outcome ?? ""}
-                                      reasonEmoji={null}
-                                      className="h-2.5 w-2.5"
-                                    />
-                                  )}
-                                </span>
-                              )}
-                            </span>
-
-                            <span className="min-w-0 flex-1">
-                              <span
-                                className="block truncate text-[15px] font-semibold"
-                                style={{
-                                  textDecoration:
-                                    bellDone && !bellBlocked ? "line-through" : undefined,
-                                  color: bellBlocked
-                                    ? "var(--danger-ink)"
-                                    : bellDone && !chosen
-                                      ? "var(--ink-muted)"
-                                      : undefined,
-                                }}
-                              >
-                                {bell.label}
-                              </span>
-                              <span className="muted block truncate text-[11px]">
-                                {bellBlocked
-                                  ? `gesperrt${
-                                      bell.blocked_by_name ? ` von ${bell.blocked_by_name}` : ""
-                                    }`
-                                  : bell.last_visit_at
-                                    ? [
-                                        bell.last_visit_user ?? "jemand",
-                                        whenLabel(bell.last_visit_at),
-                                        retry
-                                          ? `${facts.not_home_count}/${MAX_NOT_HOME_ATTEMPTS}`
-                                          : "",
-                                      ]
-                                        .filter(Boolean)
-                                        .join(" · ")
-                                    : "noch niemand hier"}
-                              </span>
-                            </span>
-
-                            {bell.floor && (
-                              <span className="muted shrink-0 text-[12px]">{bell.floor}</span>
-                            )}
-                            {isNext && <Pill tone="brand">weiter</Pill>}
-                            {chosen ? (
-                              <IconCheck className="h-5 w-5 shrink-0 text-tint" />
-                            ) : (
-                              <IconChevronRight className="h-4 w-4 shrink-0 opacity-25" />
-                            )}
-                          </button>
-
-                          {bellEdit && bell.id !== null && (
-                            <button
-                              type="button"
-                              className="icon-btn h-8 w-8 shrink-0"
-                              aria-label={`${bell.label} umbenennen`}
-                              onClick={() =>
-                                setEditing({
-                                  id: bell.id as number,
-                                  original: bell.label,
-                                  label: bell.label,
-                                  floor: bell.floor,
-                                })
-                              }
-                            >
-                              <IconPencil className="h-4 w-4" />
-                            </button>
-                          )}
-                          {bellEdit && !bellDone && (
-                            <>
-                              <button
-                                type="button"
-                                className="icon-btn h-8 w-8 shrink-0"
-                                aria-label={`${bell.label} sperren`}
-                                onClick={() => {
-                                  setBellLabel(bell.label);
-                                  setSheet("block");
-                                }}
-                              >
-                                <IconBan className="h-4 w-4" />
-                              </button>
-                              <button
-                                type="button"
-                                className="icon-btn h-8 w-8 shrink-0"
-                                aria-label={`${bell.label} entfernen`}
-                                onClick={() => void removeBell(bell)}
-                              >
-                                <IconX className="h-4 w-4" />
-                              </button>
-                            </>
-                          )}
-                          {bellBlocked && isLeader && (
-                            <button
-                              type="button"
-                              className="muted shrink-0 px-1.5 py-2 text-[11px] underline"
-                              onClick={() => {
-                                setBellLabel(bell.label);
-                                void setBlocked(false);
-                              }}
-                            >
-                              aufheben
-                            </button>
-                          )}
-                        </li>
-                      );
-                    })}
-                  </ul>
-                )}
-
-                {/* ---------------------- Schilder nachtragen --------------- */}
-                <div className="border-t" style={{ borderColor: "var(--line)" }}>
-                  <button
-                    type="button"
-                    onClick={() => setAddBellsOpen((value) => !value)}
-                    aria-expanded={addBellsOpen}
-                    className="list-row w-full px-4 py-2.5 text-[13px] font-semibold text-tint"
-                  >
-                    <IconPlus className="h-4 w-4" />
-                    <span className="flex-1">Schilder anlegen</span>
-                    <IconChevronDown
-                      className={`h-4 w-4 transition-transform ${addBellsOpen ? "rotate-180" : ""}`}
-                    />
-                  </button>
-
-                  {addBellsOpen && (
-                    <div className="rise px-4 pb-4">
-                      <label className="label" htmlFor="bell-names">
-                        Namen vom Klingelbrett
-                      </label>
-                      <textarea
-                        id="bell-names"
-                        className="textarea"
-                        rows={4}
-                        placeholder={"Müller, 2. OG\nSchmidt\nKaya, EG"}
-                        value={bellDraft}
-                        onChange={(e) => setBellDraft(e.target.value)}
-                      />
-                      <p className="muted mt-1 text-[11px]">
-                        Ein Name pro Zeile. Nach dem Komma darf die Etage stehen.
-                      </p>
-                      <button
-                        type="button"
-                        disabled={busy}
-                        className="btn btn-primary mt-2 w-full"
-                        onClick={submitBellDraft}
-                      >
-                        <IconPlus className="h-4 w-4" />
-                        Schilder anlegen
-                      </button>
-
-                      <div className="mt-4 flex items-end gap-2">
-                        <div className="w-24 shrink-0">
-                          <label className="label" htmlFor="bell-count">
-                            Anzahl
-                          </label>
-                          <input
-                            id="bell-count"
-                            className="input"
-                            inputMode="numeric"
-                            placeholder={suggestMfh ? String(currentHouse?.units) : "6"}
-                            value={bellCount}
-                            onChange={(e) => setBellCount(e.target.value.slice(0, 3))}
-                          />
-                        </div>
-                        <button
-                          type="button"
-                          disabled={busy}
-                          className="btn btn-ghost flex-1"
-                          onClick={submitBellCount}
-                        >
-                          Ohne Namen anlegen
-                        </button>
-                      </div>
-                      <p className="muted mt-1 text-[11px]">
-                        Legt „Klingel 1“, „Klingel 2“ … an – Namen kannst du später nachtragen.
-                      </p>
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {/* ========================== Einfamilienhaus ==================== */}
-            {currentType === "EFH" && (
-              <div className="card p-4">
-                <div className="flex items-center gap-3">
-                  <span className="relative shrink-0" aria-hidden>
-                    {houseFace ? (
-                      <Avatar name={houseFace.name} src={houseFace.avatar} size={44} />
-                    ) : (
-                      <span
-                        className="tile-icon h-11 w-11"
-                        style={{
-                          background: "color-mix(in srgb, var(--ink) 7%, transparent)",
-                          color: "var(--ink-muted)",
-                        }}
-                      >
-                        <IconDoor className="h-5 w-5" />
-                      </span>
-                    )}
-                    {lastWhat && (
-                      <span
-                        className="absolute -bottom-0.5 -right-0.5 grid h-[18px] w-[18px] place-items-center rounded-full border-2 text-white"
-                        style={{
-                          background: outcomeColor(lastWhat),
-                          borderColor: "var(--card)",
-                        }}
-                      >
-                        <OutcomeGlyph
-                          outcome={lastWhat}
-                          reasonEmoji={null}
-                          className="h-2.5 w-2.5"
-                        />
-                      </span>
-                    )}
-                  </span>
-                  <div className="min-w-0 flex-1">
-                    <p className="text-[15px] font-semibold">Haustür</p>
-                    <p className="muted text-[12px] leading-snug">
-                      {lastAt
-                        ? `Zuletzt ${lastBy ?? "jemand"}, ${whenLabel(lastAt)}${
-                            lastWhat ? ` · ${OUTCOME_LABEL[lastWhat]}` : ""
-                          }`
-                        : "Hier war noch niemand."}
-                    </p>
-                  </div>
-                  {houseRetry && (
-                    <Pill tone="warn">
-                      {currentDoorFacts.not_home_count}/{MAX_NOT_HOME_ATTEMPTS} Versuche
-                    </Pill>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {/* ============================ Haus fertig ====================== */}
-            {houseDone && (
-              <div
-                className="card rise p-4 text-center"
-                style={{
-                  borderColor: "color-mix(in srgb, var(--energy-500) 45%, var(--line))",
-                  background: "color-mix(in srgb, var(--energy-500) 7%, var(--card))",
-                }}
-              >
-                <span
-                  className="tile-icon mx-auto mb-2 h-11 w-11"
-                  style={{
-                    background: "color-mix(in srgb, var(--energy-500) 16%, transparent)",
-                    color: "var(--energy-700)",
-                  }}
-                  aria-hidden
-                >
-                  <IconCheck className="h-5 w-5" />
-                </span>
-                <p className="text-[16px] font-bold" style={{ color: "var(--energy-700)" }}>
-                  Haus fertig
-                </p>
-                <p className="muted mt-0.5 text-[12px]">
-                  {currentType === "MFH"
-                    ? "Alle Klingeln sind erfasst."
-                    : "Diese Tür ist abgearbeitet."}
-                </p>
-                <button type="button" className="btn btn-ghost mt-3 w-full" onClick={closeHouse}>
-                  <IconChevronLeft className="h-4 w-4" />
-                  Zurück zur Straße
-                  {nextOpenNumber ? ` · weiter mit Nr. ${nextOpenNumber}` : ""}
-                </button>
-              </div>
-            )}
-
-            {/* ========================= Ergebnis erfassen =================== */}
-            {currentType !== "" && (
-              <div className="card p-4">
-                {currentType === "MFH" && !activeBell ? (
-                  <Note icon={<IconBell className="h-4 w-4" />} tone="brand">
-                    {currentBells.length === 0
-                      ? "Erst die Klingelschilder anlegen – danach wird hier erfasst."
-                      : "Tippe oben die Klingel an, an der du stehst. Dann erscheinen hier die Ergebnisse."}
-                  </Note>
-                ) : (
-                  <>
-                    {/* An welcher Tür stehe ich gerade? */}
-                    <div className="mb-3 flex items-center gap-2.5">
-                      <span
-                        className="tile-icon h-9 w-9 shrink-0"
-                        style={{
-                          background: "color-mix(in srgb, var(--brand-500) 12%, transparent)",
-                          color: "var(--brand-600)",
-                        }}
-                        aria-hidden
-                      >
-                        {activeBell ? (
-                          <IconBell className="h-[18px] w-[18px]" />
-                        ) : (
-                          <IconDoor className="h-[18px] w-[18px]" />
-                        )}
-                      </span>
-                      <div className="min-w-0 flex-1">
-                        <p className="truncate text-[15px] font-semibold">
-                          {activeBell ? activeBell.label : "Haustür"}
-                        </p>
-                        <p className="muted truncate text-[11px]">
-                          {street.name} {currentNumber}
-                          {activeBell?.floor ? ` · ${activeBell.floor}` : ""}
-                        </p>
-                      </div>
-                      {currentDoorStatus === "RETRY" && (
-                        <Pill tone="warn">
-                          {currentDoorFacts.not_home_count}/{MAX_NOT_HOME_ATTEMPTS}
-                        </Pill>
-                      )}
-                    </div>
-
-                    <div className="mb-3.5">
-                      <p className="label">Produkt für den Abschluss</p>
-                      <Segmented
-                        options={PRODUCTS}
-                        value={product}
-                        onChange={chooseProduct}
-                        tone="brand"
-                        ariaLabel="Produkt für den Abschluss"
-                      />
-                    </div>
-
-                    <div className="grid grid-cols-3 gap-2">
-                      <OutcomeTile
-                        icon={<IconDoor className="h-[22px] w-[22px]" />}
-                        label="Nicht angetroffen"
-                        tone="neutral"
-                        disabled={busy}
-                        onClick={() => handleOutcome("NOT_HOME")}
-                      />
-                      <OutcomeTile
-                        icon={<IconPerson className="h-[22px] w-[22px]" />}
-                        label="Kein Abschluss"
-                        tone="danger"
-                        disabled={busy}
-                        onClick={() => handleOutcome("MET_NO_SALE")}
-                      />
-                      <OutcomeTile
-                        icon={<IconCalendar className="h-[22px] w-[22px]" />}
-                        label="Termin"
-                        tone="brand"
-                        disabled={busy}
-                        onClick={() => handleOutcome("APPOINTMENT")}
-                      />
-                    </div>
-
-                    <button
-                      type="button"
-                      disabled={busy}
-                      onClick={handleSale}
-                      className="btn btn-success btn-lg mt-2.5 w-full"
-                    >
-                      <IconCheck className="h-5 w-5" />
-                      Auftrag erfassen
-                      <IconArrowRight className="h-[18px] w-[18px]" />
-                    </button>
-                    <p className="muted mt-2 text-center text-[11px] leading-snug">
-                      Öffnet den Tarifrechner – Abschluss anschließend bestätigen.
-                    </p>
-
-                    {lastVisitId && (
-                      <button
-                        type="button"
-                        onClick={undo}
-                        className="btn btn-plain btn-sm mx-auto mt-2 flex"
-                      >
-                        <IconUndo className="h-4 w-4" />
-                        Letzten Eintrag rückgängig machen
-                      </button>
-                    )}
-                  </>
-                )}
-              </div>
-            )}
-          </>
-        )}
-
-        <PendingSales userId={userId} onProgress={receiveProgress} />
-        {overlays}
-      </div>
-    );
+  const status = statusLine();
+  function statusLine(): DoorStatusLine | null {
+    if (!currentNumber) return null;
+    const facts = doorFacts;
+    if (doorStatus(facts) === "BLOCKED" || houseFacts.blocked_at) {
+      const by = activeBell?.blocked_by_name ?? currentHouse?.blocked_by_name ?? null;
+      return {
+        glyph: <IconBan className="h-4 w-4 text-danger" />,
+        text: by ? `Gesperrt von ${by}` : "Gesperrt",
+      };
+    }
+    const lastAt = activeBell ? activeBell.last_visit_at : (currentHouse?.last_visit_at ?? null);
+    const lastBy = activeBell ? activeBell.last_visit_user : (currentHouse?.last_visit_user ?? null);
+    const lastWhat = activeBell ? activeBell.last_outcome : (currentHouse?.last_outcome ?? null);
+    const last = lastAt ? `${lastBy ? firstName(lastBy) : "Jemand"}, ${whenLabel(lastAt)}` : null;
+    if (currentType === "MFH" && !activeBell) return null;
+    if (doorStatus(facts) === "RETRY") {
+      return { text: [`${facts.not_home_count}. Versuch von ${MAX_NOT_HOME_ATTEMPTS}`, last].filter(Boolean).join(" · ") };
+    }
+    if (doorFinished(facts) && lastWhat) {
+      return {
+        glyph: <OutcomeGlyph outcome={lastWhat} size="sm" />,
+        text: [OUTCOME_LABEL[lastWhat], last].filter(Boolean).join(" · "),
+      };
+    }
+    if (doorFinished(facts)) return { glyph: <IconCheck className="h-4 w-4" />, text: "Erledigt" };
+    return { text: last ? `Zuletzt ${last}` : "Noch niemand hier" };
   }
 
-  /* ======================================================================== */
-  /*  Straßen-Bildschirm: wo bin ich, und welches Haus kommt als Nächstes     */
-  /* ======================================================================== */
+  const doneBells = currentBells.filter((bell) => book.isBellDone(currentKey, bell)).length;
+  const detail =
+    currentType === "MFH"
+      ? currentBells.length > 0
+        ? `Mehrfamilienhaus · ${doneBells} von ${currentBells.length} Klingeln`
+        : "Mehrfamilienhaus · noch keine Schilder"
+      : suggestMfh
+        ? `${currentHouse?.units} Wohneinheiten`
+        : null;
+
+  const chips: HouseChip[] = houses
+    .filter((house) => !onlyOpen || !book.isDone(house) || sameNumber(house.number, currentNumber))
+    .map((house) => {
+      const key = doneKey(house.street_id, house.number);
+      const mfh = book.typeOf(house) === "MFH";
+      const bells = mfh ? book.bellsOf(key, house.id) : [];
+      const facts = book.factsOf(key, house);
+      const blocked = Boolean(facts.blocked_at);
+      const done = book.isDone(house);
+      const retry = !mfh && doorStatus(facts) === "RETRY";
+      const state: ChipState = blocked
+        ? "blocked"
+        : house.sale_count > 0
+          ? "sale"
+          : house.last_outcome === "APPOINTMENT"
+            ? "appointment"
+            : done
+              ? "done"
+              : retry
+                ? "retry"
+                : "open";
+      const suffix = mfh
+        ? bells.length > 0
+          ? `${bells.filter((bell) => book.isBellDone(key, bell)).length}/${bells.length}`
+          : undefined
+        : retry
+          ? `${facts.not_home_count}/${MAX_NOT_HOME_ATTEMPTS}`
+          : undefined;
+      return {
+        id: house.id,
+        number: house.number,
+        state,
+        suffix,
+        needsBells: mfh && bells.length === 0,
+        label: `Hausnummer ${house.number}${blocked ? ", gesperrt" : ""}${done && !blocked ? ", erledigt" : ""}${
+          suffix ? `, ${suffix}` : ""
+        }`,
+      };
+    });
+
+  const bellRows: BellRow[] = currentBells.map((bell) => ({
+    bell,
+    facts: book.bellFacts(currentKey, bell),
+    done: book.isBellDone(currentKey, bell),
+  }));
+
+  const streetDone = houses.length > 0 && openHouses.length === 0 && !currentNumber;
+  const nextStreet = streetsOfTerritory.find((s) => s.id !== streetId && (progress.get(s.id)?.open ?? 0) > 0) ?? null;
+
+  const lastLine = (() => {
+    const at = currentHouse?.last_visit_at;
+    if (!at) return null;
+    return `${currentHouse?.last_visit_user ?? "Jemand"}, ${whenLabel(at)}`;
+  })();
 
   return (
-    <div className="mx-auto max-w-2xl space-y-3">
-      {/* ---------------------------- Netz & Puffer ------------------------- */}
-      <PendingSales userId={userId} onProgress={receiveProgress} />
-      <LevelCard progress={level} compact href="/level" />
-      {(!online || pending.length > 0) && (
-        <div
-          className="card rise flex items-center gap-3 px-3.5 py-2.5"
-          style={{ borderColor: "color-mix(in srgb, var(--gas-500) 45%, var(--line))" }}
-        >
-          <span
-            className="tile-icon h-9 w-9"
-            style={{
-              background: "color-mix(in srgb, var(--gas-500) 16%, transparent)",
-              color: "var(--gas-600)",
-            }}
-            aria-hidden
-          >
-            {online ? <IconCloudUp className="h-5 w-5" /> : <IconOffline className="h-5 w-5" />}
-          </span>
-          <div className="min-w-0 flex-1">
-            <p className="text-[13px] font-semibold leading-tight">
-              {pending.length > 0
-                ? `${pending.length} ${pending.length === 1 ? "Eintrag wartet" : "Einträge warten"}`
-                : "Kein Netz"}
-            </p>
-            <p className="muted text-[11px] leading-tight">
-              Erfassen geht weiter – die App sendet alles automatisch nach.
-            </p>
-          </div>
-          {pending.length > 0 && online && (
-            <button type="button" onClick={sendPendingNow} className="btn btn-ghost btn-sm shrink-0">
-              Jetzt senden
-            </button>
-          )}
-        </div>
-      )}
+    <div className="mx-auto max-w-xl lg:grid lg:max-w-5xl lg:grid-cols-[minmax(0,1fr)_400px] lg:items-start lg:gap-8">
+      <div className="lg:col-span-2">
+        <TourHeader
+          street={street}
+          territory={territory}
+          todayDoors={todayTotals.doors ?? 0}
+          dueCount={dueAppointments.length}
+          pendingCount={pending.length}
+          online={online}
+          onStreet={() => setSheet("street")}
+          onDay={() => setSheet("day")}
+        />
+      </div>
 
-      {/* ------------------------------ Tagesstand -------------------------- */}
-      <StatGroup
-        items={[
-          { label: "Türen heute", value: todayTotals.doors ?? 0 },
-          {
-            label: "Angetroffen",
-            value: todayTotals.met ?? 0,
-            tone: "brand",
-            hint: todayTotals.doors
-              ? `${Math.round(((todayTotals.met ?? 0) / todayTotals.doors) * 100)} % Quote`
-              : undefined,
-          },
-          { label: "Abschlüsse", value: todayTotals.sales ?? 0, tone: "success" },
-        ]}
-      />
-
-      {/* Termine, die heute anstehen - der Rueckweg gehoert an den Anfang. */}
-      {dueAppointments.length > 0 && (
-        <div className="card overflow-hidden">
-          <div className="flex items-center gap-2 px-4 pb-2 pt-3">
-            <IconCalendar className="h-4 w-4 text-tint" />
-            <p className="flex-1 text-[13px] font-semibold">
-              {dueAppointments.length === 1 ? "1 Termin" : `${dueAppointments.length} Termine`}{" "}
-              heute
-            </p>
-            <Link
-              href="/termine"
-              className="shrink-0 text-[12px] font-semibold text-tint hover:underline"
-            >
-              Alle Termine
-            </Link>
-          </div>
-          <ul>
-            {dueAppointments.slice(0, 3).map((item) => {
+      {/* Rechts auf dem Rechner, oben auf dem Handy: die Tuer selbst. */}
+      <div className="space-y-4 lg:sticky lg:top-6 lg:col-start-2 lg:row-start-2">
+        {dueAppointments.length > 0 && (
+          <ul className="list list-icons" aria-label="Termine heute">
+            {dueAppointments.slice(0, 2).map((item) => {
               const late = slotOverdue(item.follow_up_at, now ?? undefined);
+              const phone = item.contact_phone.replace(/[^+\d]/g, "");
               return (
-                <li
-                  key={item.id}
-                  className="flex items-center gap-1 border-t"
-                  style={{ borderColor: "var(--line)" }}
-                >
+                <li key={item.id} className="cell pr-2">
                   <button
                     type="button"
+                    className="flex min-w-0 flex-1 items-center gap-3 text-left"
                     onClick={() => goToAppointment(item)}
-                    className="list-row min-w-0 flex-1"
                   >
-                    <span
-                      className="shrink-0 rounded-lg px-2 py-1 text-[12px] font-bold tabular-nums"
-                      style={{
-                        background: late
-                          ? "color-mix(in srgb, var(--signal-500) 15%, transparent)"
-                          : "color-mix(in srgb, var(--brand-500) 14%, transparent)",
-                        color: late ? "var(--danger-ink)" : "var(--tint)",
-                      }}
-                    >
-                      {slotLabel(item.follow_up_at, now ?? undefined)}
+                    <span className="glyph glyph-round">
+                      <IconCalendar className="h-4 w-4" />
                     </span>
-                    {/* Der Name steht vorn: die Strasse kennt man, den Kunden
-                        muss man wiedererkennen. */}
                     <span className="min-w-0 flex-1">
-                      <span className="block truncate text-[14px] font-medium">
-                        {item.contact_name || "Termin"}
-                      </span>
-                      <span className="muted block truncate text-[12px]">
-                        {item.street_name ?? ""} {item.house_number}
-                        {item.doorbell_label ? ` · ${item.doorbell_label}` : ""}
+                      <span className="block truncate text-body">{item.contact_name || "Termin"}</span>
+                      <span className="block truncate text-footnote text-muted">
+                        {late && <span className="font-semibold text-danger">Überfällig · </span>}
+                        {slotLabel(item.follow_up_at, now ?? undefined)} · {item.street_name ?? ""} {item.house_number}
                       </span>
                     </span>
-                    <IconChevronRight className="h-4 w-4 shrink-0 opacity-35" />
                   </button>
-                  {item.contact_phone && (
-                    <a
-                      href={`tel:${item.contact_phone.replace(/[^+\d]/g, "")}`}
-                      className="icon-btn mr-2 shrink-0"
-                      style={{ color: "var(--brand-600)" }}
-                      aria-label={`${item.contact_name || "Kunde"} anrufen`}
-                    >
-                      <IconPhone className="h-[18px] w-[18px]" />
+                  {phone && (
+                    <a href={`tel:${phone}`} className="icon-btn icon-btn-fill" aria-label={`${item.contact_name || "Kunde"} anrufen`}>
+                      <IconPhone className="h-5 w-5" />
                     </a>
                   )}
                 </li>
               );
             })}
           </ul>
-        </div>
-      )}
-
-      {/* ============================ Straße und Haus ======================= */}
-      <div className="card overflow-hidden">
-        <div className="flex items-center gap-1 pr-2">
-          <button
-            type="button"
-            onClick={() => {
-              setStreetQuery("");
-              setSheet("street");
-            }}
-            className="list-row min-w-0 flex-1 px-4 py-3"
-          >
-            <span
-              className="tile-icon h-10 w-10 shrink-0"
-              style={{
-                background: "color-mix(in srgb, var(--brand-500) 13%, transparent)",
-                color: "var(--brand-600)",
-              }}
-              aria-hidden
-            >
-              <IconMap />
-            </span>
-            <span className="min-w-0 flex-1">
-              <span className="block truncate text-[16px] font-semibold">
-                {street ? street.name : "Straße wählen"}
-              </span>
-              <span className="muted block truncate text-[12px]">
-                {territory
-                  ? [territory.name, [territory.postal_code, territory.city].filter(Boolean).join(" ")]
-                      .filter(Boolean)
-                      .join(" · ")
-                  : "Gebiet wählen"}
-              </span>
-            </span>
-            {street && street.visit_count > 0 && (
-              <Pill tone="neutral">
-                <span className="tabular-nums">{street.visit_count}</span> Türen
-              </Pill>
-            )}
-            <IconChevronDown className="muted h-4 w-4 shrink-0" />
-          </button>
-          {/* Kommt die Strasse aus der Kartenauswahl, fuehrt der Pfeil direkt hin. */}
-          {street?.lat != null && street?.lng != null && (
-            <a
-              href={routeUrl(street.lat, street.lng)}
-              target="_blank"
-              rel="noreferrer"
-              className="icon-btn shrink-0"
-              style={{ color: "var(--brand-600)" }}
-              title={`Route zur ${street.name}`}
-              aria-label={`Route zur ${street.name}`}
-            >
-              <IconNavigate className="h-[18px] w-[18px]" />
-            </a>
-          )}
-        </div>
-
-        {/* Grundversorger des Gebiets: Preis und Einstufung gleich im Blick. */}
-        {territory && (
-          <ProviderLine
-            info={territory.provider}
-            className="border-t px-4 py-2.5 [border-color:var(--line)]"
-          />
         )}
 
-        {/* Hausnummer eintippen und öffnen */}
-        <div className="border-t px-4 py-3.5" style={{ borderColor: "var(--line)" }}>
-          <label className="label" htmlFor="house">
-            Hausnummer
-          </label>
-          <div className="flex gap-2">
-            <input
-              id="house"
-              className="input text-[22px] font-bold tabular-nums"
-              inputMode="numeric"
-              autoComplete="off"
-              placeholder="12a"
-              value={houseNumber}
-              onChange={(e) => setHouseNumber(e.target.value.slice(0, 12))}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && streetId && houseNumber.trim()) {
-                  e.preventDefault();
-                  openTypedHouse();
-                }
-              }}
-              enterKeyHint="go"
-              disabled={!streetId}
-            />
-            <button
-              type="button"
-              className="btn btn-primary shrink-0 px-5"
-              disabled={!streetId || !currentNumber}
-              onClick={openTypedHouse}
-            >
-              Öffnen
-              <IconArrowRight className="h-4 w-4" />
-            </button>
-          </div>
+        <PendingSales userId={userId} onProgress={receiveProgress} />
 
-          {!streetId && (
-            <p className="muted mt-2 text-[11px]">
-              Wähle oben zuerst die Straße – danach zählt die App die Häuser mit.
-            </p>
-          )}
-
-          {houses.length > 0 && (
-            <div className="mt-3">
-              <div className="mb-1.5 flex items-center gap-2">
-                <p className="muted flex-1 text-[11px] font-semibold tabular-nums">
-                  {openHouses} von {houses.length} Häusern offen
-                </p>
-                {nextOpenNumber && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const next = houses.find((house) => !isDone(house));
-                      if (next) openHouse(next);
-                    }}
-                    className="badge"
-                    style={{
-                      background: "color-mix(in srgb, var(--brand-500) 14%, transparent)",
-                      color: "var(--brand-600)",
-                    }}
-                  >
-                    nächste offene · {nextOpenNumber}
+        <DoorHero
+          number={currentNumber || null}
+          bell={activeBell ? { label: activeBell.label, floor: activeBell.floor } : null}
+          status={status}
+          detail={detail}
+          canPrev={houses.length > 0 && currentIndex !== 0}
+          canNext={houses.length > 0 && currentIndex < houses.length - 1}
+          onPrev={() => step(-1)}
+          onNext={() => step(1)}
+          onOpen={() => setSheet("house")}
+          onType={() => setSheet("number")}
+          empty={
+            streetDone ? (
+              <div className="flex flex-col items-center gap-2">
+                <span className="glyph glyph-lg glyph-round glyph-result check-pop">
+                  <IconCheck className="h-6 w-6" />
+                </span>
+                <p className="text-title-3">Straße erledigt</p>
+                {nextStreet && (
+                  <button type="button" className="btn btn-primary btn-sm" onClick={() => chooseStreet(nextStreet.id)}>
+                    Weiter: {nextStreet.name}
                   </button>
                 )}
-                <button
-                  type="button"
-                  onClick={() => setOnlyOpen((value) => !value)}
-                  className="badge"
-                  aria-pressed={onlyOpen}
-                  style={{
-                    background: onlyOpen
-                      ? "color-mix(in srgb, var(--brand-500) 14%, transparent)"
-                      : "color-mix(in srgb, var(--ink) 7%, transparent)",
-                    color: onlyOpen ? "var(--tint)" : "var(--ink-muted)",
-                  }}
-                >
-                  nur offene
-                </button>
               </div>
-              <ul className="flex max-h-32 flex-wrap gap-1.5 overflow-y-auto pb-0.5">
-                {shownHouses.map((house) => {
-                  const done = isDone(house);
-                  const active = sameNumber(house.number, houseNumber);
-                  const key = doneKey(house.street_id, house.number);
-                  const mfh = typeOf(house) === "MFH";
-                  const bells = mfh ? bellsOf(key, house.id) : [];
-                  const bellsDone = bells.filter((bell) => isBellDone(key, bell)).length;
-                  const facts = factsOf(key, house);
-                  const blocked = Boolean(facts.blocked_at);
-                  // Gelb heisst: hier war schon jemand, aber es ist noch offen.
-                  const retry = !blocked && !mfh && doorStatus(facts) === "RETRY";
-                  const badge: ReactNode = blocked ? (
-                    <IconBan className="inline h-3 w-3 align-[-1px]" />
-                  ) : mfh ? (
-                    bells.length > 0 ? (
-                      `${bellsDone}/${bells.length}`
-                    ) : (
-                      <IconBell className="inline h-3 w-3 align-[-1px]" />
-                    )
-                  ) : retry ? (
-                    `${facts.not_home_count}/${MAX_NOT_HOME_ATTEMPTS}`
-                  ) : (
-                    ""
-                  );
-                  const wasHere = house.last_visit_user
-                    ? `${house.last_visit_user}, ${whenLabel(house.last_visit_at)}`
-                    : "";
-                  return (
-                    <li key={house.id}>
-                      <button
-                        type="button"
-                        onClick={() => openHouse(house)}
-                        className="rounded-[var(--r-xs)] border px-2.5 py-1.5 text-sm font-semibold tabular-nums transition active:scale-95"
-                        style={{
-                          borderColor: active
-                            ? "var(--brand-600)"
-                            : blocked
-                              ? "var(--signal-500)"
-                              : retry
-                                ? "var(--gas-500)"
-                                : "var(--line)",
-                          background: active
-                            ? "color-mix(in srgb, var(--brand-500) 16%, transparent)"
-                            : blocked
-                              ? "color-mix(in srgb, var(--signal-500) 14%, transparent)"
-                              : retry
-                                ? "color-mix(in srgb, var(--gas-500) 14%, transparent)"
-                                : done
-                                  ? "color-mix(in srgb, var(--ink) 7%, transparent)"
-                                  : "var(--card)",
-                          color: blocked
-                            ? "var(--signal-600)"
-                            : done && !active
-                              ? "var(--ink-muted)"
-                              : "var(--ink)",
-                          boxShadow: active ? "0 0 0 1px var(--brand-600)" : undefined,
-                          textDecoration: done && !blocked ? "line-through" : undefined,
-                        }}
-                        title={[
-                          blocked ? "Gesperrt – nicht mehr anlaufen" : null,
-                          mfh ? "Mehrfamilienhaus" : null,
-                          mfh && bells.length > 0
-                            ? `${bellsDone} von ${bells.length} Klingeln`
-                            : null,
-                          retry
-                            ? `${facts.not_home_count}. Versuch von ${MAX_NOT_HOME_ATTEMPTS}`
-                            : null,
-                          wasHere ? `zuletzt: ${wasHere}` : null,
-                          house.units > 1 ? `${house.units} Wohneinheiten` : null,
-                        ]
-                          .filter(Boolean)
-                          .join(" · ") || undefined}
-                        aria-label={`Hausnummer ${house.number} öffnen${
-                          blocked ? ", gesperrt" : ""
-                        }${
-                          mfh
-                            ? `, Mehrfamilienhaus mit ${bellsDone} von ${bells.length} erfassten Klingeln`
-                            : retry
-                              ? `, ${facts.not_home_count} von ${MAX_NOT_HOME_ATTEMPTS} Versuchen`
-                              : ""
-                        }${wasHere ? `, zuletzt ${wasHere}` : ""}${
-                          done && !blocked ? ", abgearbeitet" : ""
-                        }`}
-                      >
-                        {house.number}
-                        {badge && (
-                          <span className="ml-1 text-[10px] font-medium opacity-70">{badge}</span>
-                        )}
-                      </button>
-                    </li>
-                  );
-                })}
-              </ul>
-            </div>
-          )}
-        </div>
+            ) : !street ? (
+              <button type="button" className="btn btn-primary" onClick={() => setSheet("street")}>
+                Straße wählen
+              </button>
+            ) : (
+              <button type="button" className="kpi text-title-1 text-muted" onClick={() => setSheet("number")}>
+                Nr. eingeben
+              </button>
+            )
+          }
+        />
+
+        {currentNumber && currentType === "" && suggestMfh && !doorLocked && (
+          <div className="grid grid-cols-2 gap-2">
+            <button type="button" className="btn btn-secondary" onClick={() => void chooseType("EFH")}>
+              Einzeltür
+            </button>
+            <button type="button" className="btn btn-primary" onClick={() => void chooseType("MFH")}>
+              Mehrfamilienhaus
+            </button>
+          </div>
+        )}
+        {currentNumber && currentType === "MFH" && currentBells.length === 0 && !doorLocked && (
+          <button type="button" className="btn btn-primary btn-block" onClick={() => setSheet("house")}>
+            Klingelschilder anlegen
+          </button>
+        )}
+
+        <OutcomeTray
+          disabled={busy || trayHint !== null}
+          hint={trayHint}
+          onNotHome={() => void notHome()}
+          onMet={() => setSheet("reason")}
+          onAppointment={() => setSheet("appointment")}
+          onSale={() => setSheet("sale")}
+        />
       </div>
 
-      {/* Letzte Einträge – wartende zuerst */}
-      {(pending.length > 0 || recent.length > 0) && (
-        <div className="card overflow-hidden">
-          <p className="px-4 pb-1.5 pt-3 text-[13px] font-semibold">Zuletzt erfasst</p>
-          <ul>
-            {pending.map((item) => (
-              <li
-                key={item.localId}
-                className="flex items-center gap-2.5 border-t px-4 py-2.5 text-sm"
-                style={{ borderColor: "var(--line)" }}
-              >
-                <span
-                  className="tile-icon h-7 w-7 shrink-0"
-                  style={{
-                    background: "color-mix(in srgb, var(--gas-500) 15%, transparent)",
-                    color: "var(--gas-600)",
-                  }}
-                  aria-hidden
-                >
-                  {item.kind === "house" ? (
-                    <IconBuilding className="h-4 w-4" />
-                  ) : (
-                    <IconClock className="h-4 w-4" />
-                  )}
-                </span>
-                <span className="min-w-0 flex-1 truncate text-[13px]">{item.label}</span>
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (!removeQueued(item.localId)) setToast("Eintrag konnte nicht aus dem Gerätespeicher entfernt werden.");
-                  }}
-                  className="muted shrink-0 text-[11px] font-semibold underline"
-                >
-                  verwerfen
-                </button>
-              </li>
-            ))}
-            {recent.map((v) => (
-              <li
-                key={v.id}
-                className="flex items-center gap-2.5 border-t px-4 py-2.5"
-                style={{ borderColor: "var(--line)" }}
-              >
-                <span
-                  className="tile-icon h-7 w-7 shrink-0"
-                  style={{
-                    background: `color-mix(in srgb, ${outcomeColor(v.outcome)} 14%, transparent)`,
-                    color: outcomeColor(v.outcome),
-                  }}
-                  aria-hidden
-                >
-                  <OutcomeGlyph
-                    outcome={v.outcome}
-                    reasonEmoji={v.reason_emoji}
-                    className="h-4 w-4"
-                  />
-                </span>
-                <span className="min-w-0 flex-1 truncate text-[13px]">
-                  {v.street_name ?? "–"} {v.house_number}
-                  {v.reason_label && <span className="muted"> · {v.reason_label}</span>}
-                </span>
-                <span className="muted shrink-0 text-[11px] tabular-nums">
-                  {formatTime(v.created_at)}
-                </span>
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
+      <div className="mt-6 space-y-6 lg:col-start-1 lg:row-start-2 lg:mt-0">
+        {currentType === "MFH" && currentBells.length > 0 && (
+          <BellBoard
+            rows={bellRows}
+            selected={bellLabel}
+            next={nextOpenBell?.label ?? null}
+            faceOf={faceOf}
+            onPick={setBellLabel}
+            onEdit={() => setSheet("house")}
+          />
+        )}
+        {houses.length > 0 && (
+          <HouseStrip
+            chips={chips}
+            current={currentNumber || null}
+            openCount={openHouses.length}
+            onlyOpen={onlyOpen}
+            onToggleOpen={() => setOnlyOpen((value) => !value)}
+            onPick={pickHouse}
+          />
+        )}
+        <div className="tray-space" aria-hidden="true" />
+      </div>
 
-      {overlays}
+      {sheet === "street" && (
+        <StreetSheet
+          territories={territories}
+          territoryId={territoryId}
+          streets={streetsOfTerritory}
+          streetId={streetId}
+          progress={progress}
+          onTerritory={(id) => setTerritoryId(id)}
+          onPick={(id) => {
+            chooseStreet(id);
+            setSheet(null);
+          }}
+          onClose={() => setSheet(null)}
+        />
+      )}
+      {sheet === "reason" && (
+        <ReasonSheet
+          place={place}
+          reasons={reasons}
+          busy={busy}
+          onPick={(reason, note) => void chooseReason(reason, note)}
+          onClose={() => setSheet(null)}
+        />
+      )}
+      {sheet === "appointment" && (
+        <AppointmentSheet
+          place={place}
+          contact={activeBell?.label ?? ""}
+          now={now}
+          busy={busy}
+          onSubmit={(values) => void submitAppointment(values)}
+          onClose={() => setSheet(null)}
+        />
+      )}
+      {sheet === "sale" && (
+        <SaleSheet place={place} product={product} busy={busy} onPick={startSale} onClose={() => setSheet(null)} />
+      )}
+      {sheet === "house" && currentNumber && (
+        <HouseSheet
+          title={`${street?.name ?? ""} ${currentNumber}`}
+          type={currentType}
+          units={currentHouse?.units ?? 0}
+          bells={currentBells.map((bell) => ({
+            bell,
+            done: book.isBellDone(currentKey, bell),
+            blocked: Boolean(book.bellFacts(currentKey, bell).blocked_at),
+          }))}
+          lastLine={lastLine}
+          attempts={houseFacts.not_home_count}
+          blocked={Boolean(houseFacts.blocked_at)}
+          blockedBy={currentHouse?.blocked_by_name ?? null}
+          canUnblock={canUnblock}
+          route={currentHouse?.lat != null && currentHouse?.lng != null ? routeUrl(currentHouse.lat, currentHouse.lng, "walk") : null}
+          busy={busy}
+          onType={(type) => void chooseType(type)}
+          onAddBells={(entries) => void addBells(entries)}
+          onAddCount={(count) => void addBells(numberedBells(count, currentBells.map((bell) => bell.label)))}
+          onRename={(bell, label, floor) => void renameBell(bell, label, floor)}
+          onRemoveBell={(bell) => void removeBell(bell)}
+          onBlockBell={(bell) => {
+            setBlockTarget(bell);
+            setSheet("block");
+          }}
+          onUnblockBell={(bell) => void setBlocked(bell, false)}
+          onBlock={() => {
+            setBlockTarget("house");
+            setSheet("block");
+          }}
+          onUnblock={() => void setBlocked("house", false)}
+          onClose={() => setSheet(null)}
+        />
+      )}
+      {sheet === "block" && blockTarget && (
+        <BlockSheet
+          target={blockTarget === "house" ? `${street?.name ?? ""} ${currentNumber}` : `„${blockTarget.label}“`}
+          busy={busy}
+          onConfirm={(note) => void setBlocked(blockTarget, true, note)}
+          onClose={() => {
+            setSheet(null);
+            setBlockTarget(null);
+          }}
+        />
+      )}
+      {sheet === "day" && (
+        <DaySheet
+          totals={todayTotals}
+          level={level}
+          pending={pending}
+          online={online}
+          recent={recent}
+          onSend={() => void sendNow()}
+          onDiscard={(localId) => {
+            if (!removeQueued(localId)) toast("Eintrag konnte nicht entfernt werden");
+          }}
+          onClose={() => setSheet(null)}
+        />
+      )}
+      {sheet === "number" && (
+        <NumberSheet
+          suggestions={numberSuggestions(lastTyped || currentNumber)}
+          onOpen={(number) => {
+            pickHouse(number);
+            setSheet(null);
+          }}
+          onClose={() => setSheet(null)}
+        />
+      )}
     </div>
   );
-}
-
-
-/** Eine der drei Ergebnis-Kacheln an der Tuer. */
-function OutcomeTile({
-  icon,
-  label,
-  tone,
-  disabled,
-  onClick,
-}: {
-  icon: ReactNode;
-  label: string;
-  tone: "neutral" | "brand" | "danger";
-  disabled?: boolean;
-  onClick: () => void;
-}) {
-  const color =
-    tone === "brand"
-      ? "var(--tint)"
-      : tone === "danger"
-        ? "var(--danger-ink)"
-        : "var(--ink-2)";
-  return (
-    <button
-      type="button"
-      disabled={disabled}
-      onClick={onClick}
-      className="tap-tile text-[13px]"
-    >
-      <span
-        className="tile-icon h-11 w-11"
-        style={{ background: `color-mix(in srgb, ${color} 12%, transparent)`, color }}
-        aria-hidden
-      >
-        {icon}
-      </span>
-      {label}
-    </button>
-  );
-}
-
-/** Farbe eines Ergebnisses - dieselbe in Liste, Klingelbrett und Verlauf. */
-function outcomeColor(outcome: string): string {
-  if (outcome === "SALE") return "var(--energy-600)";
-  if (outcome === "APPOINTMENT") return "var(--brand-600)";
-  if (outcome === "NOT_HOME") return "var(--ink-muted)";
-  return "var(--signal-600)";
-}
-
-/**
- * Zeichen eines Ergebnisses. Der Ablehnungsgrund bringt sein eigenes Emoji
- * mit - das stammt aus den Einstellungen des Teams und bleibt deshalb stehen.
- */
-function OutcomeGlyph({
-  outcome,
-  reasonEmoji,
-  className,
-}: {
-  outcome: string;
-  reasonEmoji: string | null;
-  className?: string;
-}) {
-  if (outcome === "SALE") return <IconCheck className={className} />;
-  if (outcome === "APPOINTMENT") return <IconCalendar className={className} />;
-  if (outcome === "NOT_HOME") return <IconDoor className={className} />;
-  if (reasonEmoji) return <span className="text-[13px] leading-none">{reasonEmoji}</span>;
-  return <IconPerson className={className} />;
-}
-
-const EMPTY_VISITS: Map<string, LocalVisits> = new Map();
-
-/** Schluessel einer einzelnen Klingel in den Merklisten dieser Sitzung. */
-function bellSlot(houseKey: string, label: string): string {
-  return `${houseKey}:${bellKey(label)}`;
-}
-
-/** Schluessel eines Hauses in den Merklisten dieser Sitzung. */
-function doneKey(streetId: number, number: string): string {
-  return `${streetId}:${number.trim().replace(/\s+/g, "").toLowerCase()}`;
-}
-
-/** Zwei Hausnummern meinen dasselbe Haus - Leerzeichen und Grossschreibung egal. */
-function sameNumber(a: string, b: string): boolean {
-  return (
-    a.trim().replace(/\s+/g, "").toLowerCase() ===
-    b.trim().replace(/\s+/g, "").toLowerCase()
-  );
-}
-
-function formatTime(value: string): string {
-  const date = new Date(`${value.replace(" ", "T")}Z`);
-  return date.toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" });
 }

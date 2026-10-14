@@ -1,7 +1,8 @@
+import Link from "next/link";
+import { notFound } from "next/navigation";
 import { handoverSummary } from "@/lib/territory-handover";
 import { TerritoryHandover } from "@/components/TerritoryHandover";
 import { canAccessTerritory, permissionsFor, structureIds } from "@/lib/permissions";
-import { notFound } from "next/navigation";
 import { requireUser } from "@/lib/auth";
 import { getDb } from "@/lib/db";
 import { doorStatus } from "@/lib/doors";
@@ -17,26 +18,38 @@ import {
 } from "@/lib/queries";
 import { readArea, readShape } from "@/lib/geo/area";
 import { providerLookup } from "@/lib/energy/provider";
-import { ProviderCard } from "@/components/ProviderRating";
-import {
-  Note,
-  OutcomeIcon,
-  PageHeader,
-  ProgressBar,
-  SectionHeader,
-  StatusBadge,
-  percent,
-} from "@/components/ui";
-import { IconInfo } from "@/components/icons";
+import { ProviderSummary } from "@/components/ProviderRating";
+import { HourBars } from "@/components/charts";
+import { EmptyState, ListLabel, Notice, OutcomeGlyph, PageHeader, StatGrid, percent } from "@/components/ui";
+import { IconDoor, IconInfo, IconMap } from "@/components/icons";
 import { sqlDateTime } from "@/lib/format";
+import { progressShare, territoryProgress } from "@/lib/progress";
 import { ShowMore } from "@/components/ShowMore";
+import { TerritoryActions, AreaSetupButton } from "./TerritoryActions";
 import { TerritoryControls } from "./TerritoryControls";
-import { TerritoryAreaCard } from "./TerritoryAreaCard";
-import type { DoorState, HourBucket, WorkDoor, WorkStreet } from "./TerritoryWorkspace";
+import {
+  TerritoryWorkspace,
+  type DoorState,
+  type HourBucket,
+  type WorkDoor,
+  type WorkStreet,
+} from "./TerritoryWorkspace";
 import { StreetList } from "./StreetList";
 
 export const dynamic = "force-dynamic";
 
+const STATUS_LABEL: Record<string, string> = {
+  OPEN: "Offen",
+  ACTIVE: "In Arbeit",
+  PAUSED: "Pausiert",
+  DONE: "Fertig",
+};
+
+/**
+ * Ein Gebiet: oben die Arbeitskarte mit der naechsten offenen Tuer, daneben
+ * (auf dem Handy darunter) wer dran ist, der Stand, die Strassen. Selten
+ * Gebrauchtes steckt im Menue oben rechts.
+ */
 export default async function TerritoryDetailPage({
   params,
 }: {
@@ -54,7 +67,11 @@ export default async function TerritoryDetailPage({
 
   const streets = listStreets(territory.id);
   const ids = new Set([user.id, ...structureIds(user)]);
-  const members = rights["territories.assign"] ? listMembers(user.team_id).filter((member) => rights["territories.view_all"] || ids.has(member.id) || member.id === territory.assigned_user_id) : [];
+  const members = rights["territories.assign"]
+    ? listMembers(user.team_id).filter(
+        (member) => rights["territories.view_all"] || ids.has(member.id) || member.id === territory.assigned_user_id,
+      )
+    : [];
   const visits = listVisits(user.team_id, { territoryId: territory.id, limit: 30 });
 
   // Hausnummern je Strasse - aus der Kartenauswahl uebernommen.
@@ -129,154 +146,145 @@ export default async function TerritoryDetailPage({
 
   const hours = hourBuckets(territory.id);
   const handover = handoverSummary(territory);
+  const hasMap = Boolean(area) || doors.length > 0 || workStreets.length > 0;
+  // Losgehen: die erste Strasse, die noch nicht fertig ist.
+  const startStreet = streets.find((s) => s.status !== "DONE") ?? null;
+  const place = [territory.postal_code, territory.city].filter(Boolean).join(" ");
+  const progress = territoryProgress(territory);
+  const share = progressShare(progress);
 
   return (
-    <div className="mx-auto max-w-4xl">
+    <div className="page">
       <PageHeader
-        back={{ href: "/gebiete", label: isLeader ? "Gebiete" : "Meine Gebiete" }}
+        back={{ href: "/gebiete", label: "Karte" }}
         title={territory.name}
-        subtitle={
-          [territory.postal_code, territory.city].filter(Boolean).join(" ") ||
-          "Ohne Ortsangabe"
-        }
-        action={<StatusBadge status={territory.status} />}
-      />
-
-      <div className="card mb-4 p-5">
-        <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-          <Metric label="Straßen" value={territory.street_count} />
-          <Metric label="Türen erfasst" value={territory.visit_count} />
-          <Metric label="Angetroffen" value={territory.met_count} />
-          <Metric
-            label="Abschlüsse"
-            value={territory.sale_count}
-            hint={territory.met_count > 0 ? percent(territory.sale_count, territory.met_count) : undefined}
-            tone="success"
-          />
-        </div>
-        {territory.unit_count > 0 && (
-          <div className="mt-4 border-t pt-4" style={{ borderColor: "var(--line)" }}>
-            <div className="mb-2 flex items-baseline justify-between gap-2 text-[12.5px]">
-              <span className="muted font-medium">Fortschritt</span>
-              <span className="font-semibold tabular-nums">
-                {territory.visit_count} von {territory.unit_count} Wohneinheiten
-              </span>
-            </div>
-            <ProgressBar
-              value={territory.visit_count}
-              max={territory.unit_count}
-              tone={territory.status === "DONE" ? "success" : "brand"}
+        subtitle={[place || null, STATUS_LABEL[territory.status] ?? territory.status].filter(Boolean).join(" · ")}
+        actions={
+          <>
+            <TerritoryActions
+              territoryId={territory.id}
+              name={territory.name}
+              area={area}
+              otherAreas={otherAreas}
+              canEdit={isLeader}
+              canDelete={rights["territories.delete"]}
             />
-          </div>
-        )}
-        {territory.note && (
-          <div className="mt-3">
-            <Note icon={<IconInfo className="h-4 w-4" />} tone="brand">
-              {territory.note}
-            </Note>
-          </div>
-        )}
-      </div>
-
-      <TerritoryHandover summary={handover} />
-
-      <ProviderCard
-        info={provider}
-        className="mb-4"
-        editHref={rights["energy.manage"] ? `/karte?gebiet=${territory.id}` : undefined}
+            {startStreet && territory.status !== "DONE" && (
+              <Link href={`/tour?street=${startStreet.id}`} className="btn btn-primary btn-sm">
+                <IconDoor className="h-4 w-4" />
+                Klingeln
+              </Link>
+            )}
+          </>
+        }
       />
 
-      <TerritoryAreaCard
-        territoryId={territory.id}
-        area={area}
-        doors={doors}
-        streets={workStreets}
-        hours={hours}
-        isLeader={isLeader}
-        otherAreas={otherAreas}
+      <StatGrid
+        items={[
+          { label: "Fortschritt", value: share !== null ? `${share} %` : progress.label, hint: share !== null ? progress.label : undefined },
+          { label: "Offen", value: handover.openDoors, hint: `${handover.retryDoors} nochmal` },
+          {
+            label: "Gespräche",
+            value: territory.met_count,
+            hint: `${percent(territory.met_count, territory.visit_count)} angetroffen`,
+          },
+          {
+            label: "Abschlüsse",
+            value: territory.sale_count,
+            accent: territory.sale_count > 0,
+            hint: `${percent(territory.sale_count, territory.met_count)} Quote`,
+          },
+        ]}
       />
 
-      <TerritoryControls
-        openAppointments={handover.appointments.length}
-        canTransferAppointments={rights["appointments.team"]}
-        territory={{
-          id: territory.id,
-          name: territory.name,
-          status: territory.status,
-          assigned_user_id: territory.assigned_user_id,
-          assignee_name: territory.assignee_name,
-          due_date: territory.due_date,
-        }}
-        members={members}
-        canAssign={rights["territories.assign"]}
-        canDelete={rights["territories.delete"]}
-        canStatus={canStatus}
-      />
-
-      <StreetList
-        territoryId={territory.id}
-        streets={streets}
-        numbers={numbersByStreet}
-        isLeader={isLeader}
-        canStatus={canStatus}
-      />
-
-      {visits.length > 0 && (
-        <section className="card mt-4 p-5">
-          <SectionHeader title="Letzte Kontakte" className="mb-1" />
-          <ShowMore initial={8}>
-            {visits.map((v) => (
-              <li
-                key={v.id}
-                className="flex items-center gap-3 border-t py-2.5 first:border-t-0"
-                style={{ borderColor: "var(--line)" }}
-              >
-                <OutcomeIcon outcome={v.outcome} />
-                <span className="min-w-0 flex-1 text-[13.5px]">
-                  <span className="block truncate">
-                    <span className="font-medium">
-                      {v.street_name ?? "–"} {v.house_number}
-                    </span>
-                    {v.reason_label && <span className="muted"> · {v.reason_label}</span>}
-                    {v.reason_note && <span className="muted"> · „{v.reason_note}“</span>}
-                  </span>
-                  <span className="muted block truncate text-[12px]">
-                    {v.user_name} · {sqlDateTime(v.created_at)}
-                  </span>
-                </span>
-              </li>
-            ))}
-          </ShowMore>
-        </section>
+      {territory.note && (
+        <div className="mt-4">
+          <Notice icon={<IconInfo className="h-4 w-4" />}>{territory.note}</Notice>
+        </div>
       )}
-    </div>
-  );
-}
 
-function Metric({
-  label,
-  value,
-  hint,
-  tone = "neutral",
-}: {
-  label: string;
-  value: number;
-  hint?: string;
-  tone?: "neutral" | "success";
-}) {
-  return (
-    <div>
-      <p className="muted text-[12.5px] font-medium">{label}</p>
-      <p
-        className="mt-1 text-[24px] font-bold leading-none tabular-nums"
-        style={{
-          color: tone === "success" ? "var(--ok-ink)" : "var(--ink)",
-          letterSpacing: "-0.02em",
-        }}
-      >
-        {value}
-        {hint && <span className="muted ml-1 text-[12px] font-semibold">{hint}</span>}
-      </p>
+      <div className="mt-8 grid grid-cols-1 gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,400px)] lg:items-start">
+        <div className="lg:sticky lg:top-16">
+          {hasMap ? (
+            <TerritoryWorkspace area={area} doors={doors} streets={workStreets} />
+          ) : (
+            <div className="surface">
+              <EmptyState
+                icon={<IconMap className="h-6 w-6" />}
+                title="Noch keine Fläche"
+                action={isLeader ? <AreaSetupButton territoryId={territory.id} otherAreas={otherAreas} /> : undefined}
+              />
+            </div>
+          )}
+        </div>
+
+        <div className="space-y-8">
+          <TerritoryControls
+            openAppointments={handover.appointments.length}
+            canTransferAppointments={rights["appointments.team"]}
+            territory={{
+              id: territory.id,
+              status: territory.status,
+              assigned_user_id: territory.assigned_user_id,
+              assignee_name: territory.assignee_name,
+              due_date: territory.due_date,
+            }}
+            members={members}
+            canAssign={rights["territories.assign"]}
+            canStatus={canStatus}
+          />
+
+          <TerritoryHandover summary={handover} />
+
+          <StreetList
+            territoryId={territory.id}
+            streets={streets}
+            numbers={numbersByStreet}
+            isLeader={isLeader}
+            canStatus={canStatus}
+          />
+
+          <section>
+            <ListLabel>Grundversorger</ListLabel>
+            <ProviderSummary
+              info={provider}
+              editHref={rights["energy.manage"] ? `/karte?gebiet=${territory.id}` : undefined}
+            />
+          </section>
+
+          {hours.some((h) => h.total > 0) && (
+            <section>
+              <ListLabel>Antreffquote nach Uhrzeit</ListLabel>
+              <div className="surface p-4">
+                <HourBars hours={hours} />
+              </div>
+            </section>
+          )}
+
+          {visits.length > 0 && (
+            <section>
+              <ListLabel>Letzte Kontakte</ListLabel>
+              <ShowMore initial={6} className="list list-icons">
+                {visits.map((v) => (
+                  <li key={v.id} className="cell">
+                    <OutcomeGlyph outcome={v.outcome} emoji={v.reason_emoji} />
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-body">
+                        {v.street_name ?? "–"} {v.house_number}
+                      </span>
+                      <span className="block truncate text-footnote text-muted">
+                        {[v.reason_label, v.reason_note ? `„${v.reason_note}“` : null, v.user_name, sqlDateTime(v.created_at)]
+                          .filter(Boolean)
+                          .join(" · ")}
+                      </span>
+                    </span>
+                  </li>
+                ))}
+              </ShowMore>
+            </section>
+          )}
+        </div>
+      </div>
     </div>
   );
 }

@@ -82,8 +82,8 @@ export function createLeafletEngine(
         const dot = L.circleMarker(point, {
           radius: options.radius,
           stroke: Boolean(options.ring),
-          color: "#ffffff",
-          weight: 1.5,
+          color: options.ringColor ?? "#ffffff",
+          weight: options.ringWidth ?? 1.5,
           fillColor: options.color,
           fillOpacity: options.opacity ?? 0.95,
           interactive,

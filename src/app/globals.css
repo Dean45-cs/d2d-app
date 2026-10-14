@@ -1,217 +1,331 @@
 @import "tailwindcss";
 @import "./brand.css";
 
+/* ==========================================================================
+   Carlsson Sales · Gestaltungssystem
+   Alles, was eine Seite an Farbe, Schrift, Rundung und Material braucht,
+   kommt aus diesen Tokens. Die Tailwind-Vorgaben (Farbpalette,
+   Schriftgroessen, Radien, Schatten) sind bewusst geloescht: was nicht hier
+   steht, gibt es nicht. Begruendung und Messwerte: docs/DESIGN.md.
+   ========================================================================== */
+
+@theme {
+  --color-*: initial;
+  --text-*: initial;
+  --radius-*: initial;
+  --shadow-*: initial;
+  --font-*: initial;
+}
+
 @theme inline {
-  --color-brand-50: var(--brand-50);
-  --color-brand-100: var(--brand-100);
-  --color-brand-200: var(--brand-200);
-  --color-brand-300: var(--brand-300);
-  --color-brand-400: var(--brand-400);
-  --color-brand-500: var(--brand-500);
-  --color-brand-600: var(--brand-600);
-  --color-brand-700: var(--brand-700);
-  --color-brand-800: var(--brand-800);
-  --color-brand-900: var(--brand-900);
-  --color-brand-950: var(--brand-950);
+  /* ------------------------------- Farben ------------------------------- */
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-fill: var(--fill);
+  --color-fill-strong: var(--fill-strong);
+  --color-ink: var(--ink);
+  --color-ink-2: var(--ink-2);
+  --color-muted: var(--muted);
+  --color-separator: var(--separator);
+  --color-hover: var(--hover);
+  --color-press: var(--press);
+  --color-accent: var(--accent);
+  --color-accent-ink: var(--accent-ink);
+  --color-accent-tint: var(--accent-tint);
+  --color-on-accent: var(--on-accent);
+  --color-danger: var(--danger);
+  --color-danger-tint: var(--danger-tint);
+  --color-warn: var(--warn);
+  --color-warn-tint: var(--warn-tint);
+  --color-white: #ffffff;
+  --color-transparent: transparent;
+  --color-current: currentColor;
 
-  --color-energy-300: var(--energy-300);
-  --color-energy-400: var(--energy-400);
-  --color-energy-500: var(--energy-500);
-  --color-energy-600: var(--energy-600);
-  --color-energy-700: var(--energy-700);
+  /* -------------------------------- Schrift ------------------------------- */
+  /* Die Systemschrift: auf iPhone, iPad und Mac SF Pro. */
+  --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", system-ui,
+    "Segoe UI Variable Text", "Segoe UI", Roboto, "Inter", "Helvetica Neue", Arial, sans-serif;
+  /* Grosse Zahlen in SF Pro Rounded - wie in Fitness und Health. */
+  --font-rounded: ui-rounded, "SF Pro Rounded", -apple-system, BlinkMacSystemFont, system-ui,
+    "Inter", sans-serif;
+  --font-mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
 
-  --color-gas-400: var(--gas-400);
-  --color-gas-500: var(--gas-500);
-  --color-gas-600: var(--gas-600);
+  /* Typostufen nach Apple HIG (iOS, Dynamic Type "Large"). Nur diese. */
+  --text-hero: 6rem;
+  --text-hero--line-height: 1;
+  --text-hero--letter-spacing: -0.02em;
+  --text-hero--font-weight: 700;
+  --text-display: 3rem;
+  --text-display--line-height: 3.25rem;
+  --text-display--letter-spacing: -0.01em;
+  --text-display--font-weight: 700;
+  --text-large-title: 2.125rem;
+  --text-large-title--line-height: 2.5625rem;
+  --text-large-title--letter-spacing: 0.006em;
+  --text-large-title--font-weight: 700;
+  --text-title-1: 1.75rem;
+  --text-title-1--line-height: 2.125rem;
+  --text-title-1--letter-spacing: 0.006em;
+  --text-title-1--font-weight: 700;
+  --text-title-2: 1.375rem;
+  --text-title-2--line-height: 1.75rem;
+  --text-title-2--letter-spacing: 0.005em;
+  --text-title-2--font-weight: 700;
+  --text-title-3: 1.25rem;
+  --text-title-3--line-height: 1.5625rem;
+  --text-title-3--letter-spacing: 0.004em;
+  --text-title-3--font-weight: 600;
+  --text-headline: 1.0625rem;
+  --text-headline--line-height: 1.375rem;
+  --text-headline--letter-spacing: -0.025em;
+  --text-headline--font-weight: 600;
+  --text-body: 1.0625rem;
+  --text-body--line-height: 1.375rem;
+  --text-body--letter-spacing: -0.025em;
+  --text-callout: 1rem;
+  --text-callout--line-height: 1.3125rem;
+  --text-callout--letter-spacing: -0.019em;
+  --text-subhead: 0.9375rem;
+  --text-subhead--line-height: 1.25rem;
+  --text-subhead--letter-spacing: -0.016em;
+  --text-footnote: 0.8125rem;
+  --text-footnote--line-height: 1.125rem;
+  --text-footnote--letter-spacing: -0.006em;
+  --text-caption: 0.75rem;
+  --text-caption--line-height: 1rem;
+  --text-caption-2: 0.6875rem;
+  --text-caption-2--line-height: 0.8125rem;
+  --text-caption-2--letter-spacing: 0.006em;
+  --text-caption-2--font-weight: 600;
 
-  --color-signal-400: var(--signal-400);
-  --color-signal-500: var(--signal-500);
-  --color-signal-600: var(--signal-600);
+  /* ------------------------------- Radien -------------------------------- */
+  /* Konzentrisch: innen = aussen - Abstand (28 - 8 = 20, 20 - 4 = 16 ...). */
+  --radius-xs: 4px;
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 20px;
+  --radius-2xl: 28px;
+  --radius-full: 9999px;
 
-  /* Schriftfarben der Toene - im Dunkeln heller, damit sie lesbar bleiben */
-  --color-tint: var(--tint);
-  --color-ok: var(--ok-ink);
-  --color-danger: var(--danger-ink);
-  --color-warn: var(--warn-ink);
-
-  /* Die Systemschrift des Geraets: auf dem iPhone SF Pro, auf Android Roboto.
-     Nichts sieht auf einem Telefon so selbstverstaendlich aus wie seine
-     eigene Schrift. */
-  --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display",
-    "Segoe UI Variable Text", "Segoe UI", Roboto, "Helvetica Neue", Arial,
-    system-ui, sans-serif;
+  /* ---------------------------- Tiefe & Bewegung ------------------------- */
+  --shadow-glass: var(--elev-glass);
+  --shadow-float: var(--elev-float);
+  --shadow-thumb: var(--elev-thumb);
+  --ease-spring: cubic-bezier(0.32, 0.72, 0, 1);
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-pop: cubic-bezier(0.34, 1.4, 0.64, 1);
 }
 
 /* ==========================================================================
-   Grundwerte der Oberflaeche
+   Neutrale Tokens - hell
    ========================================================================== */
 
 :root {
-  --surface: #f3f5f9;
-  --surface-sunken: #e9edf3;
-  --card: #ffffff;
-  --card-inset: #f6f8fb;
-  --ink: #0b1524;
-  --ink-2: #33465f;
-  --ink-muted: #66788f;
-  --line: #e4e8ee;
-  --line-strong: #d3dae4;
-  --scrim: rgb(9 16 27 / 0.42);
-  --glass: rgb(255 255 255 / 0.78);
-  /* Fläche unter der Maus / dem Finger */
-  --hover: color-mix(in srgb, var(--ink) 4.5%, transparent);
-  --press: color-mix(in srgb, var(--ink) 8%, transparent);
+  --bg: #f2f2f7;
+  --surface: #ffffff;
+  --surface-2: #f2f2f7;
+  --fill: rgb(118 118 128 / 0.12);
+  --fill-strong: rgb(118 118 128 / 0.2);
+  --ink: #0b0b0d;
+  --ink-2: #3c3c43;
+  --muted: #68686f;
+  --separator: rgb(60 60 67 / 0.16);
+  --scrim: rgb(0 0 0 / 0.28);
+  --seg-thumb: #ffffff;
+  --hover: rgb(118 118 128 / 0.08);
+  --press: rgb(118 118 128 / 0.16);
 
-  /* Farbige Schrift und Symbole. Hell entsprechen sie den Markenstufen,
-     im Dunkeln werden sie aufgehellt - die 600er-Stufen waeren dort zu dunkel. */
-  --tint: var(--brand-600);
-  --ok-ink: var(--energy-600);
-  --danger-ink: var(--signal-600);
-  --warn-ink: var(--gas-600);
+  /* Material "Liquid Glass" */
+  --glass-bg: rgb(250 250 252 / 0.74);
+  --glass-strong: rgb(250 250 252 / 0.86);
+  --glass-solid: #f9f9fb;
+  --glass-sheen: linear-gradient(180deg, rgb(255 255 255 / 0.55), rgb(255 255 255 / 0) 55%);
+  --glass-edge: inset 0 0.5px 0 0 rgb(255 255 255 / 0.9), inset 0 0 0 0.5px rgb(0 0 0 / 0.07);
+  --glass-blur: blur(22px) saturate(180%);
 
-  /* Radien - eine Leiter, keine Zufallswerte */
-  --r-xs: 0.5rem;
-  --r-sm: 0.625rem;
-  --r-md: 0.8125rem;
-  --r-lg: 1rem;
-  --r-xl: 1.5rem;
+  --elev-glass: 0 1px 2px rgb(0 0 0 / 0.05), 0 10px 30px -10px rgb(0 0 0 / 0.22);
+  --elev-float: 0 2px 6px rgb(0 0 0 / 0.06), 0 28px 60px -18px rgb(0 0 0 / 0.32);
+  --elev-thumb: 0 1px 2px rgb(0 0 0 / 0.08), 0 3px 8px rgb(0 0 0 / 0.1);
 
-  /* Schatten: knapp und ruhig. Karten tragen eine Haarlinie, der Schatten
-     setzt sie nur leicht vom Grund ab - keine schwebenden Kacheln. */
-  --shadow-1: 0 1px 2px rgb(11 21 36 / 0.05);
-  --shadow-2: 0 1px 2px rgb(11 21 36 / 0.04), 0 4px 14px -6px rgb(11 21 36 / 0.12);
-  --shadow-3: 0 2px 6px rgb(11 21 36 / 0.06), 0 18px 40px -14px rgb(11 21 36 / 0.28);
-  --shadow-sheet: 0 -8px 40px -12px rgb(11 21 36 / 0.35);
+  /* Bewegung: kurz und federnd, nie im Weg */
+  --dur-1: 150ms;
+  --dur-2: 250ms;
+  --dur-3: 350ms;
 
-  /* Bewegung im Tonfall von iOS: schnell anlaufen, weich auslaufen */
-  --ease-spring: cubic-bezier(0.32, 0.72, 0, 1);
-  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  /* Raster der Schale */
+  --gutter: 16px;
+  --tabbar-h: 62px;
+  --tabbar-bottom: max(12px, calc(env(safe-area-inset-bottom) - 10px));
+  --tabbar-space: calc(var(--tabbar-h) + var(--tabbar-bottom) + 12px);
+  --sidebar-w: 256px;
+  --rail-w: 68px;
 }
+
+/* ==========================================================================
+   Neutrale Tokens - dunkel (gestaltet, nicht invertiert)
+   ========================================================================== */
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --surface: #070e1a;
-    --surface-sunken: #050a13;
-    --card: #0f1a2d;
-    --card-inset: #15233a;
-    --ink: #eaf1fb;
-    --ink-2: #c3d2e6;
-    --ink-muted: #8b9fbb;
-    --line: #1b2c46;
-    --line-strong: #283d5e;
-    --scrim: rgb(2 6 12 / 0.6);
-    --glass: rgb(15 26 45 / 0.8);
-    --hover: color-mix(in srgb, var(--ink) 6%, transparent);
-    --press: color-mix(in srgb, var(--ink) 10%, transparent);
-    --tint: #5aa5ee;
-    --ok-ink: #34d07f;
-    --danger-ink: #f87171;
-    --warn-ink: #fbbf24;
-
-    --shadow-1: 0 1px 2px rgb(0 0 0 / 0.35);
-    --shadow-2: 0 1px 2px rgb(0 0 0 / 0.3), 0 8px 20px -10px rgb(0 0 0 / 0.55);
-    --shadow-3: 0 4px 8px rgb(0 0 0 / 0.4), 0 22px 48px -18px rgb(0 0 0 / 0.75);
-    --shadow-sheet: 0 -8px 40px -12px rgb(0 0 0 / 0.7);
+    --bg: #000000;
+    --surface: #1c1c1e;
+    --surface-2: #2c2c2e;
+    --fill: rgb(118 118 128 / 0.24);
+    --fill-strong: rgb(118 118 128 / 0.34);
+    --ink: #f5f5f7;
+    --ink-2: #d1d1d6;
+    --muted: #a1a1a8;
+    --separator: rgb(84 84 88 / 0.6);
+    --scrim: rgb(0 0 0 / 0.5);
+    --seg-thumb: #636366;
+    --hover: rgb(118 118 128 / 0.14);
+    --press: rgb(118 118 128 / 0.24);
+    --glass-bg: rgb(30 30 32 / 0.72);
+    --glass-strong: rgb(30 30 32 / 0.86);
+    --glass-solid: #1f1f21;
+    --glass-sheen: linear-gradient(180deg, rgb(255 255 255 / 0.07), rgb(255 255 255 / 0) 55%);
+    --glass-edge: inset 0 0.5px 0 0 rgb(255 255 255 / 0.2), inset 0 0 0 0.5px rgb(255 255 255 / 0.09);
+    --elev-glass: 0 1px 2px rgb(0 0 0 / 0.4), 0 12px 32px -10px rgb(0 0 0 / 0.7);
+    --elev-float: 0 2px 6px rgb(0 0 0 / 0.4), 0 28px 60px -18px rgb(0 0 0 / 0.8);
+    --elev-thumb: 0 1px 2px rgb(0 0 0 / 0.3), 0 3px 8px rgb(0 0 0 / 0.3);
   }
 }
 
 :root[data-theme="dark"] {
-  --surface: #070e1a;
-  --surface-sunken: #050a13;
-  --card: #0f1a2d;
-  --card-inset: #15233a;
-  --ink: #eaf1fb;
-  --ink-2: #c3d2e6;
-  --ink-muted: #8b9fbb;
-  --line: #1b2c46;
-  --line-strong: #283d5e;
-  --scrim: rgb(2 6 12 / 0.6);
-  --glass: rgb(15 26 45 / 0.8);
-  --hover: color-mix(in srgb, var(--ink) 6%, transparent);
-  --press: color-mix(in srgb, var(--ink) 10%, transparent);
-  --tint: #5aa5ee;
-  --ok-ink: #34d07f;
-  --danger-ink: #f87171;
-  --warn-ink: #fbbf24;
-
-  --shadow-1: 0 1px 2px rgb(0 0 0 / 0.35);
-  --shadow-2: 0 1px 2px rgb(0 0 0 / 0.3), 0 8px 20px -10px rgb(0 0 0 / 0.55);
-  --shadow-3: 0 4px 8px rgb(0 0 0 / 0.4), 0 22px 48px -18px rgb(0 0 0 / 0.75);
-  --shadow-sheet: 0 -8px 40px -12px rgb(0 0 0 / 0.7);
+  --bg: #000000;
+  --surface: #1c1c1e;
+  --surface-2: #2c2c2e;
+  --fill: rgb(118 118 128 / 0.24);
+  --fill-strong: rgb(118 118 128 / 0.34);
+  --ink: #f5f5f7;
+  --ink-2: #d1d1d6;
+  --muted: #a1a1a8;
+  --separator: rgb(84 84 88 / 0.6);
+  --scrim: rgb(0 0 0 / 0.5);
+  --seg-thumb: #636366;
+  --hover: rgb(118 118 128 / 0.14);
+  --press: rgb(118 118 128 / 0.24);
+  --glass-bg: rgb(30 30 32 / 0.72);
+  --glass-strong: rgb(30 30 32 / 0.86);
+  --glass-solid: #1f1f21;
+  --glass-sheen: linear-gradient(180deg, rgb(255 255 255 / 0.07), rgb(255 255 255 / 0) 55%);
+  --glass-edge: inset 0 0.5px 0 0 rgb(255 255 255 / 0.2), inset 0 0 0 0.5px rgb(255 255 255 / 0.09);
+  --elev-glass: 0 1px 2px rgb(0 0 0 / 0.4), 0 12px 32px -10px rgb(0 0 0 / 0.7);
+  --elev-float: 0 2px 6px rgb(0 0 0 / 0.4), 0 28px 60px -18px rgb(0 0 0 / 0.8);
+  --elev-thumb: 0 1px 2px rgb(0 0 0 / 0.3), 0 3px 8px rgb(0 0 0 / 0.3);
 }
 
-html {
-  color-scheme: light dark;
+@media (min-width: 768px) {
+  :root {
+    --gutter: 24px;
+  }
 }
-:root[data-theme="light"] {
-  color-scheme: light;
-}
-:root[data-theme="dark"] {
-  color-scheme: dark;
-}
-
-html,
-body {
-  background: var(--surface);
-  color: var(--ink);
+@media (min-width: 1280px) {
+  :root {
+    --gutter: 32px;
+  }
 }
 
-body {
-  font-family: var(--font-sans);
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-  text-rendering: optimizeLegibility;
-  -webkit-tap-highlight-color: transparent;
-  /* Kein Gummiband-Effekt, wenn die App vom Home-Bildschirm laeuft */
-  overscroll-behavior-y: none;
+/* Glas nur, wo es lesbar bleibt: ohne Unschaerfe, mit weniger Transparenz
+   oder mit mehr Kontrast wird es zur festen Flaeche. */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  :root {
+    --glass-bg: var(--glass-solid);
+    --glass-strong: var(--glass-solid);
+  }
+}
+@media (prefers-reduced-transparency: reduce) {
+  :root {
+    --glass-bg: var(--glass-solid);
+    --glass-strong: var(--glass-solid);
+    --glass-blur: none;
+  }
+}
+@media (prefers-contrast: more) {
+  :root {
+    --glass-bg: var(--glass-solid);
+    --glass-strong: var(--glass-solid);
+    --glass-blur: none;
+    --glass-edge: inset 0 0 0 1px var(--ink);
+    --separator: var(--muted);
+    --muted: var(--ink-2);
+  }
 }
 
-/* Ueberschriften duerfen enger stehen - so setzt Apple sie auch. */
-h1,
-h2,
-h3 {
-  letter-spacing: -0.021em;
-}
+/* ==========================================================================
+   Grundlage
+   ========================================================================== */
 
-/* Buttons und Kacheln sollen sich wie in einer App anfuehlen: kein Zoom beim
-   Doppeltippen, keine Textmarkierung beim langen Druecken. */
-button,
-.tap-tile,
-.btn,
-.seg,
-a[role="button"] {
-  touch-action: manipulation;
-  -webkit-user-select: none;
-  user-select: none;
-}
+@layer base {
+  html {
+    color-scheme: light dark;
+    background: var(--bg);
+    -webkit-text-size-adjust: 100%;
+    /* Jede Zahl gleich breit - Spalten, Kennzahlen und Zaehler stehen ruhig. */
+    font-variant-numeric: tabular-nums;
+  }
+  :root[data-theme="light"] {
+    color-scheme: light;
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+  }
 
-/* Eine sichtbare Spur fuer die Tastatur, aber nicht fuer den Daumen. */
-:focus-visible {
-  outline: 2px solid var(--brand-500);
-  outline-offset: 2px;
-  border-radius: var(--r-xs);
-}
-
-/* Im Standalone-Modus (vom Home-Bildschirm gestartet) gibt es keine
-   Safari-Leisten - der Inhalt reicht bis an die Geraetekanten. */
-@media (display-mode: standalone) {
   body {
-    -webkit-touch-callout: none;
+    min-height: 100dvh;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: var(--font-sans);
+    font-size: var(--text-body);
+    line-height: var(--text-body--line-height);
+    letter-spacing: var(--text-body--letter-spacing);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+    -webkit-tap-highlight-color: transparent;
+    overscroll-behavior-y: none;
+    /* Lange deutsche Woerter brechen lieber als die Spalte. */
+    overflow-wrap: break-word;
+    hyphens: manual;
   }
-}
 
-/* Schmale, zurueckhaltende Rollbalken - sichtbar nur, wo gerollt wird. */
-* {
-  scrollbar-width: thin;
-  scrollbar-color: color-mix(in srgb, var(--ink) 22%, transparent) transparent;
-}
-*::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
-}
-*::-webkit-scrollbar-thumb {
-  background: color-mix(in srgb, var(--ink) 20%, transparent);
-  border-radius: 999px;
+  ::selection {
+    background: var(--accent-tint-strong);
+  }
+
+  /* Eine Spur fuer die Tastatur, nicht fuer den Daumen. */
+  :focus-visible {
+    outline: 3px solid var(--accent);
+    outline-offset: 2px;
+  }
+
+  button,
+  [role="button"],
+  .btn,
+  .seg,
+  .cell-tap {
+    touch-action: manipulation;
+    -webkit-user-select: none;
+    user-select: none;
+  }
+
+  button:not(:disabled),
+  [role="button"] {
+    cursor: pointer;
+  }
+
+  @media (display-mode: standalone) {
+    body {
+      -webkit-touch-callout: none;
+    }
+  }
+
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--fill-strong) transparent;
+  }
 }
 
 /* ==========================================================================
@@ -222,70 +336,67 @@ a[role="button"] {
   from {
     opacity: 0;
   }
-  to {
-    opacity: 1;
-  }
 }
-
-@keyframes sheet-up {
-  from {
-    transform: translateY(101%);
-  }
-  to {
-    transform: translateY(0);
-  }
-}
-
-@keyframes sheet-pop {
-  from {
-    opacity: 0;
-    transform: translateY(14px) scale(0.97);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
-}
-
-@keyframes toast-up {
-  from {
-    opacity: 0;
-    transform: translateY(14px) scale(0.94);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
-}
-
 @keyframes rise {
   from {
     opacity: 0;
-    transform: translateY(6px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
+    transform: translateY(8px);
   }
 }
-
+@keyframes sheet-up {
+  from {
+    transform: translateY(105%);
+  }
+}
+@keyframes pop-in {
+  from {
+    opacity: 0;
+    transform: scale(0.96) translateY(8px);
+  }
+}
 @keyframes menu-in {
   from {
     opacity: 0;
-    transform: translateY(-4px) scale(0.98);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0) scale(1);
+    transform: scale(0.94);
   }
 }
-
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(16px) scale(0.92);
+  }
+}
 @keyframes shimmer {
   from {
     background-position: 200% 0;
   }
   to {
     background-position: -200% 0;
+  }
+}
+@keyframes check-pop {
+  0% {
+    transform: scale(0.4);
+    opacity: 0;
+  }
+  60% {
+    transform: scale(1.12);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+@keyframes number-in {
+  from {
+    opacity: 0;
+    transform: translateY(16px) scale(0.96);
+    filter: blur(4px);
+  }
+}
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
   }
 }
 
@@ -305,458 +416,640 @@ a[role="button"] {
    ========================================================================== */
 
 @layer components {
-  .card {
-    /* Im Raster darf eine Karte schmaler werden als ihr breitester Inhalt -
-       sonst schiebt eine Tabelle die ganze Seite seitlich aus dem Bild. */
-    min-width: 0;
-    background: var(--card);
-    border: 1px solid var(--line);
-    border-radius: var(--r-lg);
-    box-shadow: var(--shadow-1);
+  /* ------------------------------- Material ------------------------------ */
+
+  /* Glas: Navigation und Bedienelemente, die ueber dem Inhalt schweben. */
+  .glass {
+    background-color: var(--glass-bg);
+    background-image: var(--glass-sheen);
+    -webkit-backdrop-filter: var(--glass-blur);
+    backdrop-filter: var(--glass-blur);
+    box-shadow: var(--glass-edge), var(--elev-glass);
   }
-  /* Eine Karte, die als Ganzes angetippt wird. */
-  a.card,
-  button.card {
-    transition: border-color 0.18s var(--ease-out), box-shadow 0.18s var(--ease-out),
-      transform 0.12s var(--ease-spring);
-  }
-  a.card:hover,
-  button.card:hover {
-    border-color: var(--line-strong);
-    box-shadow: var(--shadow-2);
-  }
-  a.card:active,
-  button.card:active {
-    transform: scale(0.992);
+  .glass-strong {
+    background-color: var(--glass-strong);
+    background-image: var(--glass-sheen);
+    -webkit-backdrop-filter: var(--glass-blur);
+    backdrop-filter: var(--glass-blur);
+    box-shadow: var(--glass-edge), var(--elev-float);
   }
 
-  /* Kopf eines Abschnitts: Titel links, Verweis rechts. */
-  .section-head {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 0.75rem;
-    min-height: 1.75rem;
+  /* Inhalt liegt auf ruhigen, festen Flaechen. */
+  .surface {
+    background: var(--surface);
+    border-radius: var(--radius-xl);
   }
+
+  /* ----------------------------- Seitenraster ---------------------------- */
+
+  .page {
+    width: 100%;
+    max-width: 1200px;
+    margin-inline: auto;
+  }
+  .page-narrow {
+    width: 100%;
+    max-width: 680px;
+    margin-inline: auto;
+  }
+  .page-medium {
+    width: 100%;
+    max-width: 960px;
+    margin-inline: auto;
+  }
+
+  /* ---------------------------- Abschnitte ------------------------------- */
+
   .section-title {
-    font-size: 0.9375rem;
-    font-weight: 650;
-    letter-spacing: -0.012em;
+    font-size: var(--text-title-3);
+    line-height: var(--text-title-3--line-height);
+    letter-spacing: var(--text-title-3--letter-spacing);
+    font-weight: 700;
     color: var(--ink);
   }
-
-  /* Textverweis in der Markenfarbe - fuer "Alle anzeigen" und Aehnliches. */
-  .link {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.125rem;
-    font-size: 0.8125rem;
+  /* Kleine Ueberschrift ueber einer Liste, wie in den iOS-Einstellungen. */
+  .list-label {
+    display: block;
+    padding: 0 16px 8px;
+    font-size: var(--text-footnote);
+    line-height: var(--text-footnote--line-height);
     font-weight: 600;
-    color: var(--tint);
-    border-radius: var(--r-xs);
-    transition: opacity 0.15s var(--ease-out);
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+    color: var(--muted);
   }
-  .link:hover {
-    opacity: 0.8;
+  /* Folgt die Gruppe einer anderen, steht sie mit Luft darunter. */
+  * + .list-label {
+    margin-top: 24px;
   }
-
-  /* Eine Flaeche im Inneren einer Karte - fuer Gruppen, die zusammengehoeren. */
-  .inset {
-    background: var(--card-inset);
-    border-radius: var(--r-md);
-  }
-
-  .muted {
-    color: var(--ink-muted);
+  .list-footer {
+    padding: 8px 16px 0;
+    font-size: var(--text-footnote);
+    line-height: var(--text-footnote--line-height);
+    color: var(--muted);
   }
 
-  .hairline {
-    border-color: var(--line);
+  /* ------------------------- Gruppierte Liste ---------------------------- */
+
+  /* Die Grundform: Zeilen auf einer Flaeche, Haarlinien eingerueckt bis
+     zur Schrift (--sep-inset), keine Karte in der Karte. */
+  .list {
+    --sep-inset: 16px;
+    background: var(--surface);
+    border-radius: var(--radius-xl);
+    overflow: hidden;
+  }
+  .list-icons {
+    --sep-inset: 60px;
+  }
+  .list > * {
+    position: relative;
+  }
+  .list > * + *::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: var(--sep-inset);
+    right: 0;
+    height: 1px;
+    background: var(--separator);
+    pointer-events: none;
+  }
+  .cell {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+    min-height: 48px;
+    padding: 8px 16px;
+    text-align: left;
+    color: inherit;
+  }
+  .cell-tap {
+    transition: background-color var(--dur-1) var(--ease-out);
+  }
+  .cell-tap:hover {
+    background: var(--hover);
+  }
+  .cell-tap:active {
+    background: var(--press);
+  }
+  .cell-tap:focus-visible {
+    outline-offset: -3px;
+  }
+  .cell-chevron {
+    flex-shrink: 0;
+    width: 14px;
+    height: 14px;
+    color: var(--muted);
+    opacity: 0.7;
   }
 
-  /* Milchglas: Leisten, die ueber dem Inhalt liegen. */
-  .glass {
-    background: var(--glass);
-    -webkit-backdrop-filter: saturate(180%) blur(20px);
-    backdrop-filter: saturate(180%) blur(20px);
-  }
-
-  /* --------------------------------- Knoepfe ---------------------------- */
+  /* -------------------------------- Knoepfe ------------------------------ */
 
   .btn {
+    position: relative;
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    gap: 0.5rem;
-    border-radius: var(--r-sm);
-    padding: 0.6875rem 1.125rem;
-    min-height: 2.75rem;
+    gap: 8px;
+    min-height: 44px;
+    padding: 0 20px;
+    border-radius: var(--radius-full);
+    font-size: var(--text-headline);
+    line-height: var(--text-headline--line-height);
+    letter-spacing: var(--text-headline--letter-spacing);
     font-weight: 600;
-    font-size: 0.9375rem;
-    line-height: 1.25rem;
-    letter-spacing: -0.006em;
-    transition: background 0.18s var(--ease-out), border-color 0.18s var(--ease-out),
-      box-shadow 0.18s var(--ease-out), transform 0.12s var(--ease-spring),
-      opacity 0.18s ease;
-    cursor: pointer;
-    border: 1px solid transparent;
+    white-space: nowrap;
+    transition:
+      transform var(--dur-1) var(--ease-spring),
+      background-color var(--dur-1) var(--ease-out),
+      opacity var(--dur-1) var(--ease-out);
   }
   .btn:active:not(:disabled) {
     transform: scale(0.97);
   }
   .btn:disabled {
-    opacity: 0.45;
+    opacity: 0.4;
     cursor: not-allowed;
   }
+  /* Hauptaktion: gruen getoent und umrandet - nie gefuellt. Gefuellt ist
+     nur ein Ergebnis (Abschluss). */
   .btn-primary {
-    background: var(--brand-600);
-    color: #fff;
-    box-shadow: var(--shadow-1);
+    background: var(--accent-tint);
+    color: var(--accent-ink);
+    box-shadow: inset 0 0 0 1px var(--accent-edge);
   }
   .btn-primary:hover:not(:disabled) {
-    background: var(--brand-500);
+    background: var(--accent-tint-strong);
   }
-  .btn-success {
-    background: var(--energy-600);
-    color: #fff;
-    box-shadow: var(--shadow-1);
-  }
-  .btn-success:hover:not(:disabled) {
-    background: var(--energy-500);
-  }
-  .btn-ghost {
-    background: var(--card);
+  .btn-secondary {
+    background: var(--fill);
     color: var(--ink);
-    border-color: var(--line);
-    box-shadow: var(--shadow-1);
   }
-  .btn-ghost:hover:not(:disabled) {
-    background: color-mix(in srgb, var(--ink) 3%, var(--card));
-    border-color: var(--line-strong);
+  .btn-secondary:hover:not(:disabled) {
+    background: var(--fill-strong);
   }
-  /* Getoente Flaeche - zweite Aktion neben einer Hauptaktion. */
-  .btn-tinted {
-    background: color-mix(in srgb, var(--brand-500) 11%, transparent);
-    color: var(--tint);
-  }
-  .btn-tinted:hover:not(:disabled) {
-    background: color-mix(in srgb, var(--brand-500) 17%, transparent);
-  }
-  /* Ohne Rahmen und Flaeche - fuer Nebensaechliches neben einer Hauptaktion. */
   .btn-plain {
     background: transparent;
-    color: var(--tint);
+    color: var(--accent-ink);
   }
   .btn-plain:hover:not(:disabled) {
-    background: color-mix(in srgb, var(--brand-500) 10%, transparent);
+    background: var(--hover);
   }
   .btn-danger {
-    background: var(--signal-500);
-    color: #fff;
-  }
-  .btn-danger:hover:not(:disabled) {
-    background: var(--signal-600);
+    background: var(--danger-tint);
+    color: var(--danger);
   }
   .btn-sm {
-    min-height: 2.125rem;
-    padding: 0.375rem 0.75rem;
-    font-size: 0.8125rem;
-    border-radius: var(--r-xs);
+    min-height: 36px;
+    padding: 0 16px;
+    font-size: var(--text-subhead);
+    line-height: var(--text-subhead--line-height);
+    letter-spacing: var(--text-subhead--letter-spacing);
+  }
+  /* Kleine Knoepfe behalten 44 pt Trefferflaeche. */
+  .btn-sm::after {
+    content: "";
+    position: absolute;
+    inset: -4px 0;
   }
   .btn-lg {
-    min-height: 3.375rem;
-    padding: 0.875rem 1.5rem;
-    font-size: 1.0625rem;
-    border-radius: var(--r-md);
+    min-height: 56px;
+    padding: 0 24px;
   }
-  .btn-pill {
-    border-radius: 999px;
+  .btn-block {
+    width: 100%;
   }
 
-  /* Runder Knopf fuer ein einzelnes Zeichen - Route, Anruf, Schliessen. */
+  /* Rundes Zeichen ohne Wort - Schliessen, Anrufen, Route, Menue. */
   .icon-btn {
+    position: relative;
     display: inline-grid;
+    flex-shrink: 0;
     place-items: center;
-    width: 2.25rem;
-    height: 2.25rem;
-    border-radius: 999px;
-    color: var(--ink-muted);
-    background: transparent;
-    cursor: pointer;
-    transition: background 0.18s var(--ease-out), color 0.18s var(--ease-out),
-      transform 0.12s var(--ease-spring);
+    width: 44px;
+    height: 44px;
+    border-radius: var(--radius-full);
+    color: var(--ink-2);
+    transition:
+      transform var(--dur-1) var(--ease-spring),
+      background-color var(--dur-1) var(--ease-out);
   }
-  .icon-btn:hover {
+  .icon-btn:hover:not(:disabled) {
     background: var(--hover);
-    color: var(--ink);
+  }
+  .icon-btn:active:not(:disabled) {
+    transform: scale(0.92);
   }
   .icon-btn:disabled {
     opacity: 0.35;
     cursor: not-allowed;
   }
-  /* Umrandete Variante - steht fuer sich, etwa Anruf oder Route in einer Zeile. */
-  .icon-btn-outline {
-    border: 1px solid var(--line);
-    background: var(--card);
-    color: var(--ink-2);
+  .icon-btn-fill {
+    background: var(--fill);
+    color: var(--ink);
   }
-  .icon-btn:active {
-    transform: scale(0.92);
+  .icon-btn-fill:hover:not(:disabled) {
+    background: var(--fill-strong);
+  }
+  .icon-btn-accent {
+    background: var(--accent-tint);
+    color: var(--accent-ink);
+  }
+  .icon-btn-sm {
+    width: 32px;
+    height: 32px;
+  }
+  .icon-btn-sm::after {
+    content: "";
+    position: absolute;
+    inset: -6px;
+  }
+
+  /* Textverweis im Akzent */
+  .link {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-weight: 600;
+    color: var(--accent-ink);
+    border-radius: var(--radius-sm);
+  }
+  .link:hover {
+    text-decoration: underline;
+    text-underline-offset: 3px;
   }
 
   /* ------------------------------- Eingaben ------------------------------ */
 
-  .input,
-  .select,
-  .textarea {
+  .field {
+    display: block;
     width: 100%;
-    background: var(--card);
+    min-height: 48px;
+    padding: 12px 16px;
+    border: 0;
+    border-radius: var(--radius-md);
+    background: var(--fill);
     color: var(--ink);
-    border: 1px solid var(--line);
-    border-radius: var(--r-sm);
-    padding: 0.6875rem 0.875rem;
-    /* Unter 16px zoomt iOS beim Hineintippen in das Feld. */
-    font-size: 1rem;
-    line-height: 1.375rem;
+    /* Unter 16 px zoomt iOS beim Hineintippen. */
+    font-size: var(--text-body);
+    line-height: var(--text-body--line-height);
+    letter-spacing: var(--text-body--letter-spacing);
     outline: none;
-    transition: border-color 0.18s var(--ease-out), box-shadow 0.18s var(--ease-out);
     -webkit-appearance: none;
     appearance: none;
+    transition:
+      box-shadow var(--dur-1) var(--ease-out),
+      background-color var(--dur-1) var(--ease-out);
   }
-  .select {
-    padding-right: 2.25rem;
-    background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%236b7f99' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m4 6.5 4 4 4-4'/%3E%3C/svg%3E");
+  .field::placeholder {
+    color: var(--muted);
+    opacity: 1;
+  }
+  .field:focus {
+    box-shadow: inset 0 0 0 2px var(--accent);
+  }
+  .field:disabled {
+    opacity: 0.5;
+  }
+  textarea.field {
+    min-height: 96px;
+    resize: vertical;
+  }
+  select.field {
+    padding-right: 40px;
+    background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%238e8e93' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m7 10 5 5 5-5'/%3E%3C/svg%3E");
     background-repeat: no-repeat;
-    background-position: right 0.75rem center;
-    background-size: 1rem 1rem;
+    background-position: right 12px center;
+    background-size: 20px 20px;
   }
-  /* Kleine Auswahl in einer Zeile - etwa der Status einer Strasse. */
-  .select-sm {
-    width: auto;
-    min-height: 2rem;
-    padding: 0.25rem 1.75rem 0.25rem 0.75rem;
-    border-radius: 999px;
-    font-size: 0.8125rem;
-    font-weight: 600;
-    line-height: 1.25rem;
-    background-position: right 0.5rem center;
-    background-size: 0.875rem 0.875rem;
+  /* Feld in einer Zeile der Liste - ohne eigene Flaeche. */
+  .field-bare {
+    min-height: 44px;
+    padding: 0;
+    background: transparent;
+    border-radius: 0;
   }
-  .input:focus,
-  .select:focus,
-  .textarea:focus {
-    border-color: var(--brand-400);
-    box-shadow: 0 0 0 3.5px color-mix(in srgb, var(--brand-400) 22%, transparent);
+  .field-bare:focus {
+    box-shadow: none;
   }
-  .input::placeholder,
-  .textarea::placeholder {
-    color: color-mix(in srgb, var(--ink-muted) 75%, transparent);
-  }
-
   .label {
     display: block;
-    font-size: 0.75rem;
+    margin: 0 0 8px 4px;
+    font-size: var(--text-footnote);
+    line-height: var(--text-footnote--line-height);
     font-weight: 600;
-    letter-spacing: 0.01em;
-    color: var(--ink-muted);
-    margin-bottom: 0.375rem;
+    color: var(--ink-2);
+  }
+
+  /* --------------------------- Segmentierte Wahl ------------------------- */
+
+  .seg {
+    display: grid;
+    grid-auto-flow: column;
+    grid-auto-columns: minmax(0, 1fr);
+    gap: 2px;
+    padding: 2px;
+    border-radius: var(--radius-full);
+    background: var(--fill);
+  }
+  .seg > button,
+  .seg > a {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    min-width: 0;
+    min-height: 40px;
+    padding: 0 12px;
+    border-radius: var(--radius-full);
+    font-size: var(--text-subhead);
+    line-height: var(--text-subhead--line-height);
+    letter-spacing: var(--text-subhead--letter-spacing);
+    font-weight: 600;
+    white-space: nowrap;
+    color: var(--ink-2);
+    transition:
+      background-color var(--dur-2) var(--ease-spring),
+      color var(--dur-1) var(--ease-out),
+      box-shadow var(--dur-2) var(--ease-out);
+  }
+  .seg > button > span,
+  .seg > a > span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .seg > [aria-pressed="true"],
+  .seg > [aria-current="page"] {
+    background: var(--seg-thumb);
+    color: var(--ink);
+    box-shadow: var(--elev-thumb);
+  }
+  .seg-glass {
+    background-color: var(--glass-bg);
+    background-image: var(--glass-sheen);
+    -webkit-backdrop-filter: var(--glass-blur);
+    backdrop-filter: var(--glass-blur);
+    box-shadow: var(--glass-edge), var(--elev-glass);
+    padding: 4px;
+  }
+  .seg-glass > [aria-pressed="true"],
+  .seg-glass > [aria-current="page"] {
+    background: var(--accent-tint);
+    color: var(--accent-ink);
+    box-shadow: none;
+  }
+
+  /* Waagerechte Leiste mit Filterchips (seitlich schiebbar). */
+  .chips {
+    display: flex;
+    gap: 8px;
+    overflow-x: auto;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+  }
+  .chips::-webkit-scrollbar {
+    display: none;
+  }
+  .chip {
+    display: inline-flex;
+    flex-shrink: 0;
+    align-items: center;
+    gap: 8px;
+    min-height: 36px;
+    padding: 0 16px;
+    border-radius: var(--radius-full);
+    background: var(--fill);
+    color: var(--ink);
+    font-size: var(--text-subhead);
+    line-height: var(--text-subhead--line-height);
+    font-weight: 600;
+    white-space: nowrap;
+    transition:
+      background-color var(--dur-1) var(--ease-out),
+      transform var(--dur-1) var(--ease-spring);
+  }
+  .chip:active {
+    transform: scale(0.96);
+  }
+  .chip[aria-pressed="true"],
+  .chip[aria-current="page"] {
+    background: var(--accent-tint);
+    color: var(--accent-ink);
+    box-shadow: inset 0 0 0 1px var(--accent-edge);
   }
 
   /* -------------------------------- Plaketten ---------------------------- */
 
   .badge {
     display: inline-flex;
+    flex-shrink: 0;
     align-items: center;
-    gap: 0.25rem;
-    border-radius: 999px;
-    padding: 0.1875rem 0.625rem;
-    font-size: 0.75rem;
+    gap: 4px;
+    min-height: 22px;
+    padding: 2px 8px;
+    border-radius: var(--radius-full);
+    background: var(--fill);
+    color: var(--ink-2);
+    font-size: var(--text-caption);
+    line-height: var(--text-caption--line-height);
     font-weight: 600;
     white-space: nowrap;
   }
-
-  /* --------------------------- Segmentierte Wahl ------------------------- */
-
-  /* Eine Leiste, aus der genau eine Kachel hervortritt - wie der Schalter
-     oben in den iOS-Einstellungen. */
-  .seg {
-    display: grid;
-    grid-auto-flow: column;
-    grid-auto-columns: 1fr;
-    gap: 0.125rem;
-    padding: 0.1875rem;
-    border-radius: 999px;
-    background: color-mix(in srgb, var(--ink) 7%, transparent);
+  .badge-accent {
+    background: var(--accent-tint);
+    color: var(--accent-ink);
   }
-  .seg > button,
-  .seg > a {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    gap: 0.375rem;
-    min-height: 2.125rem;
-    padding: 0.3125rem 0.75rem;
-    border-radius: 999px;
-    font-size: 0.875rem;
-    font-weight: 600;
-    white-space: nowrap;
-    color: var(--ink-muted);
-    cursor: pointer;
-    transition: background 0.22s var(--ease-spring), color 0.22s var(--ease-out),
-      box-shadow 0.22s var(--ease-out), transform 0.12s var(--ease-spring);
+  .badge-danger {
+    background: var(--danger-tint);
+    color: var(--danger);
   }
-  .seg > button:active,
-  .seg > a:active {
-    transform: scale(0.96);
+  .badge-warn {
+    background: var(--warn-tint);
+    color: var(--warn);
   }
-  .seg > button[aria-pressed="true"],
-  .seg > a[aria-current="page"] {
-    background: var(--card);
-    color: var(--ink);
-    box-shadow: var(--shadow-1);
-  }
-  .seg-brand > button[aria-pressed="true"],
-  .seg-brand > a[aria-current="page"] {
-    background: var(--brand-600);
-    color: #fff;
-    box-shadow: 0 1px 3px rgb(11 21 36 / 0.2);
+  .badge-ink {
+    background: var(--ink);
+    color: var(--surface);
   }
 
-  /* ------------------------------ Gruppenliste --------------------------- */
-
-  /* Zeilen mit Haarlinie dazwischen - die Grundform jeder iOS-Liste. */
-  .list {
-    background: var(--card);
-    border: 1px solid var(--line);
-    border-radius: var(--r-lg);
-    overflow: hidden;
+  /* Neutraler Zeichenbehaelter - fuer Symbole und die Emoji der
+     Ablehnungsgruende, damit alle gleich ruhig nebeneinander stehen. */
+  .glyph {
+    display: inline-grid;
+    flex-shrink: 0;
+    place-items: center;
+    width: 32px;
+    height: 32px;
+    border-radius: var(--radius-md);
+    background: var(--fill);
+    color: var(--ink-2);
+    font-size: 18px;
+    line-height: 1;
   }
-  .list > * + * {
-    border-top: 1px solid var(--line);
+  .glyph-lg {
+    width: 44px;
+    height: 44px;
+    border-radius: var(--radius-lg);
+    font-size: 22px;
   }
-  .list-row {
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-    width: 100%;
-    min-height: 3.25rem;
-    padding: 0.625rem 0.875rem;
-    text-align: left;
-    background: transparent;
-    transition: background 0.15s var(--ease-out);
+  .glyph-sm {
+    width: 24px;
+    height: 24px;
+    border-radius: var(--radius-sm);
+    font-size: 14px;
   }
-  button.list-row,
-  a.list-row {
-    cursor: pointer;
+  .glyph-round {
+    border-radius: var(--radius-full);
   }
-  button.list-row:hover,
-  a.list-row:hover {
-    background: var(--hover);
-  }
-  button.list-row:active,
-  a.list-row:active {
-    background: var(--press);
-  }
-
-  /* ------------------------------- Tabellen ------------------------------ */
-
-  .data-table {
-    width: 100%;
-    border-collapse: collapse;
-    font-size: 0.875rem;
-  }
-  .data-table th {
-    padding: 0 0.75rem 0.5rem;
-    text-align: left;
-    font-size: 0.75rem;
-    font-weight: 600;
-    color: var(--ink-muted);
-    white-space: nowrap;
-    border-bottom: 1px solid var(--line);
-  }
-  .data-table td {
-    padding: 0.625rem 0.75rem;
-    border-bottom: 1px solid var(--line);
-    vertical-align: middle;
-  }
-  .data-table tr:last-child td {
-    border-bottom: 0;
-  }
-  .data-table th:first-child,
-  .data-table td:first-child {
-    padding-left: 0;
-  }
-  .data-table th:last-child,
-  .data-table td:last-child {
-    padding-right: 0;
-  }
-  .data-table .num {
-    text-align: right;
-    font-variant-numeric: tabular-nums;
+  /* Ergebnis "Abschluss": volle Akzentflaeche mit Haekchen - die einzige
+     gefuellte gruene Form der App. */
+  .glyph-result {
+    background: var(--accent);
+    color: var(--on-accent);
   }
 
   /* -------------------------------- Schalter ----------------------------- */
 
-  /* Ein Kippschalter wie in den iOS-Einstellungen. */
   .switch {
     position: relative;
     flex-shrink: 0;
-    width: 2.75rem;
-    height: 1.625rem;
-    border-radius: 999px;
-    background: color-mix(in srgb, var(--ink) 16%, transparent);
-    cursor: pointer;
-    transition: background 0.2s var(--ease-out);
+    width: 51px;
+    height: 31px;
+    border-radius: var(--radius-full);
+    background: var(--fill-strong);
+    transition: background-color var(--dur-2) var(--ease-out);
+  }
+  .switch::before {
+    content: "";
+    position: absolute;
+    inset: -7px -2px;
   }
   .switch::after {
     content: "";
     position: absolute;
-    top: 0.125rem;
-    left: 0.125rem;
-    width: 1.375rem;
-    height: 1.375rem;
-    border-radius: 999px;
-    background: #fff;
-    box-shadow: 0 1px 3px rgb(11 21 36 / 0.25);
-    transition: transform 0.24s var(--ease-spring);
+    top: 2px;
+    left: 2px;
+    width: 27px;
+    height: 27px;
+    border-radius: var(--radius-full);
+    background: #ffffff;
+    box-shadow: 0 3px 8px rgb(0 0 0 / 0.15), 0 1px 1px rgb(0 0 0 / 0.16);
+    transition: transform var(--dur-2) var(--ease-spring);
   }
   .switch[aria-checked="true"] {
-    background: var(--energy-500);
+    background: var(--accent);
   }
   .switch[aria-checked="true"]::after {
-    transform: translateX(1.125rem);
+    transform: translateX(20px);
   }
   .switch:disabled {
-    opacity: 0.5;
+    opacity: 0.4;
     cursor: not-allowed;
+  }
+
+  /* --------------------------- Blatt (Sheet) ----------------------------- */
+
+  .scrim {
+    position: fixed;
+    inset: 0;
+    background: var(--scrim);
+    animation: fade-in var(--dur-2) var(--ease-out) both;
+  }
+  .sheet {
+    position: fixed;
+    left: 8px;
+    right: 8px;
+    bottom: max(8px, env(safe-area-inset-bottom));
+    max-height: calc(100dvh - env(safe-area-inset-top) - 24px);
+    display: flex;
+    flex-direction: column;
+    border-radius: 32px;
+    overflow: hidden;
+    background-color: var(--glass-strong);
+    background-image: var(--glass-sheen);
+    -webkit-backdrop-filter: var(--glass-blur);
+    backdrop-filter: var(--glass-blur);
+    box-shadow: var(--glass-edge), var(--elev-float);
+    animation: sheet-up var(--dur-3) var(--ease-spring) both;
+    transition: transform var(--dur-2) var(--ease-out);
+    will-change: transform;
+  }
+  .sheet[data-closing] {
+    transform: translateY(110%);
+  }
+  .scrim[data-closing] {
+    opacity: 0;
+    transition: opacity var(--dur-2) var(--ease-out);
+  }
+  @media (min-width: 768px) {
+    .sheet {
+      left: 50%;
+      right: auto;
+      top: 50%;
+      bottom: auto;
+      width: min(560px, calc(100vw - 48px));
+      max-height: min(760px, calc(100dvh - 64px));
+      translate: -50% -50%;
+      animation: pop-in var(--dur-2) var(--ease-out) both;
+    }
+    .sheet-wide {
+      width: min(760px, calc(100vw - 48px));
+    }
+    .sheet[data-closing] {
+      transform: scale(0.96);
+      opacity: 0;
+      transition:
+        transform var(--dur-2) var(--ease-out),
+        opacity var(--dur-2) var(--ease-out);
+    }
+  }
+  .sheet-grip {
+    width: 36px;
+    height: 5px;
+    border-radius: var(--radius-full);
+    background: var(--fill-strong);
+  }
+  .sheet-body {
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+  }
+  /* Listen im Blatt liegen auf fester Flaeche - lesbar ueber dem Glas. */
+  .sheet .list {
+    background: var(--surface);
   }
 
   /* --------------------------------- Menue ------------------------------- */
 
   .menu {
     position: absolute;
-    z-index: 40;
-    min-width: 13.5rem;
-    padding: 0.3125rem;
-    background: var(--card);
-    border: 1px solid var(--line);
-    border-radius: var(--r-md);
-    box-shadow: var(--shadow-3);
-    animation: menu-in 0.16s var(--ease-out) both;
+    z-index: 60;
+    min-width: 232px;
+    padding: 4px;
+    border-radius: var(--radius-xl);
+    background-color: var(--glass-strong);
+    background-image: var(--glass-sheen);
+    -webkit-backdrop-filter: var(--glass-blur);
+    backdrop-filter: var(--glass-blur);
+    box-shadow: var(--glass-edge), var(--elev-float);
+    transform-origin: top right;
+    animation: menu-in var(--dur-2) var(--ease-spring) both;
   }
   .menu-item {
     display: flex;
     align-items: center;
-    gap: 0.625rem;
+    gap: 12px;
     width: 100%;
-    min-height: 2.5rem;
-    padding: 0.5rem 0.625rem;
-    border-radius: var(--r-xs);
-    font-size: 0.875rem;
-    font-weight: 500;
+    min-height: 44px;
+    padding: 0 12px;
+    border-radius: var(--radius-lg);
     text-align: left;
     color: var(--ink);
-    cursor: pointer;
+    font-size: var(--text-body);
+    line-height: var(--text-body--line-height);
   }
   .menu-item:hover,
   .menu-item:focus-visible {
@@ -764,264 +1057,571 @@ a[role="button"] {
     outline: none;
   }
   .menu-item[data-tone="danger"] {
-    color: var(--signal-600);
+    color: var(--danger);
   }
-  .menu-item svg {
-    color: var(--ink-muted);
+  .menu-item > svg {
+    color: var(--ink-2);
   }
-  .menu-item[data-tone="danger"] svg {
+  .menu-item[data-tone="danger"] > svg {
     color: currentColor;
   }
   .menu-sep {
     height: 1px;
-    margin: 0.25rem 0.375rem;
-    background: var(--line);
+    margin: 4px 12px;
+    background: var(--separator);
   }
 
-  /* Grosse Aktionsflaechen fuer die Bedienung mit einer Hand an der Tuer */
-  .tap-tile {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 0.5rem;
-    min-height: 5.75rem;
-    padding: 0.875rem 0.625rem;
-    border-radius: var(--r-md);
-    border: 1px solid var(--line);
-    background: var(--card);
-    color: var(--ink);
-    font-weight: 600;
-    font-size: 0.875rem;
-    text-align: center;
-    line-height: 1.25;
-    cursor: pointer;
-    box-shadow: var(--shadow-1);
-    transition: transform 0.12s var(--ease-spring), border-color 0.18s var(--ease-out),
-      box-shadow 0.18s var(--ease-out), background 0.18s var(--ease-out);
-  }
-  .tap-tile:active:not(:disabled) {
-    transform: scale(0.96);
-  }
-  .tap-tile:disabled {
-    opacity: 0.45;
-  }
-  .tap-tile-emoji {
-    font-size: 1.625rem;
-    line-height: 1;
-  }
-  /* Der farbige Kreis, in dem das Zeichen der Kachel sitzt. */
-  .tile-icon {
-    display: grid;
-    place-items: center;
-    width: 2.5rem;
-    height: 2.5rem;
-    border-radius: 999px;
-  }
+  /* --------------------------------- Toast ------------------------------- */
 
-  /* ---------------------------- Blatt und Schleier ----------------------- */
-
-  .scrim {
+  .toast {
     position: fixed;
-    inset: 0;
-    background: var(--scrim);
-    -webkit-backdrop-filter: blur(3px);
-    backdrop-filter: blur(3px);
-    animation: fade-in 0.22s var(--ease-out) both;
-  }
-  .sheet {
-    position: relative;
-    width: 100%;
-    max-height: 92dvh;
+    left: 50%;
+    bottom: var(--toast-bottom, calc(var(--tabbar-space) + 4px));
+    z-index: 70;
     display: flex;
-    flex-direction: column;
-    background: var(--card);
-    border-top-left-radius: var(--r-xl);
-    border-top-right-radius: var(--r-xl);
-    /* Die Fusszeile darf nicht ueber die runden Ecken hinausmalen. */
-    overflow: hidden;
-    box-shadow: var(--shadow-sheet);
-    animation: sheet-up 0.38s var(--ease-spring) both;
+    align-items: center;
+    gap: 12px;
+    width: max-content;
+    max-width: calc(100vw - 32px);
+    min-height: 52px;
+    padding: 8px 8px 8px 16px;
+    border-radius: var(--radius-full);
+    translate: -50% 0;
+    background-color: var(--glass-strong);
+    background-image: var(--glass-sheen);
+    -webkit-backdrop-filter: var(--glass-blur);
+    backdrop-filter: var(--glass-blur);
+    box-shadow: var(--glass-edge), var(--elev-float);
+    color: var(--ink);
+    animation: toast-in var(--dur-3) var(--ease-spring) both;
   }
   @media (min-width: 768px) {
-    .sheet {
-      border-radius: var(--r-xl);
-      box-shadow: var(--shadow-3);
-      animation: sheet-pop 0.26s var(--ease-out) both;
+    .toast {
+      bottom: 24px;
     }
   }
-  /* Der Griff am oberen Rand - das Zeichen dafuer, dass sich das Blatt
-     wegwischen laesst. */
-  .sheet-grip {
-    width: 2.25rem;
-    height: 0.3125rem;
-    border-radius: 999px;
-    background: color-mix(in srgb, var(--ink) 18%, transparent);
+
+  /* -------------------------------- Tabelle ------------------------------ */
+
+  /* Nur wo eine Tabelle eine Liste schlaegt (iPad, Rechner): Zahlen
+     rechtsbuendig, Zeilen mit Haarlinie, keine Gitter. */
+  .table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: var(--text-subhead);
+    line-height: var(--text-subhead--line-height);
   }
-  .sheet-body {
-    overflow-y: auto;
-    overscroll-behavior: contain;
-    -webkit-overflow-scrolling: touch;
+  .table th {
+    padding: 12px 16px 8px;
+    text-align: left;
+    font-size: var(--text-footnote);
+    font-weight: 600;
+    color: var(--muted);
+    white-space: nowrap;
+  }
+  .table td {
+    padding: 8px 16px;
+    height: 52px;
+    border-top: 1px solid var(--separator);
+    vertical-align: middle;
+  }
+  .table .num {
+    text-align: right;
+    white-space: nowrap;
+  }
+  .table tbody tr {
+    transition: background-color var(--dur-1) var(--ease-out);
+  }
+  .table tbody tr:hover {
+    background: var(--hover);
+  }
+
+  /* -------------------------------- Kennzahl ----------------------------- */
+
+  .kpi {
+    font-family: var(--font-rounded);
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.01em;
+  }
+
+  /* ------------------------------ Platzhalter ---------------------------- */
+
+  .skeleton {
+    background: linear-gradient(
+      90deg,
+      var(--fill) 25%,
+      var(--fill-strong) 37%,
+      var(--fill) 63%
+    );
+    background-size: 200% 100%;
+    animation: shimmer 1.4s linear infinite;
   }
 
   .rise {
-    animation: rise 0.3s var(--ease-out) both;
+    animation: rise var(--dur-3) var(--ease-out) both;
+  }
+  .number-in {
+    animation: number-in var(--dur-3) var(--ease-spring) both;
+  }
+  .check-pop {
+    animation: check-pop var(--dur-3) var(--ease-pop) both;
+  }
+  .spin {
+    animation: spin 0.9s linear infinite;
   }
 
-  /* --------------------------------- Regler ------------------------------ */
+  /* -------------------------------- Regler ------------------------------- */
 
   .slider {
     -webkit-appearance: none;
     appearance: none;
     width: 100%;
-    height: 1.75rem;
+    height: 44px;
     background: transparent;
-    cursor: pointer;
   }
   .slider::-webkit-slider-runnable-track {
-    height: 0.25rem;
-    border-radius: 999px;
-    background: color-mix(in srgb, var(--ink) 13%, transparent);
+    height: 4px;
+    border-radius: var(--radius-full);
+    background: var(--fill-strong);
   }
   .slider::-moz-range-track {
-    height: 0.25rem;
-    border-radius: 999px;
-    background: color-mix(in srgb, var(--ink) 13%, transparent);
+    height: 4px;
+    border-radius: var(--radius-full);
+    background: var(--fill-strong);
   }
   .slider::-webkit-slider-thumb {
     -webkit-appearance: none;
     appearance: none;
-    width: 1.625rem;
-    height: 1.625rem;
-    margin-top: -0.6875rem;
-    border-radius: 999px;
-    background: #fff;
-    border: 0.5px solid rgb(11 21 36 / 0.06);
-    box-shadow: 0 1px 2px rgb(11 21 36 / 0.16), 0 3px 8px rgb(11 21 36 / 0.16);
+    width: 28px;
+    height: 28px;
+    margin-top: -12px;
+    border-radius: var(--radius-full);
+    background: #ffffff;
+    box-shadow: 0 0.5px 4px rgb(0 0 0 / 0.12), 0 6px 13px rgb(0 0 0 / 0.12);
   }
   .slider::-moz-range-thumb {
-    width: 1.625rem;
-    height: 1.625rem;
-    border-radius: 999px;
-    background: #fff;
-    border: 0.5px solid rgb(11 21 36 / 0.06);
-    box-shadow: 0 1px 2px rgb(11 21 36 / 0.16), 0 3px 8px rgb(11 21 36 / 0.16);
+    width: 28px;
+    height: 28px;
+    border: 0;
+    border-radius: var(--radius-full);
+    background: #ffffff;
+    box-shadow: 0 0.5px 4px rgb(0 0 0 / 0.12), 0 6px 13px rgb(0 0 0 / 0.12);
   }
+}
 
-  /* Platzhalter, solange Daten unterwegs sind. */
-  .skeleton {
-    background: linear-gradient(
-      90deg,
-      color-mix(in srgb, var(--ink) 6%, transparent) 25%,
-      color-mix(in srgb, var(--ink) 11%, transparent) 37%,
-      color-mix(in srgb, var(--ink) 6%, transparent) 63%
-    );
-    background-size: 200% 100%;
-    animation: shimmer 1.4s linear infinite;
+/* Schale, Ergebnisleiste und eigene Kartenteile liegen in der Komponenten-
+   Ebene, damit Tailwind-Helfer (md:hidden ...) sie uebersteuern koennen.
+   Nur die Anpassungen fremder Bibliotheken (MapLibre, Leaflet) stehen
+   ausserhalb - deren eigene Styles sind ebenfalls ungeschichtet. */
+@layer components {
+/* ==========================================================================
+   Schale: schwebende Reiterleiste, Seitenleiste, Werkzeugleiste
+   ========================================================================== */
+
+.tabbar {
+  position: fixed;
+  left: 50%;
+  bottom: var(--tabbar-bottom);
+  z-index: 40;
+  display: flex;
+  align-items: stretch;
+  height: var(--tabbar-h);
+  padding: 4px;
+  border-radius: var(--radius-full);
+  translate: -50% 0;
+  transition:
+    translate var(--dur-3) var(--ease-spring),
+    padding var(--dur-3) var(--ease-spring);
+}
+.tabbar-item {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  width: 72px;
+  max-width: 72px;
+  border-radius: var(--radius-full);
+  color: var(--ink);
+  overflow: hidden;
+  transition:
+    max-width var(--dur-3) var(--ease-spring),
+    opacity var(--dur-2) var(--ease-out),
+    background-color var(--dur-2) var(--ease-out),
+    color var(--dur-2) var(--ease-out);
+}
+.tabbar-item > svg,
+.tabbar-item > .tabbar-avatar {
+  width: 26px;
+  height: 26px;
+  transition: transform var(--dur-2) var(--ease-spring);
+}
+.tabbar-item:active > svg,
+.tabbar-item:active > .tabbar-avatar {
+  transform: scale(0.88);
+}
+.tabbar-label {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--text-caption-2);
+  line-height: var(--text-caption-2--line-height);
+  letter-spacing: var(--text-caption-2--letter-spacing);
+  font-weight: 600;
+  transition: opacity var(--dur-2) var(--ease-out);
+}
+.tabbar-item[aria-current="page"] {
+  background: var(--fill);
+  color: var(--accent-ink);
+}
+/* Beim Rollen nach unten schrumpft die Leiste auf den aktiven Reiter. */
+.tabbar[data-collapsed="true"] .tabbar-item:not([aria-current="page"]) {
+  max-width: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+.tabbar[data-collapsed="true"] .tabbar-item[aria-current="page"] {
+  width: 54px;
+  background: transparent;
+}
+.tabbar[data-collapsed="true"] .tabbar-label {
+  opacity: 0;
+  position: absolute;
+}
+.tabbar[data-collapsed="true"] {
+  translate: calc(-50vw + var(--gutter)) 0;
+}
+
+/* Seitenleiste (iPad, Rechner): schwebendes Glas, einklappbar zur Leiste
+   aus Zeichen. "auto" = schmal auf dem iPad hochkant, breit ab 1024 px. */
+.shell {
+  --shell-offset: 0px;
+}
+@media (min-width: 768px) {
+  .shell[data-sidebar="auto"],
+  .shell[data-sidebar="rail"] {
+    --shell-offset: var(--rail-w);
+  }
+  .shell[data-sidebar="full"] {
+    --shell-offset: var(--sidebar-w);
+  }
+}
+@media (min-width: 1024px) {
+  .shell[data-sidebar="auto"] {
+    --shell-offset: var(--sidebar-w);
+  }
+}
+.sidebar {
+  position: fixed;
+  top: 8px;
+  bottom: 8px;
+  left: max(8px, env(safe-area-inset-left));
+  z-index: 40;
+  display: flex;
+  flex-direction: column;
+  width: var(--shell-offset);
+  border-radius: var(--radius-2xl);
+  overflow: hidden;
+  transition: width var(--dur-3) var(--ease-spring);
+}
+.sidebar-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 44px;
+  padding: 0 9px;
+  border-radius: var(--radius-lg);
+  color: var(--ink);
+  font-size: var(--text-body);
+  line-height: var(--text-body--line-height);
+  letter-spacing: var(--text-body--letter-spacing);
+  white-space: nowrap;
+  transition: background-color var(--dur-1) var(--ease-out);
+}
+.sidebar-item > svg,
+.sidebar-item > .sidebar-avatar {
+  flex-shrink: 0;
+  width: 26px;
+  height: 26px;
+  color: var(--ink-2);
+}
+.sidebar-item:hover {
+  background: var(--hover);
+}
+.sidebar-item[aria-current="page"] {
+  background: var(--accent-tint);
+  color: var(--accent-ink);
+  font-weight: 600;
+}
+.sidebar-item[aria-current="page"] > svg {
+  color: var(--accent-ink);
+}
+.sidebar-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  transition: opacity var(--dur-2) var(--ease-out);
+}
+.shell[data-sidebar="rail"] .sidebar-text {
+  opacity: 0;
+  pointer-events: none;
+}
+.shell[data-sidebar="rail"] .rail-hide {
+  display: none;
+}
+@media (max-width: 1023px) {
+  .shell[data-sidebar="auto"] .sidebar-text {
+    opacity: 0;
+    pointer-events: none;
+  }
+  .shell[data-sidebar="auto"] .rail-hide {
+    display: none;
+  }
+}
+
+.shell-main {
+  min-width: 0;
+  padding: 16px var(--gutter) var(--tabbar-space);
+  padding-left: max(var(--gutter), env(safe-area-inset-left));
+  padding-right: max(var(--gutter), env(safe-area-inset-right));
+}
+@media (min-width: 768px) {
+  .shell-main {
+    margin-left: calc(var(--shell-offset) + 8px);
+    padding-top: 24px;
+    padding-bottom: 48px;
+    transition: margin-left var(--dur-3) var(--ease-spring);
+  }
+}
+
+/* Werkzeugleiste: erscheint als Glas, sobald der grosse Titel weg ist. */
+.toolbar {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  margin: -16px calc(var(--gutter) * -1) 0;
+  padding: 0 var(--gutter);
+  padding-top: env(safe-area-inset-top);
+  transition:
+    background-color var(--dur-2) var(--ease-out),
+    box-shadow var(--dur-2) var(--ease-out);
+}
+@media (min-width: 768px) {
+  .toolbar {
+    margin-top: -24px;
+  }
+}
+.toolbar[data-stuck="true"] {
+  background-color: var(--glass-bg);
+  background-image: var(--glass-sheen);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
+  box-shadow: inset 0 -1px 0 var(--separator);
+}
+.toolbar-title {
+  opacity: 0;
+  transform: translateY(4px);
+  transition:
+    opacity var(--dur-2) var(--ease-out),
+    transform var(--dur-2) var(--ease-out);
+}
+.toolbar[data-stuck="true"] .toolbar-title {
+  opacity: 1;
+  transform: none;
+}
+
+/* --------------------- Ergebnisleiste an der Tuer --------------------- */
+
+/* Im Daumenbereich: auf dem Handy schwebend ueber der Reiterleiste. */
+.tray {
+  position: fixed;
+  left: max(8px, env(safe-area-inset-left));
+  right: max(8px, env(safe-area-inset-right));
+  bottom: calc(var(--tabbar-h) + var(--tabbar-bottom) + 8px);
+  z-index: 35;
+  padding: 8px;
+  border-radius: var(--radius-2xl);
+}
+.tray-space {
+  height: 168px;
+}
+.tray-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 60px;
+  padding: 0 12px;
+  border-radius: var(--radius-xl);
+  background: var(--surface);
+  color: var(--ink);
+  font-size: var(--text-headline);
+  line-height: var(--text-headline--line-height);
+  letter-spacing: var(--text-headline--letter-spacing);
+  font-weight: 600;
+  transition:
+    transform var(--dur-1) var(--ease-spring),
+    opacity var(--dur-1) var(--ease-out);
+}
+.tray-btn > svg {
+  color: var(--ink-2);
+}
+.tray-btn:active:not(:disabled) {
+  transform: scale(0.97);
+}
+.tray-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.tray-btn-primary {
+  background: linear-gradient(var(--accent-tint-strong), var(--accent-tint-strong)), var(--surface);
+  color: var(--accent-ink);
+  box-shadow: inset 0 0 0 1.5px var(--accent-edge);
+}
+.tray-btn-primary > svg {
+  color: var(--accent-ink);
+}
+:root[data-tray] .toast {
+  bottom: calc(var(--tabbar-h) + var(--tabbar-bottom) + 172px);
+}
+@media (min-width: 768px) {
+  .tray {
+    position: static;
+    background: var(--surface);
+    box-shadow: none;
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+  .tray-space {
+    display: none;
+  }
+  .tray-btn {
+    background: var(--fill);
+  }
+  .tray-btn-primary {
+    background: var(--accent-tint);
+  }
+  :root[data-tray] .toast {
+    bottom: 24px;
   }
 }
 
 /* ==========================================================================
-   Karten (Apple Karten, Rueckfall OpenStreetMap)
-   Bedienelemente und Marker sind fuer beide gleich - im Stil von Apple
-   Karten: Milchglas, weisse Raender, weiche Schatten.
+   Karten (OpenFreeMap / MapLibre, Leaflet-Rueckfall, Apple MapKit)
+   Bedienelemente aus Glas, Marker klar und ruhig.
    ========================================================================== */
 
 .map-view {
-  background: var(--card-inset);
+  background: var(--surface-2);
 }
 
-/* Runder Einzelknopf (Ebenen, Alles zeigen) */
 .map-ctrl,
 .map-ctrl-group {
-  background: var(--glass);
-  -webkit-backdrop-filter: saturate(180%) blur(18px);
-  backdrop-filter: saturate(180%) blur(18px);
+  background-color: var(--glass-bg);
+  background-image: var(--glass-sheen);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
+  box-shadow: var(--glass-edge), var(--elev-glass);
   color: var(--ink);
-  border: 0.5px solid color-mix(in srgb, var(--ink) 12%, transparent);
-  box-shadow: 0 1px 2px rgb(11 21 36 / 0.1), 0 6px 16px -6px rgb(11 21 36 / 0.3);
 }
 .map-ctrl {
   display: grid;
   place-items: center;
-  width: 2.375rem;
-  height: 2.375rem;
-  border-radius: 0.75rem;
-  transition: transform 0.15s var(--ease-out);
+  width: 44px;
+  height: 44px;
+  border-radius: var(--radius-full);
+  transition: transform var(--dur-1) var(--ease-spring);
 }
 .map-ctrl[aria-pressed="true"] {
-  color: var(--tint);
+  color: var(--accent-ink);
 }
 .map-ctrl:active,
 .map-ctrl-group button:active {
-  transform: scale(0.94);
+  transform: scale(0.92);
 }
 .map-ctrl-group {
   display: flex;
   flex-direction: column;
-  border-radius: 0.75rem;
+  width: 44px;
+  border-radius: var(--radius-full);
   overflow: hidden;
 }
 .map-ctrl-group button {
   display: grid;
   place-items: center;
-  width: 2.375rem;
-  height: 2.25rem;
-  transition: transform 0.15s var(--ease-out);
+  height: 44px;
+  transition: transform var(--dur-1) var(--ease-spring);
 }
 .map-ctrl-group button + button {
-  border-top: 0.5px solid color-mix(in srgb, var(--ink) 12%, transparent);
+  box-shadow: inset 0 1px 0 var(--separator);
 }
 
-/* Kleine Plakette auf der Karte (Hinweise, Kennzahl der Auswahl) */
+/* Kleine Plakette aus Glas ueber der Karte */
 .map-chip {
-  background: var(--glass);
-  -webkit-backdrop-filter: saturate(180%) blur(18px);
-  backdrop-filter: saturate(180%) blur(18px);
-  color: var(--ink-2);
-  border: 0.5px solid color-mix(in srgb, var(--ink) 12%, transparent);
-  border-radius: 999px;
-  padding: 0.25rem 0.625rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 36px;
+  padding: 0 16px;
+  border-radius: var(--radius-full);
+  background-color: var(--glass-bg);
+  background-image: var(--glass-sheen);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
+  box-shadow: var(--glass-edge), var(--elev-glass);
+  color: var(--ink);
+  font-size: var(--text-footnote);
+  line-height: var(--text-footnote--line-height);
   font-weight: 600;
-  box-shadow: var(--shadow-2);
+  white-space: nowrap;
+}
+.map-chip[aria-pressed="true"] {
+  background-color: var(--glass-strong);
+  color: var(--accent-ink);
+  box-shadow: var(--glass-edge), inset 0 0 0 1.5px var(--accent), var(--elev-glass);
 }
 
-/* Ladeanzeige: pulsierender Kartenpunkt statt grauer Flaeche */
 .map-loading {
-  width: 2.75rem;
-  height: 2.75rem;
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--brand-500) 18%, transparent);
+  width: 44px;
+  height: 44px;
+  border-radius: var(--radius-full);
+  background: var(--accent-tint);
   position: relative;
   animation: map-pulse 1.4s var(--ease-out) infinite;
 }
 .map-loading::after {
   content: "";
   position: absolute;
-  inset: 0.875rem;
-  border-radius: 999px;
-  background: var(--brand-600);
-  border: 2px solid #fff;
-  box-shadow: 0 1px 4px rgb(11 21 36 / 0.35);
+  inset: 14px;
+  border-radius: var(--radius-full);
+  background: var(--accent);
+  border: 2px solid #ffffff;
 }
 @keyframes map-pulse {
-  0% { transform: scale(0.7); opacity: 1; }
-  100% { transform: scale(1.35); opacity: 0.35; }
+  0% {
+    transform: scale(0.7);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1.35);
+    opacity: 0.35;
+  }
 }
 
-/* Nummernschild eines Gebiets / Teilgebiets */
+/* Nummernschild eines Gebiets / Teilgebiets - die Zahl ist die Kennzeichnung */
 .map-badge {
   display: grid;
   place-items: center;
-  border-radius: 999px;
-  color: #fff;
-  border: 2px solid #fff;
-  font: 700 12px/1 var(--font-sans);
-  letter-spacing: -0.01em;
-  box-shadow: 0 1px 2px rgb(11 21 36 / 0.25), 0 4px 10px -2px rgb(11 21 36 / 0.4);
+  border-radius: var(--radius-full);
+  color: #ffffff;
+  border: 2px solid #ffffff;
+  font: 700 12px/1 var(--font-rounded);
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.25), 0 4px 10px -2px rgb(0 0 0 / 0.35);
 }
 
-/* Griff zum Ziehen */
 .map-handle-hit {
   display: grid;
   place-items: center;
@@ -1030,13 +1630,11 @@ a[role="button"] {
 }
 .map-handle {
   display: block;
-  border-radius: 999px;
-  border: 3px solid #fff;
-  box-shadow: 0 0 0 5px color-mix(in srgb, var(--brand-500) 22%, transparent),
-    0 2px 6px rgb(11 21 36 / 0.4);
+  border-radius: var(--radius-full);
+  border: 3px solid #ffffff;
+  box-shadow: 0 0 0 6px var(--accent-tint), 0 2px 6px rgb(0 0 0 / 0.35);
 }
 
-/* Schriftzug auf einer Flaeche */
 .map-label-wrap {
   display: flex;
   justify-content: center;
@@ -1047,15 +1645,15 @@ a[role="button"] {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  padding: 0.125rem 0.5rem;
-  border-radius: 999px;
-  font: 600 10.5px/1.4 var(--font-sans);
-  color: var(--ink-2);
-  background: color-mix(in srgb, var(--card) 82%, transparent);
-  box-shadow: 0 1px 3px rgb(11 21 36 / 0.18);
+  padding: 2px 8px;
+  border-radius: var(--radius-full);
+  font: 600 11px/16px var(--font-sans);
+  color: var(--ink);
+  background: var(--glass-strong);
+  box-shadow: var(--glass-edge);
 }
 
-/* Preis-Pin der Energiekarte */
+/* Preis-Punkt der Energiekarte */
 .map-price-wrap {
   display: grid;
   place-items: center;
@@ -1063,92 +1661,79 @@ a[role="button"] {
 }
 .map-price {
   display: block;
-  border-radius: 999px;
-  border: 2px solid #fff;
-  box-shadow: 0 1px 2px rgb(11 21 36 / 0.25), 0 3px 8px -2px rgb(11 21 36 / 0.35);
-  transition: transform 0.2s var(--ease-spring);
+  border-radius: var(--radius-full);
+  border: 2px solid #ffffff;
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.25), 0 3px 8px -2px rgb(0 0 0 / 0.3);
+  transition: transform var(--dur-2) var(--ease-spring);
 }
 .map-price-wrap:hover .map-price {
-  transform: scale(1.18);
+  transform: scale(1.15);
 }
 .map-price.is-selected {
   transform: scale(1.3);
-  box-shadow: 0 0 0 4px color-mix(in srgb, var(--ink) 22%, transparent),
-    0 4px 12px rgb(11 21 36 / 0.45);
+  box-shadow: 0 0 0 4px var(--ink), 0 4px 12px rgb(0 0 0 / 0.4);
 }
 /* Ort ohne Preis: hohl und gestrichelt - "hier fehlt noch etwas" */
 .map-price.is-open {
-  background: color-mix(in srgb, #94a3b8 35%, #fff) !important;
-  border: 2px dashed #64748b;
-  box-shadow: 0 1px 2px rgb(11 21 36 / 0.2);
+  background: var(--surface) !important;
+  border: 2px dashed var(--muted);
+  box-shadow: none;
 }
 
-/* Filter ueber der Arbeitskarte */
-.map-filter {
-  display: inline-flex;
-  flex-shrink: 0;
-  align-items: center;
-  gap: 0.375rem;
-  padding: 0.375rem 0.75rem;
-  border-radius: 999px;
-  font-size: 12.5px;
-  font-weight: 600;
-  color: var(--ink-2);
-  background: var(--card-inset);
-  border: 0.5px solid var(--line);
-  transition: background 0.15s var(--ease-out), color 0.15s var(--ease-out);
-}
-.map-filter.is-active {
-  background: var(--ink);
-  color: var(--card);
-  border-color: transparent;
-}
-
-/* Eigener Standort: blauer Punkt wie in Apple Karten */
+/* Eigener Standort: Punkt in Schriftfarbe mit weissem Rand und Puls -
+   unterscheidet sich in der Form von jeder Tuer. */
 .map-me {
   display: grid;
   place-items: center;
-  width: 22px;
-  height: 22px;
+  width: 24px;
+  height: 24px;
   pointer-events: none;
 }
 .map-me::before {
   content: "";
   position: absolute;
-  width: 22px;
-  height: 22px;
-  border-radius: 999px;
-  background: rgb(10 132 255 / 0.35);
+  width: 24px;
+  height: 24px;
+  border-radius: var(--radius-full);
+  background: color-mix(in srgb, var(--ink) 22%, transparent);
   animation: map-me-pulse 2s var(--ease-out) infinite;
 }
 .map-me-dot {
   position: relative;
-  width: 16px;
-  height: 16px;
-  border-radius: 999px;
-  background: #0a84ff;
-  border: 3px solid #fff;
-  box-shadow: 0 1px 4px rgb(11 21 36 / 0.45);
+  width: 18px;
+  height: 18px;
+  border-radius: var(--radius-full);
+  background: var(--ink);
+  border: 3px solid #ffffff;
+  box-shadow: 0 1px 4px rgb(0 0 0 / 0.45);
 }
 @keyframes map-me-pulse {
-  0% { transform: scale(0.6); opacity: 1; }
-  100% { transform: scale(2.2); opacity: 0; }
+  0% {
+    transform: scale(0.6);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(2.2);
+    opacity: 0;
+  }
 }
 
-/* ----------------------- OpenFreeMap (MapLibre GL) ---------------------- */
+}
+
+/* ----------------------------- MapLibre ------------------------------- */
 
 .maplibregl-map {
   font-family: var(--font-sans);
 }
 .map-popup .maplibregl-popup-content {
-  padding: 0.625rem 0.75rem;
-  border-radius: var(--r-sm);
-  background: var(--glass);
-  -webkit-backdrop-filter: saturate(180%) blur(18px);
-  backdrop-filter: saturate(180%) blur(18px);
+  padding: 12px 16px;
+  border-radius: var(--radius-xl);
+  background-color: var(--glass-strong);
+  background-image: var(--glass-sheen);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
+  box-shadow: var(--glass-edge), var(--elev-float);
   color: var(--ink);
-  border: 0.5px solid color-mix(in srgb, var(--ink) 12%, transparent);
-  box-shadow: var(--shadow-2);
 }
 .map-popup .maplibregl-popup-tip {
   display: none;
@@ -1156,108 +1741,92 @@ a[role="button"] {
 .map-popup-body {
   display: flex;
   flex-direction: column;
-  gap: 0.125rem;
-  font-size: 12.5px;
-  line-height: 1.35;
+  gap: 2px;
+  font-size: var(--text-footnote);
+  line-height: var(--text-footnote--line-height);
 }
 .map-popup-body strong {
-  font-size: 13.5px;
-  font-weight: 650;
+  font-size: var(--text-subhead);
+  line-height: var(--text-subhead--line-height);
+  font-weight: 600;
 }
 .map-popup-body span {
-  color: var(--ink-muted);
+  color: var(--ink-2);
 }
 .map-popup-actions {
   display: flex;
-  gap: 0.375rem;
-  margin-top: 0.5rem;
+  gap: 8px;
+  margin-top: 8px;
 }
 .map-popup-actions a {
+  display: inline-flex;
   flex: 1;
-  text-align: center;
-  padding: 0.4rem 0.625rem;
-  border-radius: 999px;
+  align-items: center;
+  justify-content: center;
+  min-height: 36px;
+  padding: 0 12px;
+  border-radius: var(--radius-full);
   font-weight: 600;
-  font-size: 12.5px;
-  background: color-mix(in srgb, var(--ink) 7%, transparent);
+  font-size: var(--text-footnote);
+  background: var(--fill);
   color: var(--ink);
   white-space: nowrap;
 }
 .map-popup-actions a.is-primary {
-  background: var(--tint);
-  color: #fff;
+  background: var(--accent-tint);
+  color: var(--accent-ink);
+  box-shadow: inset 0 0 0 1px var(--accent-edge);
 }
 .maplibregl-ctrl-attrib {
   font-size: 10px;
-  background: color-mix(in srgb, var(--card) 80%, transparent) !important;
-  color: var(--ink-muted);
+  background: var(--glass-strong) !important;
+  color: var(--ink-2);
 }
 .maplibregl-ctrl-attrib a {
-  color: var(--ink-muted) !important;
-}
-.maplibregl-ctrl-attrib-button {
-  filter: none;
+  color: var(--ink-2) !important;
 }
 
-/* ------------------------- Rueckfall: Leaflet -------------------------- */
+/* -------------------------- Rueckfall: Leaflet ------------------------- */
 
 .leaflet-container {
-  height: 100%;
-  width: 100%;
-  background: #e8ecf1;
+  /* Keine Hoehe hier: die kommt per Klasse vom Aufrufer (ungeschichtet
+     wuerde sie die Tailwind-Klassen ueberstimmen). */
+  background: var(--surface-2);
   font-family: var(--font-sans);
   z-index: 0;
 }
-
-/* Die OSM-Kacheln leicht entsaettigt - naeher am ruhigen Look von Apple
-   Karten, und die farbigen Gebiete stehen klarer davor. */
+/* OSM-Kacheln ruhiger: entsaettigt, damit Gebiete und Tueren vorn stehen. */
 .leaflet-tile-pane {
-  filter: saturate(0.72) contrast(0.96) brightness(1.02);
+  filter: grayscale(0.55) contrast(0.95) brightness(1.03);
 }
-
-/* Im Dunkelmodus blenden die hellen Kartenkacheln - sie werden gedaempft,
-   damit die farbigen Gebiete darauf bestehen bleiben. Die Beschriftung der
-   Karte bleibt lesbar, deshalb kein Invertieren. */
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) .leaflet-tile-pane {
-    filter: brightness(0.74) contrast(1.08) saturate(0.6);
-  }
-  :root:not([data-theme="light"]) .leaflet-container {
-    background: #0d1b2f;
+    filter: grayscale(0.7) invert(0.92) hue-rotate(180deg) brightness(0.9) contrast(0.92);
   }
 }
-
 :root[data-theme="dark"] .leaflet-tile-pane {
-  filter: brightness(0.74) contrast(1.08) saturate(0.6);
+  filter: grayscale(0.7) invert(0.92) hue-rotate(180deg) brightness(0.9) contrast(0.92);
 }
-:root[data-theme="dark"] .leaflet-container {
-  background: #0d1b2f;
-}
-
-/* Sprechblasen der Karte in den App-Farben */
 .leaflet-tooltip {
-  background: var(--glass);
-  -webkit-backdrop-filter: saturate(180%) blur(18px);
-  backdrop-filter: saturate(180%) blur(18px);
+  background: var(--glass-strong);
   color: var(--ink);
-  border: 0.5px solid color-mix(in srgb, var(--ink) 12%, transparent);
-  border-radius: var(--r-sm);
-  box-shadow: var(--shadow-2);
-  font-size: 0.75rem;
-  font-weight: 500;
-  line-height: 1.35;
-  padding: 0.375rem 0.625rem;
+  border: 0;
+  border-radius: var(--radius-lg);
+  box-shadow: var(--glass-edge), var(--elev-glass);
+  font-size: var(--text-footnote);
+  line-height: var(--text-footnote--line-height);
+  padding: 8px 12px;
 }
 .leaflet-tooltip-top::before {
   border-top-color: transparent;
 }
 .leaflet-control-attribution {
-  background: color-mix(in srgb, var(--card) 80%, transparent) !important;
-  color: var(--ink-muted) !important;
-  border-radius: var(--r-xs) 0 0 0;
+  background: var(--glass-strong) !important;
+  color: var(--ink-2) !important;
+  border-radius: var(--radius-sm) 0 0 0;
   font-size: 10px !important;
-  padding: 1px 6px !important;
+  padding: 0 8px !important;
 }
 .leaflet-control-attribution a {
-  color: var(--ink-muted) !important;
+  color: var(--ink-2) !important;
 }

@@ -281,7 +281,7 @@ export async function createMapLibreEngine(
             "circle-color": ["get", "color"],
             "circle-radius": ["get", "radius"],
             "circle-opacity": ["get", "opacity"],
-            "circle-stroke-color": "#ffffff",
+            "circle-stroke-color": ["get", "strokeColor"],
             "circle-stroke-width": ["get", "stroke"],
             "circle-stroke-opacity": ["get", "opacity"],
           },
@@ -508,6 +508,7 @@ function dotProps(options: DotOptions, key: string) {
     color: options.color,
     radius: options.radius,
     opacity: options.opacity ?? 0.95,
-    stroke: options.ring ? 1.5 : 0,
+    stroke: options.ring ? (options.ringWidth ?? 1.5) : 0,
+    strokeColor: options.ringColor ?? "#ffffff",
   };
 }

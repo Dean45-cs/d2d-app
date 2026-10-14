@@ -1,37 +1,17 @@
-import { SkeletonLine } from "@/components/ui";
+import { SkeletonHeader, SkeletonList, SkeletonStats } from "@/components/ui";
 
-/** Platzhalter der Gebiets-Detailseite. */
+/** Platzhalter der Gebietsseite - Kennzahlen, Karte, Listen. */
 export default function LoadingTerritory() {
   return (
-    <div className="mx-auto max-w-4xl" aria-busy="true" aria-label="Gebiet wird geladen">
-      <SkeletonLine width={110} height={13} className="mb-3" />
-      <div className="mb-5 space-y-2">
-        <SkeletonLine width="50%" height={28} />
-        <SkeletonLine width="30%" height={13} />
-      </div>
-
-      <div className="card mb-4 grid grid-cols-2 gap-4 p-4 sm:grid-cols-4">
-        {Array.from({ length: 4 }, (_, i) => (
-          <div key={i} className="space-y-2">
-            <SkeletonLine width="70%" height={10} />
-            <SkeletonLine width="45%" height={20} />
-          </div>
-        ))}
-      </div>
-
-      <div className="card mb-4 space-y-3 p-4">
-        <SkeletonLine width="35%" height={13} />
-        <SkeletonLine height={240} radius={15} />
-      </div>
-
-      <div className="card space-y-3 p-4">
-        <SkeletonLine width="25%" height={13} />
-        {Array.from({ length: 4 }, (_, i) => (
-          <div key={i} className="space-y-1.5 border-t pt-2.5" style={{ borderColor: "var(--line)" }}>
-            <SkeletonLine width={`${60 - i * 6}%`} height={13} />
-            <SkeletonLine width={`${35 - i * 3}%`} height={10} />
-          </div>
-        ))}
+    <div className="page" aria-busy="true" aria-label="Gebiet wird geladen">
+      <SkeletonHeader />
+      <SkeletonStats />
+      <div className="mt-8 grid grid-cols-1 gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,400px)]">
+        <div className="skeleton h-[52vh] min-h-80 rounded-xl" aria-hidden="true" />
+        <div className="space-y-8">
+          <SkeletonList rows={2} />
+          <SkeletonList rows={5} />
+        </div>
       </div>
     </div>
   );

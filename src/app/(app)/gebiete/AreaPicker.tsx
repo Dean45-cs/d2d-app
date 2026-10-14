@@ -19,15 +19,8 @@ import { MapView } from "@/components/map/MapView";
 import { declutter, type Placeable } from "@/components/map/declutter";
 import { badgeMarker, handleMarker, labelMarker } from "@/components/map/markers";
 import type { MapEngine, MapLayer } from "@/components/map/types";
-import { plural, Segmented } from "@/components/ui";
-import {
-  IconCircleArea,
-  IconCrosshair,
-  IconInfo,
-  IconPin,
-  IconPolygonArea,
-  IconSearch,
-} from "@/components/icons";
+import { InlineError, plural, Segmented } from "@/components/ui";
+import { IconCircleArea, IconCrosshair, IconPin, IconPolygonArea, IconSearch } from "@/components/icons";
 
 export interface ExistingArea {
   id: number;
@@ -222,7 +215,7 @@ export function AreaPicker({
     });
 
     if (previous) {
-      const brand = cssColor("--tint", "#0f5cab");
+      const brand = cssColor("--ink-2", "#3c3c43");
       for (const polygon of previous) {
         layer.polygon(polygon, { color: brand, weight: 1.5, dashed: true, fillOpacity: 0 });
       }
@@ -288,7 +281,7 @@ export function AreaPicker({
     const layer = layers?.draw;
     if (!layer) return;
 
-    const brand = cssColor("--brand-600", "#0f5cab");
+    const brand = cssColor("--accent", "#1f9d4c");
     // Beim Aufteilen zeigen die Teilflaechen selbst, was dazugehoert.
     const filled = plots.length === 0;
 
@@ -399,14 +392,14 @@ export function AreaPicker({
   const sizeLabel = `${size.toFixed(2).replace(".", ",")} km²`;
 
   return (
-    <div className="space-y-2.5">
+    <div className="space-y-4">
       {/* ------------------------------ Ortssuche ----------------------------- */}
       <div className="flex gap-2">
-        <div className="relative min-w-0 flex-1">
-          <IconSearch className="muted pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2" />
+        <label className="relative min-w-0 flex-1">
+          <IconSearch className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-muted" />
           <input
-            className="input pl-9"
-            placeholder="Ort oder PLZ suchen"
+            className="field pl-12"
+            placeholder="Ort oder PLZ"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={(e) => {
@@ -419,41 +412,33 @@ export function AreaPicker({
             enterKeyHint="search"
             aria-label="Ort oder PLZ suchen"
           />
-        </div>
+        </label>
         <button
           type="button"
-          className="btn btn-ghost shrink-0 px-3.5"
-          onClick={() => void search()}
-          disabled={searching}
-        >
-          {searching ? "…" : "Suchen"}
-        </button>
-        <button
-          type="button"
-          className="btn btn-ghost shrink-0 px-3"
+          className="icon-btn icon-btn-fill h-12 w-12"
           onClick={locate}
-          title="Mein Standort"
           aria-label="Karte auf meinen Standort setzen"
         >
-          <IconCrosshair className="h-[18px] w-[18px]" />
+          <IconCrosshair className="h-5 w-5" />
         </button>
       </div>
+      {searching && <p className="px-1 text-footnote text-muted">Suche …</p>}
 
       {hits.length > 1 && (
-        <ul className="list max-h-40 overflow-y-auto">
+        <ul className="list max-h-48 overflow-y-auto">
           {hits.map((hit, index) => (
             <li key={`${hit.lat}-${hit.lng}-${index}`}>
               <button
                 type="button"
-                className="list-row text-sm"
+                className="cell cell-tap"
                 onClick={() => {
                   flyTo(hit.lat, hit.lng, 15);
                   if (modeRef.current === "circle") setCenter([hit.lat, hit.lng]);
                   setHits([]);
                 }}
               >
-                <IconPin className="muted h-4 w-4 shrink-0" />
-                <span className="min-w-0 flex-1 truncate">{hit.label}</span>
+                <IconPin className="h-5 w-5 shrink-0 text-muted" />
+                <span className="min-w-0 flex-1 truncate text-subhead">{hit.label}</span>
               </button>
             </li>
           ))}
@@ -464,7 +449,7 @@ export function AreaPicker({
       <Segmented
         options={[
           { value: "circle", label: "Umkreis", icon: <IconCircleArea className="h-4 w-4" /> },
-          { value: "polygon", label: "Fläche zeichnen", icon: <IconPolygonArea className="h-4 w-4" /> },
+          { value: "polygon", label: "Fläche", icon: <IconPolygonArea className="h-4 w-4" /> },
         ]}
         value={mode}
         onChange={(next: Mode) => {
@@ -475,8 +460,8 @@ export function AreaPicker({
       />
 
       {mode === "circle" && (
-        <div className="flex items-center gap-3 px-0.5">
-          <label className="muted shrink-0 text-xs font-semibold" htmlFor="radius">
+        <div className="flex items-center gap-4 px-1">
+          <label className="sr-only" htmlFor="radius">
             Umkreis
           </label>
           <input
@@ -489,86 +474,50 @@ export function AreaPicker({
             value={Math.max(0, RADIUS_STEPS.indexOf(radius))}
             onChange={(e) => setRadius(RADIUS_STEPS[Number(e.target.value)])}
           />
-          <span
-            className="w-[4.25rem] shrink-0 rounded-full py-1 text-center text-[13px] font-bold tabular-nums"
-            style={{
-              background: "color-mix(in srgb, var(--brand-500) 12%, transparent)",
-              color: "var(--tint)",
-            }}
-          >
+          <span className="badge badge-accent min-w-16 justify-center">
             {radius < 1000 ? `${radius} m` : `${(radius / 1000).toLocaleString("de-DE")} km`}
           </span>
         </div>
       )}
 
       {/* -------------------------------- Karte ------------------------------- */}
-      <div
-        className="relative overflow-hidden rounded-[var(--r-lg)] border"
-        style={{ borderColor: "var(--line)" }}
-      >
-        <MapView start={mapStart} className="h-[46vh] min-h-[280px] w-full" onEngine={setEngine}>
-        {/* Die Kennzahl der Auswahl liegt auf der Karte - dort schaut man hin. */}
-        <div className="pointer-events-none absolute inset-x-2 top-2 z-[500] flex items-start justify-between gap-2">
-          <span className="map-chip pointer-events-auto flex items-center gap-1.5 px-3 py-1.5 text-[12px] text-[var(--ink)]">
-            {area ? (
-              <>
-                <span
-                  className="h-2 w-2 rounded-full"
-                  style={{ background: "var(--brand-600)" }}
-                  aria-hidden
-                />
-                {sizeLabel}
-                {mode === "polygon" && ` · ${plural(points.length, "Ecke", "Ecken")}`}
-                {spared > 0 && ` · ${plural(spared, "Gebiet", "Gebiete")} ausgespart`}
-              </>
-            ) : drawn ? (
-              <>
-                <IconInfo className="h-3.5 w-3.5 text-danger" />
-                Liegt ganz in vergebenen Gebieten
-              </>
-            ) : (
-              <>
-                <IconInfo className="h-3.5 w-3.5" />
-                {mode === "circle" ? "Auf die Karte tippen" : "Ecken antippen"}
-              </>
-            )}
-          </span>
-
-          <span className="pointer-events-auto flex gap-1.5">
-            {mode === "polygon" && points.length > 0 && (
-              <button
-                type="button"
-                className="map-chip px-3 py-1.5 text-[12px] text-[var(--ink)]"
-                onClick={() => setPoints((prev) => prev.slice(0, -1))}
-              >
-                Punkt zurück
-              </button>
-            )}
-            {(center || points.length > 0) && (
-              <button
-                type="button"
-                className="map-chip px-3 py-1.5 text-[12px] text-[var(--ink)]"
-                onClick={reset}
-              >
-                Neu setzen
-              </button>
-            )}
-          </span>
-        </div>
+      <div className="relative overflow-hidden rounded-xl">
+        <MapView start={mapStart} className="h-[46vh] min-h-72 w-full" onEngine={setEngine}>
+          {/* Die Kennzahl der Auswahl liegt auf der Karte - dort schaut man hin. */}
+          <div className="pointer-events-none absolute inset-x-2 top-2 z-[500] flex items-start justify-between gap-2">
+            <span className="map-chip pointer-events-auto">
+              {area ? (
+                <>
+                  <span className="h-2 w-2 rounded-full bg-accent" aria-hidden="true" />
+                  {sizeLabel}
+                  {mode === "polygon" && ` · ${plural(points.length, "Ecke", "Ecken")}`}
+                  {spared > 0 && ` · ${plural(spared, "Gebiet", "Gebiete")} ausgespart`}
+                </>
+              ) : drawn ? (
+                "Liegt ganz in vergebenen Gebieten"
+              ) : mode === "circle" ? (
+                "Auf die Karte tippen"
+              ) : (
+                "Ecken antippen"
+              )}
+            </span>
+            <span className="pointer-events-auto flex gap-2">
+              {mode === "polygon" && points.length > 0 && (
+                <button type="button" className="map-chip" onClick={() => setPoints((prev) => prev.slice(0, -1))}>
+                  Zurück
+                </button>
+              )}
+              {(center || points.length > 0) && (
+                <button type="button" className="map-chip" onClick={reset}>
+                  Neu
+                </button>
+              )}
+            </span>
+          </div>
         </MapView>
       </div>
 
-      <p className="muted px-0.5 text-[11px] leading-snug">
-        {mode === "circle"
-          ? "Auf die Karte tippen – der Umkreis ist das Gebiet. Der Mittelpunkt lässt sich ziehen."
-          : "Ecken nacheinander antippen (mindestens drei). Jeder Punkt lässt sich verschieben."}
-        {existing.length > 0 &&
-          " Vergebene Gebiete (gestrichelt) werden automatisch ausgespart."}
-      </p>
-
-      {hint && (
-        <p className="text-[12px] font-semibold text-danger">{hint}</p>
-      )}
+      {hint && <InlineError>{hint}</InlineError>}
     </div>
   );
 }

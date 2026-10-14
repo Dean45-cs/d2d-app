@@ -1,79 +1,106 @@
 /* ==========================================================================
-   MARKEN-DATEI  ·  hier (und nur hier) die Farben von Energie Partner 24
-   eintragen. Alle Seiten, Buttons und Diagramme ziehen sich ihre Farben
-   aus diesen Variablen - eine Aenderung hier faerbt die ganze App um.
+   MARKEN-DATEI · Carlsson Sales
+   Hier (und nur hier) stehen die Farben der Marke: der eine Akzent
+   (Energie-Gruen), die zwei Signale (Rot, Bernstein) und die Datenfarben
+   fuer Diagramme und Karten. Alles Neutrale (Flaechen, Schrift, Linien)
+   steht in globals.css. Werte und Kontraste sind in docs/DESIGN.md belegt.
    ========================================================================== */
 :root {
-  /* Primaerfarbe (Kopfzeile, Links, Hauptbuttons) */
-  --brand-50: #eef6fd;
-  --brand-100: #d7eafa;
-  --brand-200: #b2d5f4;
-  --brand-300: #7db8ec;
-  --brand-400: #4295e0;
-  --brand-500: #1a76d2;
-  --brand-600: #0f5cab;
-  --brand-700: #0e4a89;
-  --brand-800: #103e70;
-  --brand-900: #0c2f56;
-  --brand-950: #071d38;
+  /* Energie-Gruen. Drei Rollen, nie vermischen:
+     --accent       Fuellung und Bedienelemente (Ring, Fortschritt, aktiver Reiter)
+                    >= 3:1 auf Weiss und auf --bg
+     --accent-ink   Schrift und kleine Zeichen in Gruen, >= 4.5:1 auch auf der Toenung
+     --accent-vivid nur zum Toenen (color-mix), nie als Schrift */
+  --accent: #1f9d4c;
+  --accent-ink: #0d6b32;
+  --accent-vivid: #2fd161;
+  /* Zeichen auf voller Akzentflaeche (Haekchen eines Abschlusses) */
+  --on-accent: #ffffff;
+  --accent-tint: color-mix(in srgb, var(--accent-vivid) 16%, transparent);
+  --accent-tint-strong: color-mix(in srgb, var(--accent-vivid) 26%, transparent);
+  --accent-edge: color-mix(in srgb, var(--accent) 34%, transparent);
 
-  /* Strom / Erfolg */
-  --energy-300: #6ee7ad;
-  --energy-400: #34d07f;
-  --energy-500: #12b76a;
-  --energy-600: #059450;
-  --energy-700: #047a43;
+  /* Signale - nur klein und nie allein (immer mit Zeichen oder Wort) */
+  --danger: #c9182a;
+  --danger-tint: color-mix(in srgb, #ff3b30 12%, transparent);
+  --warn: #a35a00;
+  --warn-tint: color-mix(in srgb, #ff9f0a 16%, transparent);
 
-  /* Gas */
-  --gas-400: #fbbf24;
-  --gas-500: #f59e0b;
-  --gas-600: #d97706;
+  /* Diagramme: Tueren neutral, Abschluesse im Akzent (>= 3:1 auf Weiss) */
+  --chart-doors: #8e8e93;
+  --chart-met: #3c3c43;
+  --chart-sales: var(--accent);
 
-  /* Signal / Ablehnung */
-  --signal-400: #f87171;
-  --signal-500: #e5484d;
-  --signal-600: #c92a2f;
-
-  /* Firmenname in der Kopfzeile */
-  --brand-name: "Energie Partner 24";
-
-  /* Diagrammfarben - gegen Farbfehlsichtigkeit geprueft (OKLab-Abstand > 20) */
-  --chart-doors: #1a76d2;
-  --chart-sales: #12b76a;
-  --chart-grid: #e2e8f0;
-
-  /* Teilgebiete auf der Karte. Vier Farben, als Kartenpalette geprueft:
-     jedes Paar bleibt auch bei Rot-Gruen-Schwaeche unterscheidbar. Mehr als
-     vier waeren es nicht mehr - deshalb teilt die App hoechstens in vier
-     Pakete. Die Zahl im Kreis bleibt die eigentliche Kennzeichnung. */
+  /* Teilgebiete auf der Karte. Vier Farben, als Satz gegen Rot-Gruen-
+     Schwaeche geprueft; die Zahl im Kreis bleibt die eigentliche
+     Kennzeichnung. Mehr als vier waeren nicht mehr unterscheidbar. */
   --plot-1: #2a78d6;
   --plot-2: #eda100;
   --plot-3: #e87ba4;
   --plot-4: #008300;
+
+  /* Preisstufen der Energiekarte - sequenziell von grau (wenig Argument)
+     zu tiefgruen (starkes Wechselargument). Die Helligkeit steigt stetig,
+     so bleiben die Stufen auch ohne Farbsehen unterscheidbar. */
+  --price-0: #c7ccc9;
+  --price-1: #9dbfa8;
+  --price-2: #5fb37c;
+  --price-3: #22a052;
+  --price-4: #0b7a35;
+  --price-none: #aeaeb2;
 }
 
-/* Im Dunkelmodus eigene, gegen den dunklen Hintergrund gepruefte Stufen */
+/* Dunkel: eigene, gegen #000 / #1c1c1e gepruefte Stufen */
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --chart-doors: #4295e0;
-    --chart-sales: #1fae6c;
-    --chart-grid: #1e3252;
-
-    /* Eigene Stufen fuer die dunkle Karte, als Satz geprueft */
+    --accent: #30d158;
+    --accent-ink: #34d66b;
+    --accent-vivid: #30d158;
+    --on-accent: #062611;
+    --accent-tint: color-mix(in srgb, var(--accent-vivid) 20%, transparent);
+    --accent-tint-strong: color-mix(in srgb, var(--accent-vivid) 30%, transparent);
+    --accent-edge: color-mix(in srgb, var(--accent) 40%, transparent);
+    --danger: #ff6b6b;
+    --danger-tint: color-mix(in srgb, #ff453a 18%, transparent);
+    --warn: #ffb547;
+    --warn-tint: color-mix(in srgb, #ff9f0a 20%, transparent);
+    --chart-doors: #8e8e93;
+    --chart-met: #d1d1d6;
     --plot-1: #3987e5;
     --plot-2: #c98500;
     --plot-3: #d55181;
     --plot-4: #008300;
+    --price-0: #4a4f4c;
+    --price-1: #3f6b4e;
+    --price-2: #2e8f52;
+    --price-3: #2bb45e;
+    --price-4: #3be077;
+    --price-none: #636366;
   }
 }
 
 :root[data-theme="dark"] {
-  --chart-doors: #4295e0;
-  --chart-sales: #1fae6c;
-  --chart-grid: #1e3252;
-
+  --accent: #30d158;
+  --accent-ink: #34d66b;
+  --accent-vivid: #30d158;
+  --on-accent: #062611;
+  --accent-tint: color-mix(in srgb, var(--accent-vivid) 20%, transparent);
+  --accent-tint-strong: color-mix(in srgb, var(--accent-vivid) 30%, transparent);
+  --accent-edge: color-mix(in srgb, var(--accent) 40%, transparent);
+  --danger: #ff6b6b;
+  --danger-tint: color-mix(in srgb, #ff453a 18%, transparent);
+  --warn: #ffb547;
+  --warn-tint: color-mix(in srgb, #ff9f0a 20%, transparent);
+  --chart-doors: #8e8e93;
+  --chart-met: #d1d1d6;
   --plot-1: #3987e5;
   --plot-2: #c98500;
   --plot-3: #d55181;
   --plot-4: #008300;
+  --price-0: #4a4f4c;
+  --price-1: #3f6b4e;
+  --price-2: #2e8f52;
+  --price-3: #2bb45e;
+  --price-4: #3be077;
+  --price-none: #636366;
 }

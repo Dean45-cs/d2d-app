@@ -5,7 +5,7 @@ import { useState } from "react";
 import { IconBellCheck, IconPlus } from "@/components/icons";
 import { useConfirm } from "@/components/useConfirm";
 import { enablePush, pushState, PUSH_HINT, type PushState } from "@/lib/push-client";
-import { useToast } from "./Toast";
+import { useToast } from "@/components/Toast";
 
 /**
  * Abonnieren wie bei Twitter - mit dem Unterschied, dass ein Abo hier heisst:
@@ -33,7 +33,7 @@ export function FollowButton({
   const [following, setFollowing] = useState(initial);
   const [busy, setBusy] = useState(false);
   const { confirm, dialog } = useConfirm();
-  const { show, toast } = useToast();
+  const show = useToast();
   const first = name.split(" ")[0];
 
   async function send(next: boolean): Promise<boolean> {
@@ -61,13 +61,11 @@ export function FollowButton({
       const ok = await send(true);
       const state = await push.catch((): PushState => "off");
       if (!ok) return;
-      show(
-        state === "on"
-          ? `Abonniert – du bekommst Bescheid, wenn ${first} einen Vertrag macht.`
-          : `${first} abonniert. ${PUSH_HINT[state] ?? ""}`.trim(),
-      );
+      show(state === "on" ? `${first} abonniert` : `${first} abonniert – ${PUSH_HINT[state] ?? ""}`.replace(/ – $/, ""), {
+        icon: <IconBellCheck className="h-5 w-5" />,
+      });
     } catch {
-      show("Keine Verbindung – bitte gleich noch einmal versuchen.");
+      show("Keine Verbindung");
     } finally {
       setBusy(false);
     }
@@ -76,7 +74,7 @@ export function FollowButton({
   async function unsubscribe() {
     const ok = await confirm({
       title: `Abo von ${first} beenden?`,
-      text: `Du bekommst dann keine Nachricht mehr, wenn ${first} einen Vertrag macht.`,
+      text: `Keine Nachricht mehr bei ${first}s Abschlüssen.`,
       confirmLabel: "Abo beenden",
       danger: true,
     });
@@ -85,7 +83,7 @@ export function FollowButton({
     try {
       await send(false);
     } catch {
-      show("Keine Verbindung – bitte gleich noch einmal versuchen.");
+      show("Keine Verbindung");
     } finally {
       setBusy(false);
     }
@@ -97,7 +95,7 @@ export function FollowButton({
       {following ? (
         <button
           type="button"
-          className={`btn btn-ghost btn-pill ${sizing}`}
+          className={`btn btn-secondary ${sizing}`}
           onClick={() => void unsubscribe()}
           disabled={busy}
           aria-pressed="true"
@@ -108,7 +106,7 @@ export function FollowButton({
       ) : (
         <button
           type="button"
-          className={`btn btn-primary btn-pill ${sizing}`}
+          className={`btn btn-primary ${sizing}`}
           onClick={() => void subscribe()}
           disabled={busy}
           aria-pressed="false"
@@ -118,7 +116,6 @@ export function FollowButton({
         </button>
       )}
       {dialog}
-      {toast}
     </>
   );
 }

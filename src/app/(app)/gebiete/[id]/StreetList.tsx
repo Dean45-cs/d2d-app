@@ -1,21 +1,24 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import type { HouseNumberWithStats, StreetWithStats } from "@/lib/queries";
-import {
-  IconBan,
-  IconBell,
-  IconChevronDown,
-  IconNavigate,
-  IconPlus,
-  IconTrash,
-} from "@/components/icons";
-import { EmptyState, ProgressBar, SectionHeader } from "@/components/ui";
+import { IconBan, IconCheck, IconDoor, IconNavigate, IconTrash } from "@/components/icons";
+import { Sheet } from "@/components/Sheet";
+import { useToast } from "@/components/Toast";
 import { useConfirm } from "@/components/useConfirm";
+import { Cell, EmptyState, ListLabel, ProgressRing, Segmented, plural } from "@/components/ui";
 import { routeUrl } from "@/lib/map";
 import { doorStatus, MAX_NOT_HOME_ATTEMPTS, whenLabel } from "@/lib/doors";
 
+type StreetStatus = "OPEN" | "ACTIVE" | "DONE";
+
+/**
+ * Strassen des Gebiets als Liste: Ring fuer den Fortschritt, Zahlen in
+ * einer Zeile. Ein Tipp oeffnet die Strasse mit Status, Hausnummern und
+ * dem Weg dorthin.
+ */
 export function StreetList({
   territoryId,
   streets,
@@ -30,315 +33,283 @@ export function StreetList({
   isLeader: boolean;
   canStatus: boolean;
 }) {
-  const router = useRouter();
-  const [adding, setAdding] = useState(false);
-  const [openStreet, setOpenStreet] = useState<number | null>(null);
-  const [raw, setRaw] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const { confirm, dialog } = useConfirm();
-
-  async function addStreets(event: React.FormEvent) {
-    event.preventDefault();
-    setBusy(true);
-    setError(null);
-    try {
-      const response = await fetch(`/api/territories/${territoryId}/streets`, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ streets: raw }),
-      });
-      const data = await response.json();
-      if (!response.ok) {
-        setError(data.error ?? "Straßen konnten nicht gespeichert werden.");
-        return;
-      }
-      setRaw("");
-      setAdding(false);
-      router.refresh();
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function setStatus(streetId: number, status: string) {
-    await fetch(`/api/streets/${streetId}`, {
-      method: "PATCH",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ status }),
-    });
-    router.refresh();
-  }
-
-  async function remove(streetId: number, name: string) {
-    const ok = await confirm({
-      title: `${name} entfernen?`,
-      text: "Die Straße verschwindet aus dem Gebiet. Bereits erfasste Türen bleiben in der Auswertung.",
-      confirmLabel: "Entfernen",
-      danger: true,
-    });
-    if (!ok) return;
-    await fetch(`/api/streets/${streetId}`, { method: "DELETE" });
-    router.refresh();
-  }
+  const [openId, setOpenId] = useState<number | null>(null);
+  const open = streets.find((s) => s.id === openId) ?? null;
 
   return (
-    <div className="card p-5">
-      <SectionHeader
-        title="Straßen"
-        count={streets.length}
-        action={
-          isLeader ? (
-            <button
-              className="btn btn-ghost btn-sm btn-pill"
-              onClick={() => setAdding((v) => !v)}
-            >
-              <IconPlus className="h-4 w-4" />
-              Hinzufügen
-            </button>
-          ) : undefined
-        }
-      />
-
-      {adding && (
-        <form onSubmit={addStreets} className="inset mb-4 p-3">
-          <label className="label" htmlFor="street-input">
-            Eine Straße pro Zeile
-          </label>
-          <textarea
-            id="street-input"
-            className="textarea font-mono text-sm"
-            rows={5}
-            placeholder={"Bahnhofstraße 1-45; 30 WE\nGartenweg"}
-            value={raw}
-            onChange={(e) => setRaw(e.target.value)}
-            required
-          />
-          {error && <p className="mt-2 text-[12px] font-semibold text-danger">{error}</p>}
-          <div className="mt-3 flex gap-2">
-            <button type="button" className="btn btn-ghost flex-1" onClick={() => setAdding(false)}>
-              Abbrechen
-            </button>
-            <button className="btn btn-primary flex-1" disabled={busy}>
-              {busy ? "Speichern …" : "Hinzufügen"}
-            </button>
-          </div>
-        </form>
-      )}
-
+    <section aria-labelledby={`streets-${territoryId}`}>
+      <p id={`streets-${territoryId}`} className="list-label">
+        {plural(streets.length, "Straße", "Straßen")}
+      </p>
       {streets.length === 0 ? (
-        <EmptyState bare title="Noch keine Straßen" />
+        <div className="surface">
+          <EmptyState title="Noch keine Straßen" />
+        </div>
       ) : (
-        <ul>
+        <ul className="list list-icons">
           {streets.map((s) => {
-            const houses = numbers[s.id] ?? [];
-            const doneHouses = houses.filter((h) => h.visit_count > 0).length;
-            const expanded = openStreet === s.id;
+            const progress = streetProgress(s, numbers[s.id] ?? []);
             return (
-              <li
-                key={s.id}
-                className="border-t py-3 first:border-t-0"
-                style={{ borderColor: "var(--line)" }}
-              >
-                <div className="flex items-center gap-2">
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-[14px] font-medium">
-                      {s.name}{" "}
-                      {s.house_numbers && (
-                        <span className="muted font-normal">{s.house_numbers}</span>
-                      )}
-                    </p>
-                    <p className="muted text-[12px] tabular-nums">
-                      {/* Kurz halten: der Fortschritt ist die wichtigste Zahl. */}
-                      {s.units > 0
-                        ? `${s.visit_count} von ${s.units} Türen`
-                        : `${s.visit_count} Türen`}
-                      {s.sale_count > 0 && ` · ${s.sale_count} Abschlüsse`}
-                    </p>
-                    {s.units > 0 && (
-                      <div className="mt-1.5 max-w-40">
-                        <ProgressBar
-                          value={s.visit_count}
-                          max={s.units}
-                          size="sm"
-                          tone={s.status === "DONE" ? "success" : "brand"}
-                        />
-                      </div>
-                    )}
-                  </div>
-
-                  {houses.length > 0 && (
-                    <button
-                      type="button"
-                      onClick={() => setOpenStreet(expanded ? null : s.id)}
-                      className="muted shrink-0 rounded-full px-2.5 py-1.5 text-[12px] font-semibold hover:bg-[var(--hover)]"
-                      aria-expanded={expanded}
-                    >
-                      {houses.length} Nr.
-                      <IconChevronDown
-                        className={`ml-0.5 inline h-3 w-3 transition-transform ${
-                          expanded ? "rotate-180" : ""
-                        }`}
-                      />
-                    </button>
-                  )}
-
-                  {s.lat !== null && s.lng !== null && (
-                    <a
-                      href={routeUrl(s.lat, s.lng)}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="icon-btn h-8 w-8 shrink-0"
-                      style={{ color: "var(--tint)" }}
-                      title={`Route zur ${s.name}`}
-                      aria-label={`Route zur ${s.name}`}
-                    >
-                      <IconNavigate className="h-4 w-4" />
-                    </a>
-                  )}
-
-                  {/* Das Auswahlfeld zeigt den Status schon an - eine zusaetzliche
-                      Plakette daneben waere doppelt und kostet auf dem Handy Platz. */}
-                  <select
-                    className="select select-sm shrink-0"
-                    disabled={!canStatus}
-                    value={s.status}
-                    onChange={(e) => setStatus(s.id, e.target.value)}
-                    aria-label={`Status von ${s.name}`}
-                  >
-                    <option value="OPEN">Offen</option>
-                    <option value="ACTIVE">In Arbeit</option>
-                    <option value="DONE">Fertig</option>
-                  </select>
-
-                  {isLeader && (
-                    <button
-                      onClick={() => void remove(s.id, s.name)}
-                      className="icon-btn h-8 w-8 shrink-0 hover:text-danger"
-                      aria-label={`${s.name} entfernen`}
-                      title="Entfernen"
-                    >
-                      <IconTrash className="h-4 w-4" />
-                    </button>
-                  )}
-                </div>
-
-                {expanded && (
-                  <div className="mt-2 rise">
-                    <p className="muted mb-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[12px]">
-                      <span>
-                        {doneHouses} von {houses.length} Häusern erfasst
+              <li key={s.id}>
+                <Cell
+                  onClick={() => setOpenId(s.id)}
+                  icon={
+                    s.status === "DONE" ? (
+                      <span className="glyph glyph-round">
+                        <IconCheck className="h-4 w-4" />
                       </span>
-                      <ChipLegend color="var(--brand-500)" label="erfasst" />
-                      <ChipLegend color="var(--energy-500)" label="Abschluss" />
-                      <ChipLegend color="var(--gas-500)" label="nochmal" />
-                    </p>
-                    <ul className="flex flex-wrap gap-1">
-                      {houses.map((house) => (
-                        <li key={house.id}>
-                          <HouseChip house={house} />
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
+                    ) : (
+                      <ProgressRing value={progress.done} max={Math.max(progress.total, 1)} size={32} stroke={4} />
+                    )
+                  }
+                  title={s.name}
+                  subtitle={[
+                    s.house_numbers ? `Nr. ${s.house_numbers}` : null,
+                    progress.label,
+                    s.sale_count > 0 ? plural(s.sale_count, "Abschluss", "Abschlüsse") : null,
+                  ]
+                    .filter(Boolean)
+                    .join(" · ")}
+                  chevron
+                />
               </li>
             );
           })}
         </ul>
       )}
-      {dialog}
-    </div>
+
+      {open && (
+        <StreetSheet
+          street={open}
+          houses={numbers[open.id] ?? []}
+          isLeader={isLeader}
+          canStatus={canStatus}
+          onClose={() => setOpenId(null)}
+        />
+      )}
+    </section>
   );
 }
 
-function ChipLegend({ color, label }: { color: string; label: string }) {
+function StreetSheet({
+  street,
+  houses,
+  isLeader,
+  canStatus,
+  onClose,
+}: {
+  street: StreetWithStats;
+  houses: HouseNumberWithStats[];
+  isLeader: boolean;
+  canStatus: boolean;
+  onClose: () => void;
+}) {
+  const router = useRouter();
+  const toast = useToast();
+  const { confirm, dialog } = useConfirm();
+  const [status, setStatus] = useState<StreetStatus>(street.status as StreetStatus);
+
+  async function changeStatus(next: StreetStatus) {
+    const previous = status;
+    setStatus(next);
+    const response = await fetch(`/api/streets/${street.id}`, {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ status: next }),
+    }).catch(() => null);
+    if (!response?.ok) {
+      setStatus(previous);
+      toast("Status nicht gespeichert");
+      return;
+    }
+    router.refresh();
+  }
+
+  async function remove() {
+    const ok = await confirm({
+      title: `${street.name} entfernen?`,
+      text: "Erfasste Türen bleiben in der Auswertung.",
+      confirmLabel: "Entfernen",
+      danger: true,
+    });
+    if (!ok) return;
+    const response = await fetch(`/api/streets/${street.id}`, { method: "DELETE" }).catch(() => null);
+    if (!response?.ok) {
+      toast("Straße nicht entfernt");
+      return;
+    }
+    toast(`${street.name} entfernt`);
+    onClose();
+    router.refresh();
+  }
+
+  const doneHouses = streetProgress(street, houses).done;
+
   return (
-    <span className="inline-flex items-center gap-1">
-      <span className="h-2 w-2 rounded-[3px]" style={{ background: color }} aria-hidden />
+    <Sheet
+      title={street.name}
+      subtitle={[street.house_numbers ? `Nr. ${street.house_numbers}` : null, streetProgress(street, houses).label]
+        .filter(Boolean)
+        .join(" · ")}
+      onClose={onClose}
+      footer={
+        <div className="flex gap-2">
+          {street.lat !== null && street.lng !== null && (
+            <a
+              href={routeUrl(street.lat, street.lng, "walk")}
+              target="_blank"
+              rel="noreferrer"
+              className="btn btn-secondary btn-lg"
+              aria-label={`Route zur ${street.name}`}
+            >
+              <IconNavigate className="h-5 w-5" />
+              Route
+            </a>
+          )}
+          <Link href={`/tour?street=${street.id}`} className="btn btn-primary btn-lg flex-1">
+            <IconDoor className="h-5 w-5" />
+            Klingeln
+          </Link>
+        </div>
+      }
+    >
+      {canStatus && (
+        <Segmented
+          ariaLabel={`Status von ${street.name}`}
+          value={status}
+          onChange={changeStatus}
+          options={[
+            { value: "OPEN", label: "Offen" },
+            { value: "ACTIVE", label: "In Arbeit" },
+            { value: "DONE", label: "Fertig" },
+          ]}
+        />
+      )}
+
+      {houses.length > 0 && (
+        <>
+          <ListLabel>{`${doneHouses} von ${houses.length} Häusern erfasst`}</ListLabel>
+          <ul className="flex flex-wrap gap-2" aria-label="Hausnummern">
+            {houses.map((house) => (
+              <li key={house.id}>
+                <HouseChip house={house} />
+              </li>
+            ))}
+          </ul>
+          <ul className="mt-4 flex flex-wrap gap-x-4 gap-y-2 text-footnote text-muted" aria-label="Legende">
+            <LegendItem state="open" label="Offen" />
+            <LegendItem state="retry" label="Nochmal" />
+            <LegendItem state="done" label="Erfasst" />
+            <LegendItem state="sale" label="Abschluss" />
+            <LegendItem state="blocked" label="Gesperrt" />
+          </ul>
+        </>
+      )}
+
+      {isLeader && (
+        <ul className="list mt-6">
+          <li>
+            <Cell
+              onClick={() => void remove()}
+              icon={<IconTrash className="h-5 w-5 text-danger" />}
+              title="Aus dem Gebiet entfernen"
+              tone="danger"
+            />
+          </li>
+        </ul>
+      )}
+      {dialog}
+    </Sheet>
+  );
+}
+
+/** Erfasst ist ein Haus, sobald jemand dort war oder es gesperrt ist - wie beim Gebiet. */
+function houseTouched(house: HouseNumberWithStats): boolean {
+  return house.visit_count > 0 || Boolean(house.blocked_at);
+}
+
+function streetProgress(
+  street: StreetWithStats,
+  houses: HouseNumberWithStats[],
+): { done: number; total: number; label: string } {
+  if (houses.length > 0) {
+    const done = houses.filter(houseTouched).length;
+    return { done, total: houses.length, label: `${done} von ${houses.length} Häusern` };
+  }
+  if (street.units > 0) {
+    const done = Math.min(street.visit_count, street.units);
+    return { done, total: street.units, label: `${done} von ${street.units} Türen` };
+  }
+  return { done: 0, total: 0, label: plural(street.visit_count, "Tür", "Türen") };
+}
+
+type ChipState = "open" | "retry" | "done" | "sale" | "blocked";
+
+/* Form vor Farbe: offen hohl, nochmal grau, erfasst dunkel, Abschluss gruen. */
+const CHIP_CLASS: Record<ChipState, string> = {
+  open: "bg-surface text-ink ring-1 ring-inset ring-[var(--ink-2)]",
+  retry: "bg-fill-strong text-ink",
+  done: "bg-fill text-ink-2",
+  // Schrift auf vollem Gruen haette nur 3,5:1 - deshalb getoent, mit Haken.
+  sale: "bg-accent-tint text-accent-ink ring-1 ring-inset ring-[var(--accent-edge)]",
+  blocked: "bg-danger-tint text-danger",
+};
+
+function LegendItem({ state, label }: { state: ChipState; label: string }) {
+  return (
+    <li className="flex items-center gap-2">
+      <span className={`h-3 w-4 rounded-xs ${CHIP_CLASS[state]}`} aria-hidden="true" />
       {label}
-    </span>
+    </li>
   );
 }
 
 /**
- * Eine Hausnummer als Plakette: grau = offen, gelb = angefangen,
- * blau = erfasst, grün = Abschluss, rot = gesperrt.
+ * Eine Hausnummer als Plakette. Ein Mehrfamilienhaus ist erst durch, wenn
+ * jede Klingel dran war - sonst saehe die Strasse nach dem ersten Eintrag
+ * schon fertig aus.
  */
 function HouseChip({ house }: { house: HouseNumberWithStats }) {
-  // Ein Mehrfamilienhaus ist erst durch, wenn jede Klingel dran war - sonst
-  // saehe die Gebietsuebersicht nach dem ersten Eintrag schon fertig aus.
   const mfh = house.building_type === "MFH";
   const status = doorStatus(house);
   const blocked = status === "BLOCKED";
   const retry = !mfh && status === "RETRY";
-  const done = blocked
-    ? true
-    : mfh
-      ? house.bell_count > 0 && house.bell_done_count >= house.bell_count
-      : status === "DONE";
-  const sale = house.sale_count > 0;
-  const wasHere = house.last_visit_user
-    ? `zuletzt ${house.last_visit_user}, ${whenLabel(house.last_visit_at)}`
-    : null;
+  const done = mfh ? house.bell_count > 0 && house.bell_done_count >= house.bell_count : status === "DONE";
+  const state: ChipState = blocked ? "blocked" : house.sale_count > 0 ? "sale" : retry ? "retry" : done ? "done" : "open";
+
+  const description = [
+    `Nr. ${house.number}`,
+    blocked
+      ? `gesperrt${house.blocked_by_name ? ` von ${house.blocked_by_name}` : ""}${house.blocked_note ? ` – ${house.blocked_note}` : ""}`
+      : null,
+    mfh && house.bell_count > 0 ? `${house.bell_done_count} von ${house.bell_count} Klingeln` : null,
+    retry ? `${house.not_home_count} von ${MAX_NOT_HOME_ATTEMPTS} Versuchen` : null,
+    house.last_visit_user ? `zuletzt ${house.last_visit_user}, ${whenLabel(house.last_visit_at)}` : null,
+  ]
+    .filter(Boolean)
+    .join(" · ");
+
   return (
-    <span
-      className="inline-flex items-center rounded-lg px-1.5 py-0.5 text-xs font-semibold tabular-nums"
-      style={{
-        background: blocked
-          ? "color-mix(in srgb, var(--signal-500) 16%, transparent)"
-          : retry
-            ? "color-mix(in srgb, var(--gas-500) 18%, transparent)"
-            : sale
-              ? "color-mix(in srgb, var(--energy-500) 20%, transparent)"
-              : done
-                ? "color-mix(in srgb, var(--brand-500) 16%, transparent)"
-                : "color-mix(in srgb, var(--ink) 7%, transparent)",
-        color: blocked
-          ? "var(--danger-ink)"
-          : retry
-            ? "var(--warn-ink)"
-            : sale
-              ? "var(--ok-ink)"
-              : done
-                ? "var(--tint)"
-                : "var(--ink-muted)",
-      }}
-      title={[
-        `Hausnummer ${house.number}`,
-        blocked
-          ? `gesperrt${house.blocked_by_name ? ` von ${house.blocked_by_name}` : ""}${
-              house.blocked_note ? ` – ${house.blocked_note}` : ""
-            }`
-          : null,
-        mfh ? "Mehrfamilienhaus" : house.building_type === "EFH" ? "Einfamilienhaus" : null,
-        mfh && house.bell_count > 0
-          ? `${house.bell_done_count} von ${house.bell_count} Klingeln`
-          : null,
-        retry ? `${house.not_home_count} von ${MAX_NOT_HOME_ATTEMPTS} Versuchen` : null,
-        house.units > 1 ? `${house.units} Wohneinheiten` : null,
-        wasHere,
-        blocked ? null : sale ? "Abschluss" : done ? "erfasst" : "offen",
-      ]
-        .filter(Boolean)
-        .join(" · ")}
+    <Link
+      href={`/tour?street=${house.street_id}&house=${encodeURIComponent(house.number)}`}
+      className={`inline-flex min-h-11 min-w-11 items-center justify-center gap-1 rounded-sm px-2 text-subhead font-semibold tabular-nums ${CHIP_CLASS[state]}`}
+      title={description}
+      aria-label={description}
     >
       {house.number}
       {blocked ? (
-        <IconBan className="ml-1 h-3 w-3" />
-      ) : mfh ? (
-        house.bell_count > 0 ? (
-          <span className="ml-1 text-[10px] font-medium opacity-70">
-            {house.bell_done_count}/{house.bell_count}
-          </span>
-        ) : (
-          <IconBell className="ml-1 h-3 w-3 opacity-70" />
-        )
+        <IconBan className="h-3.5 w-3.5" />
+      ) : state === "sale" ? (
+        <IconCheck className="h-3.5 w-3.5" />
+      ) : mfh && house.bell_count > 0 && !done ? (
+        <span className="text-caption font-medium opacity-70">
+          {house.bell_done_count}/{house.bell_count}
+        </span>
       ) : retry ? (
-        <span className="ml-1 text-[10px] font-medium opacity-70">
+        <span className="text-caption font-medium opacity-70">
           {house.not_home_count}/{MAX_NOT_HOME_ATTEMPTS}
         </span>
       ) : null}
-    </span>
+    </Link>
   );
 }

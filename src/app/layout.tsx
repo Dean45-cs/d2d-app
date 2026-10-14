@@ -3,11 +3,10 @@ import "./globals.css";
 import { ServiceWorker } from "@/components/ServiceWorker";
 
 export const metadata: Metadata = {
-  title: "Energie Partner 24 · Vertrieb",
-  description:
-    "Gebietsplanung, Tür-Tracking und Energiekarte für den Door-to-Door-Vertrieb von Strom und Gas.",
+  title: "Carlsson Sales",
+  description: "Gebiete, Türerfassung und Energiepreise für den Haustürvertrieb von Strom und Gas.",
   manifest: "/manifest.webmanifest",
-  applicationName: "EP24 Vertrieb",
+  applicationName: "Carlsson Sales",
   icons: {
     icon: [
       { url: "/favicon-32.png", sizes: "32x32", type: "image/png" },
@@ -15,16 +14,17 @@ export const metadata: Metadata = {
     ],
     apple: [{ url: "/apple-touch-icon.png", sizes: "180x180" }],
   },
-  // Sorgt dafür, dass die App vom Home-Bildschirm ohne Safari-Leisten startet.
+  // Startet vom Home-Bildschirm ohne Safari-Leisten. "default": die
+  // Statusleiste nimmt die Hintergrundfarbe (theme-color) an und bleibt in
+  // Hell und Dunkel lesbar.
   appleWebApp: {
     capable: true,
-    title: "EP24 Vertrieb",
-    statusBarStyle: "black-translucent",
+    title: "Carlsson",
+    statusBarStyle: "default",
   },
   formatDetection: { telephone: false },
   other: {
-    // Next.js setzt nur das neuere "mobile-web-app-capable". Ältere iOS-Versionen
-    // starten die App ohne Safari-Leisten nur mit diesem Tag.
+    // Aeltere iOS-Versionen starten ohne Safari-Leisten nur mit diesem Tag.
     "apple-mobile-web-app-capable": "yes",
   },
 };
@@ -34,15 +34,15 @@ export const viewport: Viewport = {
   initialScale: 1,
   maximumScale: 1,
   userScalable: false,
-  // Blendet den Inhalt bis unter Notch und Home-Indicator; die Abstände
-  // setzen wir selbst über env(safe-area-inset-*).
+  // Inhalt bis unter Notch und Home-Indikator; Abstaende per env(safe-area-inset-*).
   viewportFit: "cover",
-  themeColor: "#0c2f56",
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#f2f2f7" },
+    { media: "(prefers-color-scheme: dark)", color: "#000000" },
+  ],
 };
 
-export default function RootLayout({
-  children,
-}: Readonly<{ children: React.ReactNode }>) {
+export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="de">
       <body>

@@ -1,324 +1,292 @@
-import { hasPermission } from "@/lib/permissions";
 import Link from "next/link";
-import { PendingSales } from "@/components/PendingSales";
-import { redirect } from "next/navigation";
+import { hasPermission } from "@/lib/permissions";
 import { requireUser } from "@/lib/auth";
 import {
   dailySeries,
+  listAccessibleTerritories,
   listAppointments,
   listMembers,
-  listAccessibleTerritories,
+  listVisits,
   memberStats,
   reasonStats,
   totals,
 } from "@/lib/queries";
 import { DailyBars, ReasonBars, fillDays } from "@/components/charts";
-import { parseSlot } from "@/lib/appointments";
 import {
   Avatar,
+  Cell,
   EmptyState,
+  OutcomeGlyph,
   PageHeader,
-  ProgressBar,
+  ProgressRing,
   SectionHeader,
-  StatTile,
-  StatusBadge,
+  StatGrid,
   percent,
+  plural,
 } from "@/components/ui";
-import { PriceBadge, ProviderCard } from "@/components/ProviderRating";
-import { providerLookup, type ProviderInfo } from "@/lib/energy/provider";
-import { readArea } from "@/lib/geo/area";
-import { greeting, todayLong } from "@/lib/format";
-import { IconCalendar, IconMap } from "@/components/icons";
-import { LevelCard } from "@/components/levels/LevelCard";
-import { getLevelProgress } from "@/lib/level-queries";
+import { PendingSales } from "@/components/PendingSales";
+import { RangePicker } from "@/components/RangePicker";
+import { ShowMore } from "@/components/ShowMore";
+import { IconCalendar, IconChart, IconMap } from "@/components/icons";
+import { parseSlot } from "@/lib/appointments";
+import { greeting, sqlDateTime, todayLong } from "@/lib/format";
+import { parseRange, rangeToSince, type RangeKey } from "@/lib/ranges";
+import { territoryProgress } from "@/lib/progress";
 
 export const dynamic = "force-dynamic";
 
-export default async function StartPage() {
+const RANGE_TITLE: Record<RangeKey, string> = {
+  "1": "Heute",
+  "7": "Letzte 7 Tage",
+  "30": "Letzte 30 Tage",
+  all: "Gesamt",
+};
+
+/**
+ * Uebersicht: Zahlen des Zeitraums, Verlauf, wer im Team wo steht, offene
+ * Termine und Gebiete - die frueheren Seiten "Übersicht" und "Auswertung"
+ * in einer. Ohne Teamrecht dieselbe Seite fuer die eigenen Zahlen.
+ */
+export default async function StartPage({ searchParams }: { searchParams: Promise<{ range?: string }> }) {
   const user = await requireUser();
-  if (!hasPermission(user, "reports.team")) redirect("/tour");
-  const level = getLevelProgress(user.team_id, user.id);
+  const team = hasPermission(user, "reports.team");
+  const key = parseRange((await searchParams).range, "7");
+  const since = rangeToSince(key);
+  const scope = team ? {} : { userId: user.id };
 
-  const today = new Date().toISOString().slice(0, 10);
-  const todayTotals = totals(user.team_id, { since: today });
-  const weekAgo = new Date(Date.now() - 6 * 86_400_000).toISOString().slice(0, 10);
-  const weekTotals = totals(user.team_id, { since: weekAgo });
-
-  const series = fillDays(dailySeries(user.team_id, 14), 14);
+  const sum = totals(user.team_id, { ...scope, since });
+  const days = key === "all" ? 90 : key === "30" ? 30 : 14;
+  const series = fillDays(dailySeries(user.team_id, days, team ? undefined : user.id), days);
+  const reasons = reasonStats(user.team_id, since, team ? undefined : user.id);
+  const members = team
+    ? memberStats(user.team_id, since).sort((a, b) => b.sales - a.sales || b.doors - a.doors)
+    : [];
   const faces = new Map(listMembers(user.team_id).map((m) => [m.id, m.avatar]));
-  const members = memberStats(user.team_id, weekAgo).sort(
-    (a, b) => b.sales - a.sales || b.doors - a.doors,
-  );
-  const reasons = reasonStats(user.team_id, weekAgo);
-  const territories = listAccessibleTerritories(user);
+  const appointments = listAppointments(user.team_id, {
+    userId: hasPermission(user, "appointments.team") ? undefined : user.id,
+    limit: 100,
+  });
+  const territories = team ? listAccessibleTerritories(user) : [];
+  const recent = listVisits(user.team_id, { ...scope, since, limit: 40 });
 
-  // Termine gehoeren ins Dashboard: ein Termin, den niemand mehr sieht,
-  // verfaellt - und mit ihm die beste Tuer der Woche.
-  const appointments = listAppointments(user.team_id, { userId: hasPermission(user, "appointments.team") ? undefined : user.id, limit: 100 });
-
-  // Grundversorger je Gebiet - teuerster zuerst: dort ist das Wechselargument am staerksten.
-  const providers = providerLookup(user.team_id);
-  const providerOf = new Map<number, ProviderInfo | null>(
-    territories.map((t) => [
-      t.id,
-      providers.find({ postal_code: t.postal_code, city: t.city, area: readArea(t.area_json) }),
-    ]),
-  );
-  const active = territories.filter((t) => t.status !== "DONE");
-  const byPrice = [...active].sort(
-    (a, b) => leadYear(providerOf.get(b.id)) - leadYear(providerOf.get(a.id)),
-  );
-  const top = byPrice.find((t) => providerOf.get(t.id)) ?? null;
+  const doors = sum.doors ?? 0;
+  const met = sum.met ?? 0;
+  const sales = sum.sales ?? 0;
   const unassigned = territories.filter((t) => !t.assigned_user_id).length;
+  const activeTerritories = territories.filter((t) => t.status !== "DONE");
 
   return (
-    <div className="mx-auto max-w-6xl">
+    <div className="page">
       <PageHeader
-        title={`${greeting()}, ${user.name.split(" ")[0]}`}
-        subtitle={todayLong()}
-        action={
-          <Link href="/tour" className="btn btn-primary hidden md:inline-flex">
-            Klinken starten
-          </Link>
-        }
-      />
+        title={team ? `${greeting()}, ${user.name.split(" ")[0]}` : "Meine Zahlen"}
+        subtitle={team ? todayLong() : RANGE_TITLE[key]}
+      >
+        <RangePicker current={key} className="max-w-md" />
+      </PageHeader>
 
       <PendingSales userId={user.id} />
 
-      <div className="mb-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <StatTile
-          label="Türen heute"
-          value={todayTotals.doors ?? 0}
-          tone="brand"
-          hint={`${weekTotals.doors ?? 0} in 7 Tagen`}
-        />
-        <StatTile
-          label="Angetroffen heute"
-          value={todayTotals.met ?? 0}
-          hint={`${percent(todayTotals.met ?? 0, todayTotals.doors ?? 0)} Antreffquote`}
-        />
-        <StatTile
-          label="Abschlüsse heute"
-          value={todayTotals.sales ?? 0}
-          tone="success"
-          hint={`${percent(todayTotals.sales ?? 0, todayTotals.met ?? 0)} der Gespräche`}
-        />
-        <StatTile
-          label="Abschlüsse 7 Tage"
-          value={weekTotals.sales ?? 0}
-          tone="success"
-          hint={`${percent(weekTotals.sales ?? 0, weekTotals.met ?? 0)} der Gespräche`}
-        />
-      </div>
+      <StatGrid
+        size="lg"
+        items={[
+          { label: "Türen", value: doors, hint: `${sum.not_home ?? 0} nicht da` },
+          { label: "Gespräche", value: met, hint: `${percent(met, doors)} angetroffen` },
+          { label: "Termine", value: sum.appointments ?? 0, hint: `${percent(sum.appointments ?? 0, met)} der Gespräche` },
+          { label: "Abschlüsse", value: sales, accent: sales > 0, hint: `${percent(sales, met)} Quote` },
+        ]}
+      />
 
-      <div className="grid gap-4 lg:grid-cols-3">
-        <div className="lg:col-span-3"><LevelCard progress={level} compact href="/level" /></div>
-        {/* ------------------------------ Verlauf ------------------------------ */}
-        <section className="card p-5 lg:col-span-2">
-          <SectionHeader title="Letzte 14 Tage" href="/auswertung" linkLabel="Auswertung" />
-          <DailyBars data={series} height={250} />
+      <div className="mt-8 grid grid-cols-1 gap-8 lg:grid-cols-3">
+        <section className="lg:col-span-2">
+          <SectionHeader title="Verlauf" />
+          <div className="surface p-4">
+            <DailyBars data={series} height={184} />
+          </div>
         </section>
 
-        {/* ------------------------------ Termine ------------------------------ */}
-        <section className="card flex flex-col p-5">
-          <SectionHeader
-            title="Offene Termine"
-            count={appointments.length}
-            href="/termine"
-            linkLabel="Alle"
-          />
+        <section>
+          <SectionHeader title="Termine" count={appointments.length} href="/termine" />
           {appointments.length === 0 ? (
-            <EmptyState
-              bare
-              icon={<IconCalendar className="h-5 w-5" />}
-              title="Keine offenen Termine"
-            />
+            <div className="surface">
+              <EmptyState icon={<IconCalendar className="h-5 w-5" />} title="Keine offenen Termine" />
+            </div>
           ) : (
-            <ul className="-mx-1 space-y-0.5">
-              {appointments.slice(0, 6).map((item) => {
-                const slot = slotParts(item.follow_up_at);
-                return (
-                  <li key={item.id} className="flex items-center gap-3 rounded-[var(--r-sm)] px-1 py-1.5">
-                    <span
-                      className="grid w-12 shrink-0 place-items-center rounded-[var(--r-xs)] py-1 leading-tight"
-                      style={{ background: "var(--card-inset)" }}
-                    >
-                      <span className="muted text-[10.5px] font-semibold">{slot.day}</span>
-                      <span className="text-[13px] font-bold tabular-nums">{slot.time}</span>
-                    </span>
-                    <span className="min-w-0 flex-1">
-                      <span className="block truncate text-[13.5px] font-medium">
-                        {item.contact_name || "Ohne Namen"}
-                      </span>
-                      <span className="muted block truncate text-[12px]">
-                        {item.street_name ?? ""} {item.house_number}
-                      </span>
-                    </span>
-                    <Avatar name={item.user_name} src={faces.get(item.user_id)} size={24} />
-                  </li>
-                );
-              })}
+            <ul className="list list-icons">
+              {appointments.slice(0, 5).map((item) => (
+                <li key={item.id}>
+                  <Cell
+                    href={`/termine?termin=${item.id}`}
+                    icon={<SlotBadge slot={item.follow_up_at} />}
+                    title={item.contact_name || "Ohne Namen"}
+                    subtitle={`${item.street_name ?? ""} ${item.house_number}`.trim()}
+                    trailing={team ? <Avatar name={item.user_name} src={faces.get(item.user_id)} size={28} /> : undefined}
+                  />
+                </li>
+              ))}
             </ul>
           )}
         </section>
 
-        {/* ------------------------------- Team -------------------------------- */}
-        <section className="card p-5 lg:col-span-2">
-          <SectionHeader title="Team · 7 Tage" href="/vergleich" linkLabel="Vergleich" />
-          {members.length === 0 ? (
-            <EmptyState bare title="Noch keine Mitarbeiter" />
-          ) : (
-            <div className="-mx-1 overflow-x-auto px-1">
-              <table className="data-table min-w-[26rem]">
-                <thead>
-                  <tr>
-                    <th>Name</th>
-                    <th className="num">Türen</th>
-                    <th className="num">Angetroffen</th>
-                    <th className="num">Abschlüsse</th>
-                    <th className="num">Quote</th>
-                  </tr>
-                </thead>
-                <tbody>
+        {team && (
+          <section className="lg:col-span-2">
+            <SectionHeader title="Team" href="/team/rangliste" linkLabel="Rangliste" />
+            {members.length === 0 ? (
+              <div className="surface">
+                <EmptyState title="Noch niemand im Team" />
+              </div>
+            ) : (
+              <>
+                <ul className="list list-icons md:hidden">
                   {members.map((m) => (
-                    <tr key={m.user_id}>
-                      <td>
-                        <Link
-                          href={`/profil/${m.user_id}`}
-                          className="flex items-center gap-2.5 hover:underline"
-                        >
-                          <Avatar name={m.user_name} src={faces.get(m.user_id)} size={28} />
-                          <span className="truncate font-medium">{m.user_name}</span>
-                        </Link>
-                      </td>
-                      <td className="num">{m.doors}</td>
-                      <td className="num">{m.met}</td>
-                      <td className="num font-semibold" style={{ color: m.sales ? "var(--ok-ink)" : undefined }}>
-                        {m.sales}
-                      </td>
-                      <td className="num muted">{percent(m.sales, m.met)}</td>
-                    </tr>
+                    <li key={m.user_id}>
+                      <Cell
+                        href={`/profil/${m.user_id}`}
+                        icon={<Avatar name={m.user_name} src={faces.get(m.user_id)} size={32} />}
+                        title={m.user_name}
+                        subtitle={`${m.doors} Türen · ${m.met} Gespräche · ${percent(m.sales, m.met)}`}
+                        trailing={
+                          <span className={`kpi text-title-3 ${m.sales > 0 ? "text-accent-ink" : "text-muted"}`}>
+                            {m.sales}
+                          </span>
+                        }
+                      />
+                    </li>
                   ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </section>
+                </ul>
+                <div className="surface hidden overflow-hidden md:block">
+                  <table className="table">
+                    <thead>
+                      <tr>
+                        <th>Name</th>
+                        <th className="num">Türen</th>
+                        <th className="num">Gespräche</th>
+                        <th className="num">Termine</th>
+                        <th className="num">Abschlüsse</th>
+                        <th className="num">Quote</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {members.map((m) => (
+                        <tr key={m.user_id}>
+                          <td>
+                            <Link href={`/profil/${m.user_id}`} className="flex items-center gap-3">
+                              <Avatar name={m.user_name} src={faces.get(m.user_id)} size={28} />
+                              <span className="truncate font-semibold">{m.user_name}</span>
+                            </Link>
+                          </td>
+                          <td className="num">{m.doors}</td>
+                          <td className="num">{m.met}</td>
+                          <td className="num">{m.appointments}</td>
+                          <td className={`num font-semibold ${m.sales > 0 ? "text-accent-ink" : ""}`}>{m.sales}</td>
+                          <td className="num text-muted">{percent(m.sales, m.met)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </>
+            )}
+          </section>
+        )}
 
-        {/* ------------------------- Ablehnungsgruende ------------------------- */}
-        <section className="card p-5">
-          <SectionHeader title="Ablehnungsgründe · 7 Tage" />
+        <section className={team ? "" : "lg:col-span-1"}>
+          <SectionHeader title="Ablehnungsgründe" />
           <ReasonBars data={reasons} limit={6} />
         </section>
 
-        {/* ------------------------------ Gebiete ------------------------------ */}
-        <section className="card p-5 lg:col-span-2">
-          <SectionHeader
-            title="Gebiete"
-            count={territories.length}
-            href="/gebiete"
-            linkLabel="Verwalten"
-          />
-          {territories.length === 0 ? (
-            <EmptyState
-              bare
-              icon={<IconMap className="h-5 w-5" />}
-              title="Noch keine Gebiete"
-              action={
-                <Link href="/gebiete" className="btn btn-tinted btn-sm">
-                  Gebiet anlegen
-                </Link>
-              }
+        {team && (
+          <section className="lg:col-span-2">
+            <SectionHeader
+              title="Gebiete"
+              count={activeTerritories.length}
+              href="/gebiete"
+              linkLabel={unassigned > 0 ? `${unassigned} ohne Zuteilung` : "Alle"}
             />
-          ) : (
-            <>
-              {unassigned > 0 && (
-                <p className="mb-2 text-[12.5px] font-medium text-warn">
-                  {unassigned === 1 ? "1 Gebiet ist" : `${unassigned} Gebiete sind`} noch niemandem
-                  zugeteilt.
-                </p>
-              )}
-              <ul className="-mx-2">
-                {[...byPrice, ...territories.filter((t) => t.status === "DONE")]
-                  .slice(0, 6)
-                  .map((t) => {
-                    const info = providerOf.get(t.id);
-                    const lead = info?.strom ?? info?.gas ?? null;
-                    return (
-                      <li key={t.id}>
-                        <Link
-                          href={`/gebiete/${t.id}`}
-                          className="flex items-center gap-3 rounded-[var(--r-sm)] px-2 py-2.5 transition-colors hover:bg-[var(--hover)]"
-                        >
-                          <Avatar
-                            name={t.assignee_name}
-                            size={32}
-                            tone={t.assignee_name ? "brand" : "muted"}
-                          />
-                          <span className="min-w-0 flex-1">
-                            <span className="flex items-center gap-2">
-                              <span className="truncate text-[14px] font-medium">{t.name}</span>
-                              <StatusBadge status={t.status} />
-                            </span>
-                            <span className="muted mt-0.5 block truncate text-[12px]">
-                              {[t.postal_code, t.city].filter(Boolean).join(" ") || "Ohne Ort"} ·{" "}
-                              {t.assignee_name ?? "nicht zugeteilt"}
-                            </span>
-                            {t.unit_count > 0 && (
-                              <span className="mt-1.5 block max-w-48">
-                                <ProgressBar
-                                  value={t.visit_count}
-                                  max={t.unit_count}
-                                  size="sm"
-                                  tone={t.status === "DONE" ? "success" : "brand"}
-                                />
-                              </span>
-                            )}
-                          </span>
-                          {lead && (
-                            <span className="hidden shrink-0 sm:block">
-                              <PriceBadge step={lead.step} size="sm" />
-                            </span>
-                          )}
-                        </Link>
-                      </li>
-                    );
-                  })}
+            {activeTerritories.length === 0 ? (
+              <div className="surface">
+                <EmptyState
+                  icon={<IconMap className="h-5 w-5" />}
+                  title="Noch keine Gebiete"
+                  action={
+                    <Link href="/gebiete" className="btn btn-primary btn-sm">
+                      Gebiet anlegen
+                    </Link>
+                  }
+                />
+              </div>
+            ) : (
+              <ul className="list list-icons">
+                {activeTerritories.slice(0, 5).map((t) => (
+                  <li key={t.id}>
+                    <Cell
+                      href={`/gebiete/${t.id}`}
+                      icon={
+                        <ProgressRing value={territoryProgress(t).done} max={Math.max(territoryProgress(t).total, 1)} size={32} stroke={4} />
+                      }
+                      title={t.name}
+                      subtitle={[
+                        t.assignee_name ?? "Nicht zugeteilt",
+                        territoryProgress(t).label,
+                      ].join(" · ")}
+                      detail={t.sale_count > 0 ? plural(t.sale_count, "Abschluss", "Abschlüsse") : undefined}
+                    />
+                  </li>
+                ))}
               </ul>
-            </>
+            )}
+          </section>
+        )}
+
+        <section className={team ? "" : "lg:col-span-2"}>
+          <SectionHeader title="Kontakte" count={recent.length || undefined} />
+          {recent.length === 0 ? (
+            <div className="surface">
+              <EmptyState icon={<IconChart className="h-5 w-5" />} title="Keine Kontakte im Zeitraum" />
+            </div>
+          ) : (
+            <ShowMore initial={6} className="list list-icons">
+              {recent.map((v) => (
+                <li key={v.id} className="cell">
+                  <OutcomeGlyph outcome={v.outcome} emoji={v.reason_emoji} />
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-body">
+                      {v.street_name ?? "–"} {v.house_number}
+                    </span>
+                    <span className="block truncate text-footnote text-muted">
+                      {[team ? v.user_name : null, v.reason_label, productLabel(v.energy_type), sqlDateTime(v.created_at)]
+                        .filter(Boolean)
+                        .join(" · ")}
+                    </span>
+                  </span>
+                </li>
+              ))}
+            </ShowMore>
           )}
         </section>
-
-        {/* ---------------------------- Grundversorger ------------------------- */}
-        <div>
-          <ProviderCard
-            info={top ? (providerOf.get(top.id) ?? null) : null}
-            title={top ? `Höchste Jahreskosten · ${top.name}` : "Grundversorger"}
-            editHref={top ? `/karte?gebiet=${top.id}` : "/karte"}
-          />
-        </div>
       </div>
     </div>
   );
 }
 
-/** Jahreskosten Strom (sonst Gas) - zum Sortieren; unbekannt landet hinten. */
-function leadYear(info: ProviderInfo | null | undefined): number {
-  return info?.strom?.year ?? info?.gas?.year ?? -1;
+/** Tag und Uhrzeit eines Termins als kleiner Block links in der Zeile. */
+function SlotBadge({ slot }: { slot: string }) {
+  const date = parseSlot(slot);
+  if (!date) return <span className="glyph" />;
+  return (
+    <span className="glyph glyph-lg flex-col gap-0 leading-none">
+      <span className="text-caption-2 text-muted">
+        {date.toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit" })}
+      </span>
+      <span className="text-caption font-bold text-ink">
+        {String(date.getHours()).padStart(2, "0")}:{String(date.getMinutes()).padStart(2, "0")}
+      </span>
+    </span>
+  );
 }
 
-/**
- * "Di 22.09." und "18:00" aus der gespeicherten Ortszeit.
- *
- * Bewusst ohne "heute"/"morgen": auf dem Server ist nicht sicher, welcher Tag
- * beim Team gerade ist - an der Tuer und auf der Terminseite macht das die
- * Uhr des Geraets.
- */
-function slotParts(slot: string): { day: string; time: string } {
-  const date = parseSlot(slot);
-  if (!date) return { day: "", time: slot };
-  const weekday = date.toLocaleDateString("de-DE", { weekday: "short" }).replace(".", "");
-  const day = date.toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit" });
-  const time = `${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
-  return { day: `${weekday} ${day}`, time };
+function productLabel(value: string): string | null {
+  if (value === "BEIDES") return "Strom + Gas";
+  if (value === "STROM") return "Strom";
+  if (value === "GAS") return "Gas";
+  return null;
 }

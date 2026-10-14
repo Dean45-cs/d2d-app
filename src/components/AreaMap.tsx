@@ -1,16 +1,16 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type { LatLng } from "@/lib/geo/area";
 import { labelPoint, resolveOverlaps, shapePoints, type Shape } from "@/lib/geo/shape";
 import { MapView } from "./map/MapView";
 import { declutter, type Placeable } from "./map/declutter";
 import { badgeMarker } from "./map/markers";
 import type { MapEngine } from "./map/types";
-import { cssColor, progressColor } from "./map-colors";
+import { cssColor } from "./map-colors";
 
-export type AreaTone = "brand" | "success" | "warn" | "muted";
-export type PinState = "open" | "active" | "done";
+/** Stand eines Gebiets auf der Karte - in Arbeit gruen, sonst neutral. */
+export type AreaTone = "active" | "done" | "paused" | "open";
 
 export interface MapArea {
   id: number;
@@ -18,78 +18,57 @@ export interface MapArea {
   area: Shape;
   tone?: AreaTone;
   hint?: string;
-  /** Zahl oder Kuerzel, das dauerhaft auf der Flaeche steht. */
+  /** Kuerzel, das dauerhaft auf der Flaeche steht (wer dran ist). */
   badge?: string;
 }
 
-export interface MapPin {
-  lat: number;
-  lng: number;
-  label: string;
-  hint?: string;
-  state?: PinState;
-}
-
 export interface LegendEntry {
-  color: string;
+  tone: AreaTone;
   label: string;
 }
 
 interface Props {
   areas: MapArea[];
-  pins?: MapPin[];
   legend?: LegendEntry[];
   /** Hoehe der Karte als Tailwind-Klasse. */
   className?: string;
   onSelect?: (id: number) => void;
+  /** Bedienelemente oben links ueber der Karte (Filter). */
+  children?: ReactNode;
 }
 
-/**
- * Je Ton zwei Farben: die Linie nimmt die helle Stufe (auf dunkler Karte
- * sonst kaum zu sehen), das Schild die satte - darauf bleibt weisse Schrift lesbar.
- */
-const TONE_VARS: Record<AreaTone, { line: [string, string]; badge: [string, string] }> = {
-  brand: { line: ["--tint", "#0f5cab"], badge: ["--brand-600", "#0f5cab"] },
-  success: { line: ["--ok-ink", "#059450"], badge: ["--energy-600", "#059450"] },
-  warn: { line: ["--warn-ink", "#d97706"], badge: ["--gas-500", "#f59e0b"] },
-  muted: { line: ["--ink-muted", "#66788f"], badge: ["--ink-muted", "#66788f"] },
+const TONE_VARS: Record<AreaTone, [string, string]> = {
+  active: ["--accent", "#1f9d4c"],
+  done: ["--ink-2", "#3c3c43"],
+  paused: ["--muted", "#68686f"],
+  open: ["--muted", "#68686f"],
 };
 
-/** Legende passend zu den Linien - CSS-Variablen stimmen schon beim ersten Zeichnen. */
+/** Legende passend zu den Linien. */
 export const TONE_LEGEND: Record<AreaTone, string> = {
-  brand: "var(--tint)",
-  success: "var(--ok-ink)",
-  warn: "var(--warn-ink)",
-  muted: "var(--ink-muted)",
+  active: "var(--accent)",
+  done: "var(--ink-2)",
+  paused: "var(--muted)",
+  open: "var(--muted)",
 };
 
 const BADGE_SIZE = 28;
 
 /**
- * Zeigt gezeichnete Gebiete und ihre Strassen auf einer Karte.
- *
- * Ueberschneiden sich Gebiete (aeltere Daten), gehoert jeder Fleck Boden auf
- * der Karte trotzdem genau einem: das kleinere Gebiet liegt obenauf, das
- * groessere bekommt dort ein Loch. So entstehen keine trueben Mischfarben, und
- * jedes Schild steht mitten in seiner eigenen Flaeche.
+ * Gezeichnete Gebiete auf einer Karte. Ueberschneiden sich Gebiete (aeltere
+ * Daten), gehoert jeder Fleck genau einem: das kleinere liegt obenauf, das
+ * groessere bekommt ein Loch - keine trueben Mischfarben.
  */
-export function AreaMap({ areas, pins = [], legend, className, onSelect }: Props) {
+export function AreaMap({ areas, legend, className, onSelect, children }: Props) {
   const [engine, setEngine] = useState<MapEngine | null>(null);
   const selectRef = useRef(onSelect);
   selectRef.current = onSelect;
 
   const pieces = useMemo(() => resolveOverlaps(areas.map((item) => item.area)), [areas]);
-
-  const allPoints = useMemo<LatLng[]>(
-    () => [
-      ...areas.flatMap((item) => shapePoints(item.area)),
-      ...pins.map((pin) => [pin.lat, pin.lng] as LatLng),
-    ],
-    [areas, pins],
-  );
+  const allPoints = useMemo<LatLng[]>(() => areas.flatMap((item) => shapePoints(item.area)), [areas]);
 
   const fitAll = useCallback(
-    (animate: boolean) => engine?.fit(allPoints, { padding: 28, maxZoom: 17, animate }),
+    (animate: boolean) => engine?.fit(allPoints, { padding: 32, maxZoom: 17, animate }),
     [engine, allPoints],
   );
 
@@ -100,50 +79,37 @@ export function AreaMap({ areas, pins = [], legend, className, onSelect }: Props
     const badges: Placeable[] = [];
 
     areas.forEach((item, index) => {
-      const tone = TONE_VARS[item.tone ?? "brand"];
-      const line = cssColor(...tone.line);
+      const tone = item.tone ?? "active";
+      const color = cssColor(...TONE_VARS[tone]);
       const open = clickable ? () => selectRef.current?.(item.id) : undefined;
       const piece = pieces[index];
       // Ganz von kleineren Gebieten bedeckt: nur der Umriss, gestrichelt.
       const covered = piece.length === 0;
       const visible = covered ? item.area : piece;
-
       for (const polygon of visible) {
         layer.polygon(polygon, {
-          color: line,
+          color,
           weight: covered ? 1.5 : 2,
-          fillOpacity: covered ? 0 : 0.16,
-          dashed: covered,
+          fillOpacity: covered ? 0 : tone === "active" ? 0.16 : 0.08,
+          dashed: covered || tone === "paused",
           inset: !covered,
           title: item.name,
           subtitle: item.hint,
           onClick: open,
         });
       }
-
       const label = item.badge ? labelPoint(visible) : null;
       if (item.badge && label) {
         const handle = layer.marker(label.point, {
-          ...badgeMarker(cssColor(...tone.badge), item.badge, BADGE_SIZE),
+          ...badgeMarker(color, item.badge, BADGE_SIZE),
           title: item.name,
           subtitle: item.hint,
           onClick: open,
           priority: 2,
         });
-        // Wer mehr Platz hat, behaelt sein Schild, wenn zwei sich decken.
         badges.push({ point: label.point, size: [BADGE_SIZE, BADGE_SIZE], rank: label.room, handle });
       }
     });
-
-    for (const pin of pins) {
-      layer.dot([pin.lat, pin.lng], {
-        color: progressColor(pin.state ?? "open"),
-        radius: 6,
-        ring: true,
-        title: pin.label,
-        subtitle: pin.hint,
-      });
-    }
 
     fitAll(false);
     const stopWatching = declutter(engine, badges);
@@ -153,29 +119,33 @@ export function AreaMap({ areas, pins = [], legend, className, onSelect }: Props
     };
     // fitAll haengt an denselben Daten; nur bei neuen Daten neu zeichnen.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [engine, areas, pieces, pins]);
+  }, [engine, areas, pieces]);
 
   return (
-    <div className="overflow-hidden rounded-xl border hairline">
+    <div className="relative overflow-hidden rounded-xl">
       <MapView
-        className={className ?? "h-[45vh] min-h-[260px] w-full"}
+        className={className ?? "h-[45vh] min-h-64 w-full"}
         onEngine={setEngine}
         onFit={allPoints.length > 0 ? () => fitAll(true) : undefined}
-      />
-      {legend && legend.length > 0 && (
-        <ul className="flex flex-wrap items-center gap-x-4 gap-y-1 border-t px-3 py-2 hairline">
-          {legend.map((entry) => (
-            <li key={entry.label} className="muted flex items-center gap-1.5 text-xs">
-              <span
-                className="h-2.5 w-2.5 rounded-full ring-2 ring-white/80"
-                style={{ background: entry.color }}
-                aria-hidden
-              />
-              {entry.label}
-            </li>
-          ))}
-        </ul>
-      )}
+      >
+        {children && (
+          <div className="pointer-events-none absolute inset-x-2 top-2 z-[500] flex flex-wrap gap-2">{children}</div>
+        )}
+        {legend && legend.length > 0 && (
+          <ul className="map-chip pointer-events-none absolute bottom-2 left-2 z-[500] gap-4" aria-label="Legende">
+            {legend.map((entry) => (
+              <li key={entry.label} className="flex items-center gap-2">
+                <span
+                  className="h-2.5 w-2.5 rounded-full"
+                  style={{ background: TONE_LEGEND[entry.tone] }}
+                  aria-hidden="true"
+                />
+                {entry.label}
+              </li>
+            ))}
+          </ul>
+        )}
+      </MapView>
     </div>
   );
 }

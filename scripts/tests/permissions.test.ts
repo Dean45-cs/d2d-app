@@ -148,14 +148,16 @@ test("team-wide view grants do not expand member administration scope or enable 
 test("navigation reflects grants and denials without empty or undefined mobile tabs", () => {
   const f = fixture();
   const initial = navigation("MEMBER", permissionsFor(person(f.manager)));
-  assert.ok(initial.items.some((item) => item.href === "/berechtigungen"));
-  assert.ok(!initial.items.some((item) => item.href === "/team"));
+  assert.ok(initial.items.some((item) => item.href === "/einstellungen/rechte"));
+  assert.ok(!initial.items.some((item) => item.href === "/einstellungen/mitglieder"));
   updatePermissions(person(f.root), f.manager, { "team.manage": true, "energy.reference": true, "reports.team": true });
   const granted = navigation("MEMBER", permissionsFor(person(f.manager)));
-  for (const href of ["/team", "/einstellungen", "/start"]) assert.ok(granted.items.some((item) => item.href === href));
+  for (const href of ["/einstellungen/mitglieder", "/einstellungen/energie", "/start"]) assert.ok(granted.items.some((item) => item.href === href));
+  assert.ok(granted.tabs.some((item) => item.href === "/start"));
   db.prepare("INSERT INTO user_permissions(user_id, permission, allowed) VALUES (?, 'reports.team', 0)").run(f.root);
   const denied = navigation("LEADER", permissionsFor(person(f.root)));
-  assert.ok(!denied.items.some((item) => item.href === "/start"));
+  assert.ok(!denied.tabs.some((item) => item.href === "/start"));
+  assert.equal(denied.tabs[0].href, "/tour");
   assert.ok(denied.tabs.every(Boolean));
   assert.ok(denied.tabs.length <= 5);
 });

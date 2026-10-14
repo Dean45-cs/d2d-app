@@ -330,8 +330,8 @@ export function createMapKitEngine(
         const circle = {
           overlay: new mapkit.CircleOverlay(coordinate(point), options.radius * metersPerPixel(), {
             style: new mapkit.Style({
-              lineWidth: options.ring ? 1.5 : 0,
-              strokeColor: "#ffffff",
+              lineWidth: options.ring ? (options.ringWidth ?? 1.5) : 0,
+              strokeColor: options.ringColor ?? "#ffffff",
               strokeOpacity: options.ring ? 1 : 0,
               fillColor: options.color,
               fillOpacity: options.opacity ?? 0.95,
@@ -432,6 +432,8 @@ function dotElement(options: DotOptions): HTMLElement {
   el.style.cssText =
     `display:block;width:${d}px;height:${d}px;border-radius:999px;` +
     `background:${options.color};opacity:${options.opacity ?? 0.95};` +
-    (options.ring ? "border:1.5px solid #fff;box-shadow:0 1px 3px rgb(15 23 42 / .35);" : "");
+    (options.ring
+      ? `border:${options.ringWidth ?? 1.5}px solid ${options.ringColor ?? "#fff"};box-shadow:0 1px 3px rgb(0 0 0 / .3);`
+      : "");
   return el;
 }

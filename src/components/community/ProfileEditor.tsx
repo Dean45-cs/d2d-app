@@ -3,7 +3,8 @@
 import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
 import { Sheet } from "@/components/Sheet";
-import { Avatar, Note } from "@/components/ui";
+import { useToast } from "@/components/Toast";
+import { Avatar, InlineError } from "@/components/ui";
 import { fileToAvatar } from "@/lib/avatar";
 
 const MAX_BIO = 160;
@@ -19,6 +20,7 @@ export function ProfileEditor({
   bio: string;
 }) {
   const router = useRouter();
+  const toast = useToast();
   const [open, setOpen] = useState(false);
   const [avatar, setAvatar] = useState(initialAvatar);
   const [bio, setBio] = useState(initialBio);
@@ -62,9 +64,10 @@ export function ProfileEditor({
         return;
       }
       setOpen(false);
+      toast("Profil gespeichert");
       router.refresh();
     } catch {
-      setError("Keine Verbindung – bitte gleich noch einmal versuchen.");
+      setError("Keine Verbindung.");
     } finally {
       setBusy(false);
     }
@@ -72,69 +75,58 @@ export function ProfileEditor({
 
   return (
     <>
-      <button type="button" className="btn btn-ghost btn-pill btn-sm" onClick={start}>
-        Profil bearbeiten
+      <button type="button" className="btn btn-secondary btn-sm" onClick={start}>
+        Bearbeiten
       </button>
       {open && (
         <Sheet
           title="Profil bearbeiten"
           onClose={() => setOpen(false)}
           footer={
-            <div className="space-y-2">
-              {error && <Note tone="danger">{error}</Note>}
-              <div className="grid grid-cols-2 gap-2">
-                <button type="button" className="btn btn-ghost" onClick={() => setOpen(false)}>
-                  Abbrechen
-                </button>
-                <button type="submit" form="profile-edit" className="btn btn-primary" disabled={busy}>
-                  {busy ? "Speichern …" : "Speichern"}
-                </button>
-              </div>
+            <div className="space-y-3">
+              {error && <InlineError>{error}</InlineError>}
+              <button type="submit" form="profile-edit" className="btn btn-primary btn-lg btn-block" disabled={busy}>
+                {busy ? "Speichern …" : "Speichern"}
+              </button>
             </div>
           }
         >
-          <form id="profile-edit" onSubmit={save} className="space-y-4 pb-1">
-            <div className="inset flex items-center gap-3 p-3">
-              <Avatar name={name} src={avatar} size={60} loading={busy && !avatar} />
-              <div className="min-w-0 flex-1">
-                <p className="text-[13.5px] font-semibold">Profilbild</p>
-                <p className="muted text-[12px] leading-snug">Steht im Feed, im Vergleich und an der Tür.</p>
-              </div>
-              <div className="flex shrink-0 flex-col gap-1">
-                <label className="btn btn-ghost btn-sm btn-pill cursor-pointer">
+          <form id="profile-edit" onSubmit={save}>
+            <div className="flex flex-col items-center gap-3 py-2">
+              <Avatar name={name} src={avatar} size={88} loading={busy && !avatar} />
+              <div className="flex gap-2">
+                <label className="btn btn-secondary btn-sm cursor-pointer">
                   <input
                     type="file"
                     accept="image/*"
                     className="sr-only"
                     onChange={(e) => void pick(e.target.files?.[0])}
                   />
-                  {avatar ? "Ändern" : "Wählen"}
+                  {avatar ? "Bild ändern" : "Bild wählen"}
                 </label>
                 {avatar && (
-                  <button type="button" className="btn btn-plain btn-sm btn-pill" onClick={() => setAvatar("")}>
+                  <button type="button" className="btn btn-plain btn-sm" onClick={() => setAvatar("")}>
                     Entfernen
                   </button>
                 )}
               </div>
             </div>
 
-            <div>
-              <label className="label" htmlFor="profile-bio">
-                Über mich
-              </label>
-              <textarea
-                id="profile-bio"
-                className="textarea resize-none"
-                rows={3}
-                maxLength={MAX_BIO}
-                placeholder="Ein paar Worte über dich (optional)"
-                value={bio}
-                onChange={(e) => setBio(e.target.value)}
-              />
-              <p className="muted mt-1 text-right text-[12px] tabular-nums">
-                {bio.length}/{MAX_BIO}
-              </p>
-            </div>
+            <label className="label mt-4" htmlFor="profile-bio">
+              Über mich
+            </label>
+            <textarea
+              id="profile-bio"
+              className="field resize-none"
+              rows={3}
+              maxLength={MAX_BIO}
+              placeholder="Optional"
+              value={bio}
+              onChange={(e) => setBio(e.target.value)}
+            />
+            <p className="mt-1 px-1 text-right text-footnote text-muted">
+              {bio.length}/{MAX_BIO}
+            </p>
           </form>
         </Sheet>
       )}

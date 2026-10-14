@@ -13,12 +13,12 @@ export interface ConfirmOptions {
 }
 
 /**
- * Rueckfrage im Stil der App statt des grauen Browser-Dialogs.
+ * Rueckfrage im Stil der App - nur fuer Dinge, die sich nicht rueckgaengig
+ * machen lassen (Loeschen, Deaktivieren). Alles andere bekommt einen
+ * Toast mit "Rückgängig".
  *
  *   const { confirm, dialog } = useConfirm();
  *   if (!(await confirm({ title: "Straße entfernen?", confirmLabel: "Entfernen", danger: true }))) return;
- *   ...
- *   return <>{...}{dialog}</>;
  */
 export function useConfirm() {
   const [pending, setPending] = useState<{
@@ -27,38 +27,31 @@ export function useConfirm() {
   } | null>(null);
 
   const confirm = useCallback(
-    (options: ConfirmOptions) =>
-      new Promise<boolean>((resolve) => setPending({ options, resolve })),
+    (options: ConfirmOptions) => new Promise<boolean>((resolve) => setPending({ options, resolve })),
     [],
   );
 
-  const settle = useCallback(
-    (ok: boolean) => {
-      setPending((current) => {
-        current?.resolve(ok);
-        return null;
-      });
-    },
-    [],
-  );
+  const settle = useCallback((ok: boolean) => {
+    setPending((current) => {
+      current?.resolve(ok);
+      return null;
+    });
+  }, []);
   const cancel = useCallback(() => settle(false), [settle]);
 
   const dialog = pending ? (
-    <Sheet title={pending.options.title} onClose={cancel}>
-      {pending.options.text && (
-        <p className="muted text-[14px] leading-snug">{pending.options.text}</p>
-      )}
-      <div className="mt-5 grid grid-cols-2 gap-2">
-        <button type="button" className="btn btn-ghost" onClick={cancel}>
-          Abbrechen
-        </button>
+    <Sheet title={pending.options.title} subtitle={pending.options.text} onClose={cancel}>
+      <div className="grid gap-2 pt-2">
         <button
           type="button"
-          className={`btn ${pending.options.danger ? "btn-danger" : "btn-primary"}`}
+          className={`btn btn-lg btn-block ${pending.options.danger ? "btn-danger" : "btn-primary"}`}
           onClick={() => settle(true)}
           autoFocus
         >
           {pending.options.confirmLabel}
+        </button>
+        <button type="button" className="btn btn-lg btn-block btn-secondary" onClick={cancel}>
+          Abbrechen
         </button>
       </div>
     </Sheet>

@@ -1,110 +1,129 @@
 import Link from "next/link";
-import { IconArrowRight, IconTrophy } from "@/components/icons";
-import type { LevelProgress } from "@/lib/levels";
+import type { DailyGoal, LevelProgress } from "@/lib/levels";
+import { IconChevronRight } from "@/components/icons";
+import { ProgressBar, ProgressRing } from "@/components/ui";
 
 const number = (value: number) => value.toLocaleString("de-DE");
 
-/** Pure presentation: safe to reuse on server pages and in the live tour. */
+/** "Lv. 12" als kleine Plakette - in Listen neben dem Namen. */
 export function LevelBadge({ progress }: { progress: LevelProgress }) {
   return (
-    <span
-      className="inline-flex shrink-0 items-center gap-1.5 rounded-full px-2.5 py-1 text-[12px] font-semibold"
-      style={{ color: "var(--tint)", background: "color-mix(in srgb, var(--tint) 10%, transparent)" }}
-      title={progress.title}
-    >
-      <IconTrophy className="h-3.5 w-3.5" />
-      Level {number(progress.level)}
+    <span className="badge" title={progress.title}>
+      Lv. {number(progress.level)}
     </span>
   );
 }
 
-export function LevelCard({
+/**
+ * Level als Zeile mit Ring: Zahl in der Mitte, Titel daneben, darunter
+ * der Weg zum naechsten Level. Ohne Hooks - laeuft auf Server-Seiten.
+ */
+export function LevelSummary({
   progress,
-  compact = false,
   href,
-  title = "Dein Level",
+  label = "Level",
 }: {
   progress: LevelProgress;
-  compact?: boolean;
   href?: string;
-  title?: string;
+  label?: string;
 }) {
-  const content = compact ? (
+  const content = (
     <>
-      <div className="flex items-center gap-3">
-        <span
-          className="grid h-11 w-11 shrink-0 place-items-center rounded-[var(--r-md)] text-[21px] font-bold tabular-nums"
-          style={{ color: "var(--tint)", background: "color-mix(in srgb, var(--tint) 10%, transparent)" }}
-          aria-label={`Level ${progress.level}`}
-        >
-          {number(progress.level)}
+      <ProgressRing value={progress.xpInLevel} max={Math.max(progress.xpForNextLevel, 1)} size={64} stroke={6}>
+        <span className="text-title-3">{number(progress.level)}</span>
+      </ProgressRing>
+      <span className="min-w-0 flex-1">
+        <span className="block text-footnote font-semibold text-ink-2">{label}</span>
+        <span className="block truncate text-title-3">{progress.title}</span>
+        <span className="block text-footnote text-muted">
+          {number(progress.totalXp)} XP · noch {number(progress.xpToNextLevel)} bis Lv. {number(progress.level + 1)}
         </span>
-        <div className="min-w-0 flex-1">
-          <p className="muted text-[11.5px] font-medium">{title} · {number(progress.totalXp)} XP</p>
-          <p className="truncate text-[15px] font-semibold">{progress.title}</p>
-        </div>
-        {href && <IconArrowRight className="h-4 w-4 shrink-0 text-tint" />}
-      </div>
-      <div className="mt-3">
-        <LevelMeter progress={progress} />
-        <p className="muted mt-1.5 text-[12px]">
-          Noch <span className="font-medium tabular-nums">{number(progress.xpToNextLevel)} XP</span> bis Level {number(progress.level + 1)}
-        </p>
-      </div>
-    </>
-  ) : (
-    <>
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <p className="text-[12.5px] font-medium text-white/70">{title}</p>
-          <p className="mt-2 text-[46px] font-bold leading-none tracking-tight tabular-nums sm:text-[56px]">
-            <span className="mr-2 text-[20px] font-medium text-white/70">Level</span>
-            {number(progress.level)}
-          </p>
-          <p className="mt-2 text-[20px] font-semibold">{progress.title}</p>
-        </div>
-        <span className="grid h-14 w-14 shrink-0 place-items-center rounded-[var(--r-lg)] bg-white/10" aria-hidden>
-          <IconTrophy className="h-7 w-7" />
-        </span>
-      </div>
-      <div className="mt-6">
-        <div className="mb-2 flex flex-wrap justify-between gap-1 text-[12.5px]">
-          <span className="font-semibold tabular-nums">{number(progress.totalXp)} XP insgesamt</span>
-          <span className="text-white/70">Level {number(progress.level + 1)} ab {number(progress.nextLevelXp)} XP</span>
-        </div>
-        <LevelMeter progress={progress} light />
-        <p className="mt-2 text-[13px] text-white/80">
-          Noch <span className="font-semibold text-white">{number(progress.xpToNextLevel)} XP</span> zum nächsten Level.
-        </p>
-      </div>
+      </span>
+      {href && <IconChevronRight className="cell-chevron" />}
     </>
   );
-
-  const className = `card block ${compact ? "p-4" : "p-5 text-white sm:p-6"} ${href ? "transition-shadow hover:shadow-md" : ""}`;
-  const style = compact ? undefined : { background: "var(--brand-900)", borderColor: "transparent" };
+  const cls = "flex items-center gap-4 rounded-xl bg-surface p-4";
   return href ? (
-    <Link href={href} className={className} style={style}>{content}</Link>
+    <Link href={href} className={`${cls} cell-tap`}>
+      {content}
+    </Link>
   ) : (
-    <section aria-label={title} className={className} style={style}>{content}</section>
+    <div className={cls}>{content}</div>
   );
 }
 
-function LevelMeter({ progress, light = false }: { progress: LevelProgress; light?: boolean }) {
+/** Fortschritt im Level als schmale Leiste - fuer Kopfzeilen. */
+export function LevelMeter({ progress }: { progress: LevelProgress }) {
   return (
-    <div
-      role="progressbar"
-      aria-label={`Fortschritt zu Level ${progress.level + 1}`}
-      aria-valuemin={0}
-      aria-valuemax={progress.xpForNextLevel}
-      aria-valuenow={progress.xpInLevel}
-      aria-valuetext={`${number(progress.xpInLevel)} von ${number(progress.xpForNextLevel)} XP`}
-      className="h-2 overflow-hidden rounded-full"
-      style={{ background: light ? "rgb(255 255 255 / 0.18)" : "color-mix(in srgb, var(--ink) 10%, transparent)" }}
-    >
-      <div
-        className="h-full rounded-full transition-[width] duration-500 motion-reduce:transition-none"
-        style={{ width: `${Math.max(0, Math.min(100, progress.percent))}%`, background: light ? "var(--energy-400)" : "var(--brand-500)" }}
-      />
+    <ProgressBar
+      value={progress.xpInLevel}
+      max={Math.max(progress.xpForNextLevel, 1)}
+      label={`${number(progress.xpInLevel)} von ${number(progress.xpForNextLevel)} XP bis Level ${progress.level + 1}`}
+    />
+  );
+}
+
+const RING_COLORS: Record<string, string> = {
+  doors: "var(--chart-doors)",
+  met: "var(--chart-met)",
+  sales: "var(--chart-sales)",
+};
+
+const RING_LABEL: Record<string, string> = {
+  doors: "Türen",
+  met: "Gespräche",
+  sales: "Abschluss",
+};
+
+/**
+ * Die Tagesziele als Ringe wie in Fitness: aussen Tueren, dann Gespraeche,
+ * innen der Abschluss. Ein geschlossener Ring ist ein erreichtes Ziel;
+ * die Liste daneben sagt dasselbe in Zahlen.
+ */
+export function ActivityRings({ goals, size = 132 }: { goals: DailyGoal[]; size?: number }) {
+  const stroke = Math.round(size / 9);
+  const gap = 3;
+  return (
+    <div className="flex items-center gap-6">
+      <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="shrink-0 -rotate-90" aria-hidden="true">
+        {goals.map((goal, index) => {
+          const radius = size / 2 - stroke / 2 - index * (stroke + gap);
+          const circumference = 2 * Math.PI * radius;
+          const share = goal.target > 0 ? Math.min(1, goal.current / goal.target) : 0;
+          const color = RING_COLORS[goal.id] ?? "var(--accent)";
+          return (
+            <g key={goal.id}>
+              <circle cx={size / 2} cy={size / 2} r={radius} fill="none" stroke={color} strokeOpacity={0.18} strokeWidth={stroke} />
+              <circle
+                cx={size / 2}
+                cy={size / 2}
+                r={radius}
+                fill="none"
+                stroke={color}
+                strokeWidth={stroke}
+                strokeLinecap="round"
+                strokeDasharray={circumference}
+                strokeDashoffset={circumference * (1 - share)}
+                className="transition-[stroke-dashoffset] duration-700 ease-spring"
+              />
+            </g>
+          );
+        })}
+      </svg>
+      <ul className="min-w-0 flex-1 space-y-3">
+        {goals.map((goal) => (
+          <li key={goal.id} className="min-w-0">
+            <span className="flex items-center gap-2 text-footnote font-semibold text-ink-2">
+              <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: RING_COLORS[goal.id] }} aria-hidden="true" />
+              {RING_LABEL[goal.id] ?? goal.title}
+            </span>
+            <span className="kpi block text-title-3">
+              {number(goal.current)}
+              <span className="text-subhead font-semibold text-muted">/{number(goal.target)}</span>
+            </span>
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }

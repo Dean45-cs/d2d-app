@@ -11,7 +11,7 @@ export async function POST() {
     const delivered = await pushToUsers([user.id], {
       title: "Push ist eingerichtet ✅",
       body: "So sieht es aus, wenn jemand aus deinem Abo einen Vertrag macht.",
-      url: "/feed",
+      url: "/team",
       tag: "test",
     });
     if (delivered === 0) {

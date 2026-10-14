@@ -3,20 +3,20 @@
 import Link from "next/link";
 import { useRef, useState, type FormEvent } from "react";
 import {
+  IconChat,
   IconCheck,
   IconChevronDown,
   IconComment,
-  IconFeed,
   IconHeart,
   IconSend,
   IconTrash,
 } from "@/components/icons";
 import { Menu, MenuItem } from "@/components/Menu";
-import { Avatar, EmptyState, Pill } from "@/components/ui";
+import { useToast } from "@/components/Toast";
+import { Avatar, EmptyState, InlineError, Pill } from "@/components/ui";
 import { useConfirm } from "@/components/useConfirm";
 import { timeAgo } from "@/lib/format";
 import type { FeedComment, FeedPost } from "@/lib/community";
-import { useToast } from "./Toast";
 
 export interface Viewer {
   id: number;
@@ -75,7 +75,7 @@ export function Feed({
   const [posts, setPosts] = useState(initial);
   const [hasMore, setHasMore] = useState(initialHasMore);
   const [loading, setLoading] = useState(false);
-  const { show, toast } = useToast();
+  const show = useToast();
 
   async function loadMore() {
     const last = posts.at(-1);
@@ -105,7 +105,7 @@ export function Feed({
       )}
 
       {posts.length === 0 ? (
-        <EmptyState icon={<IconFeed className="h-7 w-7" />} title={empty.title} text={empty.text} />
+        <EmptyState boxed icon={<IconChat className="h-6 w-6" />} title={empty.title} text={empty.text} />
       ) : (
         <ul className="space-y-3">
           {posts.map((post) => (
@@ -126,15 +126,14 @@ export function Feed({
       {hasMore && posts.length > 0 && (
         <button
           type="button"
-          className="btn btn-plain mt-3 w-full"
+          className="btn btn-plain btn-block mt-3"
           onClick={() => void loadMore()}
           disabled={loading}
         >
-          {loading ? "Lädt …" : "Ältere Beiträge laden"}
+          {loading ? "Lädt …" : "Ältere laden"}
           {!loading && <IconChevronDown className="h-4 w-4" />}
         </button>
       )}
-      {toast}
     </>
   );
 }
@@ -171,8 +170,8 @@ function Composer({ viewer, onPosted }: { viewer: Viewer; onPosted: (post: FeedP
 
   const left = MAX_POST - text.length;
   return (
-    <form onSubmit={submit} className="card mb-4 flex gap-3 p-4">
-      <Avatar name={viewer.name} src={viewer.avatar} size={40} />
+    <form onSubmit={submit} className="mb-4 flex gap-3 rounded-xl bg-surface p-4">
+      <Avatar name={viewer.name} src={viewer.avatar} size={36} />
       <div className="min-w-0 flex-1">
         <label htmlFor="compose" className="sr-only">
           Neuer Beitrag
@@ -180,10 +179,10 @@ function Composer({ viewer, onPosted }: { viewer: Viewer; onPosted: (post: FeedP
         <textarea
           id="compose"
           ref={ref}
-          className="textarea resize-none"
-          rows={2}
+          className="field field-bare min-h-11 resize-none py-2"
+          rows={1}
           maxLength={MAX_POST}
-          placeholder="Nachricht ans Team …"
+          placeholder="Nachricht ans Team"
           value={text}
           onChange={(e) => {
             setText(e.target.value);
@@ -192,17 +191,21 @@ function Composer({ viewer, onPosted }: { viewer: Viewer; onPosted: (post: FeedP
             e.target.style.height = `${Math.min(e.target.scrollHeight, 260)}px`;
           }}
         />
-        {error && <p className="mt-1.5 text-[12.5px] font-semibold text-danger">{error}</p>}
-        <div className="mt-2 flex items-center justify-end gap-3">
-          {left <= 80 && (
-            <span className={`text-[12px] tabular-nums ${left <= 20 ? "text-danger" : "muted"}`}>
-              {left}
-            </span>
-          )}
-          <button className="btn btn-primary btn-sm btn-pill" disabled={busy || !text.trim()}>
-            {busy ? "Posten …" : "Posten"}
-          </button>
-        </div>
+        {error && (
+          <div className="mt-2">
+            <InlineError>{error}</InlineError>
+          </div>
+        )}
+        {text.trim() && (
+          <div className="mt-2 flex items-center justify-end gap-3">
+            {left <= 80 && (
+              <span className={`text-footnote ${left <= 20 ? "text-danger" : "text-muted"}`}>{left}</span>
+            )}
+            <button className="btn btn-primary btn-sm" disabled={busy}>
+              {busy ? "Posten …" : "Posten"}
+            </button>
+          </div>
+        )}
       </div>
     </form>
   );
@@ -270,118 +273,94 @@ function PostCard({
   }
 
   return (
-    <article className="card px-4 pb-2 pt-3.5">
-      <div className="flex gap-3">
+    <article className="rounded-xl bg-surface px-4 pb-2 pt-4">
+      <header className="flex items-center gap-3">
         <Link href={`/profil/${post.user.id}`} className="shrink-0 rounded-full" aria-label={post.user.name}>
-          <Avatar name={post.user.name} src={post.user.avatar} size={42} />
+          <Avatar name={post.user.name} src={post.user.avatar} size={40} />
         </Link>
-
         <div className="min-w-0 flex-1">
-          <header className="flex items-start gap-2">
-            <p className="min-w-0 flex-1 text-[14px] leading-snug">
-              <Link href={`/profil/${post.user.id}`} className="font-semibold hover:underline">
-                {post.user.name}
-              </Link>
-              {post.kind === "SALE" && <span className="muted"> hat einen Vertrag abgeschlossen</span>}
-              <span className="muted"> · </span>
-              <Link href={`/feed/${post.id}`} className="muted hover:underline">
-                <time dateTime={post.created_at} suppressHydrationWarning>
-                  {timeAgo(post.created_at)}
-                </time>
-              </Link>
-            </p>
-            {canDelete && (
-              <div className="-mr-2 -mt-1.5">
-                <Menu label="Aktionen für diesen Beitrag">
-                  <MenuItem
-                    icon={<IconTrash className="h-[18px] w-[18px]" />}
-                    onSelect={() => void remove()}
-                    tone="danger"
-                  >
-                    Beitrag löschen
-                  </MenuItem>
-                </Menu>
-              </div>
-            )}
-          </header>
-
-          {post.body && (
-            <p className="mt-1 whitespace-pre-wrap break-words text-[15px] leading-relaxed">{post.body}</p>
-          )}
-
-          {post.sale && <SaleCard sale={post.sale} mine={isMine} />}
-
-          <div className="-ml-2 mt-1.5 flex items-center gap-1">
-            <button
-              type="button"
-              className="inline-flex min-h-9 items-center gap-1.5 rounded-full px-2.5 text-[13px] font-semibold transition-colors hover:bg-[var(--hover)]"
-              style={{ color: open ? "var(--tint)" : "var(--ink-muted)" }}
-              onClick={() => setOpen((v) => !v)}
-              aria-expanded={open}
-              aria-label={`${post.comment_count} Kommentare`}
-            >
-              <IconComment className="h-[18px] w-[18px]" />
-              <span className="tabular-nums">{post.comment_count || ""}</span>
-            </button>
-            <button
-              type="button"
-              className="inline-flex min-h-9 items-center gap-1.5 rounded-full px-2.5 text-[13px] font-semibold transition-[background,transform] hover:bg-[var(--hover)] active:scale-90"
-              style={{ color: post.liked ? "var(--danger-ink)" : "var(--ink-muted)" }}
-              onClick={() => void toggleLike()}
-              aria-pressed={post.liked}
-              aria-label={post.liked ? "Gefällt mir nicht mehr" : "Gefällt mir"}
-            >
-              <IconHeart className="h-[18px] w-[18px]" filled={post.liked} />
-              <span className="tabular-nums">{post.like_count || ""}</span>
-            </button>
-          </div>
-
-          <Comments
-            post={post}
-            viewer={viewer}
-            open={open}
-            onOpen={() => setOpen(true)}
-            onChange={onChange}
-            onError={onError}
-          />
+          <Link href={`/profil/${post.user.id}`} className="block truncate text-headline">
+            {post.user.name}
+          </Link>
+          <Link href={`/team/beitrag/${post.id}`} className="block text-footnote text-muted">
+            <time dateTime={post.created_at} suppressHydrationWarning>
+              {timeAgo(post.created_at)}
+            </time>
+          </Link>
         </div>
+        {canDelete && (
+          <Menu label="Aktionen für diesen Beitrag">
+            <MenuItem icon={<IconTrash className="h-5 w-5" />} onSelect={() => void remove()} tone="danger">
+              Beitrag löschen
+            </MenuItem>
+          </Menu>
+        )}
+      </header>
+
+      {post.body && <p className="mt-3 whitespace-pre-wrap break-words text-body">{post.body}</p>}
+
+      {post.sale && <SaleRow sale={post.sale} mine={isMine} />}
+
+      <div className="-ml-3 mt-2 flex items-center">
+        <button
+          type="button"
+          className={`inline-flex min-h-11 items-center gap-2 rounded-full px-3 text-subhead font-semibold hover:bg-hover ${
+            open ? "text-ink" : "text-muted"
+          }`}
+          onClick={() => setOpen((v) => !v)}
+          aria-expanded={open}
+          aria-label={`${post.comment_count} Kommentare`}
+        >
+          <IconComment className="h-5 w-5" />
+          <span>{post.comment_count || ""}</span>
+        </button>
+        <button
+          type="button"
+          className={`inline-flex min-h-11 items-center gap-2 rounded-full px-3 text-subhead font-semibold hover:bg-hover ${
+            post.liked ? "text-ink" : "text-muted"
+          }`}
+          onClick={() => void toggleLike()}
+          aria-pressed={post.liked}
+          aria-label={post.liked ? "Gefällt mir nicht mehr" : "Gefällt mir"}
+        >
+          <IconHeart className={`h-5 w-5 ${post.liked ? "check-pop" : ""}`} filled={post.liked} />
+          <span>{post.like_count || ""}</span>
+        </button>
       </div>
+
+      <Comments
+        post={post}
+        viewer={viewer}
+        open={open}
+        onOpen={() => setOpen(true)}
+        onChange={onChange}
+        onError={onError}
+      />
       {dialog}
     </article>
   );
 }
 
-/** Der Abschluss selbst - gruen, damit er im Strom der Beitraege heraussticht. */
-function SaleCard({ sale, mine }: { sale: NonNullable<FeedPost["sale"]>; mine: boolean }) {
+/** Der Abschluss selbst: volles Gruen mit Haken - das Ergebnis, um das es geht. */
+function SaleRow({ sale, mine }: { sale: NonNullable<FeedPost["sale"]>; mine: boolean }) {
   const where = [sale.territory_name, sale.city].filter(Boolean).join(" · ");
   return (
-    <div
-      className="mt-2 flex items-center gap-3 rounded-[var(--r-md)] p-3"
-      style={{
-        background: "color-mix(in srgb, var(--energy-500) 11%, transparent)",
-        border: "1px solid color-mix(in srgb, var(--energy-500) 22%, transparent)",
-      }}
-    >
-      <span className="tile-icon h-10 w-10 shrink-0 text-white" style={{ background: "var(--energy-600)" }}>
+    <div className="mt-3 flex items-center gap-3">
+      <span className="glyph glyph-lg glyph-round glyph-result">
         <IconCheck className="h-5 w-5" />
       </span>
       <span className="min-w-0 flex-1">
-        <span className="block text-[15px] font-bold text-ok">
-          {PRODUCT[sale.energy_type] ?? "Vertrag"}
-        </span>
-        {where && <span className="muted block truncate text-[12.5px]">{where}</span>}
+        <span className="block text-headline">Abschluss · {PRODUCT[sale.energy_type] ?? "Vertrag"}</span>
+        {where && <span className="block truncate text-footnote text-muted">{where}</span>}
       </span>
-      {sale.number > 0 && (
-        <span className="shrink-0 text-right">
-          {MILESTONES.has(sale.number) ? (
-            <Pill tone="warn">Nr. {sale.number}</Pill>
-          ) : sale.number === 1 ? (
-            <Pill tone="success">{mine ? "Dein erster Vertrag" : "Erster Vertrag"}</Pill>
-          ) : (
-            <span className="muted text-[12px] font-semibold tabular-nums">Nr. {sale.number}</span>
-          )}
-        </span>
-      )}
+      {sale.number > 0 &&
+        (sale.number === 1 ? (
+          <Pill tone="accent">{mine ? "Dein erster" : "Erster"}</Pill>
+        ) : MILESTONES.has(sale.number) ? (
+          <Pill tone="accent">Nr. {sale.number}</Pill>
+        ) : (
+          <span className="shrink-0 text-footnote text-muted">Nr. {sale.number}</span>
+        ))}
     </div>
   );
 }
@@ -460,41 +439,41 @@ function Comments({
   const cheer = post.kind === "SALE" && post.user.id !== viewer.id;
 
   return (
-    <div className="mb-1.5 mt-1 space-y-2">
+    <div className="mb-2 mt-1 space-y-3 border-t border-separator pt-3">
       {hidden > 0 && (
         <button
           type="button"
-          className="link"
+          className="link min-h-11"
           onClick={() => {
             onOpen();
             void loadAll();
           }}
           disabled={loading}
         >
-          {loading ? "Lädt …" : hidden === 1 ? "1 weiteren Kommentar ansehen" : `${hidden} weitere Kommentare ansehen`}
+          {loading ? "Lädt …" : hidden === 1 ? "1 weiterer Kommentar" : `${hidden} weitere Kommentare`}
         </button>
       )}
 
       {post.comments.length > 0 && (
-        <ul className="space-y-2">
+        <ul className="space-y-3">
           {post.comments.map((comment) => (
             <li key={comment.id} className="flex gap-2">
-              <Link href={`/profil/${comment.user.id}`} className="shrink-0 rounded-full">
+              <Link href={`/profil/${comment.user.id}`} className="shrink-0 rounded-full" aria-label={comment.user.name}>
                 <Avatar name={comment.user.name} src={comment.user.avatar} size={28} />
               </Link>
               <div className="min-w-0 flex-1">
-                <div className="inset inline-block max-w-full px-3 py-1.5">
-                  <Link href={`/profil/${comment.user.id}`} className="text-[13px] font-semibold hover:underline">
+                <div className="inline-block max-w-full rounded-lg bg-fill px-3 py-2">
+                  <Link href={`/profil/${comment.user.id}`} className="block text-footnote font-semibold">
                     {comment.user.name}
                   </Link>
-                  <p className="whitespace-pre-wrap break-words text-[14px] leading-snug">{comment.body}</p>
+                  <p className="whitespace-pre-wrap break-words text-subhead">{comment.body}</p>
                 </div>
-                <p className="muted mt-0.5 flex gap-3 pl-3 text-[11.5px]">
+                <p className="mt-1 flex items-center gap-3 pl-3 text-caption text-muted">
                   <time dateTime={comment.created_at} suppressHydrationWarning>
                     {timeAgo(comment.created_at)}
                   </time>
                   {(comment.user.id === viewer.id || viewer.isLeader) && (
-                    <button type="button" className="font-semibold hover:underline" onClick={() => void remove(comment)}>
+                    <button type="button" className="font-semibold" onClick={() => void remove(comment)}>
                       Löschen
                     </button>
                   )}
@@ -508,15 +487,9 @@ function Comments({
       {open && (
         <>
           {cheer && (
-            <div className="flex flex-wrap gap-1.5">
+            <div className="chips" role="group" aria-label="Schnellantwort">
               {CHEERS.map((line) => (
-                <button
-                  key={line}
-                  type="button"
-                  className="map-filter"
-                  onClick={() => void send(line)}
-                  disabled={busy}
-                >
+                <button key={line} type="button" className="chip" onClick={() => void send(line)} disabled={busy}>
                   {line}
                 </button>
               ))}
@@ -529,22 +502,20 @@ function Comments({
               void send(text);
             }}
           >
-            <Avatar name={viewer.name} src={viewer.avatar} size={28} />
             <label htmlFor={`comment-${post.id}`} className="sr-only">
               Kommentar schreiben
             </label>
             <input
               id={`comment-${post.id}`}
-              className="input min-w-0 flex-1 rounded-full py-2"
-              placeholder="Kommentieren …"
+              className="field min-h-11 min-w-0 flex-1 rounded-full py-2"
+              placeholder="Kommentieren"
               maxLength={MAX_COMMENT}
               value={text}
               onChange={(e) => setText(e.target.value)}
               autoComplete="off"
             />
             <button
-              className="icon-btn shrink-0"
-              style={{ color: text.trim() ? "var(--tint)" : undefined }}
+              className="icon-btn icon-btn-accent shrink-0"
               disabled={busy || !text.trim()}
               aria-label="Kommentar senden"
             >

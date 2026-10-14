@@ -1,6 +1,7 @@
 /**
- * Zwei schlanke Diagramme, komplett aus HTML/CSS - keine Chart-Bibliothek.
- * Farben kommen aus den geprueften Tokens in brand.css.
+ * Schlanke Diagramme aus HTML/CSS - keine Bibliothek. Tueren neutral,
+ * Abschluesse im Akzent; jede Reihe traegt zusaetzlich ihre Beschriftung,
+ * damit nichts allein an der Farbe haengt.
  */
 
 export interface DayPoint {
@@ -11,102 +12,86 @@ export interface DayPoint {
 }
 
 /**
- * Tagesverlauf: Türen und Abschlüsse als gruppierte Balken.
- * Beide Reihen zaehlen Stueck, also eine gemeinsame Achse.
- *
- * Die Hoehe ist fest: neben einer langen Liste wuerden die Balken sonst
- * mitwachsen und die Seite in die Laenge ziehen.
+ * Verlauf: Tueren und Abschluesse als gepaarte Saeulen auf gemeinsamer
+ * Achse. Feste Hoehe, damit die Seite beim Laden nicht springt.
  */
-export function DailyBars({ data, height = 184 }: { data: DayPoint[]; height?: number }) {
-  if (data.length === 0) {
+export function DailyBars({ data, height = 168 }: { data: DayPoint[]; height?: number }) {
+  if (data.length === 0 || data.every((d) => d.doors === 0)) {
     return (
       <div className="grid place-items-center" style={{ height }}>
-        <p className="muted text-center text-sm">Im gewählten Zeitraum wurde nichts erfasst.</p>
+        <p className="text-subhead text-muted">Noch nichts erfasst.</p>
       </div>
     );
   }
   const max = Math.max(...data.map((d) => d.doors), 1);
-  const totalDoors = data.reduce((sum, d) => sum + d.doors, 0);
-  const totalSales = data.reduce((sum, d) => sum + d.sales, 0);
-
-  // Bei vielen Tagen nur jede zweite Datumsbeschriftung, sonst ueberlappen sie.
-  const labelEvery = data.length > 16 ? 3 : data.length > 9 ? 2 : 1;
-  // Zahlen ueber den Balken nur, solange sie nebeneinander passen.
-  const showValues = data.length <= 16;
+  const labelEvery = data.length > 16 ? 4 : data.length > 9 ? 2 : 1;
+  const weekly = data.length > 1 && dayGap(data[0].day, data[1].day) > 1;
 
   return (
     <figure className="m-0">
-      <figcaption className="mb-4 flex flex-wrap items-center gap-x-5 gap-y-1 text-[12.5px]">
-        <Legend color="var(--chart-doors)" label="Türen" value={totalDoors} />
-        <Legend color="var(--chart-sales)" label="Abschlüsse" value={totalSales} />
-      </figcaption>
-
       <div className="relative" style={{ height }}>
-        {/* Drei ruhige Hilfslinien - der Blick braucht einen Massstab. */}
-        <div className="pointer-events-none absolute inset-x-0 bottom-5 top-4 flex flex-col justify-between" aria-hidden>
-          {[0, 1, 2].map((i) => (
-            <span key={i} className="block border-t border-dashed" style={{ borderColor: "var(--chart-grid)" }} />
-          ))}
+        <div className="pointer-events-none absolute inset-x-0 top-0 bottom-6 flex flex-col justify-between" aria-hidden="true">
+          <span className="flex items-center gap-2">
+            <span className="h-px flex-1 bg-separator" />
+            <span className="text-caption-2 text-muted">{max}</span>
+          </span>
+          <span className="flex items-center gap-2">
+            <span className="h-px flex-1 bg-separator" />
+            <span className="text-caption-2 text-muted">0</span>
+          </span>
         </div>
-
-        <div className="relative flex h-full gap-1 overflow-x-auto">
+        <ol className="relative flex h-full gap-1 pr-8">
           {data.map((d, index) => (
-            <div key={d.day} className="flex h-full min-w-[18px] flex-1 flex-col items-center">
-              <span className="muted h-4 text-[10px] font-semibold tabular-nums">
-                {showValues && d.doors ? d.doors : ""}
-              </span>
-              <div className="flex w-full flex-1 items-end justify-center gap-[2px]">
+            <li key={d.day} className="flex h-full min-w-0 flex-1 flex-col items-center">
+              <div
+                className="flex w-full flex-1 items-end justify-center gap-1"
+                title={`${formatDay(d.day, weekly)}: ${d.doors} Türen, ${d.sales} Abschlüsse`}
+              >
                 <span
-                  className="w-[42%] max-w-3 rounded-t-[3px] transition-[height]"
-                  style={{
-                    height: `${Math.max(d.doors ? 2 : 0, (d.doors / max) * 100)}%`,
-                    background: "var(--chart-doors)",
-                  }}
-                  title={`${d.doors} Türen am ${formatDay(d.day)}`}
+                  className="w-full max-w-2 rounded-full bg-[var(--chart-doors)]"
+                  style={{ height: `${d.doors ? Math.max(4, (d.doors / max) * 100) : 0}%` }}
                 />
                 <span
-                  className="w-[42%] max-w-3 rounded-t-[3px] transition-[height]"
-                  style={{
-                    height: `${Math.max(d.sales ? 3 : 0, (d.sales / max) * 100)}%`,
-                    background: "var(--chart-sales)",
-                  }}
-                  title={`${d.sales} Abschlüsse am ${formatDay(d.day)}`}
+                  className="w-full max-w-2 rounded-full bg-[var(--chart-sales)]"
+                  style={{ height: `${d.sales ? Math.max(4, (d.sales / max) * 100) : 0}%` }}
                 />
               </div>
-              <span className="muted h-5 whitespace-nowrap pt-1.5 text-[10px] tabular-nums">
-                {index % labelEvery === 0 ? formatDay(d.day) : ""}
+              <span className="h-6 whitespace-nowrap pt-2 text-caption-2 text-muted">
+                {index % labelEvery === 0 ? shortDay(d.day) : ""}
               </span>
-            </div>
+            </li>
           ))}
-        </div>
+        </ol>
       </div>
+      <figcaption className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-footnote text-ink-2">
+        <Legend color="var(--chart-doors)" label="Türen" />
+        <Legend color="var(--chart-sales)" label="Abschlüsse" />
+        {weekly && <span className="text-muted">je Woche</span>}
+      </figcaption>
     </figure>
   );
 }
 
-function Legend({ color, label, value }: { color: string; label: string; value: number }) {
+function Legend({ color, label }: { color: string; label: string }) {
   return (
-    <span className="inline-flex items-center gap-1.5">
-      <span className="h-2 w-2 rounded-full" style={{ background: color }} aria-hidden />
-      <span className="muted">{label}</span>
-      <span className="font-semibold tabular-nums">{value}</span>
+    <span className="inline-flex items-center gap-2">
+      <span className="h-2 w-2 rounded-full" style={{ background: color }} aria-hidden="true" />
+      {label}
     </span>
   );
 }
 
-/** Ablehnungsgründe als waagerechte Balken - eine Reihe, daher eine Farbe. */
+/** Ablehnungsgruende als Zeilen mit schmalem Balken - Emoji im neutralen Kasten. */
 export function ReasonBars({
   data,
   limit,
 }: {
   data: Array<{ id: number; label: string; emoji: string; count: number }>;
-  /** Nur die haeufigsten zeigen; der Rest wird zu "Weitere" zusammengefasst. */
+  /** Nur die haeufigsten zeigen; der Rest wird zu "weitere". */
   limit?: number;
 }) {
   if (data.length === 0) {
-    return (
-      <p className="muted py-10 text-center text-sm">Noch keine Ablehnungen im Zeitraum.</p>
-    );
+    return <p className="px-4 py-8 text-center text-subhead text-muted">Keine Ablehnungen im Zeitraum.</p>;
   }
   const total = data.reduce((sum, d) => sum + d.count, 0);
   let rows = data;
@@ -120,29 +105,26 @@ export function ReasonBars({
   const max = Math.max(...rows.map((d) => d.count), 1);
 
   return (
-    <ul className="space-y-3">
+    <ul className="list">
       {rows.map((d) => (
-        <li key={d.id}>
-          <div className="mb-1 flex items-baseline justify-between gap-3 text-[13px]">
-            <span className={`min-w-0 truncate ${d.id === -1 ? "muted" : ""}`}>{d.label}</span>
-            <span className="shrink-0 tabular-nums">
-              <span className="font-semibold">{d.count}</span>
-              <span className="muted ml-1.5 inline-block w-8 text-right text-[12px]">
-                {Math.round((d.count / total) * 100)} %
+        <li key={d.id} className="cell">
+          <span className="glyph">{d.emoji || "·"}</span>
+          <span className="min-w-0 flex-1">
+            <span className="flex items-baseline justify-between gap-2">
+              <span className={`truncate text-subhead ${d.id === -1 ? "text-muted" : ""}`}>{d.label}</span>
+              <span className="shrink-0 text-subhead font-semibold">
+                {d.count}
+                <span className="ml-2 inline-block w-10 text-right font-normal text-muted">
+                  {Math.round((d.count / total) * 100)} %
+                </span>
               </span>
             </span>
-          </div>
-          <span
-            className="block h-1.5 overflow-hidden rounded-full"
-            style={{ background: "color-mix(in srgb, var(--ink) 7%, transparent)" }}
-          >
-            <span
-              className="block h-full rounded-full"
-              style={{
-                width: `${Math.max(3, (d.count / max) * 100)}%`,
-                background: d.id === -1 ? "var(--ink-muted)" : "var(--chart-doors)",
-              }}
-            />
+            <span className="mt-1 block h-1 overflow-hidden rounded-full bg-fill">
+              <span
+                className="block h-full rounded-full bg-[var(--chart-doors)]"
+                style={{ width: `${Math.max(3, (d.count / max) * 100)}%` }}
+              />
+            </span>
           </span>
         </li>
       ))}
@@ -150,15 +132,58 @@ export function ReasonBars({
   );
 }
 
-function formatDay(day: string): string {
+/** Antreffquote nach Tageszeit - die beste Zeit ist hervorgehoben. */
+export function HourBars({ hours }: { hours: Array<{ label: string; total: number; met: number }> }) {
+  const best = hours.reduce<{ label: string; total: number; met: number } | null>(
+    (top, h) => (h.total >= 5 && (!top || h.met / h.total > top.met / top.total) ? h : top),
+    null,
+  );
+  return (
+    <div className="grid grid-cols-4 gap-2">
+      {hours.map((h) => {
+        const rate = h.total ? h.met / h.total : 0;
+        const isBest = h === best;
+        return (
+          <div key={h.label} className="text-center">
+            <div className="mx-auto flex h-16 w-full max-w-12 items-end overflow-hidden rounded-md bg-fill">
+              <div
+                className={`w-full rounded-md ${isBest ? "bg-accent" : "bg-[var(--chart-doors)]"}`}
+                style={{ height: `${Math.max(4, rate * 100)}%`, opacity: h.total ? 1 : 0.25 }}
+              />
+            </div>
+            <p className={`mt-1 text-footnote font-semibold ${isBest ? "text-accent-ink" : ""}`}>
+              {h.total ? `${Math.round(rate * 100)} %` : "–"}
+            </p>
+            <p className="text-caption text-muted">{h.label}</p>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function dayGap(a: string, b: string): number {
+  return Math.round((Date.parse(`${b}T00:00:00Z`) - Date.parse(`${a}T00:00:00Z`)) / 86_400_000);
+}
+
+function formatDay(day: string, weekly: boolean): string {
   const date = new Date(`${day}T00:00:00Z`);
-  return date.toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", timeZone: "UTC" });
+  const text = date.toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", timeZone: "UTC" });
+  return weekly ? `Woche ab ${text}` : text;
+}
+
+/** "12.09." - bei Wochen der Montag. */
+function shortDay(day: string): string {
+  return new Date(`${day}T00:00:00Z`).toLocaleDateString("de-DE", {
+    day: "2-digit",
+    month: "2-digit",
+    timeZone: "UTC",
+  });
 }
 
 /**
  * Luecken fuellen: Tage ohne Eintrag fehlen in der Abfrage, gehoeren aber als
- * leere Spalte ins Bild - sonst rueckt der Verlauf zusammen und luegt.
- * Ab fuenf Wochen werden Wochen daraus, damit die Balken lesbar bleiben.
+ * leere Spalte ins Bild. Ab fuenf Wochen werden Wochen daraus.
  */
 export function fillDays(data: DayPoint[], days: number, now = new Date()): DayPoint[] {
   const byDay = new Map(data.map((d) => [d.day, d]));
