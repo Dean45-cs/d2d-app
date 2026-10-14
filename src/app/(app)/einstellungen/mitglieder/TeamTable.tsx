@@ -138,16 +138,16 @@ export function TeamTable({
         </div>
       ) : (
         <>
-          {/* Handy und iPad hochkant: gruppierte Liste. */}
-          <div className="lg:hidden">
+          {/* Handy und iPad: gruppierte Liste. */}
+          <div className="xl:hidden">
             <MemberList label="Aktiv" rows={active} reports={reports} currentUserId={currentUserId} onOpen={open} />
             {inactive.length > 0 && (
               <MemberList label="Deaktiviert" rows={inactive} reports={false} currentUserId={currentUserId} onOpen={open} />
             )}
           </div>
 
-          {/* Rechner: Tabelle zum Vergleichen. */}
-          <div className="surface hidden overflow-hidden lg:block">
+          {/* Rechner: Tabelle zum Vergleichen; zu schmal, rollt sie seitlich. */}
+          <div className="surface hidden overflow-x-auto xl:block">
             <table className="table">
               <thead>
                 <tr>

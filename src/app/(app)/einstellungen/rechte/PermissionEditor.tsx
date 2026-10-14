@@ -70,7 +70,7 @@ export function PermissionEditor({
   const shown = members.find((member) => member.id === selectedId) ?? members[0];
 
   return (
-    <div className="grid gap-8 lg:grid-cols-[minmax(0,320px)_minmax(0,1fr)] lg:items-start">
+    <div className="grid grid-cols-1 gap-8 lg:grid-cols-[minmax(0,320px)_minmax(0,1fr)] lg:items-start">
       <section className={selectedId ? "hidden lg:block" : ""} aria-label="Personen">
         <ul className="list list-icons">
           {members.map((member) => {
@@ -222,7 +222,7 @@ function MemberRights({ member, grantable }: { member: EditableMember; grantable
                     options={MODES}
                     value={toMode(value)}
                     onChange={(mode) => change(key, mode)}
-                    className="shrink-0 sm:w-64"
+                    className="shrink-0 sm:w-80"
                   />
                 </li>
               );
@@ -244,7 +244,7 @@ function MemberRights({ member, grantable }: { member: EditableMember; grantable
             </span>
             <button
               type="button"
-              className="btn btn-plain"
+              className="btn btn-plain btn-sm"
               disabled={busy}
               onClick={() => {
                 setChanges({});
@@ -253,7 +253,7 @@ function MemberRights({ member, grantable }: { member: EditableMember; grantable
             >
               Verwerfen
             </button>
-            <button type="button" className="btn btn-primary" disabled={busy} onClick={() => void save()}>
+            <button type="button" className="btn btn-primary btn-sm" disabled={busy} onClick={() => void save()}>
               {busy ? "Speichern …" : "Speichern"}
             </button>
           </div>
