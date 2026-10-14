@@ -150,7 +150,7 @@ export default async function StartPage({ searchParams }: { searchParams: Promis
               </div>
             ) : (
               <>
-                <ul className="list list-icons md:hidden">
+                <ul className="list list-icons xl:hidden">
                   {members.map((m) => (
                     <li key={m.user_id}>
                       <Cell
@@ -167,7 +167,7 @@ export default async function StartPage({ searchParams }: { searchParams: Promis
                     </li>
                   ))}
                 </ul>
-                <div className="surface hidden overflow-hidden md:block">
+                <div className="surface hidden overflow-x-auto xl:block">
                   <table className="table">
                     <thead>
                       <tr>
@@ -176,8 +176,8 @@ export default async function StartPage({ searchParams }: { searchParams: Promis
                         <th className="num">Gespräche</th>
                         <th className="num">Termine</th>
                         <th className="num">Abschlüsse</th>
-                        <th className="num">Antreffquote</th>
-                        <th className="num">Abschlussquote</th>
+                        <th className="num">Angetroffen</th>
+                        <th className="num">Quote</th>
                       </tr>
                     </thead>
                     <tbody>
