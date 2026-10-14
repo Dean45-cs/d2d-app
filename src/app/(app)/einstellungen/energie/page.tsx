@@ -91,8 +91,8 @@ export default async function EnergySettingsPage() {
       />
 
       {main ? (
-        <div className="grid grid-cols-1 gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,380px)] lg:items-start">
-          <div>
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,380px)] lg:items-start lg:gap-8">
+          <div className="space-y-6">
             {rights["energy.reference"] && (
               <ReferenceSettings reference={getReference(user.team_id)} referenceDefault={DEFAULT_REFERENCE} />
             )}
