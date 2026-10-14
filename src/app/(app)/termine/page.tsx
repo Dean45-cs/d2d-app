@@ -8,6 +8,8 @@ export const dynamic = "force-dynamic";
 export default async function AppointmentsPage() {
   const user = await requireUser();
   const isLeader = hasPermission(user, "appointments.team");
+  // Offene und erledigte getrennt: jede Liste hat ihr eigenes Limit.
+  const scope = isLeader ? {} : { userId: user.id };
   // Gesichter nur, wo mehrere Leute in der Liste stehen.
   const faces: Record<number, string> = isLeader
     ? Object.fromEntries(listMembers(user.team_id).map((m) => [m.id, m.avatar]))
@@ -15,11 +17,10 @@ export default async function AppointmentsPage() {
 
   return (
     <AppointmentList
-      appointments={listAppointments(user.team_id, {
-        ...(isLeader ? {} : { userId: user.id }),
-        includeDone: true,
-        limit: 100,
-      })}
+      appointments={[
+        ...listAppointments(user.team_id, { ...scope, limit: 300 }),
+        ...listAppointments(user.team_id, { ...scope, done: true, limit: 100 }),
+      ]}
       isLeader={isLeader}
       faces={faces}
       back={

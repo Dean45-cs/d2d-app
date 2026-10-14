@@ -99,6 +99,19 @@ export function decideInvitation(actorId: number, requestId: number, decision: "
   }).immediate();
 }
 
+/**
+ * Offene Beitritte ueber die Links einer deaktivierten Person kann niemand
+ * mehr freigeben - und solange sie offen sind, blockieren sie die E-Mail fuer
+ * jede neue Einladung. Beim Deaktivieren werden sie deshalb abgelehnt.
+ */
+export function rejectPendingJoins(actorId: number, inviterId: number): number {
+  return getDb().prepare(`UPDATE join_requests SET status = 'REJECTED', decided_at = datetime('now'),
+      decided_by = ?, password_hash = NULL
+    WHERE status = 'PENDING'
+      AND invitation_id IN (SELECT id FROM invitation_links WHERE inviter_id = ?)`)
+    .run(actorId, inviterId).changes;
+}
+
 export function revokeInvitation(actorId: number, linkId: number) {
   const result = getDb().prepare(`UPDATE invitation_links SET revoked_at = datetime('now')
     WHERE id = ? AND inviter_id = ? AND revoked_at IS NULL

@@ -2,8 +2,8 @@ import { AuthError, hashPassword, requireUser } from "@/lib/auth";
 import { assertMemberScope, assertPermission, structureIds } from "@/lib/permissions";
 import type { User } from "@/lib/types";
 import { getDb } from "@/lib/db";
-import { handle, optionalAvatar, optionalText } from "@/lib/api";
-import { setManager } from "@/lib/invitations";
+import { handle, optionalAvatar, optionalText, requireText } from "@/lib/api";
+import { rejectPendingJoins, setManager } from "@/lib/invitations";
 
 export const dynamic = "force-dynamic";
 
@@ -48,7 +48,7 @@ export async function PATCH(
 
     if (body.name !== undefined) {
       fields.push("name = ?");
-      values.push(optionalText(body.name, 120));
+      values.push(requireText(body.name, "Name", 120));
     }
     if (body.phone !== undefined) {
       fields.push("phone = ?");
@@ -82,7 +82,10 @@ export async function PATCH(
 
     if (fields.length === 0) return { ok: true };
     values.push(userId);
-    db.prepare(`UPDATE users SET ${fields.join(", ")} WHERE id = ?`).run(...values);
+    db.transaction(() => {
+      db.prepare(`UPDATE users SET ${fields.join(", ")} WHERE id = ?`).run(...values);
+      if (body.active !== undefined && !body.active) rejectPendingJoins(leader.id, userId);
+    })();
     return { ok: true };
   });
 }

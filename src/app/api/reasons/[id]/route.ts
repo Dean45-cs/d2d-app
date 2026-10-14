@@ -1,6 +1,6 @@
 import { requirePermission } from "@/lib/permissions";
 import { getDb } from "@/lib/db";
-import { handle, optionalText } from "@/lib/api";
+import { handle, optionalText, requireText } from "@/lib/api";
 
 export const dynamic = "force-dynamic";
 
@@ -22,7 +22,7 @@ export async function PATCH(
     const values: (string | number)[] = [];
     if (body.label !== undefined) {
       fields.push("label = ?");
-      values.push(optionalText(body.label, 80));
+      values.push(requireText(body.label, "Bezeichnung", 80));
     }
     if (body.emoji !== undefined) {
       fields.push("emoji = ?");

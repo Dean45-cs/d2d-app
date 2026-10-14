@@ -41,7 +41,7 @@ function readScope(params: URLSearchParams, teamId: number): FeedScope {
   if (scope === "following") return { kind: "following" };
   const userId = optionalNumber(params.get("user"));
   if (userId !== null && (scope === "user" || scope === "sales" || scope === "liked")) {
-    requireTeamPerson(userId, teamId);
+    requireTeamPerson(userId, teamId, { includeInactive: true });
     return { kind: scope, userId };
   }
   return { kind: "all" };

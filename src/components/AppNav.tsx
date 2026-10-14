@@ -8,6 +8,7 @@ import { Logo } from "./Logo";
 import { Avatar } from "./ui";
 import { NAV_ICONS } from "./nav-icons";
 import { activeHref, type NavItem, type NavSection } from "@/lib/nav";
+import { forgetPushDevice } from "@/lib/push-client";
 
 export interface NavUser {
   id: number;
@@ -24,6 +25,8 @@ export function useLogout() {
   const logout = useCallback(async () => {
     setBusy(true);
     try {
+      // Erst das Geraet fuer Push abmelden - danach fehlt dafuer die Anmeldung.
+      await forgetPushDevice().catch(() => undefined);
       await fetch("/api/auth/logout", { method: "POST" });
     } finally {
       router.push("/login");

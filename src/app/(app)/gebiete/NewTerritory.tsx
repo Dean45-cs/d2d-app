@@ -280,6 +280,8 @@ export function NewTerritoryButton({
       // Beim Aufteilen entstehen mehrere Gebiete - dann in die Übersicht.
       router.push(data.id ? `/gebiete/${data.id}` : "/gebiete");
       router.refresh();
+    } catch {
+      setError("Keine Verbindung – das Gebiet ist noch nicht angelegt. Bitte erneut versuchen.");
     } finally {
       setBusy(false);
     }

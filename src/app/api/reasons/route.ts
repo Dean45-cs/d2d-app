@@ -1,6 +1,7 @@
 import { requirePermission } from "@/lib/permissions";
 import { getDb } from "@/lib/db";
 import { handle, optionalText, requireText } from "@/lib/api";
+import { reasonCode } from "@/lib/queries";
 
 export const dynamic = "force-dynamic";
 
@@ -15,9 +16,7 @@ export async function POST(request: Request) {
       .prepare("SELECT COALESCE(MAX(sort_order), 0) AS m FROM rejection_reasons WHERE team_id = ?")
       .get(leader.team_id) as { m: number };
 
-    const code =
-      optionalText(body.code, 40).toUpperCase() ||
-      label.toUpperCase().replace(/[^A-Z0-9]+/g, "_").slice(0, 30) + "_" + (max.m + 1);
+    const code = reasonCode(leader.team_id, label, optionalText(body.code, 40), max.m + 1);
 
     db.prepare(
       `INSERT INTO rejection_reasons (team_id, code, label, emoji, hint, sort_order, active)

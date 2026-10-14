@@ -231,7 +231,7 @@ function AddStreetsSheet({ territoryId, onClose }: { territoryId: number; onClos
         setError(data.error ?? "Straßen nicht gespeichert.");
         return;
       }
-      toast("Straßen eingetragen");
+      toast(data.added === 0 ? "Alle Straßen schon im Gebiet" : `${plural(data.added, "Straße", "Straßen")} eingetragen`);
       onClose();
       router.refresh();
     } catch {

@@ -41,8 +41,9 @@ export async function PATCH(
       db.prepare("UPDATE streets SET status = ? WHERE id = ?").run(status, street.id);
     }
     if (body.units !== undefined) {
+      // Wie beim Anlegen: ganze Wohneinheiten in vernuenftiger Groesse.
       db.prepare("UPDATE streets SET units = ? WHERE id = ?").run(
-        Math.max(0, Number(body.units) || 0),
+        Math.max(0, Math.min(9999, Math.round(Number(body.units) || 0))),
         street.id,
       );
     }
