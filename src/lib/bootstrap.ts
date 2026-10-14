@@ -22,37 +22,9 @@ export async function bootstrap(): Promise<void> {
     count: number;
   };
 
-  if (count === 0) {
-    const email = process.env.SEED_LEADER_EMAIL?.trim().toLowerCase();
-    const password = process.env.SEED_LEADER_PASSWORD;
-
-    if (!email || !password) {
-      console.warn(
-        "[Start] Die Datenbank ist leer und es wurde noch keine Teamleitung angelegt.\n" +
-          "        Setze SEED_LEADER_EMAIL und SEED_LEADER_PASSWORD und starte neu.\n" +
-          '        Bei Fly.io:  fly secrets set SEED_LEADER_EMAIL="..." SEED_LEADER_PASSWORD="..."',
-      );
-      return;
-    }
-
-    if (password.length < 8) {
-      console.warn("[Start] SEED_LEADER_PASSWORD braucht mindestens 8 Zeichen – übersprungen.");
-      return;
-    }
-
-    const teamName = process.env.SEED_TEAM?.trim() || "Door2Door Team";
-    const leaderName = process.env.SEED_LEADER_NAME?.trim() || "Teamleitung";
-
-    const teamId = db.prepare("INSERT INTO teams (name) VALUES (?)").run(teamName)
-      .lastInsertRowid as number;
-    db.prepare(
-      `INSERT INTO users (team_id, name, email, password_hash, role)
-       VALUES (?, ?, ?, ?, 'LEADER')`,
-    ).run(teamId, leaderName, email, hashPassword(password));
-    ensureDefaultReasons(teamId);
-
-    console.log(`[Start] Team „${teamName}“ und Teamleitung ${email} angelegt.`);
-  }
+  // Ohne Teamleitung geht es trotzdem weiter: die Tagesquelle der
+  // Energiekarte haengt nicht an der Ersteinrichtung.
+  if (count === 0) seedLeader();
 
   // Ohne Tagesquelle pflegt das Team die Preise selbst - dann gibt es nichts abzurufen.
   if (!feedConfig()) return;
@@ -67,6 +39,40 @@ export async function bootstrap(): Promise<void> {
   }
 
   scheduleDailyRefresh();
+}
+
+/** Team und Teamleitung aus SEED_LEADER_EMAIL / SEED_LEADER_PASSWORD anlegen. */
+function seedLeader(): void {
+  const db = getDb();
+  const email = process.env.SEED_LEADER_EMAIL?.trim().toLowerCase();
+  const password = process.env.SEED_LEADER_PASSWORD;
+
+  if (!email || !password) {
+    console.warn(
+      "[Start] Die Datenbank ist leer und es wurde noch keine Teamleitung angelegt.\n" +
+        "        Setze SEED_LEADER_EMAIL und SEED_LEADER_PASSWORD und starte neu.\n" +
+        '        Bei Fly.io:  fly secrets set SEED_LEADER_EMAIL="..." SEED_LEADER_PASSWORD="..."',
+    );
+    return;
+  }
+
+  if (password.length < 8) {
+    console.warn("[Start] SEED_LEADER_PASSWORD braucht mindestens 8 Zeichen – übersprungen.");
+    return;
+  }
+
+  const teamName = process.env.SEED_TEAM?.trim() || "Door2Door Team";
+  const leaderName = process.env.SEED_LEADER_NAME?.trim() || "Teamleitung";
+
+  const teamId = db.prepare("INSERT INTO teams (name) VALUES (?)").run(teamName)
+    .lastInsertRowid as number;
+  db.prepare(
+    `INSERT INTO users (team_id, name, email, password_hash, role)
+     VALUES (?, ?, ?, ?, 'LEADER')`,
+  ).run(teamId, leaderName, email, hashPassword(password));
+  ensureDefaultReasons(teamId);
+
+  console.log(`[Start] Team „${teamName}“ und Teamleitung ${email} angelegt.`);
 }
 
 /**

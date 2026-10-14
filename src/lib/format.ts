@@ -7,6 +7,50 @@
 
 const ZONE = "Europe/Berlin";
 
+const berlinFormatter = new Intl.DateTimeFormat("en-GB", {
+  timeZone: ZONE,
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+  hour: "2-digit",
+  minute: "2-digit",
+  second: "2-digit",
+  hourCycle: "h23",
+});
+
+/** Datum und Uhrzeit eines Zeitpunkts in Berlin, als Zahlen. */
+export function berlinParts(date: Date) {
+  const parts = berlinFormatter.formatToParts(date);
+  const part = (type: Intl.DateTimeFormatPartTypes) => Number(parts.find((entry) => entry.type === type)!.value);
+  return { year: part("year"), month: part("month"), day: part("day"), hour: part("hour"), minute: part("minute"), second: part("second") };
+}
+
+/** Berliner Wanduhrzeit (als UTC-Zahl gelesen) in den echten Zeitpunkt umrechnen - als SQLite-Zeitstempel. */
+function berlinWallToSql(wall: number): string {
+  let instant = wall;
+  for (let iteration = 0; iteration < 3; iteration += 1) {
+    const parts = berlinParts(new Date(instant));
+    const offset = Date.UTC(parts.year, parts.month - 1, parts.day, parts.hour, parts.minute, parts.second) - instant;
+    instant = wall - offset;
+  }
+  return new Date(instant).toISOString().slice(0, 19).replace("T", " ");
+}
+
+/**
+ * Mitternacht in Berlin, `daysBack` Kalendertage vor heute - als
+ * SQLite-Zeitstempel in UTC. Gezaehlt wird im Kalender, nicht in 24-Stunden-
+ * Schritten: beim Wechsel der Sommerzeit hat ein Tag 23 oder 25 Stunden.
+ */
+export function berlinMidnight(daysBack = 0, now = new Date()): string {
+  const { year, month, day } = berlinParts(now);
+  return berlinWallToSql(Date.UTC(year, month - 1, day - daysBack));
+}
+
+/** Ein Berliner Kalendertag dauert beim Wechsel der Sommerzeit 23 oder 25 Stunden. */
+export function berlinDayBounds(now = new Date()): { start: string; end: string } {
+  return { start: berlinMidnight(0, now), end: berlinMidnight(-1, now) };
+}
+
 /** "Sonntag, 27. September" */
 export function todayLong(now = new Date()): string {
   return now.toLocaleDateString("de-DE", {

@@ -73,6 +73,28 @@ interface Props {
   tarifrechnerUrl: string;
 }
 
+/** Merker im Geraet lesen - im privaten Modus oder bei gesperrtem Speicher eben keiner. */
+function recall(key: string): string | null {
+  try {
+    return window.localStorage.getItem(key);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Merker im Geraet setzen (null entfernt ihn). Nur ein Komfort: ist der
+ * Speicher voll oder gesperrt, darf das weder Abschluss noch Strassenwahl aufhalten.
+ */
+function remember(key: string, value: string | null): void {
+  try {
+    if (value === null) window.localStorage.removeItem(key);
+    else window.localStorage.setItem(key, value);
+  } catch {
+    // Dann startet die Tuer beim naechsten Mal eben ohne Merker.
+  }
+}
+
 /**
  * Klinken - die Tuer. Ein Bildschirm fuer eine Hand: oben, wo man ist;
  * in der Mitte die Hausnummer; unten im Daumenbereich die vier Ergebnisse.
@@ -146,9 +168,9 @@ export function TourClient({
   /* --------------------------- Geraet & Umgebung ------------------------- */
 
   useEffect(() => {
-    const storedProduct = window.localStorage.getItem("d2d_product");
+    const storedProduct = recall("d2d_product");
     if (storedProduct === "STROM" || storedProduct === "GAS" || storedProduct === "BEIDES") setProduct(storedProduct);
-    const storedStreet = Number(window.localStorage.getItem("d2d_street"));
+    const storedStreet = Number(recall("d2d_street"));
     const remembered = streets.find((s) => s.id === storedStreet);
     if (remembered) {
       setStreetId(remembered.id);
@@ -164,7 +186,7 @@ export function TourClient({
     if (linked) {
       setTerritoryId(linked.territory_id);
       setStreetId(linked.id);
-      window.localStorage.setItem("d2d_street", String(linked.id));
+      remember("d2d_street", String(linked.id));
       const house = params.get("house");
       if (house) setHouseNumber(house);
       window.history.replaceState(null, "", window.location.pathname);
@@ -270,8 +292,7 @@ export function TourClient({
     setStreetId(id);
     setHouseNumber("");
     setBellLabel("");
-    if (id) window.localStorage.setItem("d2d_street", String(id));
-    else window.localStorage.removeItem("d2d_street");
+    remember("d2d_street", id ? String(id) : null);
   }, []);
 
   function pickHouse(number: string) {
@@ -300,7 +321,7 @@ export function TourClient({
     if (target) {
       setTerritoryId(target.territory_id);
       setStreetId(target.id);
-      window.localStorage.setItem("d2d_street", String(target.id));
+      remember("d2d_street", String(target.id));
     }
     setHouseNumber(item.house_number);
     setBellLabel(item.doorbell_label ?? "");
@@ -381,8 +402,14 @@ export function TourClient({
     );
   }
 
+  /** Haengen an der Klingel schon Eintraege - beim Server oder gerade erst hier erfasst? */
+  function bellUsed(bell: Bell): boolean {
+    const facts = book.bellFacts(currentKey, bell);
+    return bell.visit_count > 0 || facts.not_home_count + facts.met_count > 0;
+  }
+
   async function removeBell(bell: Bell) {
-    if (book.isBellDone(currentKey, bell)) {
+    if (bellUsed(bell)) {
       toast("An dieser Klingel hängen schon Einträge");
       return;
     }
@@ -666,7 +693,7 @@ export function TourClient({
    */
   function startSale(choice: EnergyType) {
     setProduct(choice);
-    window.localStorage.setItem("d2d_product", choice);
+    remember("d2d_product", choice);
     try {
       beginSaleDraft(
         userId,
@@ -1007,7 +1034,7 @@ export function TourClient({
           units={currentHouse?.units ?? 0}
           bells={currentBells.map((bell) => ({
             bell,
-            done: book.isBellDone(currentKey, bell),
+            used: bellUsed(bell),
             blocked: Boolean(book.bellFacts(currentKey, bell).blocked_at),
           }))}
           lastLine={lastLine}

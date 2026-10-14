@@ -12,6 +12,7 @@ import {
   type LevelTotals,
 } from "./levels";
 import { OUTCOME_LABEL, type VisitOutcome } from "./types";
+import { berlinDayBounds, berlinParts } from "./format";
 
 /** Nur vertrauenswürdige Regel-Konstanten werden hier in SQL eingesetzt. */
 const XP_SQL = `CASE v.outcome ${XP_RULES.map((rule) => `WHEN '${rule.outcome}' THEN ${rule.xp}`).join(" ")} ELSE 0 END`;
@@ -43,38 +44,8 @@ export interface LevelDashboard {
   leaderboard: LevelLeaderboardEntry[];
 }
 
-const berlinFormatter = new Intl.DateTimeFormat("en-GB", {
-  timeZone: "Europe/Berlin",
-  year: "numeric",
-  month: "2-digit",
-  day: "2-digit",
-  hour: "2-digit",
-  minute: "2-digit",
-  second: "2-digit",
-  hourCycle: "h23",
-});
-
-function berlinParts(date: Date) {
-  const parts = berlinFormatter.formatToParts(date);
-  const part = (type: Intl.DateTimeFormatPartTypes) => Number(parts.find((entry) => entry.type === type)!.value);
-  return { year: part("year"), month: part("month"), day: part("day"), hour: part("hour"), minute: part("minute"), second: part("second") };
-}
-
-/** Ein Berliner Kalendertag dauert beim Wechsel der Sommerzeit 23 oder 25 Stunden. */
-export function berlinDayBounds(now = new Date()): { start: string; end: string } {
-  const { year, month, day } = berlinParts(now);
-  const wallMidnight = Date.UTC(year, month - 1, day);
-  const midnightInUtc = (wall: number) => {
-    let instant = wall;
-    for (let iteration = 0; iteration < 3; iteration += 1) {
-      const parts = berlinParts(new Date(instant));
-      const offset = Date.UTC(parts.year, parts.month - 1, parts.day, parts.hour, parts.minute, parts.second) - instant;
-      instant = wall - offset;
-    }
-    return new Date(instant).toISOString().slice(0, 19).replace("T", " ");
-  };
-  return { start: midnightInUtc(wallMidnight), end: midnightInUtc(wallMidnight + 86_400_000) };
-}
+// Berliner Tagesgrenzen stehen in format.ts - die Rangliste rechnet mit denselben.
+export { berlinDayBounds };
 
 function userTotals(teamId: number, userId: number): TotalsRow {
   // Der JOIN prüft die Mitgliedschaft auch dann, wenn die Person noch keine Besuche hat.

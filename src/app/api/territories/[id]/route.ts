@@ -4,7 +4,7 @@ import { assertPermission, assertTerritoryAccess, territoryAssignee } from "@/li
 import { getDb } from "@/lib/db";
 import { freeArea, getTerritory } from "@/lib/queries";
 import { parseShape, shapeToJson } from "@/lib/geo/area";
-import { handle, optionalText } from "@/lib/api";
+import { handle, optionalText, requireText } from "@/lib/api";
 
 export const dynamic = "force-dynamic";
 
@@ -45,7 +45,7 @@ export async function PATCH(
           : shapeToJson(freeArea(user.team_id, parseShape(body.area), { exceptId: territoryId })),
       );
     }
-    if (body.name !== undefined) set("name", optionalText(body.name, 120));
+    if (body.name !== undefined) set("name", requireText(body.name, "Gebietsname", 120));
     if (body.city !== undefined) set("city", optionalText(body.city, 120));
     if (body.postalCode !== undefined) set("postal_code", optionalText(body.postalCode, 10));
     if (body.note !== undefined) set("note", optionalText(body.note));

@@ -108,6 +108,25 @@ export async function disablePush(): Promise<PushState> {
 }
 
 /**
+ * Beim Abmelden: der Server schickt diesem Geraet keine Nachrichten des Kontos
+ * mehr - auf einem geteilten Handy saehe sie sonst der Naechste. Die Anmeldung
+ * beim Browser bleibt bestehen; wer sich danach hier anmeldet, uebernimmt sie
+ * (syncPush). Kurz begrenzt, damit das Abmelden nie am Netz haengt.
+ */
+export async function forgetPushDevice(): Promise<void> {
+  if (!supported()) return;
+  const reg = await navigator.serviceWorker.getRegistration();
+  const subscription = await reg?.pushManager.getSubscription();
+  if (!subscription) return;
+  await fetch("/api/push", {
+    method: "DELETE",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ endpoint: subscription.endpoint }),
+    signal: typeof AbortSignal.timeout === "function" ? AbortSignal.timeout(4000) : undefined,
+  });
+}
+
+/**
  * Die Anmeldung dieses Geraets erneut beim Server hinterlegen - etwa nach
  * einem Wechsel des Kontos auf einem geteilten Handy. Schadet nie.
  */

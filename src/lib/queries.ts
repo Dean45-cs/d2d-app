@@ -60,7 +60,7 @@ const TERRITORY_STATS_SQL = `
                -- Einzeltuer: erfasst, sobald jemand dort war.
                OR (NOT EXISTS (SELECT 1 FROM doorbells d WHERE d.house_number_id = h.id)
                    AND EXISTS (SELECT 1 FROM visits v WHERE v.street_id = h.street_id
-                     AND lower(replace(v.house_number, ' ', '')) = lower(h.number)))
+                     AND lower(replace(v.house_number, ' ', '')) = lower(replace(h.number, ' ', ''))))
                -- Mehrfamilienhaus: erst, wenn jede Klingel durch ist.
                OR (EXISTS (SELECT 1 FROM doorbells d WHERE d.house_number_id = h.id)
                    AND NOT EXISTS (SELECT 1 FROM doorbells d WHERE d.house_number_id = h.id AND NOT (
@@ -375,9 +375,12 @@ export interface HouseNumberWithStats {
   blocked_by_name: string | null;
 }
 
-/** Trifft ein Besuch diese Hausnummer? Leerzeichen und Grossschreibung egal. */
+/**
+ * Trifft ein Besuch diese Hausnummer? Leerzeichen und Grossschreibung egal -
+ * auf beiden Seiten: von Hand getippt steht auch "12 A" in der Liste.
+ */
 const HOUSE_MATCH =
-  "v.street_id = h.street_id AND lower(replace(v.house_number, ' ', '')) = lower(h.number)";
+  "v.street_id = h.street_id AND lower(replace(v.house_number, ' ', '')) = lower(replace(h.number, ' ', ''))";
 
 /** Eine Klingel ist durch, wenn gesperrt, angetroffen oder alle Versuche verbraucht. */
 const BELL_DONE = `(
@@ -438,6 +441,11 @@ export function addStreets(territoryId: number, raw: string): number {
   const existing = db
     .prepare("SELECT COALESCE(MAX(sort_order), 0) AS m FROM streets WHERE territory_id = ?")
     .get(territoryId) as { m: number };
+  // Wie bei der Kartenauswahl: eine Strasse, die es im Gebiet schon gibt, kommt nicht doppelt.
+  const known = new Set(
+    (db.prepare("SELECT name FROM streets WHERE territory_id = ?").all(territoryId) as Array<{ name: string }>)
+      .map((row) => row.name.toLocaleLowerCase("de-DE")),
+  );
 
   const insert = db.prepare(
     `INSERT INTO streets (territory_id, name, house_numbers, units, sort_order)
@@ -450,15 +458,20 @@ export function addStreets(territoryId: number, raw: string): number {
     .filter(Boolean);
 
   let order = existing.m;
+  let added = 0;
   const run = db.transaction(() => {
     for (const line of lines) {
       const parsed = parseStreetLine(line);
+      const key = parsed.name.toLocaleLowerCase("de-DE");
+      if (!parsed.name || known.has(key)) continue;
+      known.add(key);
       order += 1;
-      insert.run(territoryId, parsed.name, parsed.houseNumbers, parsed.units, order);
+      added += 1;
+      insert.run(territoryId, parsed.name.slice(0, 120), parsed.houseNumbers, parsed.units, order);
     }
   });
   run();
-  return lines.length;
+  return added;
 }
 
 export function parseStreetLine(line: string): {
@@ -789,6 +802,27 @@ export function ensureDefaultReasons(teamId: number): void {
   run();
 }
 
+/**
+ * Code fuer einen neuen Ablehnungsgrund - im Team eindeutig. Aus der hoechsten
+ * Sortierung allein waere er das nicht: nach dem Umsortieren kaeme dieselbe
+ * Nummer noch einmal, und das Anlegen scheiterte an der Datenbank.
+ */
+export function reasonCode(teamId: number, label: string, wanted: string, next: number): string {
+  const taken = new Set(
+    (getDb().prepare("SELECT code FROM rejection_reasons WHERE team_id = ?").all(teamId) as Array<{ code: string }>)
+      .map((row) => row.code),
+  );
+  const own = wanted.trim().toUpperCase();
+  if (own) {
+    if (taken.has(own)) throw new Error("Diesen Code gibt es schon.");
+    return own;
+  }
+  const stem = label.toUpperCase().replace(/[^A-Z0-9]+/g, "_").slice(0, 30);
+  let suffix = Math.max(1, Math.floor(next));
+  while (taken.has(`${stem}_${suffix}`)) suffix += 1;
+  return `${stem}_${suffix}`;
+}
+
 export function listReasons(teamId: number, onlyActive = true): RejectionReason[] {
   ensureDefaultReasons(teamId);
   return getDb()
@@ -947,14 +981,16 @@ export interface AppointmentRow {
 }
 
 /**
- * Vereinbarte Termine, der naechste zuerst.
+ * Vereinbarte Termine: offene, der naechste zuerst - mit `done` die erledigten,
+ * der juengste zuerst. Getrennt abgefragt, damit sich beide nicht das Limit
+ * teilen: sonst verdraengten alte erledigte Termine die anstehenden.
  *
  * Sortiert wird ueber den Text der Ortszeit - "2026-09-21 18:00" laesst sich
  * genauso vergleichen wie ein Datum, und die Reihenfolge bleibt dieselbe.
  */
 export function listAppointments(
   teamId: number,
-  opts: { userId?: number; includeDone?: boolean; limit?: number } = {},
+  opts: { userId?: number; done?: boolean; limit?: number } = {},
 ): AppointmentRow[] {
   const where: string[] = [
     "v.team_id = ?",
@@ -966,7 +1002,7 @@ export function listAppointments(
     where.push("COALESCE(v.follow_up_user_id, v.user_id) = ?");
     params.push(opts.userId);
   }
-  if (!opts.includeDone) where.push("v.follow_up_done_at IS NULL");
+  where.push(opts.done ? "v.follow_up_done_at IS NOT NULL" : "v.follow_up_done_at IS NULL");
   params.push(opts.limit ?? 100);
 
   return getDb()
@@ -987,7 +1023,7 @@ export function listAppointments(
          LEFT JOIN territories t ON t.id = v.territory_id
          LEFT JOIN doorbells d ON d.id = v.doorbell_id
         WHERE ${where.join(" AND ")}
-        ORDER BY v.follow_up_at
+        ORDER BY v.follow_up_at ${opts.done ? "DESC" : "ASC"}, v.id
         LIMIT ?`,
     )
     .all(...params) as AppointmentRow[];

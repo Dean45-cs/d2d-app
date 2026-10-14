@@ -16,6 +16,7 @@ import { providerLookup } from "@/lib/energy/provider";
 import { readArea } from "@/lib/geo/area";
 import type { StreetWithStats } from "@/lib/queries";
 import { getLevelProgress } from "@/lib/level-queries";
+import { berlinMidnight } from "@/lib/format";
 
 export const dynamic = "force-dynamic";
 
@@ -49,8 +50,8 @@ export default async function TourPage() {
   // im Treppenhaus ist meist kein Netz, und genau dort werden sie gebraucht.
   const doorbells = listDoorbells(houseNumbers.map((h) => h.id));
 
-  const today = new Date().toISOString().slice(0, 10);
-  const todayTotals = totals(user.team_id, { userId: user.id, since: today });
+  // "Heute" beginnt um Mitternacht in Berlin - wie bei den Tageszielen.
+  const todayTotals = totals(user.team_id, { userId: user.id, since: berlinMidnight() });
   const recent = listVisits(user.team_id, { userId: user.id, limit: 8 });
 
   /*

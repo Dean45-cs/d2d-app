@@ -69,11 +69,20 @@ export function getProfile(userId: number, teamId: number, viewerId: number): Pr
   return { ...row, followed_by_me: Boolean(row.followed_by_me), follows_me: Boolean(row.follows_me) };
 }
 
-/** Prueft, dass die Person zum Team gehoert und aktiv ist. */
-export function requireTeamPerson(userId: number, teamId: number): PersonRef {
+/**
+ * Prueft, dass die Person zum Team gehoert und aktiv ist. Mit
+ * `includeInactive` genuegt die Teamzugehoerigkeit - etwa fuer die Beitraege
+ * im Profil einer deaktivierten Person, das weiterhin aufrufbar ist.
+ */
+export function requireTeamPerson(
+  userId: number,
+  teamId: number,
+  { includeInactive = false }: { includeInactive?: boolean } = {},
+): PersonRef {
   const row = getDb()
     .prepare(
-      "SELECT id, name, avatar, role FROM users WHERE id = ? AND team_id = ? AND active = 1",
+      `SELECT id, name, avatar, role FROM users
+        WHERE id = ? AND team_id = ? ${includeInactive ? "" : "AND active = 1"}`,
     )
     .get(userId, teamId) as PersonRef | undefined;
   if (!row) throw new Error("Person nicht gefunden.");

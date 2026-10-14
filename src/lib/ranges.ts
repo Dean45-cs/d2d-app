@@ -1,3 +1,5 @@
+import { berlinMidnight } from "./format";
+
 /**
  * Zeitraum-Definitionen. Bewusst ohne "use client", damit sowohl die
  * Server-Komponente als auch der Client-Umschalter darauf zugreifen koennen.
@@ -11,11 +13,14 @@ export const RANGES = [
 
 export type RangeKey = (typeof RANGES)[number]["key"];
 
-/** Wandelt den Zeitraum in ein SQL-taugliches Startdatum um. */
-export function rangeToSince(key: RangeKey): string | undefined {
+/**
+ * Wandelt den Zeitraum in einen SQL-tauglichen Startzeitpunkt um. "Heute"
+ * beginnt um Mitternacht in Berlin, nicht in UTC - sonst zaehlte kurz nach
+ * Mitternacht noch der Vortag mit.
+ */
+export function rangeToSince(key: RangeKey, now = new Date()): string | undefined {
   if (key === "all") return undefined;
-  const days = key === "1" ? 0 : Number(key) - 1;
-  return new Date(Date.now() - days * 86_400_000).toISOString().slice(0, 10);
+  return berlinMidnight(Number(key) - 1, now);
 }
 
 export function parseRange(value: string | undefined, fallback: RangeKey = "7"): RangeKey {
@@ -26,10 +31,9 @@ export function parseRange(value: string | undefined, fallback: RangeKey = "7"):
  * Der gleich lange Zeitraum davor - "letzte 7 Tage" gegen die 7 Tage davor.
  * Damit laesst sich zeigen, ob man Plaetze gutgemacht hat.
  */
-export function previousRange(key: RangeKey): { since: string; until: string } | null {
-  const since = rangeToSince(key);
+export function previousRange(key: RangeKey, now = new Date()): { since: string; until: string } | null {
+  const since = rangeToSince(key, now);
   if (!since) return null;
   const days = Number(key);
-  const start = new Date(new Date(`${since}T00:00:00Z`).getTime() - days * 86_400_000);
-  return { since: start.toISOString().slice(0, 10), until: since };
+  return { since: berlinMidnight(2 * days - 1, now), until: since };
 }

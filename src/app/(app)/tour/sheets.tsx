@@ -413,7 +413,8 @@ export function HouseSheet({
   title: string;
   type: BuildingType;
   units: number;
-  bells: Array<{ bell: Bell; done: boolean; blocked: boolean }>;
+  /** `used`: an der Klingel haengen schon Eintraege - dann laesst sie sich nicht mehr entfernen. */
+  bells: Array<{ bell: Bell; used: boolean; blocked: boolean }>;
   lastLine: string | null;
   attempts: number;
   blocked: boolean;
@@ -498,7 +499,7 @@ export function HouseSheet({
           <ListLabel>Klingelschilder</ListLabel>
           {bells.length > 0 && (
             <ul className="list">
-              {bells.map(({ bell, done, blocked: bellBlocked }) =>
+              {bells.map(({ bell, used, blocked: bellBlocked }) =>
                 editing && editing.bell === bell ? (
                   <li key={`edit-${bell.label}`} className="space-y-2 p-3">
                     <div className="grid grid-cols-[minmax(0,1fr)_6rem] gap-2">
@@ -570,7 +571,7 @@ export function HouseSheet({
                         >
                           <IconBan className="h-5 w-5" />
                         </button>
-                        {!done && (
+                        {!used && (
                           <button
                             type="button"
                             className="icon-btn"

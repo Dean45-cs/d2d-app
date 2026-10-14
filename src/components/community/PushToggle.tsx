@@ -51,6 +51,8 @@ function usePush() {
       const response = await fetch("/api/push/test", { method: "POST" });
       const data = await response.json().catch(() => ({}));
       show(response.ok ? "Probe ist unterwegs" : (data.error ?? "Senden fehlgeschlagen"));
+    } catch {
+      show("Keine Verbindung");
     } finally {
       setBusy(false);
     }
