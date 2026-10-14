@@ -25,6 +25,7 @@ interface StreetResponse {
   addressCount: number;
   areaSqKm: number;
   place: { city: string; postalCode: string; district: string };
+  source?: "overpass" | "tiles";
 }
 
 type Tab = "map" | "list";
@@ -425,6 +426,7 @@ export function NewTerritoryButton({
               <StreetResult
                 streets={result.streets}
                 addressCount={result.addressCount}
+                source={result.source}
                 chosen={chosen}
                 onToggle={(name) =>
                   setChosen((prev) => {

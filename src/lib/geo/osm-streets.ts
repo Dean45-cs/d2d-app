@@ -52,7 +52,12 @@ export interface AreaStreets {
   addressCount: number;
   place: PlaceInfo;
   areaSqKm: number;
+  /** Woher die Liste stammt - aus den Kartenkacheln ist die Zuordnung der Nummern geschaetzt. */
+  source?: StreetSource;
 }
+
+/** Overpass (Hausnummern mit Strasse) oder die Vektorkacheln der Karte (naechste Strasse). */
+export type StreetSource = "overpass" | "tiles";
 
 export interface PlaceInfo {
   city: string;
@@ -143,6 +148,8 @@ export interface OverpassOptions {
   headers?: Record<string, string>;
   /** Mit diesem Server anfangen (der zuletzt geantwortet hat). */
   startAt?: number;
+  /** Bricht alle laufenden Anfragen ab - etwa wenn die Kartendaten schneller waren. */
+  signal?: AbortSignal;
 }
 
 /**
@@ -153,12 +160,13 @@ export interface OverpassOptions {
 export function queryOverpass(
   urls: string[],
   query: string,
-  { headers = {}, startAt = 0 }: OverpassOptions = {},
+  { headers = {}, startAt = 0, signal }: OverpassOptions = {},
 ): Promise<{ elements: OverpassElement[]; server: number }> {
   const total = urls.length;
   const controllers: AbortController[] = [];
   // Ohne Server kaeme nie eine Antwort - lieber gleich sagen, was fehlt.
   if (total === 0) return Promise.reject(new Error("Kein Straßen-Server eingerichtet (OVERPASS_URL)."));
+  if (signal?.aborted) return Promise.reject(new Error("Straßenabfrage abgebrochen."));
 
   return new Promise((resolve, reject) => {
     let settled = false;
@@ -171,9 +179,12 @@ export function queryOverpass(
       if (settled) return;
       settled = true;
       clearTimeout(hedge);
+      signal?.removeEventListener("abort", cancel);
       for (const controller of controllers) controller.abort();
       done();
     };
+    const cancel = () => finish(() => reject(new Error("Straßenabfrage abgebrochen.")));
+    signal?.addEventListener("abort", cancel, { once: true });
 
     const launch = () => {
       if (settled || started >= total) return;

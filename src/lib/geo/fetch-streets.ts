@@ -1,11 +1,12 @@
 /**
  * Strassen einer Flaeche aus dem Browser laden.
  *
- * Zuerst fragt das Geraet Overpass selbst - mit der eigenen IP-Adresse. Der
- * App-Server laeuft bei einem Hoster, dessen Ausgangs-IP sich viele teilen;
- * deren Overpass-Kontingent ist oft verbraucht, und dann kommen ueber den
- * Server gar keine Strassen. Erst wenn der direkte Weg scheitert (etwa weil
- * ein Netz die Server sperrt), geht die Anfrage ueber den App-Server.
+ * Zuerst fragt das Geraet selbst - mit der eigenen IP-Adresse. Der App-Server
+ * laeuft bei einem Hoster, dessen Ausgangs-IP sich viele teilen; deren
+ * Overpass-Kontingent ist oft verbraucht. Neben Overpass laufen die
+ * Kartenkacheln mit (street-search.ts), die auch dann antworten, wenn alle
+ * Overpass-Server ueberlastet sind. Erst wenn beides scheitert (etwa weil ein
+ * Netz die Dienste sperrt), geht die Anfrage ueber den App-Server.
  */
 
 import { centerOf, type LatLng } from "./area";
@@ -15,14 +16,12 @@ import {
   QueryRejected,
   checkAreaSize,
   placeFromAddress,
-  queryOverpass,
-  streetQuery,
-  streetsFromElements,
   type AreaStreets,
   type NominatimAddress,
   type PlaceInfo,
 } from "./osm-streets";
 import { mainRing, type Shape } from "./shape";
+import { searchStreets } from "./street-search";
 
 /** Etwas laenger als die Wartezeit des Servers (Overpass-Versuche + Ortssuche). */
 const SERVER_TIMEOUT_MS = 50_000;
@@ -42,11 +41,11 @@ export async function loadStreets(area: Shape): Promise<AreaStreets> {
   }
 
   try {
-    const [{ elements }, place] = await Promise.all([
-      queryOverpass(DEFAULT_OVERPASS_URLS, streetQuery(area)),
+    const [{ streets, addressCount, source }, place] = await Promise.all([
+      searchStreets(area, { overpassUrls: DEFAULT_OVERPASS_URLS }),
       placeOf(centerOf(mainRing(area) ?? area[0][0])),
     ]);
-    return { ...streetsFromElements(elements, area), place, areaSqKm };
+    return { streets, addressCount, source, place, areaSqKm };
   } catch (error) {
     // Eine abgelehnte Abfrage lehnt auch der Server ab - da hilft kein Umweg.
     if (error instanceof QueryRejected) throw new StreetsError(error.message);

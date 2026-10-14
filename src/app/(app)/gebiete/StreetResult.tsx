@@ -34,6 +34,8 @@ export interface Plot {
 interface Props {
   streets: FoundStreet[];
   addressCount: number;
+  /** "tiles": aus den Kartenkacheln, Hausnummern der naechsten Strasse zugeordnet. */
+  source?: "overpass" | "tiles";
   chosen: Set<string>;
   onToggle: (name: string) => void;
   onChooseAll: (all: boolean) => void;
@@ -56,6 +58,7 @@ interface Props {
 export function StreetResult({
   streets,
   addressCount,
+  source,
   chosen,
   onToggle,
   onChooseAll,
@@ -88,6 +91,11 @@ export function StreetResult({
           <p className="text-footnote text-muted">
             {streets.length} gefunden · {addressCount} Adressen aus OpenStreetMap
           </p>
+          {source === "tiles" && (
+            <p className="text-footnote text-muted">
+              Aus den Kartendaten – Hausnummern sind der nächsten Straße zugeordnet.
+            </p>
+          )}
         </div>
         <div className="flex shrink-0 gap-2">
           <button type="button" className="chip min-h-8" onClick={() => onChooseAll(true)}>
