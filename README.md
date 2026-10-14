@@ -522,6 +522,16 @@ geantwortet hat. Bleibt es hartnäckig, hilft eine eigene Overpass-Instanz –
 `OVERPASS_URL` darauf zeigen lassen, fertig. Welcher Server gerade genommen wurde, steht
 im Serverprotokoll (`[overpass] …`).
 
+**Rückweg über die Kartendaten.** Die öffentlichen Overpass-Server sind oft durch
+Bot-Verkehr überlastet. Deshalb laden Gerät und Server von Anfang an zusätzlich die
+Vektorkacheln von OpenFreeMap (Zoomstufe 14, dieselben Daten wie die Karte; ohne Limit
+und ohne Schlüssel – `src/lib/geo/tile-streets.ts`). Antwortet Overpass nicht binnen
+zehn Sekunden oder scheitert es, kommt die Liste aus den Kacheln. Dort stehen
+Straßennamen und Hausnummern, aber nicht, zu welcher Straße eine Nummer gehört – jede
+Nummer wird der nächsten benannten Straße zugeordnet. Das stimmt fast immer, an Ecken
+lohnt ein kurzer Blick; Wohneinheiten kennen die Kacheln nicht (jedes Haus zählt als
+eine Tür). Die App zeigt in dem Fall einen Hinweis unter der Straßenliste.
+
 Für ein Team, das täglich Gebiete schneidet, lohnt eine eigene Overpass-Instanz oder ein
 kommerzieller Anbieter – einfach die beiden Adressen umbiegen. Die App geht sparsam mit
 den Diensten um: Die Ortssuche ist auf einen Aufruf pro Sekunde gebremst, Ergebnisse
@@ -748,7 +758,7 @@ entstehen zwei getrennte Datenbestände.
 | Datenbank | SQLite über `better-sqlite3` – kein Datenbankserver nötig |
 | Hausnummern | eigene Tabelle je Straße, aus OpenStreetMap übernommen |
 | Karte | OpenFreeMap über MapLibre GL; Apple Karten (MapKit JS), wenn eingerichtet; Rückfall Leaflet |
-| Gebietszuschnitt | Overpass (Straßen in der Fläche), Nominatim (Ortssuche) |
+| Gebietszuschnitt | Overpass (Straßen in der Fläche), Rückweg OpenFreeMap-Vektorkacheln, Nominatim (Ortssuche) |
 | Aufteilung | k-Means auf den Straßenmitten, danach Ausgleich nach Türen |
 | Login | Signiertes Session-Cookie (HMAC), Passwörter als scrypt-Hash |
 | App auf dem Handy | PWA mit Manifest, Service Worker und lokaler Erfassungs-Warteschlange |

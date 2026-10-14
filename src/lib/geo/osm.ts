@@ -19,13 +19,11 @@ import {
   checkAreaSize,
   cityOf,
   placeFromAddress,
-  queryOverpass,
-  streetQuery,
-  streetsFromElements,
   type AreaStreets,
   type NominatimAddress,
   type PlaceInfo,
 } from "./osm-streets";
+import { searchStreets } from "./street-search";
 
 export type { AreaStreets, FoundAddress, FoundStreet, PlaceInfo } from "./osm-streets";
 
@@ -87,17 +85,18 @@ export async function streetsInArea(area: Shape): Promise<AreaStreets> {
   const size = checkAreaSize(area);
 
   // Strassen und Ortsname gleichzeitig holen - hintereinander addieren sich die Wartezeiten.
-  const [{ elements, server }, place] = await Promise.all([
-    queryOverpass(OVERPASS_URLS, streetQuery(area), {
+  // Ist Overpass ueberlastet, kommen die Strassen aus den Kartenkacheln.
+  const [{ streets, addressCount, source, server }, place] = await Promise.all([
+    searchStreets(area, {
+      overpassUrls: OVERPASS_URLS,
       headers: { "user-agent": USER_AGENT },
       startAt: preferredServer,
     }),
     describePlaceQuickly(centerOf(mainRing(area) ?? area[0][0])),
   ]);
-  preferredServer = server;
-  const { streets, addressCount } = streetsFromElements(elements, area);
+  if (server !== undefined) preferredServer = server;
 
-  const result: AreaStreets = { streets, addressCount, place, areaSqKm: size };
+  const result: AreaStreets = { streets, addressCount, source, place, areaSqKm: size };
   if (streetCache.size >= STREET_CACHE_MAX) streetCache.clear();
   streetCache.set(key, { at: Date.now(), value: result });
   return result;
