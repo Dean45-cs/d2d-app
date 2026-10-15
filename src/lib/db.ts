@@ -150,7 +150,9 @@ function migrate(db: Database.Database) {
        lesen. Im Lasttest (300.000 Besuche) wurden Gebietsliste und
        Auswertungen damit von mehreren Sekunden auf Millisekunden schnell. */
     CREATE INDEX IF NOT EXISTS idx_visits_team_created_outcome ON visits (team_id, created_at, outcome, user_id);
-    CREATE INDEX IF NOT EXISTS idx_visits_user_created_outcome ON visits (user_id, created_at, outcome);
+    -- team_id hinten, sonst nimmt SQLite (ohne ANALYZE) fuer "Person im Team" den Teamindex
+    -- und laeuft durch die Besuche des ganzen Teams.
+    CREATE INDEX IF NOT EXISTS idx_visits_user_created_team    ON visits (user_id, created_at, outcome, team_id);
     CREATE INDEX IF NOT EXISTS idx_visits_user_team_outcome    ON visits (user_id, team_id, outcome);
     CREATE INDEX IF NOT EXISTS idx_visits_street_outcome       ON visits (street_id, outcome, created_at);
     -- Der Ausdruck muss exakt dem in HOUSE_MATCH (queries.ts) entsprechen, sonst greift der Index nicht.
@@ -160,6 +162,7 @@ function migrate(db: Database.Database) {
     -- Abgeloest durch die Indizes oben (gleicher Anfang, mehr Spalten).
     DROP INDEX IF EXISTS idx_visits_team_created;
     DROP INDEX IF EXISTS idx_visits_user_created;
+    DROP INDEX IF EXISTS idx_visits_user_created_outcome;
     DROP INDEX IF EXISTS idx_visits_street;
     CREATE INDEX IF NOT EXISTS idx_streets_territory   ON streets (territory_id);
     CREATE INDEX IF NOT EXISTS idx_numbers_street      ON house_numbers (street_id, sort_order);
