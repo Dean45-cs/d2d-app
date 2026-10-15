@@ -6,7 +6,7 @@
  * erscheint dort als grauer Punkt zum Antippen und in der Vorlage fuer den
  * Tabellen-Import.
  */
-import { listTerritories } from "../queries";
+import { listTerritoriesBasic } from "../queries";
 import { centerOf, readArea, type LatLng } from "../geo/area";
 import { searchPlaces } from "../geo/osm";
 import { findCity } from "./cities";
@@ -28,7 +28,7 @@ export interface OpenPlace {
 export function openPlaces(teamId: number): OpenPlace[] {
   const lookup = providerLookup(teamId);
   const places = new Map<string, OpenPlace>();
-  for (const territory of listTerritories(teamId)) {
+  for (const territory of listTerritoriesBasic(teamId)) {
     if (territory.status === "DONE") continue;
     const area = readArea(territory.area_json);
     const info = lookup.find({ postal_code: territory.postal_code, city: territory.city, area });
@@ -64,7 +64,7 @@ export function openPlaces(teamId: number): OpenPlace[] {
  */
 export function locator(teamId: number) {
   const byPlz = new Map<string, LatLng>();
-  for (const territory of listTerritories(teamId)) {
+  for (const territory of listTerritoriesBasic(teamId)) {
     if (!territory.postal_code || byPlz.has(territory.postal_code)) continue;
     const area = readArea(territory.area_json);
     if (area) byPlz.set(territory.postal_code, centerOf(area));

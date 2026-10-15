@@ -107,7 +107,29 @@ export function getTerritory(
 
 export function listAccessibleTerritories(user: User): TerritoryWithStats[] {
   const rights = permissionsFor(user);
-  return listTerritories(user.team_id).filter((territory) => canAccessTerritory(user, territory, rights));
+  // Ohne "Alle Teamgebiete sehen" bleiben nur eigene und selbst angelegte Gebiete -
+  // dann auch nur fuer diese die Kennzahlen rechnen statt fuers ganze Team.
+  const territories = rights["territories.view_all"]
+    ? listTerritories(user.team_id)
+    : (getDb()
+        .prepare(
+          `${TERRITORY_STATS_SQL} WHERE t.team_id = ? AND (t.assigned_user_id = ? OR t.created_by = ?)
+           ORDER BY CASE t.status WHEN 'ACTIVE' THEN 0 WHEN 'OPEN' THEN 1
+                                  WHEN 'PAUSED' THEN 2 ELSE 3 END, t.name`,
+        )
+        .all(user.team_id, user.id, user.id) as TerritoryWithStats[]);
+  return territories.filter((territory) => canAccessTerritory(user, territory, rights));
+}
+
+/** Gebiete ohne Kennzahlen - fuer Stellen, die nur Name, Ort, Status und Flaeche brauchen. Gleiche Reihenfolge wie listTerritories. */
+export function listTerritoriesBasic(teamId: number): Territory[] {
+  return getDb()
+    .prepare(
+      `SELECT t.* FROM territories t WHERE t.team_id = ?
+       ORDER BY CASE t.status WHEN 'ACTIVE' THEN 0 WHEN 'OPEN' THEN 1
+                              WHEN 'PAUSED' THEN 2 ELSE 3 END, t.name`,
+    )
+    .all(teamId) as Territory[];
 }
 
 export interface StreetWithStats extends Street {
@@ -1181,7 +1203,7 @@ export function dailySeries(
               SUM(outcome IN ('MET_NO_SALE','APPOINTMENT','SALE')) AS met,
               SUM(outcome = 'SALE') AS sales
          FROM visits
-        WHERE team_id = ? ${extra} AND date(created_at) >= date('now', ?)
+        WHERE team_id = ? ${extra} AND created_at >= date('now', ?)
         GROUP BY day ORDER BY day`,
     )
     .all(...params) as Array<{ day: string; doors: number; met: number; sales: number }>;
