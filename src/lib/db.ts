@@ -1,6 +1,7 @@
 import Database from "better-sqlite3";
 import fs from "node:fs";
 import path from "node:path";
+import { avatarSrc } from "./avatar-src";
 
 /**
  * Zentrale SQLite-Verbindung.
@@ -30,6 +31,10 @@ function createDb(): Database.Database {
   const db = new Database(resolveDbPath());
   db.pragma("journal_mode = WAL");
   db.pragma("foreign_keys = ON");
+  // Profilbilder werden fuer die Anzeige als Adresse ausgeliefert, nicht als Data-URL.
+  db.function("avatar_src", { deterministic: true }, (id, avatar) =>
+    avatarSrc(Number(id), typeof avatar === "string" ? avatar : ""),
+  );
   migrate(db);
   return db;
 }

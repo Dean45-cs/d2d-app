@@ -44,7 +44,7 @@ export interface Profile extends PersonRef {
 export function getProfile(userId: number, teamId: number, viewerId: number): Profile | null {
   const row = getDb()
     .prepare(
-      `SELECT u.id, u.name, u.avatar, u.role, u.bio, u.active, u.created_at,
+      `SELECT u.id, u.name, avatar_src(u.id, u.avatar) AS avatar, u.role, u.bio, u.active, u.created_at,
               (SELECT COUNT(*) FROM follows f
                  JOIN users x ON x.id = f.follower_id AND x.active = 1
                 WHERE f.followee_id = u.id)                                AS follower_count,
@@ -81,7 +81,7 @@ export function requireTeamPerson(
 ): PersonRef {
   const row = getDb()
     .prepare(
-      `SELECT id, name, avatar, role FROM users
+      `SELECT id, name, avatar_src(id, avatar) AS avatar, role FROM users
         WHERE id = ? AND team_id = ? ${includeInactive ? "" : "AND active = 1"}`,
     )
     .get(userId, teamId) as PersonRef | undefined;
@@ -143,7 +143,7 @@ export function listConnections(
     direction === "followers" ? ["followee_id", "follower_id"] : ["follower_id", "followee_id"];
   const rows = getDb()
     .prepare(
-      `SELECT u.id, u.name, u.avatar, u.role, u.bio,
+      `SELECT u.id, u.name, avatar_src(u.id, u.avatar) AS avatar, u.role, u.bio,
               EXISTS (SELECT 1 FROM follows m
                        WHERE m.follower_id = ? AND m.followee_id = u.id) AS followed_by_me
          FROM follows f
@@ -162,7 +162,7 @@ export function listConnections(
 export function followSuggestions(teamId: number, viewerId: number, limit = 4): PersonListItem[] {
   const rows = getDb()
     .prepare(
-      `SELECT u.id, u.name, u.avatar, u.role, u.bio, 0 AS followed_by_me,
+      `SELECT u.id, u.name, avatar_src(u.id, u.avatar) AS avatar, u.role, u.bio, 0 AS followed_by_me,
               (SELECT COUNT(*) FROM visits v
                 WHERE v.user_id = u.id AND v.outcome = 'SALE'
                   AND v.created_at >= datetime('now', '-30 days')) AS recent_sales
@@ -240,7 +240,7 @@ interface PostRow {
 
 const POST_SQL = `
   SELECT p.id, p.kind, p.body, p.created_at, p.user_id,
-         u.name AS user_name, u.avatar AS user_avatar, u.role AS user_role,
+         u.name AS user_name, avatar_src(u.id, u.avatar) AS user_avatar, u.role AS user_role,
          v.energy_type, t.name AS territory_name, t.city AS territory_city,
          CASE WHEN p.visit_id IS NULL THEN NULL ELSE
            (SELECT COUNT(*) FROM visits v2
@@ -414,7 +414,7 @@ interface CommentRow {
 
 const COMMENT_SQL = `
   SELECT c.id, c.post_id, c.body, c.created_at, c.user_id,
-         u.name AS user_name, u.avatar AS user_avatar, u.role AS user_role
+         u.name AS user_name, avatar_src(u.id, u.avatar) AS user_avatar, u.role AS user_role
     FROM post_comments c
     JOIN users u ON u.id = c.user_id
 `;
@@ -496,7 +496,7 @@ export function teamTotals(
   params.push(teamId);
   return getDb()
     .prepare(
-      `SELECT u.id AS user_id, u.name AS user_name, u.avatar, u.role,
+      `SELECT u.id AS user_id, u.name AS user_name, avatar_src(u.id, u.avatar) AS avatar, u.role,
               COUNT(v.id) AS doors,
               COALESCE(SUM(v.outcome IN ('MET_NO_SALE','APPOINTMENT','SALE')), 0) AS met,
               COALESCE(SUM(v.outcome = 'SALE'), 0)        AS sales,
