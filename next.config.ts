@@ -8,6 +8,17 @@ const nextConfig: NextConfig = {
   // Kein Entwickler-Knopf ueber der Reiterleiste.
   devIndicators: false,
 
+  experimental: {
+    /*
+     * Im Treppenhaus reisst die Verbindung oft gerade dann ab, wenn die App
+     * nach dem Speichern die Seite nachlaedt. Ohne diese Einstellung laedt
+     * Next.js dann die ganze Seite neu - die Tuer ist weg, und ohne Netz
+     * erscheint nur "Keine Verbindung". So wartet der Router stattdessen auf
+     * Empfang und laedt danach nach.
+     */
+    useOffline: true,
+  },
+
   /*
    * Alte Adressen aus Lesezeichen und Push-Nachrichten fuehren an ihren
    * neuen Platz. Die Suchparameter (Zeitraum, Kennzahl, Ansicht) bleiben

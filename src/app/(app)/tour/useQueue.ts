@@ -42,7 +42,8 @@ export function useQueue(
             : `${result.rejected} Einträge konnten nicht gespeichert werden`,
         );
       }
-      router.refresh();
+      if (result.held > 0) notify(heldText(result.held));
+      if (result.sent > 0 || result.rejected > 0) router.refresh();
     }, userId);
 
     const update = () => setOnline(navigator.onLine);
@@ -65,14 +66,24 @@ export function useQueue(
           .filter(Boolean)
           .join(" · "),
       );
-    } else if (result.remaining > 0) {
+    } else if (getQueue(userId).some((entry) => !entry.error)) {
       notify("Noch kein Empfang – Einträge bleiben gespeichert");
+    } else if (result.remaining > 0) {
+      notify(heldText(result.remaining));
     } else if (result.rejected === 0) {
       notify("Alles ist gesendet");
     }
     if (result.rejected > 0) notify("Ein Eintrag konnte nicht gespeichert werden");
+    else if (result.held > 0) notify(heldText(result.held));
     if (result.sent > 0 || result.rejected > 0) router.refresh();
   }, [userId, onProgress, notify, router]);
 
   return { pending, online, sendNow };
+}
+
+/** Eintraege, die der Server ablehnt, bis jemand sie verwirft - der Grund steht in "Heute". */
+function heldText(count: number): string {
+  return count === 1
+    ? "1 Eintrag wird nicht angenommen – Grund unter „Heute“"
+    : `${count} Einträge werden nicht angenommen – Grund unter „Heute“`;
 }

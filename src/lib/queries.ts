@@ -980,6 +980,11 @@ export interface AppointmentRow {
   doorbell_label: string | null;
 }
 
+/** Die Hausnummer eines Termins mit bekannter Lage - Schreibweise egal. */
+const APPOINTMENT_HOUSE = `h.street_id = v.street_id
+  AND lower(replace(h.number, ' ', '')) = lower(replace(v.house_number, ' ', ''))
+  AND h.lat IS NOT NULL AND h.lng IS NOT NULL LIMIT 1`;
+
 /**
  * Vereinbarte Termine: offene, der naechste zuerst - mit `done` die erledigten,
  * der juengste zuerst. Getrennt abgefragt, damit sich beide nicht das Limit
@@ -1013,8 +1018,11 @@ export function listAppointments(
               u.name AS user_name,
               s.id   AS street_id,
               s.name AS street_name,
-              COALESCE(v.lat, s.lat) AS lat,
-              COALESCE(v.lng, s.lng) AS lng,
+              -- Fuer die Route: zuerst die Lage des Hauses selbst, dann wo erfasst wurde, dann die Strasse.
+              COALESCE((SELECT h.lat FROM house_numbers h WHERE ${APPOINTMENT_HOUSE}),
+                       v.lat, s.lat) AS lat,
+              COALESCE((SELECT h.lng FROM house_numbers h WHERE ${APPOINTMENT_HOUSE}),
+                       v.lng, s.lng) AS lng,
               t.name AS territory_name,
               d.label AS doorbell_label
          FROM visits v

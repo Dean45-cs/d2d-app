@@ -3,6 +3,7 @@ import { requireUser } from "@/lib/auth";
 import { handle, optionalNumber, optionalText, parseDoorbellList } from "@/lib/api";
 import {
   addDoorbells,
+  ensureDoorbell,
   ensureHouseNumber,
   listDoorbells,
   requireTeamStreet,
@@ -55,13 +56,21 @@ export async function POST(request: Request) {
      * Sperren darf jeder, der an der Tuer steht - dort faellt der Widerspruch
      * an. Aufheben nur mit dem Recht "Türsperren aufheben": sonst raeumt der
      * naechste Kollege die Sperre weg, weil er die Vorgeschichte nicht kennt.
+     *
+     * Mit `bellLabel` gilt die Sperre nur dieser Klingel - auch einer, die
+     * gerade erst (womoeglich ohne Netz) angelegt wurde und noch keine ID hat.
+     * Ohne Namen gilt sie dem ganzen Haus.
      */
     if (body.blocked !== undefined) {
+      const bellLabel = optionalText(body.bellLabel, 60);
+      const target = bellLabel
+        ? { table: "doorbells" as const, id: ensureDoorbell(houseNumberId, bellLabel, optionalText(body.bellFloor, 20)) }
+        : { table: "house_numbers" as const, id: houseNumberId };
       if (body.blocked) {
-        setDoorBlocked("house_numbers", houseNumberId, user.id, optionalText(body.blockedNote, 200));
+        setDoorBlocked(target.table, target.id, user.id, optionalText(body.blockedNote, 200));
       } else {
         assertPermission(user, "doors.unblock");
-        setDoorBlocked("house_numbers", houseNumberId, null);
+        setDoorBlocked(target.table, target.id, null);
       }
     }
 
