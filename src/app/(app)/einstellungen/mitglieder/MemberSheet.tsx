@@ -3,7 +3,7 @@
 import { useRef, useState } from "react";
 import type { PermissionSet } from "@/lib/permission-definitions";
 import type { Role } from "@/lib/types";
-import { fileToAvatar } from "@/lib/avatar";
+import { avatarToDataUrl, fileToAvatar } from "@/lib/avatar";
 import { Sheet } from "@/components/Sheet";
 import { useToast } from "@/components/Toast";
 import { Avatar, Cell, InlineError, ListLabel, Segmented, StatGrid } from "@/components/ui";
@@ -67,6 +67,12 @@ export function MemberSheet({
     }
   }
 
+  async function removeAvatar() {
+    // Angezeigt wird nur die Adresse des Bildes - fuers Rueckgaengig das Bild selbst merken.
+    const previous = await avatarToDataUrl(m.avatar);
+    await onPatch(m.id, { avatar: "" }, "Profilbild entfernt", previous ? { avatar: previous } : undefined);
+  }
+
   async function changeRole(next: Role) {
     if (next === shownRole) return;
     setRole({ value: next, base: m.role });
@@ -104,7 +110,7 @@ export function MemberSheet({
                 type="button"
                 className="btn btn-plain btn-sm"
                 disabled={busy}
-                onClick={() => void onPatch(m.id, { avatar: "" }, "Profilbild entfernt", { avatar: m.avatar })}
+                onClick={() => void removeAvatar()}
               >
                 Entfernen
               </button>

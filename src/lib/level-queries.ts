@@ -67,7 +67,7 @@ export function getLevelProgress(teamId: number, userId: number): LevelProgress 
 
 export function getLevelLeaderboard(teamId: number): LevelLeaderboardEntry[] {
   const rows = getDb().prepare(`
-    SELECT u.id AS userId, u.name, u.avatar, COALESCE(SUM(${XP_SQL}), 0) AS totalXp
+    SELECT u.id AS userId, u.name, avatar_src(u.id, u.avatar) AS avatar, COALESCE(SUM(${XP_SQL}), 0) AS totalXp
     FROM users u
     LEFT JOIN visits v ON v.user_id = u.id AND v.team_id = u.team_id
     WHERE u.team_id = ? AND u.active = 1

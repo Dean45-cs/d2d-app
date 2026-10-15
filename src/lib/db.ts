@@ -1,6 +1,7 @@
 import Database from "better-sqlite3";
 import fs from "node:fs";
 import path from "node:path";
+import { avatarSrc } from "./avatar-src";
 
 /**
  * Zentrale SQLite-Verbindung.
@@ -30,6 +31,10 @@ function createDb(): Database.Database {
   const db = new Database(resolveDbPath());
   db.pragma("journal_mode = WAL");
   db.pragma("foreign_keys = ON");
+  // Profilbilder werden fuer die Anzeige als Adresse ausgeliefert, nicht als Data-URL.
+  db.function("avatar_src", { deterministic: true }, (id, avatar) =>
+    avatarSrc(Number(id), typeof avatar === "string" ? avatar : ""),
+  );
   migrate(db);
   return db;
 }
@@ -138,9 +143,24 @@ function migrate(db: Database.Database) {
       created_at   TEXT NOT NULL DEFAULT (datetime('now'))
     );
 
-    CREATE INDEX IF NOT EXISTS idx_visits_team_created ON visits (team_id, created_at);
-    CREATE INDEX IF NOT EXISTS idx_visits_user_created ON visits (user_id, created_at);
-    CREATE INDEX IF NOT EXISTS idx_visits_street       ON visits (street_id);
+    /* Indizes auf visits: jede Seite zaehlt Besuche - je Team, Person,
+       Strasse, Haus, Klingel, Gebiet oder Grund. Die Spalten hinter dem
+       Suchschluessel (outcome, created_at, ...) machen die Indizes
+       "abdeckend": gezaehlt wird im Index, ohne jede Zeile der Tabelle zu
+       lesen. Im Lasttest (300.000 Besuche) wurden Gebietsliste und
+       Auswertungen damit von mehreren Sekunden auf Millisekunden schnell. */
+    CREATE INDEX IF NOT EXISTS idx_visits_team_created_outcome ON visits (team_id, created_at, outcome, user_id);
+    CREATE INDEX IF NOT EXISTS idx_visits_user_created_outcome ON visits (user_id, created_at, outcome);
+    CREATE INDEX IF NOT EXISTS idx_visits_user_team_outcome    ON visits (user_id, team_id, outcome);
+    CREATE INDEX IF NOT EXISTS idx_visits_street_outcome       ON visits (street_id, outcome, created_at);
+    -- Der Ausdruck muss exakt dem in HOUSE_MATCH (queries.ts) entsprechen, sonst greift der Index nicht.
+    CREATE INDEX IF NOT EXISTS idx_visits_street_house         ON visits (street_id, lower(replace(house_number, ' ', '')));
+    CREATE INDEX IF NOT EXISTS idx_visits_territory_outcome    ON visits (territory_id, outcome);
+    CREATE INDEX IF NOT EXISTS idx_visits_reason               ON visits (reason_id, team_id, created_at, user_id);
+    -- Abgeloest durch die Indizes oben (gleicher Anfang, mehr Spalten).
+    DROP INDEX IF EXISTS idx_visits_team_created;
+    DROP INDEX IF EXISTS idx_visits_user_created;
+    DROP INDEX IF EXISTS idx_visits_street;
     CREATE INDEX IF NOT EXISTS idx_streets_territory   ON streets (territory_id);
     CREATE INDEX IF NOT EXISTS idx_numbers_street      ON house_numbers (street_id, sort_order);
     CREATE INDEX IF NOT EXISTS idx_doorbells_house     ON doorbells (house_number_id, sort_order);
@@ -260,7 +280,9 @@ function migrate(db: Database.Database) {
   db.exec("DELETE FROM settings WHERE key = 'energy_is_demo'");
 
   // Erst hier, denn vor addColumn gibt es die Spalte in alten Datenbanken nicht.
-  db.exec("CREATE INDEX IF NOT EXISTS idx_visits_doorbell ON visits (doorbell_id)");
+  // Mit outcome abdeckend fuer den Klingel-Stand; loest idx_visits_doorbell ab.
+  db.exec("CREATE INDEX IF NOT EXISTS idx_visits_doorbell_outcome ON visits (doorbell_id, outcome)");
+  db.exec("DROP INDEX IF EXISTS idx_visits_doorbell");
   db.exec(
     "CREATE INDEX IF NOT EXISTS idx_visits_follow_up ON visits (team_id, follow_up_at)",
   );

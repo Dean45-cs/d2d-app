@@ -20,8 +20,13 @@ import { berlinMidnight } from "@/lib/format";
 
 export const dynamic = "force-dynamic";
 
-export default async function TourPage() {
+export default async function TourPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ gebiet?: string; street?: string }>;
+}) {
   const user = await requireUser();
+  const params = await searchParams;
 
   // Vertriebler sehen nur ihre zugeteilten Gebiete, die Teamleitung alle.
   const territories = listAccessibleTerritories(user).filter((t) => t.status !== "DONE");
@@ -43,8 +48,21 @@ export default async function TourPage() {
         .all(...territories.map((t) => t.id)) as StreetWithStats[])
     : [];
 
+  /*
+   * Hausnummern und Klingeln fahren fuer die eigenen Gebiete komplett mit -
+   * im Treppenhaus ist meist kein Netz, und genau dort werden sie gebraucht.
+   * Fremde Gebiete (Teamleitung, "alle Teamgebiete sehen") kommen erst dazu,
+   * wenn eines davon gewaehlt ist (?gebiet=…); sonst luede die Teamleitung
+   * jedes Haus des ganzen Teams.
+   */
+  const linked = streets.find((s) => s.id === Number(params.street));
+  const requested = Number(params.gebiet) || linked?.territory_id || 0;
+  const loaded = new Set(territories.filter((t) => t.assigned_user_id === user.id).map((t) => t.id));
+  if (territories.some((t) => t.id === requested)) loaded.add(requested);
+  if (loaded.size === 0 && territories[0]) loaded.add(territories[0].id);
+
   // Hausnummern der eigenen Strassen: an der Tuer wird abgehakt statt getippt.
-  const houseNumbers = listHouseNumbers(streets.map((s) => s.id));
+  const houseNumbers = listHouseNumbers(streets.filter((s) => loaded.has(s.territory_id)).map((s) => s.id));
 
   // Alle Klingelschilder gleich mitschicken statt bei Bedarf nachzuladen:
   // im Treppenhaus ist meist kein Netz, und genau dort werden sie gebraucht.
@@ -90,6 +108,7 @@ export default async function TourPage() {
         }),
       }))}
       streets={streets}
+      loadedTerritories={[...loaded]}
       houseNumbers={houseNumbers}
       doorbells={doorbells}
       canUnblock={hasPermission(user, "doors.unblock")}

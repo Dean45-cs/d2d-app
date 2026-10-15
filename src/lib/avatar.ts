@@ -2,9 +2,10 @@
  * Profilbilder fuer die Mitarbeiter.
  *
  * Das Bild wird im Browser auf ein kleines Quadrat gerechnet und als
- * Data-URL gespeichert. So braucht die App keinen Dateispeicher, und das
- * Bild faehrt mit den Teamdaten mit - auch dorthin, wo an der Tuer kein
- * Netz ist.
+ * Data-URL gespeichert. So braucht die App keinen Dateispeicher. Angezeigt
+ * wird es ueber eine eigene Adresse, die das Handy zwischenspeichert
+ * (src/lib/avatar-src.ts) - so bleibt es auch dort sichtbar, wo an der Tuer
+ * kein Netz ist, ohne jede Seite schwer zu machen.
  */
 
 /** Kantenlaenge des gespeicherten Bildes. Mehr braucht eine Liste nicht. */
@@ -58,4 +59,26 @@ function load(url: string): Promise<HTMLImageElement> {
       reject(new Error("Dieses Bildformat kennt der Browser nicht. Bitte JPEG oder PNG."));
     image.src = url;
   });
+}
+
+/**
+ * Ein angezeigtes Profilbild (Adresse oder Data-URL) wieder als Data-URL -
+ * fuer "Rückgängig" nach dem Entfernen. Das Bild liegt schon im
+ * Zwischenspeicher, das geht also ohne Wartezeit. `null`, wenn es nicht klappt.
+ */
+export async function avatarToDataUrl(src: string): Promise<string | null> {
+  if (src.startsWith("data:")) return src;
+  try {
+    const response = await fetch(src);
+    if (!response.ok) return null;
+    const blob = await response.blob();
+    return await new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(typeof reader.result === "string" ? reader.result : null);
+      reader.onerror = () => resolve(null);
+      reader.readAsDataURL(blob);
+    });
+  } catch {
+    return null;
+  }
 }

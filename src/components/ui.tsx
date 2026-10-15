@@ -348,11 +348,12 @@ export function Avatar({
   }
   if (src) {
     return (
-      // Das Bild steckt als Data-URL in den Teamdaten - nichts fuer next/image.
+      // Kleines, fertig zugeschnittenes Bild (eigene Adresse oder Data-URL) - nichts fuer next/image.
       // eslint-disable-next-line @next/next/no-img-element
       <img
         src={src}
         alt=""
+        decoding="async"
         className={`shrink-0 rounded-full object-cover ring-1 ring-separator ${className}`}
         style={{ width: size, height: size }}
       />

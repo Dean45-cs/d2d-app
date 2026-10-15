@@ -67,6 +67,8 @@ interface Props {
   initialProgress: LevelProgress;
   territories: TerritoryLite[];
   streets: StreetWithStats[];
+  /** Gebiete, deren Hausnummern und Klingeln mitgekommen sind - die anderen kommen bei Bedarf. */
+  loadedTerritories: number[];
   houseNumbers: HouseNumberWithStats[];
   doorbells: DoorbellWithStats[];
   reasons: RejectionReason[];
@@ -125,6 +127,7 @@ export function TourClient({
   initialProgress,
   territories,
   streets,
+  loadedTerritories,
   houseNumbers,
   doorbells,
   reasons,
@@ -211,7 +214,8 @@ export function TourClient({
       remember("d2d_street", String(linked.id));
       setHouseNumber(params.get("house") ?? "");
       setBellLabel("");
-      window.history.replaceState(null, "", window.location.pathname);
+      // Das Gebiet der verlinkten Strasse bleibt beim Nachladen nach dem Speichern dabei.
+      window.history.replaceState(null, "", `${window.location.pathname}?gebiet=${linked.territory_id}`);
       return;
     }
     const current = streetRef.current;
@@ -263,6 +267,18 @@ export function TourClient({
 
   const territory = territories.find((t) => t.id === territoryId) ?? null;
   const street = useMemo(() => streets.find((s) => s.id === streetId) ?? null, [streets, streetId]);
+
+  /*
+   * Liegt die gewaehlte Strasse in einem Gebiet, dessen Haeuser noch nicht
+   * geladen sind (Teamleitung in einem fremden Gebiet), holt die Seite es
+   * nach - ohne die Tuer-Ansicht zu verlassen.
+   */
+  const loaded = useMemo(() => new Set(loadedTerritories), [loadedTerritories]);
+  const housesPending = street !== null && !loaded.has(street.territory_id);
+  useEffect(() => {
+    if (!housesPending || !street) return;
+    router.replace(`/tour?gebiet=${street.territory_id}`, { scroll: false });
+  }, [housesPending, street, router]);
   const streetsOfTerritory = useMemo(
     () => streets.filter((s) => s.territory_id === territoryId),
     [streets, territoryId],
@@ -980,6 +996,10 @@ export function TourClient({
               <button type="button" className="btn btn-primary" onClick={() => setSheet("street")}>
                 Straße wählen
               </button>
+            ) : housesPending ? (
+              <p className="text-subhead text-muted" role="status">
+                Hausnummern werden geladen …
+              </p>
             ) : (
               <button type="button" className="kpi text-title-1 text-muted" onClick={() => setSheet("number")}>
                 Nr. eingeben
