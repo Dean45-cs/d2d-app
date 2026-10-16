@@ -53,13 +53,25 @@ export default async function TourPage({
    * im Treppenhaus ist meist kein Netz, und genau dort werden sie gebraucht.
    * Fremde Gebiete (Teamleitung, "alle Teamgebiete sehen") kommen erst dazu,
    * wenn eines davon gewaehlt ist (?gebiet=…); sonst luede die Teamleitung
-   * jedes Haus des ganzen Teams.
+   * jedes Haus des ganzen Teams. Gebiete mit eigenen Terminen fahren mit,
+   * damit "Termine heute" auch ohne Netz an die richtige Tuer fuehrt.
    */
   const linked = streets.find((s) => s.id === Number(params.street));
   const requested = Number(params.gebiet) || linked?.territory_id || 0;
   const loaded = new Set(territories.filter((t) => t.assigned_user_id === user.id).map((t) => t.id));
   if (territories.some((t) => t.id === requested)) loaded.add(requested);
   if (loaded.size === 0 && territories[0]) loaded.add(territories[0].id);
+
+  /*
+   * Die naechsten eigenen Termine. Was davon "heute" ist, entscheidet das
+   * Geraet: an der Tuer zaehlt die Uhr des Verkaeufers, nicht die des Servers.
+   */
+  const appointments = listAppointments(user.team_id, { userId: user.id, limit: 20 });
+  const territoryOfStreet = new Map(streets.map((s) => [s.id, s.territory_id]));
+  for (const item of appointments) {
+    const territoryId = item.street_id ? territoryOfStreet.get(item.street_id) : undefined;
+    if (territoryId) loaded.add(territoryId);
+  }
 
   // Hausnummern der eigenen Strassen: an der Tuer wird abgehakt statt getippt.
   const houseNumbers = listHouseNumbers(streets.filter((s) => loaded.has(s.territory_id)).map((s) => s.id));
@@ -71,12 +83,6 @@ export default async function TourPage({
   // "Heute" beginnt um Mitternacht in Berlin - wie bei den Tageszielen.
   const todayTotals = totals(user.team_id, { userId: user.id, since: berlinMidnight() });
   const recent = listVisits(user.team_id, { userId: user.id, limit: 8 });
-
-  /*
-   * Die naechsten eigenen Termine. Was davon "heute" ist, entscheidet das
-   * Geraet: an der Tuer zaehlt die Uhr des Verkaeufers, nicht die des Servers.
-   */
-  const appointments = listAppointments(user.team_id, { userId: user.id, limit: 20 });
 
   /*
    * Name und Profilbild der Kollegen. Die Liste faehrt einmal komplett mit:

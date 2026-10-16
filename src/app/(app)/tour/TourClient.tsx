@@ -274,7 +274,15 @@ export function TourClient({
    * nach - ohne die Tuer-Ansicht zu verlassen.
    */
   const loaded = useMemo(() => new Set(loadedTerritories), [loadedTerritories]);
+  /*
+   * Bis dahin ist ueber die Tueren dieser Strasse nichts bekannt - eine
+   * besuchte, gesperrte oder als Mehrfamilienhaus angelegte Tuer saehe aus
+   * wie eine neue. Darum ruht in der Zeit alles, was an der Tuer etwas
+   * festlegt (Haustyp, Klingeln, Sperre, Ergebnis).
+   */
   const housesPending = street !== null && !loaded.has(street.territory_id);
+  // Ohne Netz wartet das Nachladen auf Empfang (experimental.useOffline).
+  const pendingText = online ? "Hausnummern werden geladen …" : "Kein Netz – Hausnummern kommen bei Empfang";
   useEffect(() => {
     if (!housesPending || !street) return;
     router.replace(`/tour?gebiet=${street.territory_id}`, { scroll: false });
@@ -440,7 +448,7 @@ export function TourClient({
   }
 
   async function chooseType(type: "EFH" | "MFH") {
-    if (!currentKey) return;
+    if (!currentKey || housesPending) return;
     const rollback = book.setType(currentKey, type);
     setBellLabel("");
     if (type === "MFH" && currentBells.length === 0) setSheet("house");
@@ -452,7 +460,7 @@ export function TourClient({
   }
 
   async function addBells(entries: DoorbellInput[]) {
-    if (!currentKey || entries.length === 0) return;
+    if (!currentKey || entries.length === 0 || housesPending) return;
     const known = new Set(currentBells.map((bell) => bellKey(bell.label)));
     const fresh = entries.filter((entry) => {
       const key = bellKey(entry.label);
@@ -526,7 +534,7 @@ export function TourClient({
    * gilt die Sperre sofort, damit auch ohne Netz niemand weiterklingelt.
    */
   async function setBlocked(target: Bell | "house", blocked: boolean, note = "") {
-    if (!streetId || !currentNumber) return;
+    if (!streetId || !currentNumber || housesPending) return;
     const bell = target === "house" ? null : target;
     const key = bell ? bellSlot(currentKey, bell.label) : currentKey;
     book.setBlocked(key, blocked);
@@ -722,6 +730,8 @@ export function TourClient({
   /** Was die Ergebnisknoepfe gerade blockiert - in einem Wort. */
   const trayHint: string | null = !street
     ? "Straße wählen"
+    : housesPending
+    ? "Hausnummern werden geladen"
     : !currentNumber
     ? "Hausnummer wählen"
     : doorLocked
@@ -818,6 +828,7 @@ export function TourClient({
   const status = statusLine();
   function statusLine(): DoorStatusLine | null {
     if (!currentNumber) return null;
+    if (housesPending) return { text: pendingText };
     const facts = doorFacts;
     if (doorStatus(facts) === "BLOCKED" || houseFacts.blocked_at) {
       const by = activeBell?.blocked_by_name ?? currentHouse?.blocked_by_name ?? null;
@@ -845,8 +856,9 @@ export function TourClient({
   }
 
   const doneBells = currentBells.filter((bell) => book.isBellDone(currentKey, bell)).length;
-  const detail =
-    currentType === "MFH"
+  const detail = housesPending
+    ? null
+    : currentType === "MFH"
       ? currentBells.length > 0
         ? `Mehrfamilienhaus · ${doneBells} von ${currentBells.length} Klingeln`
         : "Mehrfamilienhaus · noch keine Schilder"
@@ -977,7 +989,9 @@ export function TourClient({
           canNext={houses.length > 0 && currentIndex < houses.length - 1}
           onPrev={() => step(-1)}
           onNext={() => step(1)}
-          onOpen={() => setSheet("house")}
+          onOpen={() => {
+            if (!housesPending) setSheet("house");
+          }}
           onType={() => setSheet("number")}
           empty={
             streetDone ? (
@@ -998,7 +1012,7 @@ export function TourClient({
               </button>
             ) : housesPending ? (
               <p className="text-subhead text-muted" role="status">
-                Hausnummern werden geladen …
+                {pendingText}
               </p>
             ) : (
               <button type="button" className="kpi text-title-1 text-muted" onClick={() => setSheet("number")}>
@@ -1010,7 +1024,7 @@ export function TourClient({
 
         {/* Haustyp einmal festlegen - gilt danach fuers ganze Team. Ohne ihn
             waere ein Mehrfamilienhaus nach dem ersten Eintrag "erledigt". */}
-        {currentNumber && currentType === "" && !doorLocked && (
+        {currentNumber && currentType === "" && !doorLocked && !housesPending && (
           <div className="grid grid-cols-2 gap-2" role="group" aria-label="Haustyp">
             <button
               type="button"
@@ -1028,7 +1042,7 @@ export function TourClient({
             </button>
           </div>
         )}
-        {currentNumber && currentType === "MFH" && currentBells.length === 0 && !doorLocked && (
+        {currentNumber && currentType === "MFH" && currentBells.length === 0 && !doorLocked && !housesPending && (
           <button type="button" className="btn btn-primary btn-block" onClick={() => setSheet("house")}>
             Klingelschilder anlegen
           </button>
@@ -1045,7 +1059,7 @@ export function TourClient({
       </div>
 
       <div className="mt-6 space-y-6 lg:col-start-1 lg:row-start-2 lg:mt-0">
-        {currentType === "MFH" && currentBells.length > 0 && (
+        {currentType === "MFH" && currentBells.length > 0 && !housesPending && (
           <BellBoard
             rows={bellRows}
             selected={bellLabel}
@@ -1109,7 +1123,7 @@ export function TourClient({
       {sheet === "sale" && (
         <SaleSheet place={place} product={product} busy={busy} onPick={startSale} onClose={() => setSheet(null)} />
       )}
-      {sheet === "house" && currentNumber && (
+      {sheet === "house" && currentNumber && !housesPending && (
         <HouseSheet
           title={`${street?.name ?? ""} ${currentNumber}`}
           type={currentType}
