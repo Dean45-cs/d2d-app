@@ -671,6 +671,11 @@ curl -X POST https://deine-app.de/api/energy/refresh \
 Jeder Lauf wird protokolliert; Quelle, Zeitpunkt und Ergebnis stehen unter
 Profil › Verwaltung › Energie & Tarif.
 
+**Ohne eigenen Anbieter:** Eine wöchentliche Claude-Aufgabe recherchiert die
+Preisblätter der Grundversorger und pflegt daraus eine Tabelle, die die App als
+Tagesquelle abruft – siehe **`docs/ENERGIE-RECHERCHE.md`**. Vor dem Veröffentlichen
+prüft `npm run energy:check` jede Zeile (plausible Preise, Quelle, Prüfdatum).
+
 ---
 
 ## Design anpassen
@@ -803,6 +808,7 @@ docs/
 scripts/
   seed.ts             Ersteinrichtung
   refresh-energy.ts   Abruf der (optionalen) Tagesquelle für Cron
+  check-energy-feed.ts  Prüfung der Preistabelle vor dem Veröffentlichen
 ```
 
 ### Befehle
@@ -814,6 +820,7 @@ npm run start           # Produktionsserver
 npm run typecheck       # TypeScript prüfen
 npm run db:seed         # Datenbank einrichten
 npm run energy:refresh  # Tagesquelle abrufen (falls eingerichtet)
+npm run energy:check    # Preistabelle der Tagesquelle prüfen
 ```
 
 ---
