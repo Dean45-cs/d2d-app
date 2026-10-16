@@ -42,16 +42,22 @@ function sign(payload: string): string {
   return crypto.createHmac("sha256", secret()).update(payload).digest("base64url");
 }
 
-function createToken(userId: number): string {
-  const payload = `${userId}.${Date.now() + MAX_AGE_SECONDS * 1000}`;
+/*
+ * Das Token traegt den Sitzungsstand der Person (users.session_version).
+ * Setzt die Teamleitung ein neues Passwort oder deaktiviert jemanden, zaehlt
+ * der Stand hoch - alle bisherigen Anmeldungen (z. B. auf einem verlorenen
+ * Handy) gelten dann nicht mehr. Aeltere Tokens ohne Stand zaehlen als 0.
+ */
+function createToken(userId: number, version: number): string {
+  const payload = `${userId}.${version}.${Date.now() + MAX_AGE_SECONDS * 1000}`;
   return `${payload}.${sign(payload)}`;
 }
 
-function readToken(token: string): number | null {
+function readToken(token: string): { userId: number; version: number } | null {
   const parts = token.split(".");
-  if (parts.length !== 3) return null;
-  const [userId, expiresAt, signature] = parts;
-  const payload = `${userId}.${expiresAt}`;
+  if (parts.length !== 3 && parts.length !== 4) return null;
+  const signature = parts.pop()!;
+  const payload = parts.join(".");
   const expected = sign(payload);
   if (
     signature.length !== expected.length ||
@@ -59,13 +65,17 @@ function readToken(token: string): number | null {
   ) {
     return null;
   }
+  const [userId, version, expiresAt] = parts.length === 3 ? parts : [parts[0], "0", parts[1]];
   if (Number(expiresAt) < Date.now()) return null;
-  return Number(userId);
+  return { userId: Number(userId), version: Number(version) };
 }
 
 export async function startSession(userId: number): Promise<void> {
   const store = await cookies();
-  store.set(COOKIE_NAME, createToken(userId), {
+  const row = getDb().prepare("SELECT session_version FROM users WHERE id = ?").get(userId) as
+    | { session_version: number }
+    | undefined;
+  store.set(COOKIE_NAME, createToken(userId, row?.session_version ?? 0), {
     httpOnly: true,
     sameSite: "lax",
     secure: process.env.NODE_ENV === "production",
@@ -83,15 +93,15 @@ export async function getCurrentUser(): Promise<User | null> {
   const store = await cookies();
   const token = store.get(COOKIE_NAME)?.value;
   if (!token) return null;
-  const userId = readToken(token);
-  if (!userId) return null;
+  const session = readToken(token);
+  if (!session) return null;
   const user = getDb()
     .prepare(
       `SELECT id, team_id, manager_id, name, email, role, phone, active,
               avatar_src(id, avatar) AS avatar, bio, created_at
-         FROM users WHERE id = ? AND active = 1`,
+         FROM users WHERE id = ? AND active = 1 AND session_version = ?`,
     )
-    .get(userId) as User | undefined;
+    .get(session.userId, session.version) as User | undefined;
   return user ?? null;
 }
 

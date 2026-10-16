@@ -67,15 +67,39 @@ export async function POST(request: Request) {
       ready.set(price.postal_code, { ...price, lat, lng });
     }
 
+    /*
+     * Die Vorlage enthaelt alle schon gepflegten Preise. Kommen sie unveraendert
+     * zurueck, bleiben sie unberuehrt - sonst galten sie als frisch geprueft und
+     * der Hinweis "aelter als ein halbes Jahr" verschwaende, ohne dass jemand nachsah.
+     */
+    const close = (a: number | null, b: number | null, tolerance: number) =>
+      a === null || b === null ? a === b : Math.abs(a - b) <= tolerance;
+    const unchanged = (item: ManualPriceInput) => {
+      const known = existing.get(item.postal_code);
+      return Boolean(
+        known &&
+          known.city === item.city &&
+          known.provider === item.provider &&
+          known.gas_provider === item.gas_provider &&
+          close(known.strom_ct_kwh, item.strom_ct_kwh, 0.005) &&
+          close(known.gas_ct_kwh, item.gas_ct_kwh, 0.005) &&
+          // Grundpreise wandern als Monatswert mit zwei Nachkommastellen durch die Vorlage.
+          close(known.strom_base_eur, item.strom_base_eur, 0.12) &&
+          close(known.gas_base_eur, item.gas_base_eur, 0.12) &&
+          known.valid_from === item.valid_from &&
+          known.source_url === item.source_url,
+      );
+    };
+    const saved = [...ready.values()].filter((item) => !unchanged(item));
     const save = getDb().transaction((items: ManualPriceInput[]) => {
       for (const item of items) saveManualPrice(leader.team_id, leader.id, item);
     });
-    save([...ready.values()]);
+    save(saved);
 
-    const saved = [...ready.values()];
     return {
       created: saved.filter((item) => !existing.has(item.postal_code)).length,
       updated: saved.filter((item) => existing.has(item.postal_code)).length,
+      unchanged: ready.size - saved.length,
       skipped,
       errors,
       unlocated: saved

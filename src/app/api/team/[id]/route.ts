@@ -1,5 +1,5 @@
 import { AuthError, hashPassword, requireUser } from "@/lib/auth";
-import { assertMemberScope, assertPermission, structureIds } from "@/lib/permissions";
+import { assertMemberScope, assertNoExtraRights, assertPermission, structureIds } from "@/lib/permissions";
 import type { User } from "@/lib/types";
 import { getDb } from "@/lib/db";
 import { handle, optionalAvatar, optionalText, requireText } from "@/lib/api";
@@ -76,15 +76,23 @@ export async function PATCH(
     if (body.password) {
       const password = String(body.password);
       if (password.length < 8) throw new Error("Das Passwort braucht mindestens 8 Zeichen.");
+      // Wer das Passwort setzt, kann sich als diese Person anmelden - also nicht bei mehr Rechten als den eigenen.
+      assertNoExtraRights(leader, member);
       fields.push("password_hash = ?");
       values.push(hashPassword(password));
     }
+    const deactivating = body.active !== undefined && !body.active;
+    // Neues Passwort oder deaktiviert: bisherige Anmeldungen (auch auf einem verlorenen Handy) enden.
+    if (body.password || deactivating) fields.push("session_version = session_version + 1");
 
     if (fields.length === 0) return { ok: true };
     values.push(userId);
     db.transaction(() => {
       db.prepare(`UPDATE users SET ${fields.join(", ")} WHERE id = ?`).run(...values);
-      if (body.active !== undefined && !body.active) rejectPendingJoins(leader.id, userId);
+      if (deactivating) {
+        rejectPendingJoins(leader.id, userId);
+        db.prepare("DELETE FROM push_subscriptions WHERE user_id = ?").run(userId);
+      }
     })();
     return { ok: true };
   });

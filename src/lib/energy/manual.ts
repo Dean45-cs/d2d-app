@@ -137,6 +137,11 @@ export function referenceYear(reference: Reference): { strom: number; gas: numbe
   };
 }
 
+/** Grundpreis des Vergleichswerts pro Jahr - fuer Preise, bei denen er fehlt. */
+export function referenceBaseYear(reference: Reference): { strom: number; gas: number } {
+  return { strom: reference.stromBaseMonth * 12, gas: reference.gasBaseMonth * 12 };
+}
+
 /** Nach so vielen Tagen sollte ein gepflegter Preis geprueft werden. */
 export const STALE_AFTER_DAYS = 183;
 

@@ -24,7 +24,8 @@ export async function DELETE(
     const db = getDb();
 
     const visit = db
-      .prepare("SELECT id, user_id, team_id, created_at FROM visits WHERE id = ?")
+      // Nachgesendete Eintraege: die 15 Minuten zaehlen ab Ankunft, nicht ab dem Moment an der Tuer.
+      .prepare("SELECT id, user_id, team_id, COALESCE(received_at, created_at) AS created_at FROM visits WHERE id = ?")
       .get(Number(id)) as
       | { id: number; user_id: number; team_id: number; created_at: string }
       | undefined;

@@ -26,12 +26,14 @@ type BaseUnit = "month" | "year";
 export function PriceSheet({
   draft,
   reference,
+  referenceBase,
   consumption,
   onClose,
   onSaved,
 }: {
   draft: PriceDraft;
   reference: Record<Energy, number>;
+  referenceBase: Record<Energy, number>;
   consumption: Record<Energy, number>;
   onClose: () => void;
   onSaved: (saved: SavedPrice) => void;
@@ -84,7 +86,8 @@ export function PriceSheet({
     const ct = parseNumber(energy === "strom" ? form.stromCt : form.gasCt);
     const base = parseNumber(perMonth(energy === "strom" ? form.stromBaseMonth : form.gasBaseMonth));
     if (ct === null || Number.isNaN(ct) || ct < 3 || ct > 150) return null;
-    const year = Math.round((ct / 100) * consumption[energy] + (base !== null && !Number.isNaN(base) ? base * 12 : 0));
+    // Ohne Grundpreis zaehlt der des Vergleichswerts - sonst sahe jeder Preis guenstig aus.
+    const year = Math.round((ct / 100) * consumption[energy] + (base !== null && !Number.isNaN(base) ? base * 12 : referenceBase[energy]));
     return { year, delta: year - reference[energy] };
   }
 

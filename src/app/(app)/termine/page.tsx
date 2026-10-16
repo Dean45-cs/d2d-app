@@ -1,6 +1,6 @@
 import { hasPermission } from "@/lib/permissions";
 import { requireUser } from "@/lib/auth";
-import { listAppointments, listMembers } from "@/lib/queries";
+import { countAppointments, listAppointments, listMembers } from "@/lib/queries";
 import { AppointmentList } from "./AppointmentList";
 
 export const dynamic = "force-dynamic";
@@ -21,6 +21,7 @@ export default async function AppointmentsPage() {
         ...listAppointments(user.team_id, { ...scope, limit: 300 }),
         ...listAppointments(user.team_id, { ...scope, done: true, limit: 100 }),
       ]}
+      counts={countAppointments(user.team_id, scope)}
       isLeader={isLeader}
       faces={faces}
       back={

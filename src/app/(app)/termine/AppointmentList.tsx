@@ -19,11 +19,14 @@ type View = "open" | "done";
  */
 export function AppointmentList({
   appointments,
+  counts,
   isLeader,
   faces,
   back,
 }: {
   appointments: AppointmentRow[];
+  /** Echte Anzahl - die Listen selbst sind begrenzt. */
+  counts: { open: number; overdue: number; done: number };
   isLeader: boolean;
   /** Profilbilder je Mitarbeiter-ID - nur fuer die Teamleitung. */
   faces: Record<number, string>;
@@ -106,7 +109,9 @@ export function AppointmentList({
     }
   }
 
-  const summary = [`${open.length} offen`, overdue.length > 0 && `${overdue.length} überfällig`].filter(Boolean).join(" · ");
+  // Ueberfaellig zaehlt das Geraet, solange alle geladen sind; sonst gilt die Zahl vom Server.
+  const overdueCount = counts.open > open.length ? counts.overdue : overdue.length;
+  const summary = [`${counts.open} offen`, overdueCount > 0 && `${overdueCount} überfällig`].filter(Boolean).join(" · ");
 
   return (
     <div className="page-narrow">
@@ -117,7 +122,7 @@ export function AppointmentList({
           onChange={setView}
           options={[
             { value: "open", label: "Offen" },
-            { value: "done", label: `Erledigt${done.length ? ` · ${done.length}` : ""}` },
+            { value: "done", label: `Erledigt${counts.done ? ` · ${counts.done}` : ""}` },
           ]}
         />
       </PageHeader>

@@ -1,5 +1,5 @@
 import { requirePermission, territoryAssignee } from "@/lib/permissions";
-import { createTerritories, freeArea, type TerritoryDraft } from "@/lib/queries";
+import { createTerritories, freeArea, withoutTakenHouses, type TerritoryDraft } from "@/lib/queries";
 import { parseShape, shapeToJson } from "@/lib/geo/area";
 import type { Shape } from "@/lib/geo/shape";
 import { MAX_PLOTS } from "@/lib/geo/split";
@@ -53,7 +53,7 @@ export async function POST(request: Request) {
         note,
         dueDate,
         areaJson: area ? shapeToJson(area) : "",
-        streets,
+        streets: withoutTakenHouses(leader.team_id, streets),
       };
     });
 

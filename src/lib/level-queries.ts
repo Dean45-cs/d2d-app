@@ -88,10 +88,14 @@ function achievementStats(teamId: number, userId: number, totals: LevelTotals): 
   const products = db.prepare(`SELECT
     COALESCE(SUM(outcome = 'SALE' AND energy_type IN ('STROM', 'BEIDES')), 0) AS stromSales,
     COALESCE(SUM(outcome = 'SALE' AND energy_type IN ('GAS', 'BEIDES')), 0) AS gasSales,
-    COALESCE(SUM(outcome = 'SALE' AND energy_type = 'BEIDES'), 0) AS dualSales,
-    COALESCE(SUM(outcome = 'APPOINTMENT' AND follow_up_done_at IS NOT NULL), 0) AS completedAppointments
+    COALESCE(SUM(outcome = 'SALE' AND energy_type = 'BEIDES'), 0) AS dualSales
     FROM visits WHERE team_id = ? AND user_id = ?`).get(teamId, userId) as
-    Pick<AchievementStats, "stromSales" | "gasSales" | "dualSales" | "completedAppointments">;
+    Pick<AchievementStats, "stromSales" | "gasSales" | "dualSales">;
+  // Erledigte Termine zaehlen fuer den, dem der Termin gehoert (auch nach einer
+  // Gebietsuebergabe) - der hakt ihn ab, nicht wer ihn einst vereinbart hat.
+  const { completedAppointments } = db.prepare(`SELECT COUNT(*) AS completedAppointments FROM visits
+    WHERE +team_id = ? AND outcome = 'APPOINTMENT' AND follow_up_done_at IS NOT NULL
+      AND COALESCE(follow_up_user_id, user_id) = ?`).get(teamId, userId) as Pick<AchievementStats, "completedAppointments">;
 
   // SQLite kennt Europe/Berlin nicht. Stunden zuerst bündeln, dann in JS auf
   // Berliner Tage verteilen: korrekt auch bei Sommerzeit und großen Historien.
@@ -112,7 +116,7 @@ function achievementStats(teamId: number, userId: number, totals: LevelTotals): 
     if (sales > 0) saleDays += 1;
     bestDaySales = Math.max(bestDaySales, sales);
   }
-  return { ...totals, ...products, activeDays: days.size, saleDays, bestDaySales };
+  return { ...totals, ...products, completedAppointments, activeDays: days.size, saleDays, bestDaySales };
 }
 
 export function getLevelDashboard(teamId: number, userId: number, now = new Date()): LevelDashboard {

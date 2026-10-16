@@ -291,6 +291,19 @@ function migrate(db: Database.Database) {
   );
 
   addColumn(db, "visits", "follow_up_user_id", "INTEGER REFERENCES users(id) ON DELETE SET NULL");
+  /*
+   * Termine: je Person (dem, dem der Termin gehoert - auch nach einer
+   * Uebergabe) und teamweit getrennt nach offen und erledigt. Ohne diese
+   * Indizes lief jede Terminliste durch alle Termine des Teams.
+   */
+  db.exec(`
+    CREATE INDEX IF NOT EXISTS idx_visits_appt_owner ON visits
+      (COALESCE(follow_up_user_id, user_id), follow_up_done_at, follow_up_at) WHERE outcome = 'APPOINTMENT';
+    CREATE INDEX IF NOT EXISTS idx_visits_appt_open ON visits (team_id, follow_up_at)
+      WHERE outcome = 'APPOINTMENT' AND follow_up_done_at IS NULL;
+    CREATE INDEX IF NOT EXISTS idx_visits_appt_done ON visits (team_id, follow_up_at)
+      WHERE outcome = 'APPOINTMENT' AND follow_up_done_at IS NOT NULL;
+  `);
   addColumn(db, "visits", "follow_up_timezone", "TEXT NOT NULL DEFAULT 'Europe/Berlin'");
   addColumn(db, "visits", "follow_up_utc", "TEXT");
   db.exec(`
@@ -406,6 +419,11 @@ function migrateInvitations(db: Database.Database) {
 function migrateCommunity(db: Database.Database) {
   // Kurzer Text ueber sich selbst, wie bei Twitter unter dem Namen.
   addColumn(db, "users", "bio", "TEXT NOT NULL DEFAULT ''");
+  // Ohne Netz erfasste Tueren zaehlen fuer den Moment an der Tuer (created_at);
+  // received_at haelt fest, wann sie ankamen - danach richtet sich "Rueckgaengig".
+  addColumn(db, "visits", "received_at", "TEXT");
+  // Zaehlt hoch, wenn alle Anmeldungen einer Person enden sollen (neues Passwort, Deaktivieren).
+  addColumn(db, "users", "session_version", "INTEGER NOT NULL DEFAULT 0");
 
   db.exec(`
     CREATE TABLE IF NOT EXISTS posts (

@@ -33,8 +33,9 @@ export default async function EnergySettingsPage() {
     process.env.NEXT_PUBLIC_TARIFRECHNER_URL ??
     "https://portal-ep24.de/menues/tarifrechner/";
 
-  const lastRun = refresh?.finished_at
-    ? new Date(refresh.finished_at).toLocaleString("de-DE", {
+  // Zuletzt erfolgreich - waehrend ein Abruf laeuft, hat der neueste noch kein Ende.
+  const lastRun = refresh?.success_at
+    ? new Date(refresh.success_at).toLocaleString("de-DE", {
         timeZone: "Europe/Berlin",
         day: "2-digit",
         month: "2-digit",

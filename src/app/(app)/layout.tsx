@@ -7,6 +7,7 @@ import { ToastProvider } from "@/components/Toast";
 import { navigation } from "@/lib/nav";
 import { mapConfig } from "@/lib/map";
 import { MapConfigProvider } from "@/components/map/MapConfig";
+import { PushSync } from "@/components/PushSync";
 
 export const dynamic = "force-dynamic";
 
@@ -36,6 +37,7 @@ export default async function AppLayout({ children }: Readonly<{ children: React
           <main className="shell-main">{children}</main>
           <TabBar tabs={nav.tabs} user={navUser} />
         </div>
+        <PushSync userId={user.id} />
       </ToastProvider>
     </MapConfigProvider>
   );

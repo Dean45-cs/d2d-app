@@ -1,8 +1,8 @@
 import { getDb } from "./db";
 import { AuthError } from "./auth";
 import { optionalNumber, optionalText } from "./api";
-import { assertTerritoryAccess } from "./permissions";
-import { doorBlocked, ensureDoorbell, ensureHouseNumber, getTerritory, requireTeamStreet } from "./queries";
+import { canAccessTerritory } from "./permissions";
+import { doorBlocked, ensureDoorbell, ensureHouseNumber, getTerritory, ownsAppointmentAt, requireTeamStreet } from "./queries";
 import { parseVisitRequestId } from "./visit-idempotency";
 import { recordVisit } from "./record-visit";
 import type { User } from "./types";
@@ -40,7 +40,21 @@ export function changeSaleDraft(user: User, body: Record<string, unknown>) {
         db.prepare("UPDATE sale_drafts SET status = 'ABORTED' WHERE draft_key = ? AND user_id = ?").run(key, user.id);
         return { ok: true, status: "ABORTED", replayed: false };
       }
-      const result = recordVisit(user, { ...JSON.parse(draft.payload), clientRequestId: key, ownerUserId: user.id, outcome: "SALE" });
+      const payload = JSON.parse(draft.payload) as Record<string, unknown>;
+      // Klingel inzwischen umbenannt (etwa auf den Namen des Kunden): der Abschluss gehoert zu ihr,
+      // nicht zu einem neu angelegten Schild mit dem alten Namen.
+      if (typeof payload.doorbellId === "number") {
+        const bell = db.prepare("SELECT label, floor FROM doorbells WHERE id = ?").get(payload.doorbellId) as
+          | { label: string; floor: string }
+          | undefined;
+        if (bell) Object.assign(payload, { doorbellLabel: bell.label, doorbellFloor: bell.floor });
+      }
+      const result = recordVisit(
+        user,
+        // Bestaetigt ohne Netz: der Abschluss zaehlt fuer den Moment der Bestaetigung.
+        { ...payload, clientRequestId: key, ownerUserId: user.id, outcome: "SALE", recordedAt: body.recordedAt },
+        { fromDraft: true },
+      );
       db.prepare("UPDATE sale_drafts SET status = 'CONFIRMED', visit_id = ? WHERE draft_key = ? AND user_id = ?")
         .run(result.id, key, user.id);
       return { ok: true, status: "CONFIRMED", ...result };
@@ -51,17 +65,20 @@ export function changeSaleDraft(user: User, body: Record<string, unknown>) {
     if (territoryId === null || streetId === null) throw new Error("Bitte Gebiet und Straße wählen.");
     const territory = getTerritory(territoryId, user.team_id);
     if (!territory) throw new Error("Gebiet nicht gefunden.");
-    assertTerritoryAccess(user, territory);
     const houseNumber = optionalText(body.houseNumber, 20);
     if (!houseNumber) throw new Error("Bitte Hausnummer wählen.");
+    if (!canAccessTerritory(user, territory) && !ownsAppointmentAt(user, streetId, houseNumber)) {
+      throw new AuthError("Dieses Gebiet ist für dich nicht freigegeben.", 403);
+    }
     const houseId = ensureHouseNumber(streetId, houseNumber);
     if (doorBlocked("house_numbers", houseId)) throw new Error("Diese Adresse ist gesperrt.");
     const doorbellLabel = optionalText(body.doorbellLabel, 60);
     const doorbellFloor = optionalText(body.doorbellFloor, 20);
-    if (doorbellLabel && doorBlocked("doorbells", ensureDoorbell(houseId, doorbellLabel, doorbellFloor))) throw new Error("Diese Klingel ist gesperrt.");
+    const doorbellId = doorbellLabel ? ensureDoorbell(houseId, doorbellLabel, doorbellFloor) : null;
+    if (doorbellId !== null && doorBlocked("doorbells", doorbellId)) throw new Error("Diese Klingel ist gesperrt.");
     const energyType = optionalText(body.energyType, 10);
     if (!["STROM", "GAS", "BEIDES"].includes(energyType)) throw new Error("Bitte Produkt wählen.");
-    const payload = { territoryId, streetId, houseNumber, doorbellLabel, doorbellFloor, energyType,
+    const payload = { territoryId, streetId, houseNumber, doorbellLabel, doorbellFloor, doorbellId, energyType,
       lat: optionalNumber(body.lat), lng: optionalNumber(body.lng) };
     const street = db.prepare("SELECT name FROM streets WHERE id = ?").get(streetId) as { name: string };
     const label = `${street.name} ${houseNumber}${doorbellLabel ? ` · ${doorbellLabel}` : ""}`;

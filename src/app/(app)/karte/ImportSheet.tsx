@@ -8,6 +8,8 @@ import { checkPrice, readPriceTable, TABLE_COLUMNS, type TableRow } from "@/lib/
 interface ImportResult {
   created: number;
   updated: number;
+  /** Unveraendert zurueckgekommen - bleibt samt Pruefdatum, wie es war. */
+  unchanged?: number;
   skipped: number;
   errors: Array<{ line: number; error: string }>;
   unlocated: string[];
@@ -106,6 +108,7 @@ export function ImportSheet({
       const parts = [
         `${plural(data.created + data.updated, "Ort", "Orte")} übernommen`,
         data.updated > 0 && `davon ${data.updated} aktualisiert`,
+        (data.unchanged ?? 0) > 0 && `${data.unchanged} unverändert`,
         data.errors.length > 0 && `${data.errors.length} mit Fehler`,
       ].filter(Boolean);
       let message = `${parts.join(", ")}.`;

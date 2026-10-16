@@ -46,6 +46,13 @@ export function berlinMidnight(daysBack = 0, now = new Date()): string {
   return berlinWallToSql(Date.UTC(year, month - 1, day - daysBack));
 }
 
+/** Berliner Ortszeit als Termin-Schreibweise: "2026-10-16 18:05" - vergleichbar mit follow_up_at. */
+export function berlinSlot(now = new Date(), daysAhead = 0): string {
+  const { year, month, day, hour, minute } = berlinParts(now);
+  const date = new Date(Date.UTC(year, month - 1, day + daysAhead, hour, minute));
+  return date.toISOString().slice(0, 16).replace("T", " ");
+}
+
 /** Ein Berliner Kalendertag dauert beim Wechsel der Sommerzeit 23 oder 25 Stunden. */
 export function berlinDayBounds(now = new Date()): { start: string; end: string } {
   return { start: berlinMidnight(0, now), end: berlinMidnight(-1, now) };
