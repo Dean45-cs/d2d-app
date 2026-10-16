@@ -1221,7 +1221,10 @@
 
 .tabbar {
   position: fixed;
-  left: 50%;
+  /* Nur gleiche Einheiten animieren: left in vw/px, translate in %.
+     Ein Uebergang von "-50%" nach "calc(-50vw + ...)" mischt Einheiten -
+     Safari/WebKit rechnet das falsch und die Leiste schiesst aus dem Bild. */
+  left: 50vw;
   bottom: var(--tabbar-bottom);
   z-index: 40;
   display: flex;
@@ -1231,6 +1234,7 @@
   border-radius: var(--radius-full);
   translate: -50% 0;
   transition:
+    left var(--dur-3) var(--ease-spring),
     translate var(--dur-3) var(--ease-spring),
     padding var(--dur-3) var(--ease-spring);
 }
@@ -1292,7 +1296,8 @@
   position: absolute;
 }
 .tabbar[data-collapsed="true"] {
-  translate: calc(-50vw + var(--gutter)) 0;
+  left: max(var(--gutter), env(safe-area-inset-left));
+  translate: 0 0;
 }
 
 /* Seitenleiste (iPad, Rechner): schwebendes Glas, einklappbar zur Leiste
