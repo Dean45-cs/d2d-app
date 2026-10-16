@@ -12,6 +12,7 @@
     "test": "node --import tsx --test scripts/tests/*.test.ts",
     "db:seed": "tsx scripts/seed.ts",
     "energy:refresh": "tsx scripts/refresh-energy.ts",
+    "energy:check": "tsx scripts/check-energy-feed.ts",
     "icons": "node scripts/build-icons.mjs"
   },
   "dependencies": {

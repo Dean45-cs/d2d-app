@@ -74,7 +74,7 @@ function toNumber(value: string | null): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
-function mapRow(raw: Record<string, unknown>): PriceRow | null {
+export function mapRow(raw: Record<string, unknown>): PriceRow | null {
   const lower: Record<string, unknown> = {};
   for (const [k, v] of Object.entries(raw)) lower[k.trim().toLowerCase()] = v;
 
