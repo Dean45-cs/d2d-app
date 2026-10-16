@@ -142,3 +142,42 @@ test("doors recorded without signal count for the moment at the door, undo count
   const post = db.prepare("SELECT created_at FROM posts WHERE visit_id = ?").get(saved.id) as { created_at: string };
   assert.equal(post.created_at, row.created_at);
 });
+
+test("in an apartment building the kept appointment opens only its own bell, also after a rename", () => {
+  const f = fixture();
+  recordVisit(f.first, {
+    streetId: f.streetId, territoryId: f.territoryId, houseNumber: "20", doorbellLabel: "Klingel 2",
+    outcome: "APPOINTMENT", followUpAt: "2026-12-03 18:00", clientRequestId: key(),
+  });
+  db.prepare("UPDATE doorbells SET label = 'Müller' WHERE label = 'Klingel 2'").run();
+  f.handOver("KEEP");
+  const at = (doorbellLabel: string) => () =>
+    recordVisit(f.first, { streetId: f.streetId, territoryId: f.territoryId, houseNumber: "20", doorbellLabel, outcome: "NOT_HOME", clientRequestId: key() });
+  assert.doesNotThrow(at("Müller"));
+  assert.throws(at("Klingel 5"), /nicht freigegeben/);
+  assert.throws(at(""), /nicht freigegeben/);
+});
+
+test("a door recorded without signal is never dated before the last door saved online", () => {
+  const f = fixture();
+  const live = recordVisit(f.first, { streetId: f.streetId, territoryId: f.territoryId, houseNumber: "30", outcome: "NOT_HOME", clientRequestId: key() });
+  const liveAt = (db.prepare("SELECT created_at FROM visits WHERE id = ?").get(live.id) as { created_at: string }).created_at;
+  const backdated = recordVisit(f.first, {
+    streetId: f.streetId, territoryId: f.territoryId, houseNumber: "31", outcome: "SALE", energyType: "GAS",
+    recordedAt: new Date(Date.now() - 48 * 3_600_000).toISOString(), clientRequestId: key(),
+  });
+  const row = db.prepare("SELECT created_at FROM visits WHERE id = ?").get(backdated.id) as { created_at: string };
+  assert.equal(row.created_at >= liveAt, true);
+});
+
+test("open appointments: what is still coming first, then the most recently passed", () => {
+  const f = fixture();
+  const book = (slot: string) =>
+    recordVisit(f.first, { streetId: f.streetId, territoryId: f.territoryId, houseNumber: String(++sequence), outcome: "APPOINTMENT", followUpAt: slot, clientRequestId: key() }).id as number;
+  const morning = book("2026-10-16 08:00");
+  const noon = book("2026-10-16 12:00");
+  const evening = book("2026-10-16 18:00");
+  const yesterday = book("2026-10-15 17:00");
+  const now = new Date("2026-10-16T13:30:00Z"); // 15:30 in Berlin
+  assert.deepEqual(listAppointments(f.team, { userId: f.first.id, now }).map((row) => row.id), [evening, noon, morning, yesterday]);
+});

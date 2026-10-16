@@ -23,6 +23,10 @@ export async function POST(request: Request) {
 
     const assignedUserId = territoryAssignee(leader, body.assignedUserId, true);
     return getDb().transaction(() => {
+      // Vor dem Anlegen pruefen: sonst zaehlte die eigene neue Flaeche als "fremd"
+      // und das Gebiet bekaeme keines seiner Haeuser.
+      const listed = parseStreetList(body.streetList);
+      const fromMap = withoutTakenHouses(leader.team_id, listed);
       const id = createTerritory({
         teamId: leader.team_id,
         name: requireText(body.name, "Gebietsname"),
@@ -35,8 +39,10 @@ export async function POST(request: Request) {
         areaJson: area ? shapeToJson(area) : "",
       });
 
-      const fromMap = withoutTakenHouses(leader.team_id, parseStreetList(body.streetList));
       const streetsRaw = optionalText(body.streets, 20000);
+      if (listed.length > 0 && fromMap.length === 0 && !streetsRaw) {
+        throw new Error("Die Häuser in dieser Fläche gehören schon zu anderen Gebieten.");
+      }
       const added =
         (fromMap.length > 0 ? addStreetEntries(id, fromMap) : 0) +
         (streetsRaw ? addStreets(id, streetsRaw) : 0);

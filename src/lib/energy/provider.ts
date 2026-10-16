@@ -141,13 +141,20 @@ export function providerLookup(teamId?: number): ProviderLookup {
     /*
      * Ueber den Namen nur, wenn es plausibel derselbe Ort ist: "Neustadt (Hessen)"
      * und "Neustadt (Dosse)" heissen ohne Klammer gleich, liegen aber 400 km
-     * auseinander. Mit PLZ auf beiden Seiten muss die Leitregion (die ersten
-     * zwei Ziffern) stimmen.
+     * auseinander. Verschiedene Klammerzusaetze oder eine andere Leitzone (erste
+     * PLZ-Ziffer) schliessen aus; Berlin mit 10xxx bis 14xxx bleibt ein Ort.
+     * Unter mehreren Kandidaten gewinnt die gleiche Leitregion (zwei Ziffern).
      */
-    const byName = <T extends { postal_code: string }>(row: T | undefined): T | undefined =>
-      row && (!/^\d{5}$/.test(plz) || !/^\d{5}$/.test(row.postal_code) || row.postal_code.slice(0, 2) === plz.slice(0, 2))
-        ? row
-        : undefined;
+    const suffix = (name: string) => /\(([^)]*)\)/.exec(name)?.[1]?.trim().toLocaleLowerCase("de-DE") ?? "";
+    const ownSuffix = suffix(place.city ?? "");
+    const byName = <T extends { postal_code: string; city: string }>(rows: T[] | undefined): T | undefined => {
+      const fits = (rows ?? []).filter((row) => {
+        const other = suffix(row.city);
+        if (ownSuffix && other && ownSuffix !== other) return false;
+        return !/^\d{5}$/.test(plz) || !/^\d{5}$/.test(row.postal_code) || row.postal_code[0] === plz[0];
+      });
+      return fits.find((row) => row.postal_code.slice(0, 2) === plz.slice(0, 2)) ?? fits[0];
+    };
 
     const own = (plz && manualIndex.byPlz.get(plz)) || (city && byName(manualIndex.byCity.get(city)));
     if (own) return fromManual(own, own.postal_code === plz ? "plz" : "city", null);
@@ -178,11 +185,12 @@ export function providerLookup(teamId?: number): ProviderLookup {
 
 function index<T extends { postal_code: string; city: string }>(rows: T[]) {
   const byPlz = new Map<string, T>();
-  const byCity = new Map<string, T>();
+  // Alle Zeilen je Ortsname - "Neustadt" gibt es viele Male.
+  const byCity = new Map<string, T[]>();
   for (const row of rows) {
     if (row.postal_code && !byPlz.has(row.postal_code)) byPlz.set(row.postal_code, row);
     const key = normalizeCity(row.city);
-    if (key && !byCity.has(key)) byCity.set(key, row);
+    if (key) byCity.set(key, [...(byCity.get(key) ?? []), row]);
   }
   return { byPlz, byCity };
 }

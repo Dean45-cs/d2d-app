@@ -67,7 +67,7 @@ export function changeSaleDraft(user: User, body: Record<string, unknown>) {
     if (!territory) throw new Error("Gebiet nicht gefunden.");
     const houseNumber = optionalText(body.houseNumber, 20);
     if (!houseNumber) throw new Error("Bitte Hausnummer wählen.");
-    if (!canAccessTerritory(user, territory) && !ownsAppointmentAt(user, streetId, houseNumber)) {
+    if (!canAccessTerritory(user, territory) && !ownsAppointmentAt(user, streetId, houseNumber, optionalText(body.doorbellLabel, 60))) {
       throw new AuthError("Dieses Gebiet ist für dich nicht freigegeben.", 403);
     }
     const houseId = ensureHouseNumber(streetId, houseNumber);

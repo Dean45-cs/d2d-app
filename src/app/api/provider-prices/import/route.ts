@@ -72,8 +72,11 @@ export async function POST(request: Request) {
      * zurueck, bleiben sie unberuehrt - sonst galten sie als frisch geprueft und
      * der Hinweis "aelter als ein halbes Jahr" verschwaende, ohne dass jemand nachsah.
      */
-    const close = (a: number | null, b: number | null, tolerance: number) =>
-      a === null || b === null ? a === b : Math.abs(a - b) <= tolerance;
+    const same = (a: number | null, b: number | null, scale: (n: number) => number) =>
+      a === null || b === null ? a === b : scale(a) === scale(b);
+    // Arbeitspreis mit drei Nachkommastellen, Grundpreis als Monatswert in Cent - so steht er in der Vorlage.
+    const ct = (n: number) => Math.round(n * 1000);
+    const monthCents = (yearly: number) => Math.round((yearly / 12) * 100);
     const unchanged = (item: ManualPriceInput) => {
       const known = existing.get(item.postal_code);
       return Boolean(
@@ -81,28 +84,35 @@ export async function POST(request: Request) {
           known.city === item.city &&
           known.provider === item.provider &&
           known.gas_provider === item.gas_provider &&
-          close(known.strom_ct_kwh, item.strom_ct_kwh, 0.005) &&
-          close(known.gas_ct_kwh, item.gas_ct_kwh, 0.005) &&
-          // Grundpreise wandern als Monatswert mit zwei Nachkommastellen durch die Vorlage.
-          close(known.strom_base_eur, item.strom_base_eur, 0.12) &&
-          close(known.gas_base_eur, item.gas_base_eur, 0.12) &&
+          same(known.strom_ct_kwh, item.strom_ct_kwh, ct) &&
+          same(known.gas_ct_kwh, item.gas_ct_kwh, ct) &&
+          same(known.strom_base_eur, item.strom_base_eur, monthCents) &&
+          same(known.gas_base_eur, item.gas_base_eur, monthCents) &&
           known.valid_from === item.valid_from &&
           known.source_url === item.source_url,
       );
     };
-    const saved = [...ready.values()].filter((item) => !unchanged(item));
-    const save = getDb().transaction((items: ManualPriceInput[]) => {
-      for (const item of items) saveManualPrice(leader.team_id, leader.id, item);
+    const items = [...ready.values()];
+    const saved = items.filter((item) => !unchanged(item));
+    // Unveraenderte Preise, fuer die es jetzt einen Kartenpunkt gibt: nur die Lage nachtragen.
+    const locatedNow = items.filter((item) => {
+      const known = existing.get(item.postal_code);
+      return unchanged(item) && item.lat !== null && item.lng !== null && (known?.lat == null || known?.lng == null);
     });
-    save(saved);
+    const save = getDb().transaction(() => {
+      for (const item of saved) saveManualPrice(leader.team_id, leader.id, item);
+      const place = getDb().prepare("UPDATE provider_prices SET lat = ?, lng = ? WHERE team_id = ? AND postal_code = ?");
+      for (const item of locatedNow) place.run(item.lat, item.lng, leader.team_id, item.postal_code);
+    });
+    save();
 
     return {
       created: saved.filter((item) => !existing.has(item.postal_code)).length,
       updated: saved.filter((item) => existing.has(item.postal_code)).length,
-      unchanged: ready.size - saved.length,
+      unchanged: items.length - saved.length,
       skipped,
       errors,
-      unlocated: saved
+      unlocated: items
         .filter((item) => item.lat === null || item.lng === null)
         .map((item) => `${item.postal_code} ${item.city}`.trim()),
     };

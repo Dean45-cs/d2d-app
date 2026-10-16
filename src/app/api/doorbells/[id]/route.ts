@@ -1,6 +1,6 @@
-import { assertPermission, assertStreetAccess } from "@/lib/permissions";
+import { assertPermission, assertStreetAccess, hasPermission } from "@/lib/permissions";
 import { getDb } from "@/lib/db";
-import { requireUser } from "@/lib/auth";
+import { AuthError, requireUser } from "@/lib/auth";
 import { handle, optionalText } from "@/lib/api";
 import {
   deleteDoorbell,
@@ -60,6 +60,10 @@ export async function DELETE(
     assertStreetAccess(user, house.street_id);
     if (bell.visit_count > 0) {
       throw new Error("An diesem Klingelschild hängen schon Einträge.");
+    }
+    // Mit dem Schild ginge die Sperre weg - das darf nur, wer Sperren aufheben darf.
+    if (bell.blocked_at && !hasPermission(user, "doors.unblock")) {
+      throw new AuthError("Diese Klingel ist gesperrt („Nicht klingeln“). Entfernen kann nur, wer Türsperren aufheben darf.", 403);
     }
     deleteDoorbell(bell.id);
     return { ok: true };

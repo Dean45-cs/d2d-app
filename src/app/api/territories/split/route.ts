@@ -37,9 +37,13 @@ export async function POST(request: Request) {
     const claimed: Shape[] = [];
     const drafts: TerritoryDraft[] = groups.map((group: Record<string, unknown>, index: number) => {
       const assignedUserId = territoryAssignee(leader, group.assignedUserId, true);
-      const streets = parseStreetList(group.streetList);
-      if (streets.length === 0) {
+      const listed = parseStreetList(group.streetList);
+      if (listed.length === 0) {
         throw new Error(`Teilgebiet ${index + 1} enthält keine Straßen.`);
+      }
+      const streets = withoutTakenHouses(leader.team_id, listed);
+      if (streets.length === 0) {
+        throw new Error(`Die Häuser von Teilgebiet ${index + 1} gehören schon zu anderen Gebieten.`);
       }
       const area = group.area
         ? freeArea(leader.team_id, parseShape(group.area), { avoid: claimed })
@@ -53,7 +57,7 @@ export async function POST(request: Request) {
         note,
         dueDate,
         areaJson: area ? shapeToJson(area) : "",
-        streets: withoutTakenHouses(leader.team_id, streets),
+        streets,
       };
     });
 

@@ -68,9 +68,18 @@ export default async function TourPage({
    * mit, aber nur diese Tueren. Dort erfassen darf man nur wegen des Termins.
    */
   const known = new Set(ownStreets.map((s) => s.id));
-  const foreignIds = [
-    ...new Set(appointments.map((a) => a.street_id).filter((id): id is number => id !== null && !known.has(id))),
-  ];
+  // Alle offenen eigenen Termine dort, nicht nur die angezeigten: jede Termin-Tuer muss sich oeffnen lassen.
+  const foreignDoors = (
+    getDb()
+      .prepare(
+        `SELECT v.street_id, v.house_number, v.doorbell_id FROM visits v
+          WHERE +v.team_id = ? AND v.outcome = 'APPOINTMENT' AND v.follow_up_done_at IS NULL
+            AND v.follow_up_at IS NOT NULL AND COALESCE(v.follow_up_user_id, v.user_id) = ?
+            AND v.street_id IS NOT NULL`,
+      )
+      .all(user.team_id, user.id) as Array<{ street_id: number; house_number: string; doorbell_id: number | null }>
+  ).filter((door) => !known.has(door.street_id));
+  const foreignIds = [...new Set(foreignDoors.map((door) => door.street_id))];
   const appointmentStreets = foreignIds.length
     ? streetRows(
         `s.id IN (${foreignIds.map(() => "?").join(",")})
@@ -111,21 +120,33 @@ export default async function TourPage({
     const territoryId = item.street_id ? territoryOfStreet.get(item.street_id) : undefined;
     if (territoryId) loaded.add(territoryId);
   }
+  for (const id of appointmentTerritoryIds) loaded.add(id);
 
   // Hausnummern der eigenen Strassen: an der Tuer wird abgehakt statt getippt.
-  const appointmentDoors = new Set(
-    appointments.map((a) => `${a.street_id}|${a.house_number.replace(/\s+/g, "").toLowerCase()}`),
-  );
+  const doorKey = (streetId: number, number: string) => `${streetId}|${number.replace(/\s+/g, "").toLowerCase()}`;
+  const appointmentDoors = new Map<string, Set<number> | "house">();
+  for (const door of foreignDoors) {
+    const key = doorKey(door.street_id, door.house_number);
+    const bells = appointmentDoors.get(key);
+    // Termin ohne Klingel: das ganze Haus; sonst nur die Klingeln der Termine.
+    if (door.doorbell_id === null || bells === "house") appointmentDoors.set(key, "house");
+    else appointmentDoors.set(key, new Set([...(bells ?? []), door.doorbell_id]));
+  }
   const appointmentOnly = new Set(appointmentStreets.filter((s) => !ownTerritoryIds.has(s.territory_id)).map((s) => s.id));
   const houseNumbers = listHouseNumbers(streets.filter((s) => loaded.has(s.territory_id)).map((s) => s.id)).filter(
-    (h) =>
-      !appointmentOnly.has(h.street_id) ||
-      appointmentDoors.has(`${h.street_id}|${h.number.replace(/\s+/g, "").toLowerCase()}`),
+    (h) => !appointmentOnly.has(h.street_id) || appointmentDoors.has(doorKey(h.street_id, h.number)),
   );
 
   // Alle Klingelschilder gleich mitschicken statt bei Bedarf nachzuladen:
   // im Treppenhaus ist meist kein Netz, und genau dort werden sie gebraucht.
-  const doorbells = listDoorbells(houseNumbers.map((h) => h.id));
+  // In fremden Haeusern nur die Klingel des eigenen Termins - nicht das Haus des neuen Besitzers.
+  const streetOfHouse = new Map(houseNumbers.map((h) => [h.id, h]));
+  const doorbells = listDoorbells(houseNumbers.map((h) => h.id)).filter((bell) => {
+    const house = streetOfHouse.get(bell.house_number_id);
+    if (!house || !appointmentOnly.has(house.street_id)) return true;
+    const allowed = appointmentDoors.get(doorKey(house.street_id, house.number));
+    return allowed === "house" || Boolean(allowed?.has(bell.id));
+  });
 
   // "Heute" beginnt um Mitternacht in Berlin - wie bei den Tageszielen.
   const todayTotals = totals(user.team_id, { userId: user.id, since: berlinMidnight() });

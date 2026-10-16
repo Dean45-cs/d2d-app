@@ -137,6 +137,20 @@ test("progress of streets from a list counts their units, not just the first typ
   assert.equal(territoryProgress(getTerritory(mapped, team)!).label, "0 von 2 Häusern");
 });
 
+test("on a street from a list, every bell of an apartment building is a door", () => {
+  const id = territory("Mehrfamilien");
+  const streetId = street(id, "Bahnhofstraße", 12);
+  for (const number of ["1", "3"]) {
+    const houseId = ensureHouseNumber(streetId, number);
+    for (let bell = 1; bell <= 6; bell += 1) {
+      const bellId = Number(db.prepare("INSERT INTO doorbells(house_number_id, label) VALUES (?, ?)").run(houseId, `Klingel ${bell}`).lastInsertRowid);
+      db.prepare("INSERT INTO visits(team_id, user_id, territory_id, street_id, house_number, doorbell_id, outcome) VALUES (?, ?, ?, ?, ?, ?, 'MET_NO_SALE')")
+        .run(team, leader.id, id, streetId, number, bellId);
+    }
+  }
+  assert.equal(territoryProgress(getTerritory(id, team)!).label, "12 von 12 Türen");
+});
+
 test("blocked doors are counted before a street or territory may be deleted", () => {
   const id = territory("Sperren");
   const streetId = street(id, "Ringstraße");
@@ -194,4 +208,14 @@ test("towns that only differ by their bracketed suffix do not share a price", ()
   assert.equal(lookup.find({ postal_code: "16845", city: "Neustadt (Dosse)" }), null);
   assert.equal(lookup.find({ postal_code: "34612", city: "Neustadt (Hessen)" })?.match, "city");
   assert.equal(lookup.find({ city: "Neustadt" })?.provider, "EAM");
+});
+
+test("a big city keeps its price across its postal regions", () => {
+  const priceTeam = Number(db.prepare("INSERT INTO teams(name) VALUES ('Grossstadt')").run().lastInsertRowid);
+  const base = { provider: "Vattenfall", gas_provider: "", lat: null, lng: null, strom_ct_kwh: 41, strom_base_eur: 150, gas_ct_kwh: null, gas_base_eur: null, valid_from: "", source_url: "" };
+  saveManualPrice(priceTeam, leader.id, { ...base, postal_code: "10115", city: "Berlin" });
+  const lookup = providerLookup(priceTeam);
+  for (const plz of ["10117", "12043", "13353", "14193"]) assert.equal(lookup.find({ postal_code: plz, city: "Berlin" })?.provider, "Vattenfall", plz);
+  // Andere Leitzone: kein Treffer ueber den Namen.
+  assert.equal(lookup.find({ postal_code: "86150", city: "Berlin" }), null);
 });
