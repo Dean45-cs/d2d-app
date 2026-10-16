@@ -17,6 +17,19 @@ const OUTCOMES: VisitOutcome[] = ["NOT_HOME", "MET_NO_SALE", "APPOINTMENT", "SAL
  * vernuenftigen Grenzen (hoechstens 3 Tage alt, nicht in der Zukunft), damit
  * eine falsch gehende Uhr am Handy keine Zahlen verschiebt.
  */
+/**
+ * Nie vor die letzte live gespeicherte Tuer: wer heute schon online erfasst
+ * hat, kann nichts mehr auf gestern legen. Eine echte Funkloch-Strecke
+ * dazwischen behaelt ihre Zeiten.
+ */
+function notBeforeLastLive(user: User, recordedAt: string | null): string | null {
+  if (!recordedAt) return null;
+  const last = getDb()
+    .prepare("SELECT created_at FROM visits WHERE user_id = ? AND received_at IS NULL ORDER BY created_at DESC LIMIT 1")
+    .get(user.id) as { created_at: string } | undefined;
+  return last && last.created_at > recordedAt ? last.created_at : recordedAt;
+}
+
 export function recordedAtFrom(value: unknown, now = Date.now()): string | null {
   if (typeof value !== "string") return null;
   const at = Date.parse(value);
@@ -70,7 +83,7 @@ export function recordVisit(user: User, body: Record<string, unknown>, { fromDra
 
   if (territoryId !== null && !fromDraft) {
     const territory = teamTerritory(territoryId)!;
-    if (!canAccessTerritory(user, territory) && !ownsAppointmentAt(user, streetId, houseNumber)) {
+    if (!canAccessTerritory(user, territory) && !ownsAppointmentAt(user, streetId, houseNumber, optionalText(body.doorbellLabel, 60))) {
       throw new AuthError("Dieses Gebiet ist für dich nicht freigegeben.", 403);
     }
   }
@@ -137,7 +150,7 @@ export function recordVisit(user: User, body: Record<string, unknown>, { fromDra
     contactPhone: optionalText(body.contactPhone, 40),
     lat: optionalNumber(body.lat),
     lng: optionalNumber(body.lng),
-    recordedAt: recordedAtFrom(body.recordedAt),
+    recordedAt: notBeforeLastLive(user, recordedAtFrom(body.recordedAt)),
   };
 
   const result = db.transaction(() => {

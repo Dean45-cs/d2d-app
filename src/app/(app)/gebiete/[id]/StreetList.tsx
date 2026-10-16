@@ -254,15 +254,25 @@ function streetProgress(
   street: StreetWithStats,
   houses: HouseNumberWithStats[],
 ): { done: number; total: number; label: string } {
-  // Ohne Kartenimport sind die Hausnummern nur die schon getippten - dann zaehlen die Wohneinheiten.
-  const fromList = houses.length > 0 && street.units > houses.length && !houses.some((h) => h.lat !== null);
+  // Ohne Kartenimport sind die Hausnummern nur die schon getippten - dann zaehlen Tueren:
+  // die Wohneinheiten, im Mehrfamilienhaus jede Klingel (wie auf der Gebietsseite).
+  const fromList = houses.length > 0 && street.units > 0 && !houses.some((h) => h.lat !== null);
   if (houses.length > 0 && !fromList) {
     const done = houses.filter(houseTouched).length;
     return { done, total: houses.length, label: `${done} von ${houses.length} Häusern` };
   }
   if (fromList) {
-    const done = houses.filter(houseTouched).length;
-    return { done, total: street.units, label: `${done} von ${street.units} Türen` };
+    const doors = houses.reduce((sum, h) => sum + Math.max(1, h.bell_count), 0);
+    const total = Math.max(street.units, doors);
+    const done = Math.min(
+      total,
+      houses.reduce(
+        (sum, h) =>
+          sum + (h.blocked_at ? Math.max(1, h.bell_count) : h.bell_count > 0 ? h.bell_done_count : houseTouched(h) ? 1 : 0),
+        0,
+      ),
+    );
+    return { done, total, label: `${done} von ${total} Türen` };
   }
   if (street.units > 0) {
     const done = Math.min(street.visit_count, street.units);

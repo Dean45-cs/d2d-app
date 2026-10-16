@@ -126,7 +126,7 @@ export default async function ComparePage({
             )}
 
             <ol className="list list-icons">
-              {board.map((entry) => (
+              {(places ? board : board.map((entry) => ({ ...entry, rank: null }))).map((entry) => (
                 <RankRow
                   key={entry.user_id}
                   entry={entry}
@@ -278,7 +278,8 @@ function MeVersusTeam({ me, totals }: { me: RankEntry; totals: PersonTotals[] })
             const avg = teamAverage(m, totals);
             const place = rank(m, totals);
             const top = bestValue(place);
-            const myPlace = place.find((e) => e.user_id === me.user_id)?.rank ?? null;
+            // Stehen alle bei null, gibt es keinen Platz - auch keinen geteilten ersten.
+            const myPlace = hasPlaces(m, place) ? (place.find((e) => e.user_id === me.user_id)?.rank ?? null) : null;
             const scale = Math.max(top ?? 0, mine ?? 0, avg ?? 0) || 1;
             return (
               <li key={m.key}>

@@ -9,6 +9,7 @@ import { useToast } from "@/components/Toast";
 import { useConfirm } from "@/components/useConfirm";
 import { CreateMemberSheet } from "./CreateMemberSheet";
 import { MemberSheet, PasswordSheet } from "./MemberSheet";
+import { syncPush } from "@/lib/push-client";
 import { TeamStructure } from "./TeamStructure";
 import { ROLE_LABEL, type MemberRow, type PatchMember } from "./types";
 
@@ -256,7 +257,12 @@ export function TeamTable({
         <PasswordSheet
           member={current}
           onClose={() => setSheet(null)}
-          onSave={(password) => patch(current.id, { password }, `Neues Passwort für ${current.name} gesetzt`)}
+          onSave={async (password) => {
+            const ok = await patch(current.id, { password }, `Neues Passwort für ${current.name} gesetzt`);
+            // Eigenes Passwort: der Server meldet alle Geraete von Push ab - dieses gleich wieder an.
+            if (ok && current.id === currentUserId) void syncPush().catch(() => undefined);
+            return ok;
+          }}
         />
       )}
 

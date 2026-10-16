@@ -43,11 +43,35 @@ export interface TerritoryWithStats extends Territory {
   house_count: number;
   house_touched_count: number;
   /**
-   * Tueren aus Strassenlisten, fuer die es (noch) keine Hausnummern gibt: Wohneinheiten
-   * einer Strasse ohne Kartenimport, abzueglich der dort schon getippten Nummern.
+   * Strassen aus einer Liste (ohne Kartenimport): dort zaehlt jede Tuer - im
+   * Mehrfamilienhaus jede Klingel -, mindestens so viele wie Wohneinheiten
+   * angegeben sind. Die schon getippten Hausnummern stecken auch in
+   * house_count/house_touched_count und werden dort herausgerechnet.
    */
-  house_extra_units: number;
+  list_house_count: number;
+  list_house_touched: number;
+  list_door_total: number;
+  list_door_done: number;
 }
+
+/** Eine Klingel ist durch, wenn gesperrt, angetroffen oder alle Versuche verbraucht (auch in listHouseNumbers). */
+const BELL_DONE = `(d.blocked_at IS NOT NULL
+  OR EXISTS (SELECT 1 FROM visits v WHERE v.doorbell_id = d.id AND v.outcome <> 'NOT_HOME')
+  OR (SELECT COUNT(*) FROM visits v WHERE v.doorbell_id = d.id AND v.outcome = 'NOT_HOME') >= ${MAX_NOT_HOME_ATTEMPTS})`;
+
+/** Haus erfasst: gesperrt, Einzeltuer besucht oder im Mehrfamilienhaus jede Klingel durch. */
+const HOUSE_TOUCHED = `(h.blocked_at IS NOT NULL
+  -- Einzeltuer: erfasst, sobald jemand dort war.
+  OR (NOT EXISTS (SELECT 1 FROM doorbells d WHERE d.house_number_id = h.id)
+      AND EXISTS (SELECT 1 FROM visits v WHERE v.street_id = h.street_id
+        AND lower(replace(v.house_number, ' ', '')) = lower(replace(h.number, ' ', ''))))
+  -- Mehrfamilienhaus: erst, wenn jede Klingel durch ist.
+  OR (EXISTS (SELECT 1 FROM doorbells d WHERE d.house_number_id = h.id)
+      AND NOT EXISTS (SELECT 1 FROM doorbells d WHERE d.house_number_id = h.id AND NOT ${BELL_DONE})))`;
+
+/** Strasse ohne Kartenimport: keine ihrer Hausnummern hat eine Lage. */
+const LIST_STREET = "NOT EXISTS (SELECT 1 FROM house_numbers x WHERE x.street_id = s.id AND x.lat IS NOT NULL)";
+const BELLS_OF_HOUSE = "(SELECT COUNT(*) FROM doorbells d WHERE d.house_number_id = h.id)";
 
 const TERRITORY_STATS_SQL = `
   SELECT t.*,
@@ -62,23 +86,21 @@ const TERRITORY_STATS_SQL = `
          (SELECT COUNT(*) FROM house_numbers h JOIN streets s ON s.id = h.street_id
            WHERE s.territory_id = t.id)                                           AS house_count,
          (SELECT COUNT(*) FROM house_numbers h JOIN streets s ON s.id = h.street_id
-           WHERE s.territory_id = t.id
-             AND (h.blocked_at IS NOT NULL
-               -- Einzeltuer: erfasst, sobald jemand dort war.
-               OR (NOT EXISTS (SELECT 1 FROM doorbells d WHERE d.house_number_id = h.id)
-                   AND EXISTS (SELECT 1 FROM visits v WHERE v.street_id = h.street_id
-                     AND lower(replace(v.house_number, ' ', '')) = lower(replace(h.number, ' ', ''))))
-               -- Mehrfamilienhaus: erst, wenn jede Klingel durch ist.
-               OR (EXISTS (SELECT 1 FROM doorbells d WHERE d.house_number_id = h.id)
-                   AND NOT EXISTS (SELECT 1 FROM doorbells d WHERE d.house_number_id = h.id AND NOT (
-                     d.blocked_at IS NOT NULL
-                     OR EXISTS (SELECT 1 FROM visits v WHERE v.doorbell_id = d.id AND v.outcome <> 'NOT_HOME')
-                     OR (SELECT COUNT(*) FROM visits v WHERE v.doorbell_id = d.id
-                           AND v.outcome = 'NOT_HOME') >= ${MAX_NOT_HOME_ATTEMPTS}))))) AS house_touched_count,
-         (SELECT COALESCE(SUM(MAX(s.units - (SELECT COUNT(*) FROM house_numbers h WHERE h.street_id = s.id), 0)), 0)
-            FROM streets s
-           WHERE s.territory_id = t.id
-             AND NOT EXISTS (SELECT 1 FROM house_numbers h WHERE h.street_id = s.id AND h.lat IS NOT NULL)) AS house_extra_units
+           WHERE s.territory_id = t.id AND ${HOUSE_TOUCHED})                       AS house_touched_count,
+         (SELECT COUNT(*) FROM house_numbers h JOIN streets s ON s.id = h.street_id
+           WHERE s.territory_id = t.id AND ${LIST_STREET})                         AS list_house_count,
+         (SELECT COUNT(*) FROM house_numbers h JOIN streets s ON s.id = h.street_id
+           WHERE s.territory_id = t.id AND ${LIST_STREET} AND ${HOUSE_TOUCHED})    AS list_house_touched,
+         (SELECT COALESCE(SUM(MAX(s.units,
+                   (SELECT COALESCE(SUM(MAX(1, ${BELLS_OF_HOUSE})), 0) FROM house_numbers h WHERE h.street_id = s.id))), 0)
+            FROM streets s WHERE s.territory_id = t.id AND ${LIST_STREET})         AS list_door_total,
+         (SELECT COALESCE(SUM(CASE
+                   WHEN h.blocked_at IS NOT NULL THEN MAX(1, ${BELLS_OF_HOUSE})
+                   WHEN ${BELLS_OF_HOUSE} > 0 THEN
+                     (SELECT COUNT(*) FROM doorbells d WHERE d.house_number_id = h.id AND ${BELL_DONE})
+                   WHEN ${HOUSE_TOUCHED} THEN 1 ELSE 0 END), 0)
+            FROM house_numbers h JOIN streets s ON s.id = h.street_id
+           WHERE s.territory_id = t.id AND ${LIST_STREET})                         AS list_door_done
     FROM territories t
     LEFT JOIN users u ON u.id = t.assigned_user_id
 `;
@@ -500,14 +522,6 @@ export interface HouseNumberWithStats {
 const HOUSE_MATCH =
   "v.street_id = h.street_id AND lower(replace(v.house_number, ' ', '')) = lower(replace(h.number, ' ', ''))";
 
-/** Eine Klingel ist durch, wenn gesperrt, angetroffen oder alle Versuche verbraucht. */
-const BELL_DONE = `(
-  d.blocked_at IS NOT NULL
-  OR EXISTS (SELECT 1 FROM visits v WHERE v.doorbell_id = d.id AND v.outcome <> 'NOT_HOME')
-  OR (SELECT COUNT(*) FROM visits v
-        WHERE v.doorbell_id = d.id AND v.outcome = 'NOT_HOME') >= ${MAX_NOT_HOME_ATTEMPTS}
-)`;
-
 /**
  * Hausnummern samt Bearbeitungsstand. Abgeglichen wird ueber den Text der
  * erfassten Hausnummer - Gross-/Kleinschreibung und Leerzeichen egal.
@@ -874,20 +888,22 @@ export function doorBlocked(
  * dort erfassen, auch wenn das Gebiet inzwischen jemand anderem gehoert
  * (Uebergabe mit "Termine bleiben") - sonst liesse sich der Termin nur noch
  * abhaken, nie in den Abschluss verwandeln, fuer den er vereinbart wurde.
+ *
+ * Tuer heisst im Mehrfamilienhaus: die Klingel des Termins (auch wenn sie
+ * inzwischen umbenannt wurde), nicht das ganze Haus des neuen Besitzers.
  */
-export function ownsAppointmentAt(user: User, streetId: number | null, houseNumber: string): boolean {
+export function ownsAppointmentAt(user: User, streetId: number | null, houseNumber: string, doorbellLabel = ""): boolean {
   if (streetId === null || !houseNumber.trim()) return false;
-  return Boolean(
-    getDb()
-      .prepare(
-        `SELECT 1 FROM visits v
-          WHERE v.team_id = ? AND v.street_id = ? AND v.outcome = 'APPOINTMENT'
-            AND v.follow_up_done_at IS NULL AND COALESCE(v.follow_up_user_id, v.user_id) = ?
-            AND lower(replace(v.house_number, ' ', '')) = lower(replace(?, ' ', ''))
-          LIMIT 1`,
-      )
-      .get(user.team_id, streetId, user.id, houseNumber),
-  );
+  const rows = getDb()
+    .prepare(
+      `SELECT d.label AS bell FROM visits v
+         LEFT JOIN doorbells d ON d.id = v.doorbell_id
+        WHERE v.team_id = ? AND v.street_id = ? AND v.outcome = 'APPOINTMENT'
+          AND v.follow_up_done_at IS NULL AND COALESCE(v.follow_up_user_id, v.user_id) = ?
+          AND lower(replace(v.house_number, ' ', '')) = lower(replace(?, ' ', ''))`,
+    )
+    .all(user.team_id, streetId, user.id, houseNumber) as Array<{ bell: string | null }>;
+  return rows.some((row) => row.bell === null || (doorbellLabel !== "" && bellKey(row.bell) === bellKey(doorbellLabel)));
 }
 
 /**
@@ -1151,8 +1167,8 @@ const APPOINTMENT_HOUSE = `h.street_id = v.street_id
   AND h.lat IS NOT NULL AND h.lng IS NOT NULL LIMIT 1`;
 
 /**
- * Vereinbarte Termine. Offene: die von heute und die kommenden zuerst (der
- * naechste vorn), danach die ueberfaelligen, der juengste zuerst - sonst
+ * Vereinbarte Termine. Offene: die kommenden zuerst (der naechste vorn),
+ * danach die ueberfaelligen, der juengste zuerst - sonst
  * fuellten Termine von vor Monaten, die nie abgehakt wurden, das ganze Limit
  * und die von heute fehlten. Mit `done` die erledigten, der juengste zuerst;
  * getrennt abgefragt, damit sich beide nicht das Limit teilen.
@@ -1185,11 +1201,12 @@ export function listAppointments(
     where.push("v.follow_up_at < ?");
     params.push(opts.before);
   }
-  const today = berlinSlot(opts.now).slice(0, 10);
+  // Geteilt am jetzigen Moment: was noch kommt, der naechste vorn - danach das Vorbeigegangene, das juengste vorn.
+  const now = berlinSlot(opts.now);
   const order = opts.done
     ? "v.follow_up_at DESC, v.id"
-    : `CASE WHEN v.follow_up_at >= '${today}' THEN 0 ELSE 1 END,
-       CASE WHEN v.follow_up_at >= '${today}' THEN v.follow_up_at END ASC,
+    : `CASE WHEN v.follow_up_at >= '${now}' THEN 0 ELSE 1 END,
+       CASE WHEN v.follow_up_at >= '${now}' THEN v.follow_up_at END ASC,
        v.follow_up_at DESC, v.id`;
   params.push(opts.limit ?? 100);
 
