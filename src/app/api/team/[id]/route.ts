@@ -1,4 +1,4 @@
-import { AuthError, hashPassword, requireUser } from "@/lib/auth";
+import { AuthError, hashPassword, requireUser, startSession } from "@/lib/auth";
 import { assertMemberScope, assertNoExtraRights, assertPermission, structureIds } from "@/lib/permissions";
 import type { User } from "@/lib/types";
 import { getDb } from "@/lib/db";
@@ -89,11 +89,13 @@ export async function PATCH(
     values.push(userId);
     db.transaction(() => {
       db.prepare(`UPDATE users SET ${fields.join(", ")} WHERE id = ?`).run(...values);
-      if (deactivating) {
-        rejectPendingJoins(leader.id, userId);
-        db.prepare("DELETE FROM push_subscriptions WHERE user_id = ?").run(userId);
-      }
+      if (deactivating) rejectPendingJoins(leader.id, userId);
+      // Neues Passwort (etwa nach verlorenem Handy) oder deaktiviert: die alten Geraete bekommen
+      // auch keine Push-Nachrichten mehr. Wer sich neu anmeldet, wird wieder zugeordnet (PushSync).
+      if (deactivating || body.password) db.prepare("DELETE FROM push_subscriptions WHERE user_id = ?").run(userId);
     })();
+    // Das eigene Passwort geaendert: dieses Geraet bleibt angemeldet, nur die anderen nicht.
+    if (body.password && userId === leader.id) await startSession(userId);
     return { ok: true };
   });
 }

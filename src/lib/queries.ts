@@ -286,21 +286,46 @@ export function createTerritories(teamId: number, drafts: TerritoryDraft[], crea
  */
 export function withoutTakenHouses(teamId: number, entries: StreetInput[], exceptTerritoryId = 0): StreetInput[] {
   const db = getDb();
+  // Flaechen der anderen Gebiete, mit Rechteck drumherum: die meisten Haeuser liegen weit weg.
   const areas = (
     db.prepare("SELECT id, area_json FROM territories WHERE team_id = ? AND id <> ? AND area_json <> ''")
       .all(teamId, exceptTerritoryId) as Array<{ id: number; area_json: string }>
   ).flatMap((row) => {
     const shape = readShape(row.area_json);
-    return shape ? [shape] : [];
+    if (!shape) return [];
+    const points = shape.flatMap(([outer]) => outer ?? []);
+    const lats = points.map(([lat]) => lat);
+    const lngs = points.map(([, lng]) => lng);
+    return [{ shape, minLat: Math.min(...lats), maxLat: Math.max(...lats), minLng: Math.min(...lngs), maxLng: Math.max(...lngs) }];
   });
-  const sameHouse = db.prepare(
-    `SELECT h.lat, h.lng FROM house_numbers h
+  const inOtherArea = (lat: number, lng: number) =>
+    areas.some(
+      (a) => lat >= a.minLat && lat <= a.maxLat && lng >= a.minLng && lng <= a.maxLng && shapeContains(a.shape, [lat, lng]),
+    );
+
+  // Hausnummern anderer Gebiete je Strassenname - eine Abfrage pro Strasse, nicht pro Haus.
+  const sameStreet = db.prepare(
+    `SELECT lower(replace(h.number, ' ', '')) AS number, h.lat, h.lng FROM house_numbers h
        JOIN streets s ON s.id = h.street_id
        JOIN territories t ON t.id = s.territory_id
       WHERE t.team_id = ? AND t.id <> ? AND lower(s.name) = lower(?)
-        AND lower(replace(h.number, ' ', '')) = lower(replace(?, ' ', ''))
         AND h.lat IS NOT NULL AND h.lng IS NOT NULL`,
   );
+  const twinsByStreet = new Map<string, Map<string, Array<{ lat: number; lng: number }>>>();
+  const twinsOf = (name: string) => {
+    const key = name.trim().toLowerCase();
+    let twins = twinsByStreet.get(key);
+    if (!twins) {
+      twins = new Map();
+      for (const row of sameStreet.all(teamId, exceptTerritoryId, name.trim()) as Array<{ number: string; lat: number; lng: number }>) {
+        const list = twins.get(row.number) ?? [];
+        list.push({ lat: row.lat, lng: row.lng });
+        twins.set(row.number, list);
+      }
+      twinsByStreet.set(key, twins);
+    }
+    return twins;
+  };
   // Gleicher Name und gleiche Nummer allein reicht nicht (Hauptstrasse 1 gibt es in jeder Stadt).
   const near = (a: { lat: number; lng: number }, b: { lat: number; lng: number }) =>
     Math.hypot((a.lat - b.lat) * METERS_PER_DEGREE, (a.lng - b.lng) * METERS_PER_DEGREE * Math.cos((a.lat * Math.PI) / 180)) < 60;
@@ -311,8 +336,8 @@ export function withoutTakenHouses(teamId: number, entries: StreetInput[], excep
     const kept = numbers.filter((house) => {
       if (house.lat === null || house.lng === null) return true;
       const point = { lat: house.lat, lng: house.lng };
-      if (areas.some((shape) => shapeContains(shape, [point.lat, point.lng]))) return false;
-      const twins = sameHouse.all(teamId, exceptTerritoryId, entry.name.trim(), house.number) as Array<{ lat: number; lng: number }>;
+      if (inOtherArea(point.lat, point.lng)) return false;
+      const twins = twinsOf(entry.name).get(house.number.replace(/\s+/g, "").toLowerCase()) ?? [];
       return !twins.some((twin) => near(point, twin));
     });
     if (kept.length === numbers.length) return [entry];

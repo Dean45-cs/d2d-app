@@ -141,7 +141,9 @@ function StreetSheet({
     if (!ok) return;
     const response = await fetch(`/api/streets/${street.id}`, { method: "DELETE" }).catch(() => null);
     if (!response?.ok) {
-      toast("Straße nicht entfernt");
+      // Den Grund zeigen (etwa gesperrte Tueren) - sonst weiss niemand, warum es nicht geht.
+      const data = await response?.json().catch(() => null);
+      toast(data?.error ?? (response ? "Straße nicht entfernt" : "Keine Verbindung – Straße nicht entfernt"));
       return;
     }
     toast(`${street.name} entfernt`);
