@@ -12,6 +12,7 @@ import {
   isStale,
   listManualPrices,
   monthly,
+  referenceBaseYear,
   referenceYear,
 } from "@/lib/energy/manual";
 import { openPlaces } from "@/lib/energy/places";
@@ -37,6 +38,10 @@ export default async function EnergyMapPage({
   const user = await requireUser();
   const isLeader = hasPermission(user, "energy.manage");
 
+  const settings = getReference(user.team_id);
+  const reference = referenceYear(settings);
+  const referenceBase = referenceBaseYear(settings);
+
   // Eigene Preise ersetzen den Wert der Tagesquelle fuer dieselbe PLZ.
   const manual = listManualPrices(user.team_id);
   const own = new Set(manual.map((m) => m.postal_code));
@@ -54,8 +59,8 @@ export default async function EnergyMapPage({
     stromBaseMonth: monthly(m.strom_base_eur),
     gasCt: m.gas_ct_kwh,
     gasBaseMonth: monthly(m.gas_base_eur),
-    stromYear: annualCost(m.strom_ct_kwh, m.strom_base_eur, CONSUMPTION_STROM_KWH),
-    gasYear: annualCost(m.gas_ct_kwh, m.gas_base_eur, CONSUMPTION_GAS_KWH),
+    stromYear: annualCost(m.strom_ct_kwh, m.strom_base_eur, CONSUMPTION_STROM_KWH, referenceBase.strom),
+    gasYear: annualCost(m.gas_ct_kwh, m.gas_base_eur, CONSUMPTION_GAS_KWH, referenceBase.gas),
     validFrom: m.valid_from,
     sourceUrl: m.source_url,
     stale: isStale(m.updated_at),
@@ -76,8 +81,8 @@ export default async function EnergyMapPage({
       stromBaseMonth: monthly(p.strom_base_eur),
       gasCt: p.gas_ct_kwh,
       gasBaseMonth: monthly(p.gas_base_eur),
-      stromYear: annualCost(p.strom_ct_kwh, p.strom_base_eur, CONSUMPTION_STROM_KWH),
-      gasYear: annualCost(p.gas_ct_kwh, p.gas_base_eur, CONSUMPTION_GAS_KWH),
+      stromYear: annualCost(p.strom_ct_kwh, p.strom_base_eur, CONSUMPTION_STROM_KWH, referenceBase.strom),
+      gasYear: annualCost(p.gas_ct_kwh, p.gas_base_eur, CONSUMPTION_GAS_KWH, referenceBase.gas),
       validFrom: p.valid_from ?? "",
       sourceUrl: "",
       stale: false,
@@ -127,13 +132,13 @@ export default async function EnergyMapPage({
   }
 
   const feed = feedConfig();
-  const reference = referenceYear(getReference(user.team_id));
 
   return (
     <EnergyMapClient
       prices={[...ownPoints, ...feedPoints]}
       open={open}
       reference={reference}
+      referenceBase={referenceBase}
       isLeader={isLeader}
       canRefresh={hasPermission(user, "energy.refresh")}
       feed={feed ? { refresh: lastRefresh() } : null}

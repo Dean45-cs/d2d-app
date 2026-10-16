@@ -5,6 +5,7 @@ import {
   METRICS,
   bestValue,
   chaseLine,
+  hasPlaces,
   firstName,
   formatMetric,
   metricByKey,
@@ -58,18 +59,20 @@ export default async function ComparePage({
 
   // Plaetze im Zeitraum davor - fuer "zwei Plaetze gutgemacht".
   const previous = previousRange(key);
+  const previousBoard = previous ? rank(metric, teamTotals(user.team_id, previous)) : [];
+  // Ein Zeitraum, in dem alle bei null standen, hat keine Plaetze - weder heute noch davor.
+  const places = hasPlaces(metric, board);
   const previousRank = new Map(
-    previous
-      ? rank(metric, teamTotals(user.team_id, previous)).map((e) => [e.user_id, e.rank])
-      : [],
+    hasPlaces(metric, previousBoard) ? previousBoard.map((e) => [e.user_id, e.rank]) : [],
   );
   const delta = (entry: RankEntry): number | null => {
     const before = previousRank.get(entry.user_id);
-    if (entry.rank === null || before === null || before === undefined) return null;
+    if (!places || entry.rank === null || before === null || before === undefined) return null;
     return before - entry.rank;
   };
 
-  const me = board.find((e) => e.user_id === user.id) ?? null;
+  const found = board.find((e) => e.user_id === user.id) ?? null;
+  const me = found && !places ? { ...found, rank: null } : found;
   const best = bestValue(board);
   const average = teamAverage(metric, totals);
 

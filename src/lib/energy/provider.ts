@@ -23,6 +23,7 @@ import {
   getReference,
   isStale,
   listManualPrices,
+  referenceBaseYear,
   referenceYear,
   type ManualPrice,
 } from "./manual";
@@ -80,11 +81,13 @@ export interface ProviderLookup {
 export function providerLookup(teamId?: number): ProviderLookup {
   const rows = listEnergyPrices();
   const manual = teamId ? listManualPrices(teamId) : [];
-  const reference = referenceYear(getReference(teamId ?? 0));
+  const settings = getReference(teamId ?? 0);
+  const reference = referenceYear(settings);
+  const referenceBase = referenceBaseYear(settings);
 
   function price(ct: number | null, base: number | null, energy: "strom" | "gas"): PriceInfo | null {
     if (ct === null) return null;
-    const year = annualCost(ct, base, energy === "strom" ? CONSUMPTION_STROM_KWH : CONSUMPTION_GAS_KWH);
+    const year = annualCost(ct, base, energy === "strom" ? CONSUMPTION_STROM_KWH : CONSUMPTION_GAS_KWH, referenceBase[energy]);
     if (year === null) return null;
     return {
       ct,
@@ -135,10 +138,21 @@ export function providerLookup(teamId?: number): ProviderLookup {
     const plz = (place.postal_code ?? "").trim();
     const city = normalizeCity(place.city ?? "");
 
-    const own = (plz && manualIndex.byPlz.get(plz)) || (city && manualIndex.byCity.get(city));
+    /*
+     * Ueber den Namen nur, wenn es plausibel derselbe Ort ist: "Neustadt (Hessen)"
+     * und "Neustadt (Dosse)" heissen ohne Klammer gleich, liegen aber 400 km
+     * auseinander. Mit PLZ auf beiden Seiten muss die Leitregion (die ersten
+     * zwei Ziffern) stimmen.
+     */
+    const byName = <T extends { postal_code: string }>(row: T | undefined): T | undefined =>
+      row && (!/^\d{5}$/.test(plz) || !/^\d{5}$/.test(row.postal_code) || row.postal_code.slice(0, 2) === plz.slice(0, 2))
+        ? row
+        : undefined;
+
+    const own = (plz && manualIndex.byPlz.get(plz)) || (city && byName(manualIndex.byCity.get(city)));
     if (own) return fromManual(own, own.postal_code === plz ? "plz" : "city", null);
 
-    const feed = (plz && feedIndex.byPlz.get(plz)) || (city && feedIndex.byCity.get(city));
+    const feed = (plz && feedIndex.byPlz.get(plz)) || (city && byName(feedIndex.byCity.get(city)));
     if (feed) return fromFeed(feed, feed.postal_code === plz ? "plz" : "city", null);
 
     if (place.area && place.area.length >= 3) {

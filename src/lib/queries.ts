@@ -1,10 +1,11 @@
 import { appointmentUtc } from "./appointment-time";
+import { berlinSlot } from "./format";
 import { getDb } from "./db";
 import { canAccessTerritory, permissionsFor } from "./permissions";
 import { bellKey, MAX_BELLS_PER_HOUSE, normalizeFloor, normalizeLabel } from "./doorbells";
 import { MAX_NOT_HOME_ATTEMPTS } from "./doors";
-import { readShape } from "./geo/area";
-import { subtract, type Shape } from "./geo/shape";
+import { METERS_PER_DEGREE, readShape } from "./geo/area";
+import { shapeContains, subtract, type Shape } from "./geo/shape";
 import type { DoorbellInput } from "./doorbells";
 import type {
   BuildingType,
@@ -41,6 +42,11 @@ export interface TerritoryWithStats extends Territory {
   /** Hinterlegte Hausnummern - und wie viele davon erfasst sind (Mehrfamilienhaus: jede Klingel durch) oder gesperrt. */
   house_count: number;
   house_touched_count: number;
+  /**
+   * Tueren aus Strassenlisten, fuer die es (noch) keine Hausnummern gibt: Wohneinheiten
+   * einer Strasse ohne Kartenimport, abzueglich der dort schon getippten Nummern.
+   */
+  house_extra_units: number;
 }
 
 const TERRITORY_STATS_SQL = `
@@ -68,7 +74,11 @@ const TERRITORY_STATS_SQL = `
                      d.blocked_at IS NOT NULL
                      OR EXISTS (SELECT 1 FROM visits v WHERE v.doorbell_id = d.id AND v.outcome <> 'NOT_HOME')
                      OR (SELECT COUNT(*) FROM visits v WHERE v.doorbell_id = d.id
-                           AND v.outcome = 'NOT_HOME') >= ${MAX_NOT_HOME_ATTEMPTS}))))) AS house_touched_count
+                           AND v.outcome = 'NOT_HOME') >= ${MAX_NOT_HOME_ATTEMPTS}))))) AS house_touched_count,
+         (SELECT COALESCE(SUM(MAX(s.units - (SELECT COUNT(*) FROM house_numbers h WHERE h.street_id = s.id), 0)), 0)
+            FROM streets s
+           WHERE s.territory_id = t.id
+             AND NOT EXISTS (SELECT 1 FROM house_numbers h WHERE h.street_id = s.id AND h.lat IS NOT NULL)) AS house_extra_units
     FROM territories t
     LEFT JOIN users u ON u.id = t.assigned_user_id
 `;
@@ -267,6 +277,51 @@ export function createTerritories(teamId: number, drafts: TerritoryDraft[], crea
 }
 
 /**
+ * Haeuser, die schon zu einem anderen Gebiet des Teams gehoeren, nicht noch
+ * einmal anlegen - sonst stuende dieselbe Tuer in zwei Gebieten bei zwei
+ * Leuten. Das betrifft Haeuser in der Flaeche eines anderen Gebiets (die
+ * Kartenvorschau einer Fuehrungskraft kennt fremde Flaechen nicht) und
+ * Haeuser, die ein anderes Gebiet schon als Hausnummer hat (eine Strasse,
+ * die beim Aufteilen ganz in das Nachbar-Teilgebiet ging).
+ */
+export function withoutTakenHouses(teamId: number, entries: StreetInput[], exceptTerritoryId = 0): StreetInput[] {
+  const db = getDb();
+  const areas = (
+    db.prepare("SELECT id, area_json FROM territories WHERE team_id = ? AND id <> ? AND area_json <> ''")
+      .all(teamId, exceptTerritoryId) as Array<{ id: number; area_json: string }>
+  ).flatMap((row) => {
+    const shape = readShape(row.area_json);
+    return shape ? [shape] : [];
+  });
+  const sameHouse = db.prepare(
+    `SELECT h.lat, h.lng FROM house_numbers h
+       JOIN streets s ON s.id = h.street_id
+       JOIN territories t ON t.id = s.territory_id
+      WHERE t.team_id = ? AND t.id <> ? AND lower(s.name) = lower(?)
+        AND lower(replace(h.number, ' ', '')) = lower(replace(?, ' ', ''))
+        AND h.lat IS NOT NULL AND h.lng IS NOT NULL`,
+  );
+  // Gleicher Name und gleiche Nummer allein reicht nicht (Hauptstrasse 1 gibt es in jeder Stadt).
+  const near = (a: { lat: number; lng: number }, b: { lat: number; lng: number }) =>
+    Math.hypot((a.lat - b.lat) * METERS_PER_DEGREE, (a.lng - b.lng) * METERS_PER_DEGREE * Math.cos((a.lat * Math.PI) / 180)) < 60;
+
+  return entries.flatMap((entry) => {
+    const numbers = entry.numbers ?? [];
+    if (numbers.length === 0) return [entry];
+    const kept = numbers.filter((house) => {
+      if (house.lat === null || house.lng === null) return true;
+      const point = { lat: house.lat, lng: house.lng };
+      if (areas.some((shape) => shapeContains(shape, [point.lat, point.lng]))) return false;
+      const twins = sameHouse.all(teamId, exceptTerritoryId, entry.name.trim(), house.number) as Array<{ lat: number; lng: number }>;
+      return !twins.some((twin) => near(point, twin));
+    });
+    if (kept.length === numbers.length) return [entry];
+    if (kept.length === 0) return [];
+    return [{ ...entry, numbers: kept, units: kept.reduce((sum, house) => sum + Math.max(1, house.units), 0) }];
+  });
+}
+
+/**
  * Strassen aus der Kartenauswahl uebernehmen - inklusive Koordinate und der
  * einzelnen Hausnummern, damit an der Tuer klar ist, welche Haeuser es gibt.
  *
@@ -293,6 +348,15 @@ export function addStreetEntries(territoryId: number, entries: StreetInput[]): n
      VALUES (?, ?, ?, ?, ?, ?)
      ON CONFLICT(street_id, number) DO NOTHING`,
   );
+  // Schreibweise egal, wie beim Erfassen: "21A" an der Tuer getippt ist dasselbe Haus wie "21a" aus der Karte.
+  const sameNumber = db.prepare(
+    "SELECT id FROM house_numbers WHERE street_id = ? AND lower(replace(number, ' ', '')) = lower(replace(?, ' ', '')) LIMIT 1",
+  );
+  const completeNumber = db.prepare(
+    `UPDATE house_numbers SET lat = COALESCE(lat, ?), lng = COALESCE(lng, ?),
+            units = CASE WHEN units > 1 THEN units ELSE ? END
+      WHERE id = ?`,
+  );
   const countNumbers = db.prepare(
     "SELECT COUNT(*) AS c FROM house_numbers WHERE street_id = ?",
   );
@@ -302,6 +366,12 @@ export function addStreetEntries(territoryId: number, entries: StreetInput[]): n
 
   const saveNumbers = (streetId: number, numbers: HouseNumberInput[]) => {
     for (const house of numbers) {
+      const existing = sameNumber.get(streetId, house.number) as { id: number } | undefined;
+      if (existing) {
+        // Schon da (z. B. an der Tuer getippt): nur ergaenzen, was fehlt.
+        completeNumber.run(house.lat, house.lng, house.units, existing.id);
+        continue;
+      }
       // Sortiert wird nach der Zahl im Namen: so liegt eine spaeter
       // nachgetragene 9 zwischen 7 und 11 und nicht am Ende.
       const numeric = Number.parseInt(house.number, 10);
@@ -774,6 +844,47 @@ export function doorBlocked(
 }
 
 /** Prueft, dass die Strasse ueber ihr Gebiet zum Team gehoert. */
+/**
+ * Hat die Person an dieser Tuer einen eigenen offenen Termin? Dann darf sie
+ * dort erfassen, auch wenn das Gebiet inzwischen jemand anderem gehoert
+ * (Uebergabe mit "Termine bleiben") - sonst liesse sich der Termin nur noch
+ * abhaken, nie in den Abschluss verwandeln, fuer den er vereinbart wurde.
+ */
+export function ownsAppointmentAt(user: User, streetId: number | null, houseNumber: string): boolean {
+  if (streetId === null || !houseNumber.trim()) return false;
+  return Boolean(
+    getDb()
+      .prepare(
+        `SELECT 1 FROM visits v
+          WHERE v.team_id = ? AND v.street_id = ? AND v.outcome = 'APPOINTMENT'
+            AND v.follow_up_done_at IS NULL AND COALESCE(v.follow_up_user_id, v.user_id) = ?
+            AND lower(replace(v.house_number, ' ', '')) = lower(replace(?, ' ', ''))
+          LIMIT 1`,
+      )
+      .get(user.team_id, streetId, user.id, houseNumber),
+  );
+}
+
+/**
+ * Gesperrte Tueren ("Nicht klingeln") einer Strasse oder eines Gebiets. Die
+ * Sperre haengt an der Hausnummer bzw. Klingel - wird die Strasse geloescht,
+ * ist sie weg, und nach dem erneuten Anlegen darf wieder geklingelt werden.
+ */
+export function blockedDoorCount(scope: { streetId: number } | { territoryId: number }): number {
+  const [where, id] =
+    "streetId" in scope ? ["s.id = ?", scope.streetId] : ["s.territory_id = ?", scope.territoryId];
+  const row = getDb()
+    .prepare(
+      `SELECT (SELECT COUNT(*) FROM house_numbers h JOIN streets s ON s.id = h.street_id
+                WHERE ${where} AND h.blocked_at IS NOT NULL)
+            + (SELECT COUNT(*) FROM doorbells d JOIN house_numbers h ON h.id = d.house_number_id
+                 JOIN streets s ON s.id = h.street_id
+                WHERE ${where} AND d.blocked_at IS NOT NULL) AS c`,
+    )
+    .get(id, id) as { c: number };
+  return row.c;
+}
+
 export function requireTeamStreet(
   streetId: number,
   teamId: number,
@@ -875,15 +986,19 @@ export function createVisit(input: {
   contactPhone?: string;
   lat: number | null;
   lng: number | null;
+  /** Wann an der Tuer erfasst (ohne Netz nachgesendet), als SQLite-Zeitstempel in UTC. */
+  recordedAt?: string | null;
 }): number {
   const db = getDb();
+  const recordedAt = input.recordedAt ?? null;
   const result = db
     .prepare(
       `INSERT INTO visits
          (team_id, user_id, territory_id, street_id, house_number, doorbell_id, outcome,
           reason_id, reason_note, energy_type, follow_up_at, contact_name, contact_phone,
-          lat, lng)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          lat, lng, created_at, received_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, COALESCE(?, datetime('now')),
+               CASE WHEN ? IS NULL THEN NULL ELSE datetime('now') END)`,
     )
     .run(
       input.teamId,
@@ -901,6 +1016,8 @@ export function createVisit(input: {
       input.contactPhone ?? "",
       input.lat,
       input.lng,
+      recordedAt,
+      recordedAt,
     );
 
   // Ein Abschluss kommt als Beitrag in den Feed - dort gratuliert das Team.
@@ -1009,19 +1126,23 @@ const APPOINTMENT_HOUSE = `h.street_id = v.street_id
   AND h.lat IS NOT NULL AND h.lng IS NOT NULL LIMIT 1`;
 
 /**
- * Vereinbarte Termine: offene, der naechste zuerst - mit `done` die erledigten,
- * der juengste zuerst. Getrennt abgefragt, damit sich beide nicht das Limit
- * teilen: sonst verdraengten alte erledigte Termine die anstehenden.
+ * Vereinbarte Termine. Offene: die von heute und die kommenden zuerst (der
+ * naechste vorn), danach die ueberfaelligen, der juengste zuerst - sonst
+ * fuellten Termine von vor Monaten, die nie abgehakt wurden, das ganze Limit
+ * und die von heute fehlten. Mit `done` die erledigten, der juengste zuerst;
+ * getrennt abgefragt, damit sich beide nicht das Limit teilen.
  *
+ * `from`/`before` grenzen nach Ortszeit ein ("2026-10-16" = ab diesem Tag).
  * Sortiert wird ueber den Text der Ortszeit - "2026-09-21 18:00" laesst sich
  * genauso vergleichen wie ein Datum, und die Reihenfolge bleibt dieselbe.
  */
 export function listAppointments(
   teamId: number,
-  opts: { userId?: number; done?: boolean; limit?: number } = {},
+  opts: { userId?: number; done?: boolean; limit?: number; from?: string; before?: string; now?: Date } = {},
 ): AppointmentRow[] {
   const where: string[] = [
-    "v.team_id = ?",
+    // Mit Person: "+" haelt SQLite vom Teamindex fern - der Index je Person ist viel enger.
+    opts.userId ? "+v.team_id = ?" : "v.team_id = ?",
     "v.outcome = 'APPOINTMENT'",
     "v.follow_up_at IS NOT NULL",
   ];
@@ -1031,11 +1152,40 @@ export function listAppointments(
     params.push(opts.userId);
   }
   where.push(opts.done ? "v.follow_up_done_at IS NOT NULL" : "v.follow_up_done_at IS NULL");
+  if (opts.from) {
+    where.push("v.follow_up_at >= ?");
+    params.push(opts.from);
+  }
+  if (opts.before) {
+    where.push("v.follow_up_at < ?");
+    params.push(opts.before);
+  }
+  const today = berlinSlot(opts.now).slice(0, 10);
+  const order = opts.done
+    ? "v.follow_up_at DESC, v.id"
+    : `CASE WHEN v.follow_up_at >= '${today}' THEN 0 ELSE 1 END,
+       CASE WHEN v.follow_up_at >= '${today}' THEN v.follow_up_at END ASC,
+       v.follow_up_at DESC, v.id`;
   params.push(opts.limit ?? 100);
 
+  /*
+   * Offene: erst auswaehlen, dann die Details (Lage des Hauses) nur fuer die
+   * gewaehlten rechnen - die Sortierung "heute zuerst" braucht alle offenen.
+   * Erledigte kommen in Indexreihenfolge, da reicht das LIMIT allein.
+   */
+  const pick = opts.done
+    ? `SELECT v.id, row_number() OVER (ORDER BY ${order}) AS position FROM (
+         SELECT v.id, v.follow_up_at FROM visits v WHERE ${where.join(" AND ")} ORDER BY ${order} LIMIT ?
+       ) v`
+    : `SELECT v.id, row_number() OVER (ORDER BY ${order}) AS position
+         FROM visits v
+        WHERE ${where.join(" AND ")}
+        ORDER BY position
+        LIMIT ?`;
   return getDb()
     .prepare(
-      `SELECT v.id, v.created_at, v.follow_up_at, v.follow_up_done_at,
+      `WITH pick AS (${pick})
+       SELECT v.id, v.created_at, v.follow_up_at, v.follow_up_done_at,
               v.contact_name, v.contact_phone, v.reason_note, v.energy_type,
               v.house_number, COALESCE(v.follow_up_user_id, v.user_id) AS user_id,
               u.name AS user_name,
@@ -1048,16 +1198,34 @@ export function listAppointments(
                        v.lng, s.lng) AS lng,
               t.name AS territory_name,
               d.label AS doorbell_label
-         FROM visits v
+         FROM pick
+         JOIN visits v ON v.id = pick.id
          JOIN users u ON u.id = COALESCE(v.follow_up_user_id, v.user_id)
          LEFT JOIN streets s ON s.id = v.street_id
          LEFT JOIN territories t ON t.id = v.territory_id
          LEFT JOIN doorbells d ON d.id = v.doorbell_id
-        WHERE ${where.join(" AND ")}
-        ORDER BY v.follow_up_at ${opts.done ? "DESC" : "ASC"}, v.id
-        LIMIT ?`,
+        ORDER BY pick.position`,
     )
     .all(...params) as AppointmentRow[];
+}
+
+/** Wie viele Termine es wirklich gibt - die Listen sind begrenzt. */
+export function countAppointments(
+  teamId: number,
+  opts: { userId?: number; now?: Date } = {},
+): { open: number; overdue: number; done: number } {
+  const base = `${opts.userId ? "+v.team_id" : "v.team_id"} = ? AND v.outcome = 'APPOINTMENT' AND v.follow_up_at IS NOT NULL`;
+  const scope = opts.userId ? " AND COALESCE(v.follow_up_user_id, v.user_id) = ?" : "";
+  const args = opts.userId ? [teamId, opts.userId] : [teamId];
+  return getDb()
+    .prepare(
+      `SELECT
+         (SELECT COUNT(*) FROM visits v WHERE ${base}${scope} AND v.follow_up_done_at IS NULL) AS open,
+         (SELECT COUNT(*) FROM visits v WHERE ${base}${scope} AND v.follow_up_done_at IS NULL
+            AND v.follow_up_at < ?) AS overdue,
+         (SELECT COUNT(*) FROM visits v WHERE ${base}${scope} AND v.follow_up_done_at IS NOT NULL) AS done`,
+    )
+    .get(...args, ...args, berlinSlot(opts.now), ...args) as { open: number; overdue: number; done: number };
 }
 
 /** Termin abhaken oder wieder oeffnen. */
@@ -1224,14 +1392,17 @@ export function lastRefresh(): {
   source: string;
   row_count: number;
   message: string;
+  /** Wann die Daten zuletzt erfolgreich kamen - ein laufender Abruf hat noch kein Ende. */
+  success_at: string | null;
 } | null {
   const row = getDb()
     .prepare(
-      `SELECT finished_at, status, source, row_count, message
+      `SELECT finished_at, status, source, row_count, message,
+              (SELECT finished_at FROM energy_refresh_log WHERE status = 'ok' ORDER BY id DESC LIMIT 1) AS success_at
          FROM energy_refresh_log ORDER BY id DESC LIMIT 1`,
     )
     .get() as
-    | { finished_at: string | null; status: string; source: string; row_count: number; message: string }
+    | { finished_at: string | null; status: string; source: string; row_count: number; message: string; success_at: string | null }
     | undefined;
   return row ?? null;
 }

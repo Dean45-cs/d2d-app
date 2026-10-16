@@ -1,8 +1,8 @@
 import { recordTerritoryHandover } from "@/lib/territory-handover";
-import { requireUser } from "@/lib/auth";
-import { assertPermission, assertTerritoryAccess, territoryAssignee } from "@/lib/permissions";
+import { AuthError, requireUser } from "@/lib/auth";
+import { assertPermission, assertTerritoryAccess, hasPermission, territoryAssignee } from "@/lib/permissions";
 import { getDb } from "@/lib/db";
-import { freeArea, getTerritory } from "@/lib/queries";
+import { blockedDoorCount, freeArea, getTerritory } from "@/lib/queries";
 import { parseShape, shapeToJson } from "@/lib/geo/area";
 import { handle, optionalText, requireText } from "@/lib/api";
 
@@ -94,6 +94,10 @@ export async function DELETE(
     const territory = getTerritory(Number(id), leader.team_id);
     if (!territory) throw new Error("Gebiet nicht gefunden.");
     assertTerritoryAccess(leader, territory);
+    const blocked = blockedDoorCount({ territoryId: territory.id });
+    if (blocked > 0 && !hasPermission(leader, "doors.unblock")) {
+      throw new AuthError(`In diesem Gebiet ${blocked === 1 ? "ist 1 Tür" : `sind ${blocked} Türen`} gesperrt („Nicht klingeln“). Löschen kann nur, wer Türsperren aufheben darf – sonst wäre die Sperre einfach weg.`, 403);
+    }
     getDb()
       .prepare("DELETE FROM territories WHERE id = ? AND team_id = ?")
       .run(Number(id), leader.team_id);

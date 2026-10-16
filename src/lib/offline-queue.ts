@@ -222,8 +222,26 @@ export async function flush(userId?: number): Promise<FlushResult> {
   let held = 0;
   let progression: LevelFeedback | undefined;
 
+  /*
+   * Auftraege, deren Eroeffnung (OPEN) noch nicht angekommen ist: die
+   * Entscheidung dazu (Abschluss, Abbruch) wartet mit. Der Server kennt den
+   * Auftrag sonst nicht und lehnt ab - und ein bestaetigter Abschluss waere weg.
+   */
+  const waitingDrafts = new Set<string>();
+  const draftKeyOf = (entry: QueuedWrite) =>
+    entry.url === "/api/sale-drafts" && typeof entry.payload.draftKey === "string" ? entry.payload.draftKey : null;
+
   try {
     for (const entry of getQueue(userId)) {
+      const draftKey = draftKeyOf(entry);
+      if (draftKey && entry.payload.action !== "OPEN" && waitingDrafts.has(draftKey)) {
+        const error = "Wartet, bis der Auftrag selbst gespeichert ist";
+        if (entry.error !== error) {
+          if (!write(read().map((item) => (item.localId === entry.localId ? { ...item, error } : item)))) break;
+          held += 1;
+        }
+        continue;
+      }
       try {
         // Auch Eintraege aus einer aelteren App-Version behalten beim Retry
         // dieselbe ID. Vor dem Senden speichern, sonst hilft es bei Abbruch nicht.
@@ -231,10 +249,12 @@ export async function flush(userId?: number): Promise<FlushResult> {
           entry.payload = { ...entry.payload, clientRequestId: `legacy-${entry.localId}` };
           if (!write(read().map((item) => item.localId === entry.localId ? entry : item))) break;
         }
+        // Besuche und Auftraege zaehlen fuer den Moment an der Tuer, nicht fuers Nachsenden.
+        const body = entry.kind === "house" ? entry.payload : { recordedAt: entry.createdAt, ...entry.payload };
         const response = await fetchWithTimeout(entry.url ?? DEFAULT_URL, {
           method: "POST",
           headers: { "content-type": "application/json" },
-          body: JSON.stringify(entry.payload),
+          body: JSON.stringify(body),
         });
         if (response.ok) {
           // Die Bestaetigung vor dem Entfernen lesen: bei Verbindungsabbruch
@@ -257,6 +277,7 @@ export async function flush(userId?: number): Promise<FlushResult> {
           // Liegen lassen, Grund merken - und mit dem naechsten weitermachen.
           const data = await response.json().catch(() => ({}));
           const error = typeof data.error === "string" && data.error ? data.error : "Keine Berechtigung";
+          if (draftKey) waitingDrafts.add(draftKey);
           if (entry.error !== error) {
             if (!write(read().map((item) => (item.localId === entry.localId ? { ...item, error } : item)))) break;
             held += 1;

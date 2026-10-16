@@ -2,7 +2,7 @@ import { requireUser } from "@/lib/auth";
 import { permissionsFor } from "@/lib/permissions";
 import { navigation } from "@/lib/nav";
 import { getLevelProgress } from "@/lib/level-queries";
-import { listAppointments } from "@/lib/queries";
+import { countAppointments } from "@/lib/queries";
 import { Avatar, Cell, ListLabel, PageHeader } from "@/components/ui";
 import { NAV_ICONS } from "@/components/nav-icons";
 import { InstallCell } from "@/components/InstallHint";
@@ -24,7 +24,7 @@ export default async function ProfileHubPage() {
   const rights = permissionsFor(user);
   const nav = navigation(user.role, rights, user.id);
   const level = getLevelProgress(user.team_id, user.id);
-  const openAppointments = listAppointments(user.team_id, { userId: user.id, limit: 100 }).length;
+  const openAppointments = countAppointments(user.team_id, { userId: user.id }).open;
 
   return (
     <div className="page-narrow">

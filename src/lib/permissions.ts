@@ -93,6 +93,20 @@ export function assertMemberScope(user: User, target: User): void {
   if (!canManageMember(user, target)) throw new AuthError("Diese Person gehört nicht zu deiner verwaltbaren Struktur.", 403);
 }
 
+/**
+ * Ein Konto uebernehmen (Passwort setzen) darf nur, wer selbst mindestens die
+ * Rechte dieser Person hat - sonst liesse sich so jedes Recht beschaffen, das
+ * man nicht vergeben darf. Die Teamleitung hat ohnehin alle.
+ */
+export function assertNoExtraRights(actor: User, target: User): void {
+  if (actor.role === "LEADER") return;
+  const mine = permissionsFor(actor);
+  const theirs = permissionsFor({ ...target, active: 1 });
+  if (PERMISSIONS.some(({ key }) => theirs[key] && !mine[key])) {
+    throw new AuthError("Diese Person hat Rechte, die du selbst nicht hast. Das Passwort kann nur die Teamleitung neu setzen.", 403);
+  }
+}
+
 /** Validate the whole patch before writing; no partial grants on invalid input. */
 export function updatePermissions(actor: User, targetId: number, patch: unknown): void {
   assertPermission(actor, "permissions.manage");
@@ -108,12 +122,15 @@ export function updatePermissions(actor: User, targetId: number, patch: unknown)
     if (!rights[key] || (key === "team.roles" && actor.role !== "LEADER")) throw new AuthError("Du kannst nur eigene Berechtigungen vergeben oder ändern.", 403);
   }
   const overrides = permissionOverrides(targetId);
-  const before = permissionsFor(target, overrides);
+  // Gerechnet wie aktiv: sonst waeren bei Deaktivierten vorher und nachher alle Rechte aus,
+  // und nach dem Wiederaktivieren haetten sie Rechte, die der Vergebende selbst nicht hat.
+  const asActive = { ...target, active: 1 };
+  const before = permissionsFor(asActive, { ...overrides });
   for (const [key, value] of entries) {
     if (value === null) delete overrides[key as Permission];
     else overrides[key as Permission] = value;
   }
-  const after = permissionsFor(target, overrides);
+  const after = permissionsFor(asActive, overrides);
   if (PERMISSIONS.some(({ key }) => after[key] && !before[key] && !rights[key])) {
     throw new AuthError("Diese Änderung würde zusätzliche Rechte vergeben, die du selbst nicht besitzt.", 403);
   }

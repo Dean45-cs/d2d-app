@@ -53,6 +53,8 @@ interface Props {
   area: Shape | null;
   doors: WorkDoor[];
   streets: WorkStreet[];
+  /** Fertige Gebiete stehen nicht in der Tour - dann kein "Klingeln", das ins Leere fuehrt. */
+  canRing: boolean;
 }
 
 type Filter = "all" | "todo" | "retry" | "appointment" | "sale" | "finished";
@@ -94,7 +96,7 @@ function tourLink(door: WorkDoor): string {
  * ihrem Stand, der eigene Standort, die naechste offene Tuer und eine
  * Laufroute durch alles, was noch offen ist.
  */
-export function TerritoryWorkspace({ area, doors, streets }: Props) {
+export function TerritoryWorkspace({ area, doors, streets, canRing }: Props) {
   const [engine, setEngine] = useState<MapEngine | null>(null);
   const [layers, setLayers] = useState<{ base: MapLayer; route: MapLayer; doors: MapLayer } | null>(null);
   const [filter, setFilter] = useState<Filter>("todo");
@@ -195,7 +197,7 @@ export function TerritoryWorkspace({ area, doors, streets }: Props) {
         title: street.name,
         subtitle: street.hint,
         actions: [
-          { label: "Hier klingeln", href: `/tour?street=${street.id}`, primary: true },
+          ...(canRing ? [{ label: "Hier klingeln", href: `/tour?street=${street.id}`, primary: true }] : []),
           { label: "Route", href: routeUrl(street.lat, street.lng, "walk"), external: true },
         ],
       });
@@ -232,7 +234,7 @@ export function TerritoryWorkspace({ area, doors, streets }: Props) {
         subtitle: lines.join("\n"),
         actions: shown
           ? [
-              { label: "Hier klingeln", href: tourLink(door), primary: true },
+              ...(canRing ? [{ label: "Hier klingeln", href: tourLink(door), primary: true }] : []),
               { label: "Route", href: routeUrl(door.lat, door.lng, "walk"), external: true },
             ]
           : undefined,
@@ -352,9 +354,11 @@ export function TerritoryWorkspace({ area, doors, streets }: Props) {
             >
               <IconNavigate className="h-5 w-5" />
             </a>
-            <a href={tourLink(next.door)} className="btn btn-primary btn-sm">
-              Klingeln
-            </a>
+            {canRing && (
+              <a href={tourLink(next.door)} className="btn btn-primary btn-sm">
+                Klingeln
+              </a>
+            )}
           </li>
         </ul>
       )}
@@ -369,7 +373,7 @@ export function TerritoryWorkspace({ area, doors, streets }: Props) {
             {route.stops.slice(0, 8).map((stop, index) => (
               <li key={stop.id}>
                 <Cell
-                  href={tourLink(stop)}
+                  href={canRing ? tourLink(stop) : undefined}
                   icon={<span className="glyph glyph-round kpi text-subhead">{index + 1}</span>}
                   title={`${stop.street} ${stop.number}`}
                 />

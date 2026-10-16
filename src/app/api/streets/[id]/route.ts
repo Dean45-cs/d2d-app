@@ -1,5 +1,6 @@
-import { assertPermission, assertTerritoryAccess } from "@/lib/permissions";
-import { requireUser } from "@/lib/auth";
+import { assertPermission, assertTerritoryAccess, hasPermission } from "@/lib/permissions";
+import { AuthError, requireUser } from "@/lib/auth";
+import { blockedDoorCount } from "@/lib/queries";
 import { getDb } from "@/lib/db";
 import { handle, optionalText } from "@/lib/api";
 
@@ -61,6 +62,10 @@ export async function DELETE(
     const { id } = await params;
     const street = loadStreet(Number(id), user.team_id);
     assertTerritoryAccess(user, street);
+    const blocked = blockedDoorCount({ streetId: street.id });
+    if (blocked > 0 && !hasPermission(user, "doors.unblock")) {
+      throw new AuthError(`In dieser Straße ${blocked === 1 ? "ist 1 Tür" : `sind ${blocked} Türen`} gesperrt („Nicht klingeln“). Löschen kann nur, wer Türsperren aufheben darf – sonst wäre die Sperre einfach weg.`, 403);
+    }
     getDb().prepare("DELETE FROM streets WHERE id = ?").run(street.id);
     return { ok: true };
   });

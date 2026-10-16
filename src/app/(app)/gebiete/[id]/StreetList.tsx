@@ -25,6 +25,7 @@ export function StreetList({
   numbers,
   isLeader,
   canStatus,
+  canRing,
 }: {
   territoryId: number;
   streets: StreetWithStats[];
@@ -32,6 +33,8 @@ export function StreetList({
   numbers: Record<number, HouseNumberWithStats[]>;
   isLeader: boolean;
   canStatus: boolean;
+  /** Fertige Gebiete stehen nicht in der Tour - dann fuehrt kein Link dorthin. */
+  canRing: boolean;
 }) {
   const [openId, setOpenId] = useState<number | null>(null);
   const open = streets.find((s) => s.id === openId) ?? null;
@@ -84,6 +87,7 @@ export function StreetList({
           houses={numbers[open.id] ?? []}
           isLeader={isLeader}
           canStatus={canStatus}
+          canRing={canRing}
           onClose={() => setOpenId(null)}
         />
       )}
@@ -96,12 +100,14 @@ function StreetSheet({
   houses,
   isLeader,
   canStatus,
+  canRing,
   onClose,
 }: {
   street: StreetWithStats;
   houses: HouseNumberWithStats[];
   isLeader: boolean;
   canStatus: boolean;
+  canRing: boolean;
   onClose: () => void;
 }) {
   const router = useRouter();
@@ -166,10 +172,12 @@ function StreetSheet({
               Route
             </a>
           )}
-          <Link href={`/tour?street=${street.id}`} className="btn btn-primary btn-lg flex-1">
-            <IconDoor className="h-5 w-5" />
-            Klingeln
-          </Link>
+          {canRing && (
+            <Link href={`/tour?street=${street.id}`} className="btn btn-primary btn-lg flex-1">
+              <IconDoor className="h-5 w-5" />
+              Klingeln
+            </Link>
+          )}
         </div>
       }
     >
@@ -199,7 +207,7 @@ function StreetSheet({
           <ul className="flex flex-wrap gap-2" aria-label="Hausnummern">
             {houses.map((house) => (
               <li key={house.id}>
-                <HouseChip house={house} />
+                <HouseChip house={house} canRing={canRing} />
               </li>
             ))}
           </ul>
@@ -244,9 +252,15 @@ function streetProgress(
   street: StreetWithStats,
   houses: HouseNumberWithStats[],
 ): { done: number; total: number; label: string } {
-  if (houses.length > 0) {
+  // Ohne Kartenimport sind die Hausnummern nur die schon getippten - dann zaehlen die Wohneinheiten.
+  const fromList = houses.length > 0 && street.units > houses.length && !houses.some((h) => h.lat !== null);
+  if (houses.length > 0 && !fromList) {
     const done = houses.filter(houseTouched).length;
     return { done, total: houses.length, label: `${done} von ${houses.length} Häusern` };
+  }
+  if (fromList) {
+    const done = houses.filter(houseTouched).length;
+    return { done, total: street.units, label: `${done} von ${street.units} Türen` };
   }
   if (street.units > 0) {
     const done = Math.min(street.visit_count, street.units);
@@ -281,7 +295,7 @@ function LegendItem({ state, label }: { state: ChipState; label: string }) {
  * jede Klingel dran war - sonst saehe die Strasse nach dem ersten Eintrag
  * schon fertig aus.
  */
-function HouseChip({ house }: { house: HouseNumberWithStats }) {
+function HouseChip({ house, canRing }: { house: HouseNumberWithStats; canRing: boolean }) {
   const mfh = house.building_type === "MFH";
   const status = doorStatus(house);
   const blocked = status === "BLOCKED";
@@ -304,13 +318,9 @@ function HouseChip({ house }: { house: HouseNumberWithStats }) {
     .filter(Boolean)
     .join(" · ");
 
-  return (
-    <Link
-      href={`/tour?street=${house.street_id}&house=${encodeURIComponent(house.number)}`}
-      className={`inline-flex min-h-11 min-w-11 items-center justify-center gap-1 rounded-sm px-2 text-subhead font-semibold tabular-nums ${CHIP_CLASS[state]}`}
-      title={description}
-      aria-label={description}
-    >
+  const className = `inline-flex min-h-11 min-w-11 items-center justify-center gap-1 rounded-sm px-2 text-subhead font-semibold tabular-nums ${CHIP_CLASS[state]}`;
+  const content = (
+    <>
       {house.number}
       {blocked ? (
         <IconBan className="h-3.5 w-3.5" />
@@ -327,6 +337,23 @@ function HouseChip({ house }: { house: HouseNumberWithStats }) {
           {house.not_home_count}/{MAX_NOT_HOME_ATTEMPTS}
         </span>
       ) : null}
+    </>
+  );
+  if (!canRing) {
+    return (
+      <span className={className} title={description} aria-label={description}>
+        {content}
+      </span>
+    );
+  }
+  return (
+    <Link
+      href={`/tour?street=${house.street_id}&house=${encodeURIComponent(house.number)}`}
+      className={className}
+      title={description}
+      aria-label={description}
+    >
+      {content}
     </Link>
   );
 }

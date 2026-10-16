@@ -4,6 +4,7 @@ import { requireUser } from "@/lib/auth";
 import {
   dailySeries,
   listAccessibleTerritories,
+  countAppointments,
   listAppointments,
   listMembers,
   listVisits,
@@ -65,10 +66,9 @@ export default async function StartPage({ searchParams }: { searchParams: Promis
     ? memberStats(user.team_id, since).sort((a, b) => b.sales - a.sales || b.doors - a.doors)
     : [];
   const faces = new Map(listMembers(user.team_id).map((m) => [m.id, m.avatar]));
-  const appointments = listAppointments(user.team_id, {
-    userId: hasPermission(user, "appointments.team") ? undefined : user.id,
-    limit: 100,
-  });
+  const appointmentScope = { userId: hasPermission(user, "appointments.team") ? undefined : user.id };
+  const appointments = listAppointments(user.team_id, { ...appointmentScope, limit: 5 });
+  const openAppointments = countAppointments(user.team_id, appointmentScope).open;
   const territories = team ? listAccessibleTerritories(user) : [];
   const recent = listVisits(user.team_id, { ...scope, since, limit: 40 });
 
@@ -119,7 +119,7 @@ export default async function StartPage({ searchParams }: { searchParams: Promis
         </section>
 
         <section>
-          <SectionHeader title="Termine" count={appointments.length} href="/termine" />
+          <SectionHeader title="Termine" count={openAppointments} href="/termine" />
           {appointments.length === 0 ? (
             <div className="surface">
               <EmptyState icon={<IconCalendar className="h-5 w-5" />} title="Keine offenen Termine" />
@@ -271,7 +271,8 @@ export default async function StartPage({ searchParams }: { searchParams: Promis
         )}
 
         <section className={team ? "" : "lg:col-span-2"}>
-          <SectionHeader title="Kontakte" count={recent.length || undefined} />
+          {/* Gezaehlt werden alle Tueren im Zeitraum - die Liste zeigt nur die letzten. */}
+          <SectionHeader title="Kontakte" count={doors || undefined} />
           {recent.length === 0 ? (
             <div className="surface">
               <EmptyState icon={<IconChart className="h-5 w-5" />} title="Keine Kontakte im Zeitraum" />

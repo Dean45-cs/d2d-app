@@ -15,7 +15,8 @@ export function invitationApprover(inviter: User): User {
     if (inviter.role === "LEADER") return inviter;
     throw new Error("Bitte lass dir zuerst von der Teamleitung eine direkte Führungskraft zuordnen.");
   }
-  const manager = activeUser(inviter.manager_id);
+  const manager = getDb().prepare("SELECT * FROM users WHERE id = ? AND active = 1").get(inviter.manager_id) as User | undefined;
+  if (!manager) throw new Error("Deine Führungskraft ist nicht mehr aktiv. Bitte die Teamleitung, dir eine neue zuzuordnen.");
   if (manager.team_id !== inviter.team_id || manager.id === inviter.id) {
     throw new Error("Die Zuordnung in der Struktur ist ungültig.");
   }
@@ -79,7 +80,8 @@ export function decideInvitation(actorId: number, requestId: number, decision: "
       { id: number; inviter_id: number; status: string; name: string; email: string; phone: string; password_hash: string } | undefined;
     if (!request) throw new Error("Anfrage nicht gefunden.");
     const inviter = activeUser(request.inviter_id);
-    if (actor.team_id !== inviter.team_id || invitationApprover(inviter).id !== actor.id) {
+    const byLeader = actor.role === "LEADER" && approverInactive(inviter);
+    if (actor.team_id !== inviter.team_id || (!byLeader && invitationApprover(inviter).id !== actor.id)) {
       throw new AuthError("Nur die direkte Führungskraft des Einladenden darf diese Anfrage bearbeiten.", 403);
     }
     assertPermission(actor, "invitations.approve");
@@ -97,6 +99,16 @@ export function decideInvitation(actorId: number, requestId: number, decision: "
       user_id = ?, password_hash = NULL WHERE id = ?`).run(decision, actor.id, userId, request.id);
     return { ok: true };
   }).immediate();
+}
+
+/**
+ * Ist die Fuehrungskraft des Einladenden deaktiviert, kann sie offene
+ * Beitritte nicht mehr bearbeiten - dann entscheidet die Teamleitung, statt
+ * dass die Anfrage haengen bleibt und die E-Mail blockiert.
+ */
+function approverInactive(inviter: User): boolean {
+  if (inviter.manager_id === null) return false;
+  return !getDb().prepare("SELECT 1 FROM users WHERE id = ? AND active = 1").get(inviter.manager_id);
 }
 
 /**
@@ -151,8 +163,9 @@ export function invitationDashboard(user: User) {
     LEFT JOIN join_requests r ON r.invitation_id = l.id`;
   const own = db.prepare(`${select} WHERE l.inviter_id = ? ORDER BY l.id DESC LIMIT 100`).all(user.id) as InvitationRow[];
   const approvals = db.prepare(`${select} WHERE u.team_id = ? AND u.active = 1 AND r.status = 'PENDING'
-    AND (u.manager_id = ? OR (u.id = ? AND u.manager_id IS NULL AND u.role = 'LEADER'))
-    ORDER BY r.id`).all(user.team_id, user.id, user.id) as InvitationRow[];
+    AND (u.manager_id = ? OR (u.id = ? AND u.manager_id IS NULL AND u.role = 'LEADER')
+      OR (? = 'LEADER' AND EXISTS (SELECT 1 FROM users m WHERE m.id = u.manager_id AND m.active = 0)))
+    ORDER BY r.id`).all(user.team_id, user.id, user.id, user.role) as InvitationRow[];
   let approver: string | null = null;
   let problem: string | null = null;
   try { approver = invitationApprover(user).name; }

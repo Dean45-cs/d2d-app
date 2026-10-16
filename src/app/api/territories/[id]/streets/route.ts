@@ -1,5 +1,5 @@
 import { requirePermission, assertTerritoryAccess } from "@/lib/permissions";
-import { addStreetEntries, addStreets, getTerritory } from "@/lib/queries";
+import { addStreetEntries, addStreets, getTerritory, withoutTakenHouses } from "@/lib/queries";
 import { handle, optionalText, parseStreetList } from "@/lib/api";
 
 export const dynamic = "force-dynamic";
@@ -20,7 +20,7 @@ export async function POST(
     // Entweder kommen die Strassen aus der Kartenauswahl oder als eingefuegte Liste.
     const fromMap = parseStreetList(body.streetList);
     if (fromMap.length > 0) {
-      return { ok: true, added: addStreetEntries(territory.id, fromMap) };
+      return { ok: true, added: addStreetEntries(territory.id, withoutTakenHouses(leader.team_id, fromMap, territory.id)) };
     }
 
     const raw = optionalText(body.streets, 20000);

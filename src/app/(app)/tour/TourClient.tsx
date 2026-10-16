@@ -218,6 +218,11 @@ export function TourClient({
       window.history.replaceState(null, "", `${window.location.pathname}?gebiet=${linked.territory_id}`);
       return;
     }
+    if (params.get("street")) {
+      // Nicht still in eine andere Strasse springen - dort landete sonst die naechste Tuer.
+      toast("Diese Straße ist nicht in deiner Tour – das Gebiet ist fertig oder übergeben.");
+      window.history.replaceState(null, "", window.location.pathname);
+    }
     const current = streetRef.current;
     if (current !== null ? streets.some((s) => s.id === current) : streetPicked.current) return;
     streetPicked.current = true;

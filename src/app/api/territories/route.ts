@@ -1,6 +1,6 @@
 import { requirePermission, territoryAssignee } from "@/lib/permissions";
 import { getDb } from "@/lib/db";
-import { addStreetEntries, addStreets, createTerritory, freeArea } from "@/lib/queries";
+import { addStreetEntries, addStreets, createTerritory, freeArea, withoutTakenHouses } from "@/lib/queries";
 import { parseShape, shapeToJson } from "@/lib/geo/area";
 import {
   handle,
@@ -35,7 +35,7 @@ export async function POST(request: Request) {
         areaJson: area ? shapeToJson(area) : "",
       });
 
-      const fromMap = parseStreetList(body.streetList);
+      const fromMap = withoutTakenHouses(leader.team_id, parseStreetList(body.streetList));
       const streetsRaw = optionalText(body.streets, 20000);
       const added =
         (fromMap.length > 0 ? addStreetEntries(id, fromMap) : 0) +

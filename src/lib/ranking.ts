@@ -112,13 +112,22 @@ export function bestValue(entries: RankEntry[]): number | null {
  * Der Satz unter dem eigenen Platz: wie weit es bis zum naechsten ist - oder
  * wie gross der Vorsprung. Das ist die eigentliche Motivation der Seite.
  */
+/**
+ * Gibt es ueberhaupt Plaetze? Morgens um acht oder am Montag stehen bei
+ * Stueckzahlen alle bei null - das ist kein geteilter erster Platz, und
+ * "zwei Plaetze verloren" gegenueber so einem Tag waere falsch.
+ */
+export function hasPlaces(metric: Metric, entries: RankEntry[]): boolean {
+  if (metric.rate) return entries.some((e) => e.rank !== null);
+  return entries.some((e) => e.rank !== null && e.value !== null && e.value > 0);
+}
+
 export function chaseLine(metric: Metric, entries: RankEntry[], userId: number): string | null {
   const me = entries.find((e) => e.user_id === userId);
   if (!me || me.rank === null || me.value === null) return null;
   const ranked = entries.filter((e) => e.rank !== null);
 
-  // Morgens um acht stehen alle bei null - das ist kein geteilter erster Platz.
-  if (!metric.rate && ranked.every((e) => e.value === 0)) {
+  if (!hasPlaces(metric, entries)) {
     return `Noch keine ${metric.many} im Zeitraum – Platz 1 ist frei.`;
   }
 
@@ -127,6 +136,7 @@ export function chaseLine(metric: Metric, entries: RankEntry[], userId: number):
     if (tied.length > 0) return `Gleichauf mit ${firstName(tied[0].user_name)} an der Spitze.`;
     const second = ranked.find((e) => e.rank !== 1);
     if (!second || second.value === null) return "Du führst.";
+    if (metric.rate && me.value - second.value < 1) return `Du führst knapp vor ${firstName(second.user_name)}.`;
     return `Du führst – ${gap(metric, me.value - second.value)} Vorsprung vor ${firstName(second.user_name)}.`;
   }
 
@@ -135,6 +145,8 @@ export function chaseLine(metric: Metric, entries: RankEntry[], userId: number):
   if (!ahead || ahead.value === null) return null;
   const diff = ahead.value - me.value;
   if (metric.rate) {
+    // Unter einem Prozentpunkt ist "1 Prozentpunkt" uebertrieben - oft fehlt nur ein Abschluss.
+    if (diff < 1) return `Knapp hinter ${firstName(ahead.user_name)} auf Platz ${ahead.rank}.`;
     return `${gap(metric, diff)} hinter ${firstName(ahead.user_name)} auf Platz ${ahead.rank}.`;
   }
   // Bei Stueckzahlen: einer mehr als der Abstand, und man ist vorbei.

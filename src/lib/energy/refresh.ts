@@ -99,13 +99,19 @@ function writeRows(rows: PriceRow[], source: string) {
  * Jahreskosten eines Musterhaushalts beim Grundversorger.
  * Standardverbrauch: Strom 3.500 kWh, Gas 15.000 kWh (typischer 3-Personen-Haushalt).
  */
+/**
+ * Jahreskosten des Musterhaushalts. Fehlt der Grundpreis, zaehlt `fallbackBaseYear`
+ * (der Grundpreis des Vergleichswerts) - mit 0 waere ein unvollstaendig
+ * gepflegter Preis immer "guenstig" und an der Tuer fehlte das Argument.
+ */
 export function annualCost(
   workingPriceCtKwh: number | null,
   basePriceEurYear: number | null,
   consumptionKwh: number,
+  fallbackBaseYear = 0,
 ): number | null {
   if (workingPriceCtKwh === null) return null;
-  return Math.round((workingPriceCtKwh / 100) * consumptionKwh + (basePriceEurYear ?? 0));
+  return Math.round((workingPriceCtKwh / 100) * consumptionKwh + (basePriceEurYear ?? fallbackBaseYear));
 }
 
 export const CONSUMPTION_STROM_KWH = 3500;

@@ -220,8 +220,10 @@ export async function pushToUsers(userIds: number[], message: PushMessage): Prom
   const db = getDb();
   const subscriptions = db
     .prepare(
-      `SELECT id, endpoint, p256dh, auth FROM push_subscriptions
-        WHERE user_id IN (${userIds.map(() => "?").join(",")})`,
+      // Nur aktive Personen: ein deaktiviertes Konto bekommt auf dem alten Handy nichts mehr.
+      `SELECT s.id, s.endpoint, s.p256dh, s.auth FROM push_subscriptions s
+         JOIN users u ON u.id = s.user_id AND u.active = 1
+        WHERE s.user_id IN (${userIds.map(() => "?").join(",")})`,
     )
     .all(...userIds) as Subscription[];
 

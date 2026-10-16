@@ -207,7 +207,7 @@ export default async function TerritoryDetailPage({
       <div className="mt-8 grid grid-cols-1 gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,400px)] lg:items-start">
         <div className="lg:sticky lg:top-16">
           {hasMap ? (
-            <TerritoryWorkspace area={area} doors={doors} streets={workStreets} />
+            <TerritoryWorkspace area={area} doors={doors} streets={workStreets} canRing={territory.status !== "DONE"} />
           ) : (
             <div className="surface">
               <EmptyState
@@ -243,6 +243,7 @@ export default async function TerritoryDetailPage({
             numbers={numbersByStreet}
             isLeader={isLeader}
             canStatus={canStatus}
+            canRing={territory.status !== "DONE"}
           />
 
           <section>

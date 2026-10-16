@@ -249,7 +249,15 @@ export function columnFor(header: string): { key: FieldKey; yearly?: boolean } |
   const gas = n.includes("gas");
   if (/(versorger|provider|anbieter)/.test(n)) return { key: gas ? "gasProvider" : "provider" };
   if (/(grundpreis|base)/.test(n)) {
-    const yearly = /(jahr|year|jaehrl)/.test(n) || (/eur$/.test(n) && !n.includes("monat"));
+    // Die Einheit steht oft nur als Zeichen da ("€/a", "p.a.") - die faellt bei simplify() weg.
+    const raw = header.toLowerCase();
+    const perMonth = /(monat|month|\/\s*m(on)?\b|p\.\s*m\.)/.test(raw);
+    const yearly =
+      !perMonth &&
+      (/(jahr|year|jaehrl|jaehrlich|annual)/.test(n) ||
+        /(\/\s*a\b|p\.\s*a\.|\bpa\b|jährl)/.test(raw) ||
+        // So heisst die Spalte in der Datenbank (strom_base_eur): Euro pro Jahr.
+        /baseeur$/.test(n));
     return { key: gas ? "gasBaseMonth" : "stromBaseMonth", yearly };
   }
   if (/(arbeitspreis|ct|kwh|power)/.test(n) || n === "strom" || n === "gas") {

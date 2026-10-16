@@ -45,6 +45,8 @@ interface Props {
   open: OpenPoint[];
   /** Jahreskosten des Musterhaushalts beim Bundesdurchschnitt */
   reference: Record<Energy, number>;
+  /** Grundpreis des Vergleichswerts pro Jahr - zaehlt, wo ein Preis ohne Grundpreis gepflegt ist. */
+  referenceBase: Record<Energy, number>;
   isLeader: boolean;
   canRefresh: boolean;
   /** Nur mit eingerichteter Tagesquelle */
@@ -55,6 +57,7 @@ interface Props {
       source: string;
       row_count: number;
       message: string;
+      success_at: string | null;
     } | null;
   } | null;
   consumption: Record<Energy, number>;
@@ -80,6 +83,7 @@ export function EnergyMapClient({
   prices,
   open,
   reference,
+  referenceBase,
   isLeader,
   canRefresh,
   feed,
@@ -239,8 +243,9 @@ export function EnergyMapClient({
   /* ------------------------------- Ansicht ------------------------------- */
 
   const refresh = feed?.refresh ?? null;
-  const stand = refresh?.finished_at
-    ? `Stand ${new Date(refresh.finished_at).toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit" })}`
+  // Stand der Daten, nicht des letzten Versuchs - ein fehlgeschlagener Abruf aendert die Preise nicht.
+  const stand = refresh?.success_at
+    ? `Stand ${new Date(refresh.success_at).toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit" })}`
     : null;
   const nothing = prices.length === 0 && open.length === 0;
   const showMenu = isLeader || (canRefresh && feed);
@@ -288,7 +293,7 @@ export function EnergyMapClient({
         <SegmentedLinks ariaLabel="Ansicht der Karte" current="preise" options={MAP_VIEWS} className="max-w-xs" />
       </PageHeader>
 
-      {refresh && refresh.status !== "ok" && (
+      {refresh && refresh.status === "error" && (
         <div className="mb-4">
           <InlineError>Tagesquelle fehlgeschlagen: {refresh.message}</InlineError>
         </div>
@@ -491,6 +496,7 @@ export function EnergyMapClient({
         <PriceSheet
           draft={draft}
           reference={reference}
+          referenceBase={referenceBase}
           consumption={consumption}
           onClose={() => setDraft(null)}
           onSaved={saved}
