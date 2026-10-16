@@ -1446,15 +1446,16 @@
   border-radius: var(--radius-2xl);
 }
 .tray-space {
-  height: 168px;
+  height: calc(var(--tour-tray-height, 144px) + 24px);
 }
 .tray-btn {
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 8px;
+  min-width: 0;
   min-height: 60px;
-  padding: 0 12px;
+  padding: 8px 10px;
   border-radius: var(--radius-xl);
   background: var(--surface);
   color: var(--ink);
@@ -1467,7 +1468,16 @@
     opacity var(--dur-1) var(--ease-out);
 }
 .tray-btn > svg {
+  flex-shrink: 0;
   color: var(--ink-2);
+}
+.tray-btn > span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.tray-btn-setup {
+  flex-direction: column;
+  font-size: var(--text-subhead);
 }
 .tray-btn:active:not(:disabled) {
   transform: scale(0.97);
@@ -1485,7 +1495,7 @@
   color: var(--accent-ink);
 }
 :root[data-tray] .toast {
-  bottom: calc(var(--tabbar-h) + var(--tabbar-bottom) + 172px);
+  bottom: calc(var(--tabbar-h) + var(--tabbar-bottom) + var(--tour-tray-height, 144px) + 16px);
 }
 @media (min-width: 768px) {
   .tray {

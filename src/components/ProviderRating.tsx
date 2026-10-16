@@ -1,7 +1,7 @@
 import type { PriceInfo, ProviderInfo } from "@/lib/energy/provider";
 import { PRICE_LEVELS, type PriceStep } from "@/lib/energy/rating";
 import { Cell, euro } from "./ui";
-import { IconBolt } from "./icons";
+import { IconBolt, IconFlame } from "./icons";
 
 /*
  * Grundversorger eines Ortes samt Preis und Einstufung. Ohne Hooks: laeuft
@@ -59,7 +59,7 @@ function dateLabel(value: string): string {
   return d && m && y ? `${d}.${m}.${y}` : value;
 }
 
-/** Kompakte Zeile: Name, Strompreis, Einstufung. */
+/** Kompakte Preiszeilen mit eindeutiger Energieart und zugehoerigem Versorger. */
 export function ProviderLine({ info, className = "" }: { info: ProviderInfo | null; className?: string }) {
   if (!info) {
     return (
@@ -69,17 +69,35 @@ export function ProviderLine({ info, className = "" }: { info: ProviderInfo | nu
       </p>
     );
   }
-  const price = info.strom ?? info.gas;
+  const products = [
+    { label: "Strom", price: info.strom, provider: info.provider, Icon: IconBolt },
+    { label: "Gas", price: info.gas, provider: info.gasProvider || info.provider, Icon: IconFlame },
+  ];
   return (
-    <p className={`flex min-w-0 items-center gap-2 text-footnote ${className}`}>
-      <IconBolt className="h-4 w-4 shrink-0 text-muted" />
-      <span className="min-w-0 flex-1 truncate">
-        <span className="font-semibold">{info.provider || "Grundversorger"}</span>
-        {price && <span className="text-muted"> · {ctLabel(price.ct)}</span>}
-        {info.stale && <span className="font-semibold text-warn"> · prüfen</span>}
-      </span>
-      {price && <PriceBadge step={price.step} size="sm" />}
-    </p>
+    <div className={`min-w-0 space-y-1.5 text-footnote ${className}`}>
+      {products.map(({ label, price, provider, Icon }) => price && (
+        <p key={label} className="flex min-w-0 items-center gap-2">
+          <Icon className="h-4 w-4 shrink-0 text-muted" />
+          <span className="min-w-0 flex-1">
+            <span className="flex flex-wrap items-baseline gap-x-1">
+              <span className="font-semibold">{label}</span>
+              <span className="whitespace-nowrap text-muted">· {ctLabel(price.ct)}</span>
+            </span>
+            <span className="block truncate text-caption text-muted" title={provider || "Grundversorger"}>
+              {provider || "Grundversorger"}
+            </span>
+          </span>
+          <PriceBadge step={price.step} size="sm" />
+        </p>
+      ))}
+      {!info.strom && !info.gas && (
+        <p className="flex min-w-0 items-center gap-2">
+          <IconBolt className="h-4 w-4 shrink-0 text-muted" />
+          <span className="truncate font-semibold">{info.provider || "Grundversorger"}</span>
+        </p>
+      )}
+      {info.stale && <p className="pl-6 text-caption font-semibold text-warn">Preise prüfen · älter als 6 Monate</p>}
+    </div>
   );
 }
 

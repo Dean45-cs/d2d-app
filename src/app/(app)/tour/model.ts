@@ -89,6 +89,7 @@ export type SaveResult =
   | { status: "error" };
 
 export type SheetName =
+  | "bells"
   | "street"
   | "reason"
   | "appointment"

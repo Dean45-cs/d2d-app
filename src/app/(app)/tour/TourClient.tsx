@@ -3,9 +3,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { PendingSales } from "@/components/PendingSales";
+import { Sheet } from "@/components/Sheet";
 import { useToast } from "@/components/Toast";
 import { EmptyState, OutcomeGlyph } from "@/components/ui";
-import { IconBan, IconCalendar, IconCheck, IconMap, IconPhone, IconSparkles } from "@/components/icons";
+import { IconBan, IconBell, IconBuilding, IconCheck, IconHome, IconKeypad, IconMap, IconSparkles } from "@/components/icons";
 import { beginSaleDraft } from "@/lib/sale-drafts-client";
 import type {
   AppointmentRow,
@@ -35,7 +36,8 @@ import { levelFeedbackText, type LevelFeedback } from "@/lib/level-feedback";
 import { BellBoard, type BellRow } from "./BellBoard";
 import { DoorHero, type DoorStatusLine } from "./DoorHero";
 import { HouseStrip, type ChipState, type HouseChip } from "./HouseStrip";
-import { OutcomeTray } from "./OutcomeTray";
+import { OutcomeTray, type TrayAction } from "./OutcomeTray";
+import { TourAppointments } from "./TourAppointments";
 import { TourHeader } from "./TourHeader";
 import {
   AppointmentSheet,
@@ -742,7 +744,7 @@ export function TourClient({
     : doorLocked
       ? "Gesperrt – hier nicht klingeln"
       : currentType === ""
-        ? "Erst Haustyp wählen"
+        ? "Was für ein Haus ist das?"
         : currentType === "MFH" && currentBells.length === 0
           ? "Erst Klingelschilder anlegen"
           : currentType === "MFH" && !activeBell
@@ -925,6 +927,27 @@ export function TourClient({
   ).length;
   const nextStreet = streetsOfTerritory.find((s) => s.id !== streetId && (progress.get(s.id)?.open ?? 0) > 0) ?? null;
 
+  const setupActions: TrayAction[] = !street
+    ? [{ label: "Straße wählen", icon: <IconMap className="h-6 w-6" />, onClick: () => setSheet("street"), primary: true }]
+    : housesPending
+      ? []
+      : !currentNumber
+        ? streetDone && nextStreet
+          ? [{ label: `Weiter: ${nextStreet.name}`, icon: <IconMap className="h-6 w-6" />, onClick: () => chooseStreet(nextStreet.id), primary: true }]
+          : [{ label: "Nummer eingeben", icon: <IconKeypad className="h-6 w-6" />, onClick: () => setSheet("number"), primary: true }]
+        : doorLocked
+          ? [{ label: "Haus ansehen", icon: <IconHome className="h-6 w-6" />, onClick: () => setSheet("house") }]
+          : currentType === ""
+            ? [
+                { label: "Einfamilienhaus", icon: <IconHome className="h-6 w-6" />, onClick: () => void chooseType("EFH"), primary: !suggestMfh },
+                { label: "Mehrfamilienhaus", icon: <IconBuilding className="h-6 w-6" />, onClick: () => void chooseType("MFH"), primary: suggestMfh },
+              ]
+            : currentType === "MFH" && currentBells.length === 0
+              ? [{ label: "Klingelschilder anlegen", icon: <IconBell className="h-6 w-6" />, onClick: () => setSheet("house"), primary: true }]
+              : currentType === "MFH" && !activeBell
+                ? [{ label: "Klingel wählen", icon: <IconBell className="h-6 w-6" />, onClick: () => setSheet("bells"), primary: true }]
+                : [];
+
   const lastLine = (() => {
     const at = currentHouse?.last_visit_at;
     if (!at) return null;
@@ -948,40 +971,7 @@ export function TourClient({
 
       {/* Rechts auf dem Rechner, oben auf dem Handy: die Tuer selbst. */}
       <div className="space-y-4 lg:sticky lg:top-6 lg:col-start-2 lg:row-start-2">
-        {dueAppointments.length > 0 && (
-          <ul className="list list-icons" aria-label="Termine heute">
-            {dueAppointments.slice(0, 3).map((item) => {
-              const late = slotOverdue(item.follow_up_at, now ?? undefined);
-              const phone = item.contact_phone.replace(/[^+\d]/g, "");
-              return (
-                <li key={item.id} className="cell pr-2">
-                  <button
-                    type="button"
-                    className="flex min-w-0 flex-1 items-center gap-3 text-left"
-                    onClick={() => goToAppointment(item)}
-                  >
-                    <span className="glyph glyph-round">
-                      <IconCalendar className="h-4 w-4" />
-                    </span>
-                    <span className="min-w-0 flex-1">
-                      <span className="block truncate text-body">{item.contact_name || "Termin"}</span>
-                      <span className="block truncate text-footnote text-muted">
-                        {late && <span className="font-semibold text-danger">Überfällig · </span>}
-                        {slotLabel(item.follow_up_at, now ?? undefined)} · {item.street_name ?? ""} {item.house_number}
-                        {item.doorbell_label && ` · ${item.doorbell_label}`}
-                      </span>
-                    </span>
-                  </button>
-                  {phone && (
-                    <a href={`tel:${phone}`} className="icon-btn icon-btn-fill" aria-label={`${item.contact_name || "Kunde"} anrufen`}>
-                      <IconPhone className="h-5 w-5" />
-                    </a>
-                  )}
-                </li>
-              );
-            })}
-          </ul>
-        )}
+        <TourAppointments appointments={dueAppointments} now={now} onPick={goToAppointment} />
 
         <PendingSales userId={userId} onProgress={receiveProgress} />
 
@@ -1027,35 +1017,10 @@ export function TourClient({
           }
         />
 
-        {/* Haustyp einmal festlegen - gilt danach fuers ganze Team. Ohne ihn
-            waere ein Mehrfamilienhaus nach dem ersten Eintrag "erledigt". */}
-        {currentNumber && currentType === "" && !doorLocked && !housesPending && (
-          <div className="grid grid-cols-2 gap-2" role="group" aria-label="Haustyp">
-            <button
-              type="button"
-              className={`btn ${suggestMfh ? "btn-secondary" : "btn-primary"}`}
-              onClick={() => void chooseType("EFH")}
-            >
-              Einzeltür
-            </button>
-            <button
-              type="button"
-              className={`btn ${suggestMfh ? "btn-primary" : "btn-secondary"}`}
-              onClick={() => void chooseType("MFH")}
-            >
-              Mehrfamilienhaus
-            </button>
-          </div>
-        )}
-        {currentNumber && currentType === "MFH" && currentBells.length === 0 && !doorLocked && !housesPending && (
-          <button type="button" className="btn btn-primary btn-block" onClick={() => setSheet("house")}>
-            Klingelschilder anlegen
-          </button>
-        )}
-
         <OutcomeTray
-          disabled={busy || trayHint !== null}
-          hint={trayHint}
+          disabled={busy}
+          hint={streetDone && !housesPending ? "Straße erledigt" : trayHint}
+          setupActions={setupActions}
           onNotHome={() => void notHome()}
           onMet={() => setSheet("reason")}
           onAppointment={() => setSheet("appointment")}
@@ -1127,6 +1092,21 @@ export function TourClient({
       )}
       {sheet === "sale" && (
         <SaleSheet place={place} product={product} busy={busy} onPick={startSale} onClose={() => setSheet(null)} />
+      )}
+      {sheet === "bells" && currentNumber && !housesPending && (
+        <Sheet title="Klingel wählen" subtitle={`${street?.name ?? ""} ${currentNumber}`} onClose={() => setSheet(null)}>
+          <BellBoard
+            rows={bellRows}
+            selected={bellLabel}
+            next={nextOpenBell?.label ?? null}
+            faceOf={faceOf}
+            onPick={(label) => {
+              setBellLabel(label);
+              setSheet(null);
+            }}
+            onEdit={() => setSheet("house")}
+          />
+        </Sheet>
       )}
       {sheet === "house" && currentNumber && !housesPending && (
         <HouseSheet

@@ -165,7 +165,7 @@ export function ReasonSheet({
   }
 
   return (
-    <Sheet title="Woran lag’s?" subtitle={place} onClose={onClose}>
+    <Sheet title="Gespräch ohne Abschluss" subtitle={place} onClose={onClose}>
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
         {reasons.map((reason) => (
           <button
@@ -364,7 +364,7 @@ export function SaleSheet({
   onClose: () => void;
 }) {
   return (
-    <Sheet title="Abschluss" subtitle={place} onClose={onClose}>
+    <Sheet title="Auftrag starten" subtitle={place} onClose={onClose}>
       <div className="grid gap-2">
         {PRODUCTS.map((option) => (
           <button

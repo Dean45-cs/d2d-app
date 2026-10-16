@@ -199,6 +199,12 @@ Alle in `src/components/`. Stil per Klassen aus `globals.css` (`@layer component
 - **Bearbeiten im Blatt** (`Sheet`), Hauptknopf im Fuß als `btn-primary btn-lg btn-block`.
 - **Löschen**: `useConfirm` mit `danger`. Alles andere: Toast mit „Rückgängig“.
 - **Leere Zustände**: ein Zeichen, ein Satz, höchstens eine Aktion.
+- **Klinken**: Termine erscheinen als kompakte Zusammenfassung; ein Tipp öffnet
+  die Liste mit Adresse, Anruf und Sprung zur Tür. Die Aktionsleiste bietet zuerst
+  die fehlende Haus- oder Klingelauswahl, danach „Nicht da“, „Ohne Abschluss“,
+  „Termin“ und „Auftrag starten“. Inhalt und Toasts halten Abstand zur gemessenen
+  Höhe der Leiste. Strom und Gas haben jeweils eine beschriftete Preiszeile mit
+  Versorger und eigener Preisstufe.
 - **Rechner/iPad**: zweispaltig (`lg:grid-cols-[minmax(0,1fr)_minmax(0,380px)]`),
   Tabellen (`table.table`) erlaubt, wo Spalten vergleichen.
 
