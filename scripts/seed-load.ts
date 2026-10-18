@@ -50,9 +50,9 @@ db.transaction(() => {
   const reasonIds = DEFAULT_REASONS.map((r) =>
     Number(
       db.prepare(
-        `INSERT INTO rejection_reasons (team_id, code, label, emoji, hint, sort_order, active)
+        `INSERT INTO rejection_reasons (team_id, code, label, icon, hint, sort_order, active)
          VALUES (?, ?, ?, ?, ?, ?, 1)`,
-      ).run(team, r.code, r.label, r.emoji, r.hint, r.sort_order).lastInsertRowid,
+      ).run(team, r.code, r.label, r.icon, r.hint, r.sort_order).lastInsertRowid,
     ),
   );
 

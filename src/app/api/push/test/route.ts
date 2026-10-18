@@ -9,7 +9,7 @@ export async function POST() {
   return handle(async () => {
     const user = await requireUser();
     const delivered = await pushToUsers([user.id], {
-      title: "Push ist eingerichtet ✅",
+      title: "Push ist eingerichtet",
       body: "So sieht es aus, wenn jemand aus deinem Abo einen Vertrag macht.",
       url: "/team",
       tag: "test",

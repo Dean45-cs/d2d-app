@@ -15,7 +15,7 @@
  * passende Seite. Versendet werden sie in src/lib/push.ts.
  */
 
-const VERSION = "v3";
+const VERSION = "v4";
 const SHELL_CACHE = `d2d-shell-${VERSION}`;
 const ASSET_CACHE = `d2d-assets-${VERSION}`;
 
@@ -115,6 +115,7 @@ self.addEventListener("push", (event) => {
     self.registration.showNotification(data.title || "Carlsson Sales", {
       body: data.body || "",
       icon: "/icon-192.png",
+      badge: "/badge-96.png",
       tag: data.tag,
       // Nur relative Pfade der eigenen App - eine Nachricht fuehrt nie nach draussen.
       data: {

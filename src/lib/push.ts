@@ -281,9 +281,9 @@ export async function notifySale(visitId: number): Promise<void> {
   const post = getPost(postId, row.team_id, row.user_id);
   if (!post?.sale) return;
   const where = [PRODUCT[post.sale.energy_type], post.sale.territory_name].filter(Boolean).join(" · ");
-  const milestone = isMilestone(post.sale.number) ? ` · Abschluss Nr. ${post.sale.number} 🏅` : "";
+  const milestone = isMilestone(post.sale.number) ? ` · Abschluss Nr. ${post.sale.number}` : "";
   await pushToUsers(recipients, {
-    title: `${post.user.name} hat einen Vertrag gemacht 🎉`,
+    title: `${post.user.name} hat einen Vertrag gemacht`,
     body: `${where || "Neuer Abschluss"}${milestone} – jetzt gratulieren!`,
     url: `/team/beitrag/${postId}`,
     tag: `post-${postId}`,

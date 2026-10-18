@@ -2,12 +2,12 @@ import type { ReactNode } from "react";
 import Link from "next/link";
 import {
   IconCalendar,
-  IconChat,
   IconCheck,
   IconChevronRight,
   IconDoor,
   IconExternal,
 } from "./icons";
+import { ReasonIcon } from "./ReasonIcon";
 
 export { PageHeader } from "./PageHeader";
 
@@ -503,15 +503,16 @@ export const OUTCOME_LABEL: Record<string, string> = {
 /**
  * Das Ergebnis eines Besuchs als Zeichen. Nur der Abschluss ist gefuellt
  * gruen mit Haekchen; alles andere bleibt neutral und traegt sein Zeichen
- * (bei Ablehnungen das Emoji des Grundes).
+ * (bei Ablehnungen das Zeichen des Grundes, ohne dessen Kachelfarbe).
  */
 export function OutcomeGlyph({
   outcome,
-  emoji,
+  reason,
   size = "md",
 }: {
   outcome: string;
-  emoji?: string | null;
+  /** Zeichen des Ablehnungsgrunds (src/lib/reason-icons.ts) */
+  reason?: string | null;
   size?: "sm" | "md";
 }) {
   const cls = `glyph glyph-round ${size === "sm" ? "glyph-sm" : ""} ${outcome === "SALE" ? "glyph-result" : ""}`;
@@ -524,10 +525,8 @@ export function OutcomeGlyph({
         <IconCalendar className={icon} />
       ) : outcome === "NOT_HOME" ? (
         <IconDoor className={icon} />
-      ) : emoji ? (
-        <span>{emoji}</span>
       ) : (
-        <IconChat className={icon} />
+        <ReasonIcon name={reason} className={icon} />
       )}
     </span>
   );

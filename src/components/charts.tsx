@@ -1,3 +1,6 @@
+import { IconMore } from "./icons";
+import { ReasonTile } from "./ReasonIcon";
+
 /**
  * Schlanke Diagramme aus HTML/CSS - keine Bibliothek. Tueren neutral,
  * Abschluesse im Akzent; jede Reihe traegt zusaetzlich ihre Beschriftung,
@@ -81,12 +84,12 @@ function Legend({ color, label }: { color: string; label: string }) {
   );
 }
 
-/** Ablehnungsgruende als Zeilen mit schmalem Balken - Emoji im neutralen Kasten. */
+/** Ablehnungsgruende als Zeilen mit schmalem Balken - vorn die Kachel des Grundes. */
 export function ReasonBars({
   data,
   limit,
 }: {
-  data: Array<{ id: number; label: string; emoji: string; count: number }>;
+  data: Array<{ id: number; label: string; icon: string; count: number }>;
   /** Nur die haeufigsten zeigen; der Rest wird zu "weitere". */
   limit?: number;
 }) {
@@ -99,7 +102,7 @@ export function ReasonBars({
     const rest = data.slice(limit - 1);
     rows = [
       ...data.slice(0, limit - 1),
-      { id: -1, label: `${rest.length} weitere`, emoji: "", count: rest.reduce((s, d) => s + d.count, 0) },
+      { id: -1, label: `${rest.length} weitere`, icon: "", count: rest.reduce((s, d) => s + d.count, 0) },
     ];
   }
   const max = Math.max(...rows.map((d) => d.count), 1);
@@ -108,7 +111,13 @@ export function ReasonBars({
     <ul className="list">
       {rows.map((d) => (
         <li key={d.id} className="cell">
-          <span className="glyph">{d.emoji || "·"}</span>
+          {d.id === -1 ? (
+            <span className="glyph" aria-hidden="true">
+              <IconMore className="h-4 w-4" />
+            </span>
+          ) : (
+            <ReasonTile name={d.icon} />
+          )}
           <span className="min-w-0 flex-1">
             <span className="flex items-baseline justify-between gap-2">
               <span className={`truncate text-subhead ${d.id === -1 ? "text-muted" : ""}`}>{d.label}</span>

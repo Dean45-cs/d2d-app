@@ -103,7 +103,8 @@ export interface RejectionReason {
   team_id: number;
   code: string;
   label: string;
-  emoji: string;
+  /** Schluessel aus src/lib/reason-icons.ts */
+  icon: string;
   hint: string;
   sort_order: number;
   active: number;

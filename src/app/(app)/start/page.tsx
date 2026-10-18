@@ -281,7 +281,7 @@ export default async function StartPage({ searchParams }: { searchParams: Promis
             <ShowMore initial={6} className="list list-icons">
               {recent.map((v) => (
                 <li key={v.id} className="cell">
-                  <OutcomeGlyph outcome={v.outcome} emoji={v.reason_emoji} />
+                  <OutcomeGlyph outcome={v.outcome} reason={v.reason_icon} />
                   <span className="min-w-0 flex-1">
                     <span className="block truncate text-body">
                       {v.street_name ?? "–"} {v.house_number}

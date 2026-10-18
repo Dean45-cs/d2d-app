@@ -1,6 +1,7 @@
 import { requirePermission } from "@/lib/permissions";
 import { getDb } from "@/lib/db";
 import { handle, optionalText, requireText } from "@/lib/api";
+import { isReasonIcon } from "@/lib/reason-icons";
 
 export const dynamic = "force-dynamic";
 
@@ -24,9 +25,10 @@ export async function PATCH(
       fields.push("label = ?");
       values.push(requireText(body.label, "Bezeichnung", 80));
     }
-    if (body.emoji !== undefined) {
-      fields.push("emoji = ?");
-      values.push(optionalText(body.emoji, 8));
+    if (body.icon !== undefined) {
+      if (!isReasonIcon(body.icon)) throw new Error("Unbekanntes Zeichen.");
+      fields.push("icon = ?");
+      values.push(body.icon);
     }
     if (body.hint !== undefined) {
       fields.push("hint = ?");
