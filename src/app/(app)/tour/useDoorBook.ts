@@ -142,7 +142,7 @@ export function useDoorBook(
         not_home_count: bell.not_home_count,
         met_count: bell.met_count,
         last_outcome: bell.last_outcome,
-        last_reason_emoji: bell.last_reason_emoji,
+        last_reason_icon: bell.last_reason_icon,
         last_visit_at: bell.last_visit_at,
         last_visit_user: bell.last_visit_user,
         last_visit_user_id: bell.last_visit_user_id,

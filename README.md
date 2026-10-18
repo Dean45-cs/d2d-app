@@ -175,7 +175,10 @@ fürs ganze Team – aufheben kann ihn nur die Teamleitung.
 
 Die Ablehnungsgründe sind vorbelegt (zufrieden mit Anbieter, kein Interesse, Vertrag läuft
 noch, muss mit Partner sprechen, keine Haustürgeschäfte …) und unter **Einstellungen**
-frei änderbar: umbenennen, ausblenden, sortieren, eigene ergänzen.
+frei änderbar: umbenennen, ausblenden, sortieren, eigene ergänzen. Jeder Grund trägt ein
+Zeichen aus der App-eigenen Symbolfamilie auf einer farbigen Kachel (27 zur Auswahl, von
+„Stoppuhr“ bis „Umzugskarton“) – keine Emojis, die auf jedem Gerät anders aussehen.
+Gründe aus älteren Versionen bekommen beim ersten Start das passende Zeichen.
 
 ---
 
@@ -246,9 +249,11 @@ Pro Besuch zählt genau ein Ergebnis. Level 1 beginnt bei 0 XP, Level 2 bei 100 
 Level 3 bei 250 XP. Jeder weitere Aufstieg kostet 50 XP mehr als der vorherige;
 es gibt kein festes Maximallevel. Die Regeln stehen zentral in `src/lib/levels.ts`.
 Die Erfolgssammlung ist von **Bronze → Silber → Gold → Platin → Diamant** sortiert.
-Farbige Medaillen und Kategorie-Symbole unterscheiden Türen, Gespräche, Termine,
-Abschlüsse, Strom/Gas und Beständigkeit. Filter zeigen einzelne Stufen, Bereiche
-oder offene/freigeschaltete Erfolge. Ein nächster Meilenstein wird hervorgehoben.
+Erreichte Abzeichen sind Medaillen im Metall ihrer Stufe (Bronze bis Diamant, ab Gold mit
+Perlkranz), offene ein leerer Rohling im Fortschrittsring. Kategorie-Symbole unterscheiden
+Türen, Gespräche, Termine, Abschlüsse, Strom/Gas und Beständigkeit. Filter zeigen einzelne
+Stufen, Bereiche oder offene/freigeschaltete Erfolge. Ein nächster Meilenstein wird
+hervorgehoben.
 
 Neu zählen Strom-, Gas- und Kombiabschlüsse, erledigte Termine, aktive Tage,
 Tage mit Abschluss und persönliche Tagesbestwerte. `BEIDES` zählt für beide
@@ -308,7 +313,7 @@ dort bewusst nicht. Wird der Eintrag an der Tür rückgängig gemacht, verschwin
 Beitrag. Abschlüsse von vor dem Feed werden beim ersten Start nachgetragen.
 
 Dazu kann jeder **eigene Beiträge** schreiben (bis 500 Zeichen), **kommentieren** und
-**„Gefällt mir“** setzen. Unter einem Abschluss stehen Ein-Tipp-Glückwünsche („Stark! 💪“)
+**„Gefällt mir“** setzen. Unter einem Abschluss stehen Ein-Tipp-Glückwünsche („Glückwunsch!“)
 bereit. „Abonniert“ zeigt nur die Beiträge der Leute, denen man folgt. Eigene Beiträge
 und Kommentare löscht man selbst, die Teamleitung darf alle löschen.
 
@@ -693,8 +698,9 @@ Kontraste (hell und dunkel), Glas-Material, Schrift, Radien, Bewegung, Bausteine
 - **Logo:** Bildmarke und Schriftzug in `src/components/Logo.tsx`; dieselbe Geometrie in
   `public/logo.svg`, `public/logo-mark.svg`, `public/icon.svg` und
   `public/icon-maskable.svg`. Nach einer Änderung `npm run icons` – das erzeugt
-  `icon-192.png`, `icon-512.png`, `icon-maskable-512.png`, `apple-touch-icon.png` und
-  `favicon-32.png` neu. Danach in `public/sw.js` die `VERSION` erhöhen.
+  `icon-192.png`, `icon-512.png`, `icon-maskable-512.png`, `apple-touch-icon.png`,
+  `favicon-32.png` und das einfarbige Benachrichtigungs-Symbol `badge-96.png` neu. Danach
+  in `public/sw.js` die `VERSION` erhöhen.
 
 Die Diagrammfarben und die Farben der Teilgebiete (`--plot-1` bis `--plot-4`) sind auf
 Farbfehlsichtigkeit geprüft – jedes Paar gegen jedes, hell und dunkel. Wer sie

@@ -40,14 +40,24 @@ Kompakt, ohne Erklärtexte, eine Hauptaktion je Bildschirm.
 | `--chart-doors` / `--chart-met` / `--chart-sales` | grau / dunkel / Akzent | grau / hell / Akzent | Diagramme, Fitness-Ringe |
 | `--plot-1…4` | unverändert | dunkel angepasst | Teilgebiete (CVD-geprüfter Satz) |
 | `--price-0…4`, `--price-none` | grau → tiefgrün | dunkel → hellgrün | Preisstufen der Energiekarte (sequenziell, Helligkeit steigt) |
+| `--tone-{blue,indigo,purple,magenta,teal,slate,brown}-{hi,lo}` | Verlauf hell → satt | gleich | Kacheln der Ablehnungsgründe (`ReasonTile`) – nur dort |
 
 **Regeln**
 
 - Aktionen sind **getönt** (`.btn-primary` = Tönung + `--accent-ink`) oder umrandet,
   nie flächig grün. Volle grüne Fläche mit Haken (`.glyph-result`) bedeutet
-  ausschließlich **Abschluss** – im Toast, in Kontakten, im Feed, bei Abzeichen.
+  ausschließlich **Abschluss** – im Toast, in Kontakten, im Feed.
 - Rot und Bernstein sind Signale, nie Dekoration, nie allein (immer Wort/Zeichen).
-- Ablehnungsgründe behalten ihr Emoji – in einem neutralen Zeichen-Kreis (`.glyph`).
+- **Keine Emojis.** Ablehnungsgründe tragen ein Zeichen aus `ReasonIcon.tsx`
+  (Schlüssel in `src/lib/reason-icons.ts`). Wo Gründe gewählt, gepflegt oder
+  ausgewertet werden, steht es auf seiner Kachel im Symbolton; in Verläufen
+  (`OutcomeGlyph`) neutral im `.glyph`, damit der grüne Abschluss das einzige
+  Farbsignal der Liste bleibt.
+- Symboltöne haben kein Grün, Rot oder Bernstein und sind keine Bedienfarben.
+  Weißes Zeichen auf dem hellen Ende des Verlaufs ≥ 3 : 1.
+- Medaillen der Abzeichen (`levels/Medal.tsx`) sind Bildfarben wie das Logo:
+  Bronze, Silber, Gold, Platin (Lavendel), Diamant (Eisblau); ab Gold mit
+  Perlkranz. Das Zeichen sitzt eingraviert in der dunkelsten Metallfarbe.
 - Schrift auf voller Akzentfläche ist verboten (hell nur 3,5 : 1) – dafür die Tönung.
 
 ### Gemessene Kontraste (WCAG 2.x)
@@ -175,7 +185,9 @@ Alle in `src/components/`. Stil per Klassen aus `globals.css` (`@layer component
 | `Avatar` | `ui.tsx` | Bild oder Kürzel |
 | `EmptyState`, `InlineError`, `Notice` | `ui.tsx` | Leer, Fehler, ruhiger Hinweis |
 | `Skeleton*` | `ui.tsx` | Ladeplatzhalter (Kopf, Liste, Kennzahlen) |
-| `OutcomeGlyph` | `ui.tsx` | Ergebnis eines Besuchs als Zeichen |
+| `OutcomeGlyph` | `ui.tsx` | Ergebnis eines Besuchs als Zeichen (bei Ablehnung das Zeichen des Grundes, neutral) |
+| `ReasonIcon`, `ReasonTile` | `ReasonIcon.tsx` | Zeichen eines Ablehnungsgrunds; als Kachel im Symbolton (`sm` 24, `md` 32, `lg` 48) |
+| `Medal` | `levels/Medal.tsx` | Medaille eines erreichten Abzeichens im Metall der Stufe |
 | `Segmented`, `SegmentedLinks` | `ui.tsx` | Wahl aus wenigen (auch Glas-Variante über Karten) |
 | `Switch` | `ui.tsx` | Kippschalter |
 | `Sheet` | `Sheet.tsx` | Blatt von unten (Handy, ziehbar) / mittiger Dialog (iPad, Rechner) |
@@ -213,6 +225,10 @@ Alle in `src/components/`. Stil per Klassen aus `globals.css` (`@layer component
 ## 7. Marke
 
 „Carlsson Sales“: Zeichen = offener Ring (das „C“, als Fortschrittsring) mit
-Punkt – Tür/Ziel. Wortmarke in der Systemschrift, „Carlsson“ fett, „Sales“
-normal. Dateien: `public/logo.svg`, `public/logo-mark.svg`, `public/icon.svg`,
-`public/icon-maskable.svg`; PNGs erzeugt `scripts/build-icons.mjs`.
+Punkt – Tür/Ziel. Der Ring wächst von 3 Uhr bis 12 Uhr von schmal zu breit und
+läuft so auf den Punkt zu. App-Symbol: Energie-Grün mit Licht von oben links,
+feiner Lichtkante, heller Marke mit weichem Schatten und leicht leuchtendem
+Punkt. Wortmarke in der Systemschrift, „Carlsson“ fett, „Sales“ normal.
+Dateien: `public/logo.svg`, `public/logo-mark.svg`, `public/icon.svg`,
+`public/icon-maskable.svg`; PNGs (inkl. Benachrichtigungs-Symbol
+`badge-96.png`) erzeugt `scripts/build-icons.mjs`.

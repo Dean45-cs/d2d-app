@@ -271,7 +271,7 @@ export default async function TerritoryDetailPage({
               <ShowMore initial={6} className="list list-icons">
                 {visits.map((v) => (
                   <li key={v.id} className="cell">
-                    <OutcomeGlyph outcome={v.outcome} emoji={v.reason_emoji} />
+                    <OutcomeGlyph outcome={v.outcome} reason={v.reason_icon} />
                     <span className="min-w-0 flex-1">
                       <span className="block truncate text-body">
                         {v.street_name ?? "–"} {v.house_number}

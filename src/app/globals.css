@@ -875,7 +875,7 @@
     color: var(--surface);
   }
 
-  /* Neutraler Zeichenbehaelter - fuer Symbole und die Emoji der
+  /* Neutraler Zeichenbehaelter - fuer Symbole, auch die der
      Ablehnungsgruende, damit alle gleich ruhig nebeneinander stehen. */
   .glyph {
     display: inline-grid;
@@ -909,6 +909,115 @@
   .glyph-result {
     background: var(--accent);
     color: var(--on-accent);
+  }
+
+  /* Kachel eines Ablehnungsgrunds (ReasonTile): Verlauf im Symbolton aus
+     brand.css, feine Lichtkante oben, helles Zeichen mit getoenter Flaeche.
+     Nur wo Gruende gewaehlt, gepflegt oder ausgewertet werden - in
+     Verlaeufen steht dasselbe Zeichen neutral im .glyph. */
+  .reason-tile {
+    --duo: 0.3;
+    display: inline-grid;
+    flex-shrink: 0;
+    place-items: center;
+    width: 32px;
+    height: 32px;
+    border-radius: var(--radius-sm);
+    background: linear-gradient(180deg, var(--tone-hi), var(--tone-lo));
+    color: #ffffff;
+    box-shadow:
+      inset 0 0.5px 0 rgb(255 255 255 / 0.4),
+      inset 0 -0.5px 0 rgb(0 0 0 / 0.14),
+      0 1px 2px rgb(0 0 0 / 0.08);
+  }
+  .reason-tile svg {
+    filter: drop-shadow(0 0.5px 0.5px rgb(0 0 0 / 0.18));
+  }
+  .reason-tile-sm {
+    width: 24px;
+    height: 24px;
+    border-radius: var(--radius-xs);
+  }
+  .reason-tile-lg {
+    width: 48px;
+    height: 48px;
+    border-radius: var(--radius-md);
+  }
+  .reason-tile-round {
+    border-radius: var(--radius-full);
+  }
+  .reason-tile[data-tone="blue"] {
+    --tone-hi: var(--tone-blue-hi);
+    --tone-lo: var(--tone-blue-lo);
+  }
+  .reason-tile[data-tone="indigo"] {
+    --tone-hi: var(--tone-indigo-hi);
+    --tone-lo: var(--tone-indigo-lo);
+  }
+  .reason-tile[data-tone="purple"] {
+    --tone-hi: var(--tone-purple-hi);
+    --tone-lo: var(--tone-purple-lo);
+  }
+  .reason-tile[data-tone="magenta"] {
+    --tone-hi: var(--tone-magenta-hi);
+    --tone-lo: var(--tone-magenta-lo);
+  }
+  .reason-tile[data-tone="teal"] {
+    --tone-hi: var(--tone-teal-hi);
+    --tone-lo: var(--tone-teal-lo);
+  }
+  .reason-tile[data-tone="slate"] {
+    --tone-hi: var(--tone-slate-hi);
+    --tone-lo: var(--tone-slate-lo);
+  }
+  .reason-tile[data-tone="brown"] {
+    --tone-hi: var(--tone-brown-hi);
+    --tone-lo: var(--tone-brown-lo);
+  }
+
+  /* Medaille eines erreichten Abzeichens (levels/Medal.tsx): Metall als
+     SVG darunter, das Zeichen eingraviert - dunkel, mit Lichtkante unten. */
+  .medal {
+    position: relative;
+    display: inline-grid;
+    flex-shrink: 0;
+    place-items: center;
+    filter: drop-shadow(0 1px 1.5px rgb(0 0 0 / 0.2));
+  }
+  .medal > svg {
+    position: absolute;
+    inset: 0;
+  }
+  .medal-mark {
+    position: relative;
+    display: grid;
+    filter: drop-shadow(0 0.75px 0 rgb(255 255 255 / 0.55));
+  }
+  /* Offenes Abzeichen: leerer Rohling im Fortschrittsring. */
+  .medal-blank {
+    display: grid;
+    place-items: center;
+    border-radius: var(--radius-full);
+    background: var(--fill);
+    box-shadow: inset 0 1px 2px rgb(0 0 0 / 0.08);
+  }
+
+  /* Wahl eines Zeichens: die gewaehlte Kachel steht in einem Akzent-Ring. */
+  .icon-pick {
+    display: grid;
+    place-items: center;
+    min-height: 48px;
+    border-radius: var(--radius-md);
+    transition:
+      background-color var(--dur-1) var(--ease-out),
+      transform var(--dur-1) var(--ease-spring);
+  }
+  .icon-pick:active {
+    transform: scale(0.94);
+  }
+  .icon-pick[aria-checked="true"] {
+    background: var(--accent-tint);
+    box-shadow: inset 0 0 0 2px var(--accent);
   }
 
   /* -------------------------------- Schalter ----------------------------- */

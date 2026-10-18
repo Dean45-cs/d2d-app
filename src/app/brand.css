@@ -48,6 +48,26 @@
   --price-3: #22a052;
   --price-4: #0b7a35;
   --price-none: #aeaeb2;
+
+  /* Symboltoene - nur fuer die Kacheln der Ablehnungsgruende (ReasonTile),
+     nie fuer Schrift oder Zustaende. Bewusst ohne Gruen (das ist der
+     Abschluss), Rot und Bernstein (Signale). Je Ton ein Verlauf von hell
+     (oben) nach satt (unten); das weisse Zeichen hat schon am hellen Ende
+     >= 3:1. Hell und dunkel gleich, wie die Symbole der iOS-Einstellungen. */
+  --tone-blue-hi: #4a8af0;
+  --tone-blue-lo: #1d5fd1;
+  --tone-indigo-hi: #7c76ea;
+  --tone-indigo-lo: #4a42c4;
+  --tone-purple-hi: #a874e0;
+  --tone-purple-lo: #7c45bd;
+  --tone-magenta-hi: #dc64a2;
+  --tone-magenta-lo: #b0387a;
+  --tone-teal-hi: #2a9fb2;
+  --tone-teal-lo: #0b7385;
+  --tone-slate-hi: #8390a3;
+  --tone-slate-lo: #545f74;
+  --tone-brown-hi: #b2865a;
+  --tone-brown-lo: #835a33;
 }
 
 /* Dunkel: eigene, gegen #000 / #1c1c1e gepruefte Stufen */

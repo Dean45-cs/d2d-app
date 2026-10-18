@@ -4,11 +4,13 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Sheet } from "@/components/Sheet";
 import { useToast } from "@/components/Toast";
+import { ReasonTile } from "@/components/ReasonIcon";
 import { IconChat, IconChevronDown, IconChevronUp, IconPlus } from "@/components/icons";
 import { Cell, EmptyState, InlineError, ListLabel, PageHeader, Switch } from "@/components/ui";
+import { DEFAULT_REASON_ICON, REASON_ICONS, reasonIcon } from "@/lib/reason-icons";
 import type { RejectionReason } from "@/lib/types";
 
-type Patch = { label?: string; emoji?: string; active?: number; sortOrder?: number };
+type Patch = { label?: string; icon?: string; active?: number; sortOrder?: number };
 
 async function patchReason(id: number, body: Patch): Promise<string | null> {
   try {
@@ -23,14 +25,6 @@ async function patchReason(id: number, body: Patch): Promise<string | null> {
   } catch {
     return "Keine Verbindung.";
   }
-}
-
-function Glyph({ emoji }: { emoji: string }) {
-  return (
-    <span className="glyph glyph-round" aria-hidden="true">
-      {emoji || <IconChat className="h-4 w-4" />}
-    </span>
-  );
 }
 
 /**
@@ -84,7 +78,7 @@ export function ReasonSettings({ reasons }: { reasons: RejectionReason[] }) {
       <li key={reason.id}>
         {sorting ? (
           <Cell
-            icon={<Glyph emoji={reason.emoji} />}
+            icon={<ReasonTile name={reason.icon} />}
             title={reason.label}
             trailing={
               <span className="-mr-2 flex shrink-0">
@@ -112,7 +106,7 @@ export function ReasonSettings({ reasons }: { reasons: RejectionReason[] }) {
         ) : (
           <Cell
             onClick={() => setSheet(reason)}
-            icon={<Glyph emoji={reason.emoji} />}
+            icon={<ReasonTile name={reason.icon} />}
             title={reason.label}
             subtitle={reason.hint || undefined}
             chevron
@@ -186,7 +180,8 @@ export function ReasonSettings({ reasons }: { reasons: RejectionReason[] }) {
 function ReasonSheet({ reason, onClose }: { reason: RejectionReason | null; onClose: () => void }) {
   const router = useRouter();
   const toast = useToast();
-  const [emoji, setEmoji] = useState(reason?.emoji ?? "");
+  // Gespeicherte Werte, die es (nicht mehr) gibt, zeigen das Standardzeichen.
+  const [icon, setIcon] = useState(reason ? reasonIcon(reason.icon).key : DEFAULT_REASON_ICON);
   const [label, setLabel] = useState(reason?.label ?? "");
   const [active, setActive] = useState(reason ? Boolean(reason.active) : true);
   const [busy, setBusy] = useState(false);
@@ -196,7 +191,7 @@ function ReasonSheet({ reason, onClose }: { reason: RejectionReason | null; onCl
   const patch: Patch = {};
   if (reason) {
     if (label.trim() !== reason.label) patch.label = label.trim();
-    if (emoji.trim() !== reason.emoji) patch.emoji = emoji.trim();
+    if (icon !== reasonIcon(reason.icon).key) patch.icon = icon;
     if (active !== Boolean(reason.active)) patch.active = active ? 1 : 0;
   }
   const changed = reason ? Object.keys(patch).length > 0 : true;
@@ -207,7 +202,7 @@ function ReasonSheet({ reason, onClose }: { reason: RejectionReason | null; onCl
       const response = await fetch("/api/reasons", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ label, emoji }),
+        body: JSON.stringify({ label, icon }),
       });
       if (response.ok) return null;
       const data = await response.json().catch(() => ({}));
@@ -231,7 +226,7 @@ function ReasonSheet({ reason, onClose }: { reason: RejectionReason | null; onCl
     if (reason) {
       const previous: Patch = {};
       if (patch.label !== undefined) previous.label = reason.label;
-      if (patch.emoji !== undefined) previous.emoji = reason.emoji;
+      if (patch.icon !== undefined) previous.icon = reasonIcon(reason.icon).key;
       if (patch.active !== undefined) previous.active = reason.active ? 1 : 0;
       toast("Grund gespeichert", {
         action: {
@@ -265,21 +260,8 @@ function ReasonSheet({ reason, onClose }: { reason: RejectionReason | null; onCl
       }
     >
       <form id="reason-form" onSubmit={submit} className="space-y-6">
-        <div className="flex gap-3">
-          <div className="w-20 shrink-0">
-            <label className="label" htmlFor="reason-emoji">
-              Zeichen
-            </label>
-            <input
-              id="reason-emoji"
-              className="field px-2 text-center"
-              placeholder="🙂"
-              maxLength={8}
-              autoComplete="off"
-              value={emoji}
-              onChange={(e) => setEmoji(e.target.value)}
-            />
-          </div>
+        <div className="flex items-end gap-3">
+          <ReasonTile name={icon} size="lg" />
           <div className="min-w-0 flex-1">
             <label className="label" htmlFor="reason-label">
               Bezeichnung
@@ -296,6 +278,7 @@ function ReasonSheet({ reason, onClose }: { reason: RejectionReason | null; onCl
             />
           </div>
         </div>
+        <IconPicker value={icon} onChange={setIcon} />
         {reason && (
           <ul className="list">
             <li>
@@ -308,5 +291,53 @@ function ReasonSheet({ reason, onClose }: { reason: RejectionReason | null; onCl
         )}
       </form>
     </Sheet>
+  );
+}
+
+/**
+ * Zeichen waehlen: Raster aller Kacheln als Optionsgruppe. Pfeiltasten
+ * wandern wie bei Optionsfeldern; nur die gewaehlte Kachel ist per Tab
+ * erreichbar.
+ */
+function IconPicker({ value, onChange }: { value: string; onChange: (key: (typeof REASON_ICONS)[number]["key"]) => void }) {
+  const index = Math.max(0, REASON_ICONS.findIndex((entry) => entry.key === value));
+
+  function onKeyDown(event: React.KeyboardEvent<HTMLDivElement>) {
+    const step = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 }[event.key];
+    if (!step) return;
+    event.preventDefault();
+    const next = (index + step + REASON_ICONS.length) % REASON_ICONS.length;
+    onChange(REASON_ICONS[next].key);
+    event.currentTarget.querySelectorAll<HTMLButtonElement>("[role=radio]")[next]?.focus();
+  }
+
+  return (
+    <div>
+      <p className="label" id="reason-icon-label">
+        Zeichen
+      </p>
+      <div
+        role="radiogroup"
+        aria-labelledby="reason-icon-label"
+        className="grid grid-cols-6 gap-1 rounded-xl bg-surface p-2 sm:grid-cols-9"
+        onKeyDown={onKeyDown}
+      >
+        {REASON_ICONS.map((entry, i) => (
+          <button
+            key={entry.key}
+            type="button"
+            role="radio"
+            aria-checked={entry.key === value}
+            aria-label={entry.label}
+            title={entry.label}
+            tabIndex={i === index ? 0 : -1}
+            className="icon-pick"
+            onClick={() => onChange(entry.key)}
+          >
+            <ReasonTile name={entry.key} />
+          </button>
+        ))}
+      </div>
+    </div>
   );
 }

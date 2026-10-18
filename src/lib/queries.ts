@@ -644,7 +644,7 @@ export interface DoorbellWithStats extends Doorbell {
   met_count: number;
   /** Ergebnis des letzten Eintrags - fuer das Symbol in der Liste. */
   last_outcome: VisitOutcome | null;
-  last_reason_emoji: string | null;
+  last_reason_icon: string | null;
   last_visit_at: string | null;
   last_visit_user: string | null;
   /** Wer zuletzt an dieser Klingel war - fuer Name und Profilbild. */
@@ -668,10 +668,10 @@ export function listDoorbells(houseNumberIds: number[]): DoorbellWithStats[] {
                 WHERE v.doorbell_id = d.id AND v.outcome <> 'NOT_HOME')   AS met_count,
               (SELECT v.outcome FROM visits v WHERE v.doorbell_id = d.id
                 ORDER BY v.created_at DESC, v.id DESC LIMIT 1)            AS last_outcome,
-              (SELECT r.emoji FROM visits v
+              (SELECT r.icon FROM visits v
                  LEFT JOIN rejection_reasons r ON r.id = v.reason_id
                 WHERE v.doorbell_id = d.id
-                ORDER BY v.created_at DESC, v.id DESC LIMIT 1)            AS last_reason_emoji,
+                ORDER BY v.created_at DESC, v.id DESC LIMIT 1)            AS last_reason_icon,
               (SELECT v.created_at FROM visits v WHERE v.doorbell_id = d.id
                 ORDER BY v.created_at DESC, v.id DESC LIMIT 1)            AS last_visit_at,
               (SELECT u.name FROM visits v JOIN users u ON u.id = v.user_id
@@ -944,19 +944,19 @@ export function requireTeamStreet(
 /* ========================== Ablehnungsgruende =========================== */
 
 export const DEFAULT_REASONS: Array<Omit<RejectionReason, "id" | "team_id">> = [
-  { code: "ZUFRIEDEN", label: "Zufrieden mit Anbieter", emoji: "🙂", hint: "Kunde will nicht wechseln", sort_order: 1, active: 1 },
-  { code: "KEIN_INTERESSE", label: "Kein Interesse", emoji: "🚫", hint: "Grundsätzliche Ablehnung", sort_order: 2, active: 1 },
-  { code: "KEINE_ZEIT", label: "Keine Zeit", emoji: "⏱️", hint: "Gerade ungelegen", sort_order: 3, active: 1 },
-  { code: "PARTNER", label: "Muss mit Partner sprechen", emoji: "👫", hint: "Entscheider nicht da", sort_order: 4, active: 1 },
-  { code: "VERTRAG_LAEUFT", label: "Vertrag läuft noch", emoji: "📆", hint: "Kündigungsfrist / Laufzeit", sort_order: 5, active: 1 },
-  { code: "SCHON_GEWECHSELT", label: "Gerade gewechselt", emoji: "🔁", hint: "Kürzlich neuer Vertrag", sort_order: 6, active: 1 },
-  { code: "ZU_TEUER", label: "Sieht keine Ersparnis", emoji: "💶", hint: "Preis überzeugt nicht", sort_order: 7, active: 1 },
-  { code: "KEINE_HAUSTUER", label: "Keine Haustürgeschäfte", emoji: "🚪", hint: "Grundsätzlich nichts an der Tür", sort_order: 8, active: 1 },
-  { code: "UNTERLAGEN", label: "Unterlagen fehlen", emoji: "📄", hint: "Letzte Abrechnung nicht zur Hand", sort_order: 9, active: 1 },
-  { code: "MIETER", label: "Mieter / entscheidet nicht", emoji: "🔑", hint: "Vermieter oder WEG entscheidet", sort_order: 10, active: 1 },
-  { code: "SCHLECHTE_ERFAHRUNG", label: "Schlechte Erfahrung", emoji: "😠", hint: "Ärger bei früherem Wechsel", sort_order: 11, active: 1 },
-  { code: "SPRACHE", label: "Sprachbarriere", emoji: "🗣️", hint: "Verständigung nicht möglich", sort_order: 12, active: 1 },
-  { code: "SONSTIGES", label: "Sonstiges", emoji: "✏️", hint: "Freitext eintragen", sort_order: 13, active: 1 },
+  { code: "ZUFRIEDEN", label: "Zufrieden mit Anbieter", icon: "smile", hint: "Kunde will nicht wechseln", sort_order: 1, active: 1 },
+  { code: "KEIN_INTERESSE", label: "Kein Interesse", icon: "hand", hint: "Grundsätzliche Ablehnung", sort_order: 2, active: 1 },
+  { code: "KEINE_ZEIT", label: "Keine Zeit", icon: "stopwatch", hint: "Gerade ungelegen", sort_order: 3, active: 1 },
+  { code: "PARTNER", label: "Muss mit Partner sprechen", icon: "couple", hint: "Entscheider nicht da", sort_order: 4, active: 1 },
+  { code: "VERTRAG_LAEUFT", label: "Vertrag läuft noch", icon: "contract", hint: "Kündigungsfrist / Laufzeit", sort_order: 5, active: 1 },
+  { code: "SCHON_GEWECHSELT", label: "Gerade gewechselt", icon: "switch", hint: "Kürzlich neuer Vertrag", sort_order: 6, active: 1 },
+  { code: "ZU_TEUER", label: "Sieht keine Ersparnis", icon: "euro", hint: "Preis überzeugt nicht", sort_order: 7, active: 1 },
+  { code: "KEINE_HAUSTUER", label: "Keine Haustürgeschäfte", icon: "door-slash", hint: "Grundsätzlich nichts an der Tür", sort_order: 8, active: 1 },
+  { code: "UNTERLAGEN", label: "Unterlagen fehlen", icon: "document", hint: "Letzte Abrechnung nicht zur Hand", sort_order: 9, active: 1 },
+  { code: "MIETER", label: "Mieter / entscheidet nicht", icon: "key", hint: "Vermieter oder WEG entscheidet", sort_order: 10, active: 1 },
+  { code: "SCHLECHTE_ERFAHRUNG", label: "Schlechte Erfahrung", icon: "frown", hint: "Ärger bei früherem Wechsel", sort_order: 11, active: 1 },
+  { code: "SPRACHE", label: "Sprachbarriere", icon: "speech", hint: "Verständigung nicht möglich", sort_order: 12, active: 1 },
+  { code: "SONSTIGES", label: "Sonstiges", icon: "pencil", hint: "Freitext eintragen", sort_order: 13, active: 1 },
 ];
 
 export function ensureDefaultReasons(teamId: number): void {
@@ -966,12 +966,12 @@ export function ensureDefaultReasons(teamId: number): void {
     .get(teamId) as { c: number };
   if (count.c > 0) return;
   const insert = db.prepare(
-    `INSERT INTO rejection_reasons (team_id, code, label, emoji, hint, sort_order, active)
+    `INSERT INTO rejection_reasons (team_id, code, label, icon, hint, sort_order, active)
      VALUES (?, ?, ?, ?, ?, ?, ?)`,
   );
   const run = db.transaction(() => {
     for (const r of DEFAULT_REASONS) {
-      insert.run(teamId, r.code, r.label, r.emoji, r.hint, r.sort_order, r.active);
+      insert.run(teamId, r.code, r.label, r.icon, r.hint, r.sort_order, r.active);
     }
   });
   run();
@@ -1095,7 +1095,7 @@ export interface VisitRow {
   street_name: string | null;
   territory_name: string | null;
   reason_label: string | null;
-  reason_emoji: string | null;
+  reason_icon: string | null;
 }
 
 export function listVisits(
@@ -1126,7 +1126,7 @@ export function listVisits(
               s.name AS street_name,
               t.name AS territory_name,
               r.label AS reason_label,
-              r.emoji AS reason_emoji
+              r.icon AS reason_icon
          FROM visits v
          JOIN users u ON u.id = v.user_id
          LEFT JOIN streets s ON s.id = v.street_id
@@ -1371,7 +1371,7 @@ export function memberStats(teamId: number, since?: string): MemberStats[] {
 export interface ReasonStat {
   id: number;
   label: string;
-  emoji: string;
+  icon: string;
   count: number;
 }
 
@@ -1383,7 +1383,7 @@ export function reasonStats(teamId: number, since?: string, userId?: number): Re
   params.push(teamId);
   return getDb()
     .prepare(
-      `SELECT r.id, r.label, r.emoji, COUNT(v.id) AS count
+      `SELECT r.id, r.label, r.icon, COUNT(v.id) AS count
          FROM rejection_reasons r
          LEFT JOIN visits v ON v.reason_id = r.id ${joinFilter}
         WHERE r.team_id = ?

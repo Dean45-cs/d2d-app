@@ -36,7 +36,7 @@ export interface Bell {
   not_home_count: number;
   met_count: number;
   last_outcome: VisitOutcome | null;
-  last_reason_emoji: string | null;
+  last_reason_icon: string | null;
   last_visit_at: string | null;
   last_visit_user: string | null;
   /** Wer zuletzt hier geklingelt hat - dazu gehoert das Profilbild. */
@@ -52,7 +52,7 @@ export const NEW_BELL = {
   not_home_count: 0,
   met_count: 0,
   last_outcome: null,
-  last_reason_emoji: null,
+  last_reason_icon: null,
   last_visit_at: null,
   last_visit_user: null,
   last_visit_user_id: null,

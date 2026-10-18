@@ -24,6 +24,7 @@ import {
 } from "@/components/icons";
 import { Sheet } from "@/components/Sheet";
 import { Cell, ListLabel, ProgressBar, ProgressRing } from "@/components/ui";
+import { Medal } from "./Medal";
 
 const number = (value: number) => value.toLocaleString("de-DE");
 
@@ -43,8 +44,8 @@ const ICONS = {
 
 /**
  * Abzeichen als Raster runder Medaillen, nach Stufe gruppiert. Erreicht:
- * volles Gruen mit Zeichen. Offen: neutral, mit Ring fuer den Fortschritt.
- * Ein Tipp zeigt, was fehlt.
+ * gepraegt im Metall der Stufe. Offen: leerer Rohling, mit Ring fuer den
+ * Fortschritt. Ein Tipp zeigt, was fehlt.
  */
 export function Achievements({ achievements }: { achievements: Achievement[] }) {
   const [tier, setTier] = useState<AchievementTier | "all">("all");
@@ -71,7 +72,7 @@ export function Achievements({ achievements }: { achievements: Achievement[] }) 
           <li>
             <Cell
               onClick={() => setOpen(next)}
-              icon={<Medal achievement={next} size={40} />}
+              icon={<Badge achievement={next} size={40} />}
               title={next.title}
               subtitle={`Nächstes · ${number(Math.min(next.current, next.target))} von ${number(next.target)}`}
               chevron
@@ -94,6 +95,7 @@ export function Achievements({ achievements }: { achievements: Achievement[] }) 
               aria-pressed={tier === entry.id}
               onClick={() => setTier(entry.id)}
             >
+              <Medal tier={entry.id} size={16} />
               {entry.label}
               <span className="font-normal text-muted">
                 {badges.filter((badge) => badge.unlocked).length}/{badges.length}
@@ -118,7 +120,7 @@ export function Achievements({ achievements }: { achievements: Achievement[] }) 
                     className="cell-tap flex h-full w-full flex-col items-center gap-2 px-2 py-4 text-center"
                     aria-label={`${achievement.title}: ${achievement.unlocked ? "erreicht" : `${number(achievement.current)} von ${number(achievement.target)}`}`}
                   >
-                    <Medal achievement={achievement} size={56} />
+                    <Badge achievement={achievement} size={56} />
                     <span className="line-clamp-2 text-footnote font-semibold">{achievement.title}</span>
                     <span className="text-caption text-muted">
                       {achievement.unlocked
@@ -138,23 +140,23 @@ export function Achievements({ achievements }: { achievements: Achievement[] }) 
   );
 }
 
-function Medal({ achievement, size }: { achievement: Achievement; size: number }) {
+function Badge({ achievement, size }: { achievement: Achievement; size: number }) {
   const Icon = ICONS[achievement.kind];
-  const icon = size >= 56 ? "h-6 w-6" : "h-5 w-5";
+  const icon = size >= 96 ? "h-10 w-10" : size >= 56 ? "h-6 w-6" : "h-5 w-5";
   if (achievement.unlocked) {
     return (
-      <span
-        className="glyph glyph-round glyph-result shrink-0"
-        style={{ width: size, height: size }}
-        aria-hidden="true"
-      >
+      <Medal tier={achievement.tier} size={size}>
         <Icon className={icon} />
-      </span>
+      </Medal>
     );
   }
+  const stroke = Math.max(3, Math.round(size / 14));
+  const blank = size - 2 * stroke - Math.max(4, Math.round(size / 12));
   return (
-    <ProgressRing value={achievement.current} max={achievement.target} size={size} stroke={Math.max(3, Math.round(size / 14))}>
-      <Icon className={`${icon} text-muted`} />
+    <ProgressRing value={achievement.current} max={achievement.target} size={size} stroke={stroke}>
+      <span className="medal-blank" style={{ width: blank, height: blank }}>
+        <Icon className={`${icon} text-muted`} />
+      </span>
     </ProgressRing>
   );
 }
@@ -165,7 +167,7 @@ function AchievementSheet({ achievement, onClose }: { achievement: Achievement; 
   return (
     <Sheet title={achievement.title} subtitle={achievement.description} onClose={onClose}>
       <div className="flex flex-col items-center gap-4 py-4">
-        <Medal achievement={achievement} size={96} />
+        <Badge achievement={achievement} size={96} />
         {achievement.unlocked ? (
           <p className="flex items-center gap-2 text-headline text-accent-ink">
             <IconCheck className="h-5 w-5" />

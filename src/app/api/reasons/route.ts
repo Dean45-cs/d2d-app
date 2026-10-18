@@ -2,6 +2,7 @@ import { requirePermission } from "@/lib/permissions";
 import { getDb } from "@/lib/db";
 import { handle, optionalText, requireText } from "@/lib/api";
 import { reasonCode } from "@/lib/queries";
+import { DEFAULT_REASON_ICON, isReasonIcon } from "@/lib/reason-icons";
 
 export const dynamic = "force-dynamic";
 
@@ -19,13 +20,13 @@ export async function POST(request: Request) {
     const code = reasonCode(leader.team_id, label, optionalText(body.code, 40), max.m + 1);
 
     db.prepare(
-      `INSERT INTO rejection_reasons (team_id, code, label, emoji, hint, sort_order, active)
+      `INSERT INTO rejection_reasons (team_id, code, label, icon, hint, sort_order, active)
        VALUES (?, ?, ?, ?, ?, ?, 1)`,
     ).run(
       leader.team_id,
       code,
       label,
-      optionalText(body.emoji, 8) || "💬",
+      isReasonIcon(body.icon) ? body.icon : DEFAULT_REASON_ICON,
       optionalText(body.hint, 120),
       max.m + 1,
     );

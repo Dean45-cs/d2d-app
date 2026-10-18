@@ -81,7 +81,7 @@ export function BellBoard({
                       <IconBan className="h-4 w-4" />
                     </span>
                   ) : bell.last_outcome ? (
-                    <OutcomeGlyph outcome={bell.last_outcome} emoji={bell.last_reason_emoji} />
+                    <OutcomeGlyph outcome={bell.last_outcome} reason={bell.last_reason_icon} />
                   ) : face ? (
                     <Avatar name={face.name} src={face.avatar} size={32} />
                   ) : (

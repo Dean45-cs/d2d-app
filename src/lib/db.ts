@@ -2,6 +2,7 @@ import Database from "better-sqlite3";
 import fs from "node:fs";
 import path from "node:path";
 import { avatarSrc } from "./avatar-src";
+import { reasonIconFor } from "./reason-icons";
 
 /**
  * Zentrale SQLite-Verbindung.
@@ -117,7 +118,7 @@ function migrate(db: Database.Database) {
       team_id    INTEGER NOT NULL REFERENCES teams(id) ON DELETE CASCADE,
       code       TEXT NOT NULL,
       label      TEXT NOT NULL,
-      emoji      TEXT NOT NULL DEFAULT '',
+      icon       TEXT NOT NULL DEFAULT '',
       hint       TEXT NOT NULL DEFAULT '',
       sort_order INTEGER NOT NULL DEFAULT 0,
       active     INTEGER NOT NULL DEFAULT 1,
@@ -244,6 +245,23 @@ function migrate(db: Database.Database) {
     "TEXT NOT NULL DEFAULT '' CHECK (building_type IN ('','EFH','MFH'))",
   );
   addColumn(db, "visits", "doorbell_id", "INTEGER REFERENCES doorbells(id) ON DELETE SET NULL");
+
+  /* Ablehnungsgruende tragen ein Zeichen der App (src/lib/reason-icons.ts)
+     statt eines Emojis. Aeltere Datenbanken bekommen die Spalte einmalig
+     nachgetragen, jeder Grund das passende Zeichen - nach seinem Code, sonst
+     nach dem bisherigen Emoji. Die Spalte "emoji" bleibt dort ungenutzt stehen. */
+  if (!hasColumn(db, "rejection_reasons", "icon")) {
+    addColumn(db, "rejection_reasons", "icon", "TEXT NOT NULL DEFAULT ''");
+    const reasons = db.prepare("SELECT id, code, emoji FROM rejection_reasons").all() as Array<{
+      id: number;
+      code: string;
+      emoji: string;
+    }>;
+    const setIcon = db.prepare("UPDATE rejection_reasons SET icon = ? WHERE id = ?");
+    db.transaction(() => {
+      for (const reason of reasons) setIcon.run(reasonIconFor(reason.code, reason.emoji), reason.id);
+    })();
+  }
 
   /* Profilbild des Mitarbeiters als Data-URL (kleines JPEG, von der
      Teamleitung beim Anlegen gesetzt). An der Tuer steht damit ein Gesicht

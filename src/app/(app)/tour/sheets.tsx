@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { Sheet } from "@/components/Sheet";
+import { ReasonTile } from "@/components/ReasonIcon";
 import {
   IconBan,
   IconUndo,
@@ -175,7 +176,7 @@ export function ReasonSheet({
             onClick={() => pick(reason)}
             className="flex min-h-14 items-center gap-3 rounded-xl bg-surface px-3 text-left text-subhead font-semibold transition-transform active:scale-[0.97] disabled:opacity-40"
           >
-            <span className="glyph">{reason.emoji || "·"}</span>
+            <ReasonTile name={reason.icon} />
             <span className="min-w-0 flex-1 leading-tight">{reason.label}</span>
           </button>
         ))}
@@ -819,7 +820,7 @@ export function DaySheet({
           <ul className="list list-icons">
             {recent.map((v) => (
               <li key={v.id} className="cell">
-                <OutcomeGlyph outcome={v.outcome} emoji={v.reason_emoji} />
+                <OutcomeGlyph outcome={v.outcome} reason={v.reason_icon} />
                 <span className="min-w-0 flex-1 truncate text-subhead">
                   {v.street_name ?? "–"} {v.house_number}
                   {v.reason_label && <span className="text-muted"> · {v.reason_label}</span>}
