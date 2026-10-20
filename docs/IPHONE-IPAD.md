@@ -101,7 +101,8 @@ Team also nicht erklären – nur den Link schicken.
 - Start direkt in der Türerfassung
 - **Erfassung ohne Netz**: Im Treppenhaus oder Keller wird jeder Tap auf dem
   Gerät gespeichert und automatisch nachgesendet, sobald wieder Empfang da ist.
-  Ein Banner zeigt, wie viele Einträge warten.
+  Ein Banner zeigt, wie viele Einträge warten. Auch ein Neustart im Funkloch
+  klappt: Klinken und Termine kommen dann mit dem zuletzt gespeicherten Stand.
 - Kein Zoom beim Doppeltippen, kein Gummiband-Scrollen – fühlt sich an wie eine App
 - **Push-Nachrichten** (ab iOS 16.4): Wer Kollegen abonniert, bekommt eine
   Nachricht, sobald sie einen Vertrag machen. Eingeschaltet wird im eigenen
@@ -193,7 +194,12 @@ anmelden muss. Wer das anders will, ändert `MAX_AGE_SECONDS` in
 **Gepufferte Einträge verschwinden**
 Sie liegen im Speicher des Browsers. Wird der Safari-Verlauf samt Websitedaten
 gelöscht, sind sie weg. Deshalb: bei schlechtem Empfang das Team bitten, die App
-kurz zu öffnen, sobald wieder Netz da ist – dann wird sofort nachgesendet.
+kurz zu öffnen, sobald wieder Netz da ist – dann wird sofort nachgesendet. Die App
+bittet den Browser außerdem, wartende Einträge nicht bei Platzmangel wegzuräumen.
+
+**„Abmelden braucht Verbindung“**
+Ohne Netz kann die Sitzung auf dem Server nicht beendet werden – die App bleibt
+deshalb angemeldet, statt nur so zu tun. Bei Empfang erneut tippen.
 
 **Push kommt nicht an**
 Drei Dinge prüfen: Die App ist über „Zum Home-Bildschirm“ installiert (im

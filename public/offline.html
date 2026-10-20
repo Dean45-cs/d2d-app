@@ -141,8 +141,27 @@
         <circle cx="71.2" cy="28.8" r="6.75" fill="url(#cs-dot)"/>
       </svg>
       <h1>Keine Verbindung</h1>
-      <p>Erfasste Türen bleiben auf dem Gerät und werden nachgesendet, sobald wieder Netz da ist.</p>
+      <p id="text">Erfasste Türen bleiben auf dem Gerät und werden nachgesendet, sobald wieder Netz da ist.</p>
       <button type="button" onclick="location.reload()">Erneut versuchen</button>
     </main>
+    <script>
+      /* Wartende Eintraege nennen (src/lib/offline-queue.ts) - sie sind nicht verloren. */
+      try {
+        var queue = JSON.parse(localStorage.getItem("d2d_pending_visits") || "[]");
+        if (Array.isArray(queue) && queue.length > 0) {
+          document.getElementById("text").textContent =
+            (queue.length === 1
+              ? "1 Eintrag wartet auf dem Gerät und wird"
+              : queue.length + " Einträge warten auf dem Gerät und werden") +
+            " nachgesendet, sobald wieder Netz da ist.";
+        }
+      } catch (error) {}
+      /* Kommt das Netz zurueck, von selbst weiter - ohne Suchen nach dem Knopf. */
+      window.addEventListener("online", function () {
+        setTimeout(function () {
+          location.reload();
+        }, 1000);
+      });
+    </script>
   </body>
 </html>

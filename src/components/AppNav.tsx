@@ -9,6 +9,9 @@ import { Avatar } from "./ui";
 import { NAV_ICONS } from "./nav-icons";
 import { activeHref, type NavItem, type NavSection } from "@/lib/nav";
 import { forgetPushDevice } from "@/lib/push-client";
+import { fetchWithTimeout, flush } from "@/lib/offline-queue";
+import { clearOfflinePages } from "@/lib/offline-pages";
+import { useToast } from "./Toast";
 
 export interface NavUser {
   id: number;
@@ -18,21 +21,33 @@ export interface NavUser {
   avatar: string | null;
 }
 
-/** Abmelden und zurueck zur Anmeldung - von ueberall gleich. */
-export function useLogout() {
+/**
+ * Abmelden und zurueck zur Anmeldung - von ueberall gleich. Ohne Netz geht
+ * das nicht: die Sitzung bliebe auf dem Server bestehen, obwohl die App
+ * "abgemeldet" zeigt. Dann lieber ehrlich sagen und angemeldet bleiben.
+ */
+export function useLogout(userId: number) {
   const router = useRouter();
+  const toast = useToast();
   const [busy, setBusy] = useState(false);
   const logout = useCallback(async () => {
     setBusy(true);
     try {
+      // Wartende Eintraege noch mit dieser Anmeldung senden - danach fehlt sie dafuer.
+      await flush(userId).catch(() => undefined);
       // Erst das Geraet fuer Push abmelden - danach fehlt dafuer die Anmeldung.
       await forgetPushDevice().catch(() => undefined);
-      await fetch("/api/auth/logout", { method: "POST" });
-    } finally {
-      router.push("/login");
-      router.refresh();
+      const response = await fetchWithTimeout("/api/auth/logout", { method: "POST" });
+      if (!response.ok) throw new Error(`Abmelden: ${response.status}`);
+    } catch {
+      setBusy(false);
+      toast("Abmelden braucht Verbindung – bitte bei Empfang erneut tippen");
+      return;
     }
-  }, [router]);
+    await clearOfflinePages();
+    router.push("/login");
+    router.refresh();
+  }, [router, toast, userId]);
   return { logout, busy };
 }
 
@@ -121,7 +136,7 @@ const SIDEBAR_COOKIE = "cs_sidebar";
 
 export function Sidebar({ sections, user }: { sections: NavSection[]; user: NavUser }) {
   const pathname = usePathname();
-  const { logout, busy } = useLogout();
+  const { logout, busy } = useLogout(user.id);
   const account: NavItem = { href: "/profil", label: "Profil", icon: "profile", match: [`/profil/${user.id}`] };
   const active = activeHref([...sections.flatMap((s) => s.items), account], pathname);
 

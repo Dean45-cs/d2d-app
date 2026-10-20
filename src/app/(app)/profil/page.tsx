@@ -105,7 +105,7 @@ export default async function ProfileHubPage() {
       </ul>
 
       <ul className="list mt-6">
-        <LogoutCell />
+        <LogoutCell userId={user.id} />
       </ul>
 
       <p className="list-footer text-center">

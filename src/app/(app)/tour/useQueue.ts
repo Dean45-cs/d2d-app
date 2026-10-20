@@ -2,13 +2,15 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { flush, getQueue, startAutoFlush, subscribe, type QueuedWrite } from "@/lib/offline-queue";
+import { flush, getQueue, QUEUE_FLUSHED_EVENT, subscribe, type FlushResult, type QueuedWrite } from "@/lib/offline-queue";
 import { levelFeedbackText, type LevelFeedback } from "@/lib/level-feedback";
 
 /**
  * Warteschlange und Netz im Blick: was noch nicht beim Server ist, wird
- * automatisch nachgesendet, sobald Empfang da ist. Die Oberflaeche zeigt
- * davon nur eine kleine Plakette - erfasst wird ohne Unterbrechung weiter.
+ * automatisch nachgesendet, sobald Empfang da ist (app-weit in
+ * src/components/OfflineSupport.tsx - von dort kommen auch die Toasts). Die
+ * Oberflaeche zeigt davon nur eine kleine Plakette - erfasst wird ohne
+ * Unterbrechung weiter.
  */
 export function useQueue(
   userId: number,
@@ -23,39 +25,20 @@ export function useQueue(
     setPending(getQueue(userId));
     setOnline(navigator.onLine);
     const unsubscribe = subscribe(setPending, userId);
-    const stopAutoFlush = startAutoFlush((result) => {
-      if (result.sent > 0) {
-        onProgress(result.progression);
-        notify(
-          [
-            result.sent === 1 ? "1 Eintrag nachgesendet" : `${result.sent} Einträge nachgesendet`,
-            levelFeedbackText(result.progression),
-          ]
-            .filter(Boolean)
-            .join(" · "),
-        );
-      }
-      if (result.rejected > 0) {
-        notify(
-          result.rejected === 1
-            ? "1 Eintrag konnte nicht gespeichert werden"
-            : `${result.rejected} Einträge konnten nicht gespeichert werden`,
-        );
-      }
-      if (result.held > 0) notify(heldText(result.held));
-      if (result.sent > 0 || result.rejected > 0) router.refresh();
-    }, userId);
+    // Nachgesendete Eintraege bringen XP mit - der Level-Ring zaehlt sie mit.
+    const flushed = (event: Event) => onProgress((event as CustomEvent<FlushResult>).detail.progression);
+    window.addEventListener(QUEUE_FLUSHED_EVENT, flushed);
 
     const update = () => setOnline(navigator.onLine);
     window.addEventListener("online", update);
     window.addEventListener("offline", update);
     return () => {
       unsubscribe();
-      stopAutoFlush();
+      window.removeEventListener(QUEUE_FLUSHED_EVENT, flushed);
       window.removeEventListener("online", update);
       window.removeEventListener("offline", update);
     };
-  }, [router, userId, onProgress, notify]);
+  }, [userId, onProgress]);
 
   const sendNow = useCallback(async () => {
     const result = await flush(userId);
