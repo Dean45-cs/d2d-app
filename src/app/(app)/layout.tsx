@@ -8,6 +8,7 @@ import { navigation } from "@/lib/nav";
 import { mapConfig } from "@/lib/map";
 import { MapConfigProvider } from "@/components/map/MapConfig";
 import { PushSync } from "@/components/PushSync";
+import { OfflineSupport } from "@/components/OfflineSupport";
 
 export const dynamic = "force-dynamic";
 
@@ -34,7 +35,11 @@ export default async function AppLayout({ children }: Readonly<{ children: React
       <ToastProvider>
         <div className="shell" data-sidebar={sidebar}>
           <Sidebar sections={nav.sidebar} user={navUser} />
-          <main className="shell-main">{children}</main>
+          <main className="shell-main">
+            {/* Zeitstempel je Server-Aufruf: daran erkennt die App, dass frische Daten da sind. */}
+            <OfflineSupport userId={user.id} renderedAt={Date.now()} />
+            {children}
+          </main>
           <TabBar tabs={nav.tabs} user={navUser} />
         </div>
         <PushSync userId={user.id} />

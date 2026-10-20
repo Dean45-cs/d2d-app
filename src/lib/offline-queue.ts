@@ -300,6 +300,12 @@ export async function flush(userId?: number): Promise<FlushResult> {
   return { sent, rejected, held, remaining: getQueue(userId).length, progression };
 }
 
+/**
+ * Meldet ein automatisches Nachsenden an die ganze Seite (detail: FlushResult) -
+ * etwa an die Tuer, damit ihr Level-Ring die nachgesendeten XP mitzaehlt.
+ */
+export const QUEUE_FLUSHED_EVENT = "d2d-queue-flushed";
+
 /** Hängt sich an die Ereignisse, bei denen ein neuer Versuch sinnvoll ist. */
 export function startAutoFlush(onFlushed: (result: FlushResult) => void, userId?: number): () => void {
   if (typeof window === "undefined") return () => {};

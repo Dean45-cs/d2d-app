@@ -9,6 +9,7 @@ import { useToast } from "@/components/Toast";
 import { IconCalendar, IconCheck, IconDoor, IconNavigate, IconPhone, IconUndo } from "@/components/icons";
 import { routeUrl } from "@/lib/map";
 import { parseSlot, slotDate, slotLabel, slotOverdue, toSlot } from "@/lib/appointments";
+import { fetchWithTimeout } from "@/lib/offline-queue";
 
 type View = "open" | "done";
 
@@ -56,7 +57,7 @@ export function AppointmentList({
   async function setDone(item: AppointmentRow, done: boolean) {
     setBusy(item.id);
     try {
-      const response = await fetch(`/api/visits/${item.id}`, {
+      const response = await fetchWithTimeout(`/api/visits/${item.id}`, {
         method: "PATCH",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ done }),

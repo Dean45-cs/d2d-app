@@ -720,13 +720,28 @@ Installation noch Service Worker.
 
 **Erfassung ohne Empfang:** Tippt jemand im Treppenhaus ohne Netz ein Ergebnis, landet der
 Eintrag im Speicher des Geräts. Ein Banner zeigt, wie viele Einträge warten; sobald wieder
-Verbindung besteht, werden sie automatisch nachgesendet (bei erneutem Öffnen der App, beim
-Wechsel auf „online“ und alle 30 Sekunden). Einträge, die der Server dauerhaft ablehnt –
-etwa weil das Gebiet gelöscht wurde – werden verworfen, damit die Schlange nicht blockiert.
+Verbindung besteht, werden sie automatisch nachgesendet – von jeder Seite der App aus (beim
+Öffnen, beim Zurückkehren in die App, beim Wechsel auf „online“ und alle 30 Sekunden).
+Einträge, die der Server dauerhaft ablehnt – etwa weil das Gebiet gelöscht wurde – werden
+verworfen, damit die Schlange nicht blockiert. Hängt eine Anfrage bei schwachem Empfang,
+wird sie nach 8 Sekunden gemerkt statt die Knöpfe zu sperren.
 
-Der Service Worker speichert bewusst **nur** JavaScript, CSS und Icons zwischen, niemals
-HTML mit Teamdaten. So kann auf einem geteilten Gerät nach dem Abmelden keine gecachte
-Seite mehr auftauchen.
+**Start ohne Empfang:** Räumt das Handy die App im Funkloch weg, startet sie trotzdem –
+mit dem zuletzt gespeicherten Stand von Klinken und Terminen. Ein Hinweis oben nennt die
+Uhrzeit dieses Stands; Türen lassen sich wie gewohnt erfassen und werden nachgesendet.
+Mit Empfang lädt die Seite sich von selbst neu. Dasselbe gilt, wenn der Server bei
+schwachem Netz nicht binnen 6 Sekunden antwortet oder gerade nicht erreichbar ist
+(502–504). Seiten, die nie gespeichert wurden, zeigen eine Offline-Seite, die bei
+Empfang von selbst weitermacht.
+
+Dafür speichert der Service Worker neben JavaScript, CSS und Icons auch die zuletzt
+geöffneten Seiten (höchstens 30, höchstens 7 Tage alt); Klinken und Termine frischt die
+App auf Handy und Tablet im Hintergrund auf (höchstens alle 5 Minuten, nicht im
+Datensparmodus). Gezeigt werden diese Seiten nur ohne Netz. Weil sie Teamdaten enthalten,
+werden sie gelöscht, sobald die Anmeldeseite erscheint – beim Abmelden, nach einer
+abgelaufenen Sitzung und beim Kontowechsel auf einem geteilten Gerät. Abmelden geht nur
+mit Verbindung; ohne Netz sagt die App das, statt nur so zu tun – die Sitzung bliebe
+sonst auf dem Server bestehen.
 
 Alles Weitere – Livegang in 15 Minuten, App-Store-Weg, Stolpersteine – steht in
 [docs/IPHONE-IPAD.md](docs/IPHONE-IPAD.md).
@@ -805,6 +820,7 @@ src/
     energy/           Preise, Bewertung, Tabellen-Import, Städteliste, Tagesquelle
     geo/              Flächenberechnung, Aufteilung, OpenStreetMap-Abfragen
     offline-queue.ts  Puffer für Türeinträge ohne Netz
+    offline-pages.ts  Gespeicherte Seiten für den Start ohne Netz (löschen, auffrischen)
   components/         UI-Bausteine, Diagramme, Navigation
     map/              Kartenschicht: OpenFreeMap (MapLibre), Apple Karten, OSM-Rückfall
 public/
@@ -875,8 +891,9 @@ Für Push-Nachrichten speichert die App je Gerät die Adresse beim Push-Dienst d
 Browsers; beim Ausschalten wird sie gelöscht.
 
 Ohne Netz liegen wartende Einträge **auf dem Gerät** im lokalen Speicher des Browsers, bis
-sie gesendet sind. Geräte des Außendienstes gehören deshalb gesperrt und im Verlustfall
-gelöscht.
+sie gesendet sind. Ebenso die zuletzt geöffneten Seiten der App (höchstens 7 Tage, gelöscht
+beim Abmelden), damit sie auch im Funkloch startet. Geräte des Außendienstes gehören
+deshalb gesperrt und im Verlustfall gelöscht.
 
 Wird beim Erfassen die Standortfreigabe erteilt, wird zusätzlich die Position des
 Erfassenden gespeichert – das ist eine Mitarbeiterortung und gehört mit dem Betriebsrat

@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { enqueue, flush, getQueue } from "@/lib/offline-queue";
+import { enqueue, fetchWithTimeout, flush, getQueue } from "@/lib/offline-queue";
 import { localSaleDrafts, SALE_DRAFT_EVENT, storeSaleDrafts } from "@/lib/sale-drafts-client";
 import type { SaleDraft } from "@/lib/sale-drafts";
 import type { LevelFeedback } from "@/lib/level-feedback";
@@ -66,7 +66,7 @@ export function PendingSales({
           );
         }
         if (result.sent) router.refresh();
-        const response = await fetch("/api/sale-drafts", { cache: "no-store" });
+        const response = await fetchWithTimeout("/api/sale-drafts", { cache: "no-store" });
         if (!response.ok) return;
         const data = await response.json();
         serverDrafts.current = data.drafts;

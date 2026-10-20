@@ -507,7 +507,7 @@ export function TourClient({
       return;
     }
     try {
-      const response = await fetch(`/api/doorbells/${bell.id}`, { method: "DELETE" });
+      const response = await fetchWithTimeout(`/api/doorbells/${bell.id}`, { method: "DELETE" });
       const data = await response.json();
       if (!response.ok) toast(data.error ?? "Nicht möglich");
       else router.refresh();
@@ -519,7 +519,7 @@ export function TourClient({
   async function renameBell(bell: Bell, label: string, floor: string) {
     if (bell.id === null || !label.trim()) return;
     try {
-      const response = await fetch(`/api/doorbells/${bell.id}`, {
+      const response = await fetchWithTimeout(`/api/doorbells/${bell.id}`, {
         method: "PATCH",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ label: label.trim(), floor: floor.trim() }),
@@ -708,7 +708,7 @@ export function TourClient({
 
   async function undo(id: number, door: SavedDoor) {
     try {
-      const response = await fetch(`/api/visits/${id}`, { method: "DELETE" });
+      const response = await fetchWithTimeout(`/api/visits/${id}`, { method: "DELETE" });
       const data = await response.json();
       if (!response.ok) {
         toast(data.error ?? "Nicht möglich");

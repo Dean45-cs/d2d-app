@@ -1,9 +1,11 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { IconEye, IconEyeOff } from "@/components/icons";
 import { InlineError } from "@/components/ui";
+import { fetchWithTimeout } from "@/lib/offline-queue";
+import { clearOfflinePages } from "@/lib/offline-pages";
 
 export function LoginForm() {
   const router = useRouter();
@@ -13,16 +15,25 @@ export function LoginForm() {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
+  // Wer hier landet, ist abgemeldet: gespeicherte Seiten des letzten Kontos verschwinden.
+  useEffect(() => {
+    void clearOfflinePages();
+  }, []);
+
   async function submit(event: React.FormEvent) {
     event.preventDefault();
     setBusy(true);
     setError(null);
     try {
-      const response = await fetch("/api/auth/login", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ email, password }),
-      });
+      const response = await fetchWithTimeout(
+        "/api/auth/login",
+        {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ email, password }),
+        },
+        15_000,
+      );
       const data = await response.json();
       if (!response.ok) {
         setError(data.error ?? "Anmeldung fehlgeschlagen.");
