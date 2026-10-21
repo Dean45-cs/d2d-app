@@ -22,8 +22,11 @@ export function PageHeader({
 }: {
   title: string;
   subtitle?: ReactNode;
-  /** Ruecksprung links oben, etwa "Gebiete". */
-  back?: { href: string; label: string };
+  /**
+   * Ruecksprung links oben, etwa "Gebiete". mobileOnly: die Seite steht ab
+   * dem iPad selbst in der Seitenleiste - dort waere "zurueck" irrefuehrend.
+   */
+  back?: { href: string; label: string; mobileOnly?: boolean };
   /** Zeichen-Knoepfe rechts oben (Neu, Menue, Filter). */
   actions?: ReactNode;
   /** Steht unter dem Titel - etwa eine Segmentleiste. */
@@ -55,7 +58,9 @@ export function PageHeader({
             {back && (
               <Link
                 href={back.href}
-                className="-ml-2 flex min-h-11 min-w-0 items-center gap-1 rounded-full pr-2 text-body text-accent-ink"
+                className={`-ml-2 flex min-h-11 min-w-0 items-center gap-1 rounded-full pr-2 text-body text-accent-ink ${
+                  back.mobileOnly ? "md:hidden" : ""
+                }`}
               >
                 <IconChevronLeft className="h-5 w-5 shrink-0" />
                 <span className="truncate">{back.label}</span>

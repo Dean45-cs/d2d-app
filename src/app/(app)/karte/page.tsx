@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { hasPermission } from "@/lib/permissions";
 import { requireUser } from "@/lib/auth";
 import { getTerritory, lastRefresh, listEnergyPrices } from "@/lib/queries";
@@ -29,6 +30,7 @@ import {
 } from "./data";
 
 export const dynamic = "force-dynamic";
+export const metadata: Metadata = { title: "Preise" };
 
 export default async function EnergyMapPage({
   searchParams,

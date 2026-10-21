@@ -31,6 +31,9 @@ export interface WorkDoor {
   bellsDone: number;
   lastAt: string | null;
   lastBy: string | null;
+  /** Offene Tueren im Haus (im Mehrfamilienhaus je Klingel) - davon erneut zu klingeln. */
+  openDoors: number;
+  retryDoors: number;
 }
 
 /** Strasse ohne einzelne Hausnummern - dann steht nur die Strasse auf der Karte. */
@@ -110,6 +113,10 @@ export function TerritoryWorkspace({ area, doors, streets, canRing }: Props) {
         if (key !== "all" && matches(door.state, key)) result[key]++;
       });
     }
+    // Offen und Nochmal zaehlen Tueren wie Kopf und Arbeitsstand - im
+    // Mehrfamilienhaus jede Klingel, nicht nur das Haus als einen Punkt.
+    result.todo = doors.reduce((sum, door) => sum + door.openDoors, 0);
+    result.retry = doors.reduce((sum, door) => sum + door.retryDoors, 0);
     return result;
   }, [doors]);
 

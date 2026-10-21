@@ -6,6 +6,7 @@ import {
   IconChevronRight,
   IconDoor,
   IconExternal,
+  IconPerson,
 } from "./icons";
 import { ReasonIcon } from "./ReasonIcon";
 
@@ -34,22 +35,26 @@ export function SectionHeader({
   action?: ReactNode;
   className?: string;
 }) {
+  // Titel und Verweis stehen auf einer Grundlinie; die 44-pt-Trefferflaeche
+  // des Verweises waechst per Polster nach oben, ohne die Zeile hoeher zu machen.
   return (
-    <div className={`mb-2 flex min-h-11 items-end justify-between gap-4 px-1 ${className}`}>
-      <h2 className="section-title min-w-0 truncate">
-        {title}
-        {count !== undefined && (
-          <span className="ml-2 font-normal text-muted">{count}</span>
+    <div className={`mb-2 flex min-h-11 items-end px-1 ${className}`}>
+      <div className="flex w-full items-baseline justify-between gap-4">
+        <h2 className="section-title min-w-0 truncate">
+          {title}
+          {count !== undefined && (
+            <span className="ml-2 font-normal text-muted">{count}</span>
+          )}
+        </h2>
+        {href ? (
+          <Link href={href} className="link -mb-2 -mt-4 shrink-0 pb-2 pt-4 text-subhead">
+            {linkLabel}
+            <IconChevronRight className="h-3.5 w-3.5" />
+          </Link>
+        ) : (
+          action && <div className="flex shrink-0 items-center gap-2">{action}</div>
         )}
-      </h2>
-      {href ? (
-        <Link href={href} className="link min-h-11 shrink-0 text-subhead">
-          {linkLabel}
-          <IconChevronRight className="h-3.5 w-3.5" />
-        </Link>
-      ) : (
-        action && <div className="flex shrink-0 items-center gap-2">{action}</div>
-      )}
+      </div>
     </div>
   );
 }
@@ -69,6 +74,8 @@ interface CellProps {
   icon?: ReactNode;
   title: ReactNode;
   subtitle?: ReactNode;
+  /** Untertitel darf auf zwei Zeilen umbrechen, statt abgeschnitten zu werden. */
+  wrap?: boolean;
   /** Wert rechts, leise (z. B. "3 offen"). */
   detail?: ReactNode;
   /** Eigenes Element rechts (Schalter, Knopf, Plakette). */
@@ -93,6 +100,7 @@ export function Cell({
   icon,
   title,
   subtitle,
+  wrap = false,
   detail,
   trailing,
   chevron,
@@ -108,7 +116,9 @@ export function Cell({
       {icon}
       <span className="min-w-0 flex-1">
         <span className={`block truncate text-body ${color}`}>{title}</span>
-        {subtitle && <span className="block truncate text-footnote text-muted">{subtitle}</span>}
+        {subtitle && (
+          <span className={`block text-footnote text-muted ${wrap ? "line-clamp-2" : "truncate"}`}>{subtitle}</span>
+        )}
       </span>
       {detail !== undefined && detail !== null && detail !== false && (
         <span className="shrink-0 text-subhead text-muted">{detail}</span>
@@ -188,7 +198,9 @@ export function StatGrid({
   return (
     <dl className={`grid gap-px overflow-hidden rounded-xl bg-separator ${grid}`}>
       {items.map((item) => (
-        <div key={item.label} className="flex min-w-0 flex-col-reverse bg-surface px-4 py-3">
+        // justify-end: in umgekehrter Spalte heisst das "oben" - Beschriftungen stehen auf einer
+        // Hoehe, auch wenn nur eine Nachbarzelle einen Zusatz traegt.
+        <div key={item.label} className="flex min-w-0 flex-col-reverse justify-end bg-surface px-4 py-3">
           {item.hint && <dd className="order-first truncate text-footnote text-muted">{item.hint}</dd>}
           <dd
             className={`kpi truncate ${size === "lg" ? "text-large-title" : "text-title-1"} ${
@@ -373,7 +385,8 @@ export function Avatar({
       style={{ width: size, height: size, fontSize: Math.round(size * 0.38) }}
       aria-hidden="true"
     >
-      {short || "–"}
+      {/* Noch kein Name (etwa beim Anlegen): ein Personenzeichen statt eines Strichs. */}
+      {short || <IconPerson className="h-1/2 w-1/2" />}
     </span>
   );
 }

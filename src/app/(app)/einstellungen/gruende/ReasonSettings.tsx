@@ -119,7 +119,7 @@ export function ReasonSettings({ reasons }: { reasons: RejectionReason[] }) {
   return (
     <div className="page-narrow">
       <PageHeader
-        back={{ href: "/profil", label: "Profil" }}
+        back={{ href: "/profil", label: "Profil", mobileOnly: true }}
         title="Ablehnungsgründe"
         subtitle={[`${active.length} an der Tür`, hidden.length > 0 && `${hidden.length} ausgeblendet`]
           .filter(Boolean)
@@ -139,11 +139,12 @@ export function ReasonSettings({ reasons }: { reasons: RejectionReason[] }) {
             {!sorting && (
               <button
                 type="button"
-                className="icon-btn icon-btn-accent"
+                className="btn btn-primary btn-sm"
                 aria-label="Grund hinzufügen"
                 onClick={() => setSheet("new")}
               >
-                <IconPlus className="h-5 w-5" />
+                <IconPlus className="h-4 w-4" />
+                Neu
               </button>
             )}
           </>

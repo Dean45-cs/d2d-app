@@ -1,5 +1,5 @@
 import { getDb } from "./db";
-import { doorStatus } from "./doors";
+import { doorStatus, type DoorFacts, type DoorStatus } from "./doors";
 import { listDoorbells, listHouseNumbers, listStreets } from "./queries";
 import { assertPermission, assertTerritoryAccess, territoryAssignee } from "./permissions";
 import type { Territory, User } from "./types";
@@ -23,6 +23,14 @@ export interface HandoverSummary {
   latest: { from_name: string | null; to_name: string | null; note: string; appointments_transferred: number; created_at: string } | null;
 }
 
+/**
+ * Stand einer Tuer - im Mehrfamilienhaus je Klingel. Eine Sperre am Haus
+ * gilt fuer jede Klingel darin. Uebergabe und Arbeitskarte zaehlen damit gleich.
+ */
+export function doorStateIn(house: { blocked_at: string | null }, door: DoorFacts): DoorStatus {
+  return doorStatus({ ...door, blocked_at: house.blocked_at ?? door.blocked_at });
+}
+
 export function handoverSummary(territory: Territory): HandoverSummary {
   const db = getDb();
   const streets = listStreets(territory.id);
@@ -36,7 +44,7 @@ export function handoverSummary(territory: Territory): HandoverSummary {
     const houseBells = bells.filter((bell) => bell.house_number_id === house.id);
     if (house.building_type === "MFH" && !houseBells.length && !house.blocked_at) summary.unknownBuildings++;
     for (const door of houseBells.length ? houseBells : [house]) {
-      const state = doorStatus({ ...door, blocked_at: house.blocked_at ?? door.blocked_at });
+      const state = doorStateIn(house, door);
       const label = "label" in door ? `${address} · ${door.label}` : address;
       if (state === "OPEN" || state === "RETRY") summary.openDoors++;
       if (state === "RETRY") summary.retryDoors++;

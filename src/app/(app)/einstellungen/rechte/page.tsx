@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { requireUser } from "@/lib/auth";
 import { listMembers } from "@/lib/queries";
@@ -8,6 +9,7 @@ import { PageHeader, plural } from "@/components/ui";
 import { PermissionEditor } from "./PermissionEditor";
 
 export const dynamic = "force-dynamic";
+export const metadata: Metadata = { title: "Rechte" };
 
 /**
  * Rechte je Person: links die Personen, die man verwalten darf, rechts
@@ -44,7 +46,7 @@ export default async function PermissionsPage({
   return (
     <div className="page">
       <PageHeader
-        back={{ href: "/profil", label: "Profil" }}
+        back={{ href: "/profil", label: "Profil", mobileOnly: true }}
         title="Rechte"
         subtitle={members.length > 0 ? plural(members.length, "Person", "Personen") : undefined}
       />

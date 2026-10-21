@@ -116,10 +116,20 @@ export function sameNumber(a: string, b: string): boolean {
   return a.trim().replace(/\s+/g, "").toLowerCase() === b.trim().replace(/\s+/g, "").toLowerCase();
 }
 
-/** Uhrzeit eines Eintrags ("2026-09-27 17:52:10", UTC) in Ortszeit. */
-export function formatTime(value: string): string {
+/** Zeitpunkt eines Eintrags ("2026-09-27 17:52:10", UTC) in Ortszeit: "17:52", "gestern 17:52", "Mo. 17:52", "21.09.". */
+export function formatTime(value: string, now = new Date()): string {
   const date = new Date(`${value.replace(" ", "T")}Z`);
-  return date.toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" });
+  const time = date.toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" });
+  // Nur heute genuegt die Uhrzeit - sonst sahe ein Eintrag von gestern aus wie von eben.
+  const day = new Date(date);
+  day.setHours(0, 0, 0, 0);
+  const today = new Date(now);
+  today.setHours(0, 0, 0, 0);
+  const days = Math.round((today.getTime() - day.getTime()) / 86_400_000);
+  if (days <= 0) return time;
+  if (days === 1) return `gestern ${time}`;
+  if (days < 7) return `${date.toLocaleDateString("de-DE", { weekday: "short" })} ${time}`;
+  return date.toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit" });
 }
 
 /** Naechste Hausnummern fuer Strassen ohne Liste: +1 und +2. */

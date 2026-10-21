@@ -105,7 +105,13 @@ export function navigation(role: Role, rights: PermissionSet, userId?: number): 
     tour,
     { href: "/gebiete", label: "Karte", icon: "map", match: ["/karte"] },
     { href: "/team", label: "Team", icon: "team", match: ["/profil/"] },
-    { href: "/profil", label: "Profil", icon: "profile", match: ["/einstellungen", ...me] },
+    // Ohne Teamrecht fuehrt "Meine Zahlen" aus dem Profil - dann bleibt dieser Reiter markiert.
+    {
+      href: "/profil",
+      label: "Profil",
+      icon: "profile",
+      match: ["/einstellungen", ...me, ...(reports ? [] : ["/start"])],
+    },
   ];
 
   const sidebar: NavSection[] = [

@@ -280,11 +280,12 @@ export function EnergyMapClient({
             {isLeader && (
               <button
                 type="button"
-                className="icon-btn icon-btn-accent"
+                className="btn btn-primary btn-sm"
                 onClick={() => setDraft(EMPTY_DRAFT)}
                 aria-label="Preis eintragen"
               >
-                <IconPlus className="h-5 w-5" />
+                <IconPlus className="h-4 w-4" />
+                Preis
               </button>
             )}
           </>
@@ -410,6 +411,8 @@ export function EnergyMapClient({
                         }
                         title={point.city || point.plz}
                         subtitle={[
+                          // Mehrere Preise in einer Stadt (je PLZ) - erst die PLZ macht die Zeilen unterscheidbar.
+                          point.city ? point.plz : null,
                           (energy === "gas" && point.gasProvider ? point.gasProvider : point.provider) || null,
                           point.stale ? "prüfen" : null,
                         ]

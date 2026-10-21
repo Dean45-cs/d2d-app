@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { requireUser } from "@/lib/auth";
 import { getLevelDashboard } from "@/lib/level-queries";
@@ -11,6 +12,7 @@ import { TEAM_VIEWS } from "../views";
 import { LevelInfo } from "./LevelInfo";
 
 export const dynamic = "force-dynamic";
+export const metadata: Metadata = { title: "Erfolge" };
 
 const number = (value: number) => value.toLocaleString("de-DE");
 

@@ -1,6 +1,7 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { hasPermission } from "@/lib/permissions";
-import { requireUser } from "@/lib/auth";
+import { getCurrentUser, requireUser } from "@/lib/auth";
 import {
   dailySeries,
   listAccessibleTerritories,
@@ -32,12 +33,17 @@ import { readArea } from "@/lib/geo/area";
 import { RangePicker } from "@/components/RangePicker";
 import { ShowMore } from "@/components/ShowMore";
 import { IconCalendar, IconChart, IconMap } from "@/components/icons";
-import { parseSlot } from "@/lib/appointments";
-import { greeting, sqlDateTime, todayLong } from "@/lib/format";
+import { normalizeSlot, parseSlot } from "@/lib/appointments";
+import { berlinSlot, greeting, sqlDateTime, todayLong } from "@/lib/format";
 import { parseRange, rangeToSince, type RangeKey } from "@/lib/ranges";
-import { territoryProgress } from "@/lib/progress";
+import { progressShare, territoryProgress } from "@/lib/progress";
 
 export const dynamic = "force-dynamic";
+
+export async function generateMetadata(): Promise<Metadata> {
+  const user = await getCurrentUser();
+  return { title: user && hasPermission(user, "reports.team") ? "Übersicht" : "Meine Zahlen" };
+}
 
 const RANGE_TITLE: Record<RangeKey, string> = {
   "1": "Heute",
@@ -234,14 +240,20 @@ export default async function StartPage({ searchParams }: { searchParams: Promis
               <ul className="list list-icons">
                 {activeTerritories.slice(0, 5).map((t) => {
                   const progress = territoryProgress(t);
+                  const share = progressShare(progress);
                   const info = providerOf.get(t.id);
                   const lead = info?.strom ?? info?.gas ?? null;
                   return (
                     <li key={t.id}>
                       <Cell
                         href={`/gebiete/${t.id}`}
-                        icon={<ProgressRing value={progress.done} max={Math.max(progress.total, 1)} size={32} stroke={4} />}
+                        icon={
+                          <ProgressRing value={progress.done} max={Math.max(progress.total, 1)} size={36} stroke={4}>
+                            {share !== null ? share : ""}
+                          </ProgressRing>
+                        }
                         title={t.name}
+                        wrap
                         subtitle={[
                           t.assignee_name ?? "Nicht zugeteilt",
                           progress.label,
@@ -309,16 +321,18 @@ export default async function StartPage({ searchParams }: { searchParams: Promis
   );
 }
 
-/** Tag und Uhrzeit eines Termins als kleiner Block links in der Zeile. */
+/** Tag und Uhrzeit eines Termins als kleiner Block links in der Zeile; ueberfaellig rot wie unter Termine. */
 function SlotBadge({ slot }: { slot: string }) {
   const date = parseSlot(slot);
   if (!date) return <span className="glyph" />;
+  // Termine stehen in Berliner Ortszeit - der Server rechnet in UTC.
+  const late = normalizeSlot(slot) < berlinSlot();
   return (
-    <span className="glyph glyph-lg flex-col gap-0 leading-none">
-      <span className="text-caption-2 text-muted">
+    <span className={`glyph glyph-lg flex-col gap-0 leading-none ${late ? "bg-danger-tint text-danger" : ""}`}>
+      <span className={`text-caption-2 ${late ? "" : "text-muted"}`}>
         {date.toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit" })}
       </span>
-      <span className="text-caption font-bold text-ink">
+      <span className={`text-caption font-bold ${late ? "" : "text-ink"}`}>
         {String(date.getHours()).padStart(2, "0")}:{String(date.getMinutes()).padStart(2, "0")}
       </span>
     </span>

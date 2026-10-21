@@ -28,7 +28,7 @@ type Status = "OPEN" | "ACTIVE" | "PAUSED" | "DONE";
 const STATUS_OPTIONS: Array<{ value: Status; label: string }> = [
   { value: "OPEN", label: "Offen" },
   { value: "ACTIVE", label: "In Arbeit" },
-  { value: "PAUSED", label: "Pause" },
+  { value: "PAUSED", label: "Pausiert" },
   { value: "DONE", label: "Fertig" },
 ];
 

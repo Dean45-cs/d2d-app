@@ -31,7 +31,7 @@ export function AppointmentList({
   isLeader: boolean;
   /** Profilbilder je Mitarbeiter-ID - nur fuer die Teamleitung. */
   faces: Record<number, string>;
-  back: { href: string; label: string };
+  back: { href: string; label: string; mobileOnly?: boolean };
 }) {
   const router = useRouter();
   const toast = useToast();

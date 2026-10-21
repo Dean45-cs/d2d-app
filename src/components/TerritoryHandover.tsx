@@ -141,7 +141,7 @@ export function TerritoryHandover({ summary }: { summary: HandoverSummary }) {
               <Cell title="Termine übergeben" detail={summary.latest.appointments_transferred} />
             </li>
             <li>
-              <Cell title="Datum" detail={new Date(`${summary.latest.created_at.replace(" ", "T")}Z`).toLocaleDateString("de-DE")} />
+              <Cell title="Datum" detail={new Date(`${summary.latest.created_at.replace(" ", "T")}Z`).toLocaleDateString("de-DE", { timeZone: "Europe/Berlin" })} />
             </li>
           </ul>
           {summary.latest.note && (

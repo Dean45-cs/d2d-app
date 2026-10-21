@@ -20,7 +20,8 @@ Kompakt, ohne Erklärtexte, eine Hauptaktion je Bildschirm.
 | --- | --- | --- | --- |
 | `--bg` | `#f2f2f7` | `#000000` | Seitengrund (gruppiert) |
 | `--surface` | `#ffffff` | `#1c1c1e` | Inhaltsfläche: Listen, Kennzahlen, Beiträge |
-| `--surface-2` | `#f2f2f7` | `#2c2c2e` | Fläche auf Fläche (selten), Kartengrund |
+| `--surface-2` | `#f2f2f7` | `#2c2c2e` | Fläche auf Fläche (selten) |
+| `--map-ground` | `#e5e5ea` | `#2c2c2e` | Kartengrund, solange Kacheln laden (hebt sich vom Seitengrund ab) |
 | `--fill` / `--fill-strong` | `#767680` 12 % / 20 % | 24 % / 34 % | Felder, Segmentleisten, Ringe-Spur |
 | `--ink` | `#0b0b0d` | `#f5f5f7` | Text |
 | `--ink-2` | `#3c3c43` | `#d1d1d6` | Beschriftung von Kennzahlen |
@@ -176,8 +177,8 @@ Alle in `src/components/`. Stil per Klassen aus `globals.css` (`@layer component
 
 | Baustein | Datei | Zweck |
 | --- | --- | --- |
-| `PageHeader` | `PageHeader.tsx` | Werkzeugleiste (Zurück, Aktionen) + großer Titel; wird beim Scrollen zu Glas mit kleinem Titel |
-| `Cell` | `ui.tsx` | Zeile einer gruppierten Liste (`ul.list`, `ul.list list-icons`) – Link, Knopf oder statisch |
+| `PageHeader` | `PageHeader.tsx` | Werkzeugleiste (Zurück, Aktionen) + großer Titel; wird beim Scrollen zu Glas mit kleinem Titel. `back.mobileOnly` für Seiten, die ab dem iPad selbst in der Seitenleiste stehen |
+| `Cell` | `ui.tsx` | Zeile einer gruppierten Liste (`ul.list`, `ul.list list-icons`) – Link, Knopf oder statisch; `wrap` lässt den Untertitel zweizeilig umbrechen statt ihn abzuschneiden |
 | `ListLabel`, `SectionHeader` | `ui.tsx` | Gruppenüberschrift (Versalien, klein) bzw. Abschnittstitel mit „Alle“ |
 | `StatGrid` | `ui.tsx` | Kennzahlen auf einer Fläche, Haarlinien dazwischen |
 | `ProgressRing`, `ProgressBar` | `ui.tsx` | Fortschritt im Akzent |
@@ -205,8 +206,14 @@ Alle in `src/components/`. Stil per Klassen aus `globals.css` (`@layer component
 
 - **Gruppierte Liste statt Karten.** Überschrift `ListLabel`, darunter
   `ul.list` mit `Cell`s. Kein Erklärtext – höchstens eine `list-footer`-Zeile.
-- **Eine Hauptaktion je Bildschirm** – oben rechts in der Werkzeugleiste
-  (`btn-primary btn-sm` oder `icon-btn-accent`) oder als Fuß im Blatt.
+- **Eine Hauptaktion je Bildschirm** – oben rechts in der Werkzeugleiste als
+  `btn-primary btn-sm` mit Zeichen und kurzem Wort („+ Neu“, „+ Preis“,
+  „Einladen“), oder als Fuß im Blatt. `icon-btn-accent` nur für Aktionen in
+  einer Zeile (Abhaken, Senden).
+- **Raster aus Kacheln** (Abzeichen) als `.tile-grid`: Haarlinien je Kachel,
+  eine unvollständige letzte Reihe bleibt Fläche statt graue Lücke.
+- **Untertitel immer** auf Seiten, die als Reiter nebeneinanderstehen (Feed,
+  Rangliste, Erfolge) – sonst springt die Segmentleiste beim Wechsel.
 - **Selten Gebrauchtes** hinter `Menu` („…“).
 - **Bearbeiten im Blatt** (`Sheet`), Hauptknopf im Fuß als `btn-primary btn-lg btn-block`.
 - **Löschen**: `useConfirm` mit `danger`. Alles andere: Toast mit „Rückgängig“.

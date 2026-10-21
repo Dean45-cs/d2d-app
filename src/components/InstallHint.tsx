@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { IconShare } from "./icons";
+import { IconChevronRight, IconShare } from "./icons";
 import { LogoMark } from "./Logo";
 import { Sheet } from "./Sheet";
 
@@ -53,6 +53,7 @@ export function InstallCell() {
       <button type="button" className="cell cell-tap" onClick={() => void install()}>
         <LogoMark size={32} />
         <span className="min-w-0 flex-1 truncate text-body">Als App installieren</span>
+        <IconChevronRight className="cell-chevron" />
       </button>
       {guide && (
         <Sheet title="Zum Home-Bildschirm" onClose={() => setGuide(false)}>

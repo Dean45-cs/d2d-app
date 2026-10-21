@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { requireUser } from "@/lib/auth";
 import { permissionsFor } from "@/lib/permissions";
@@ -11,6 +12,7 @@ import { FeedRefreshCell } from "./FeedRefreshCell";
 import { ReferenceSettings } from "./ReferenceSettings";
 
 export const dynamic = "force-dynamic";
+export const metadata: Metadata = { title: "Energie & Tarif" };
 
 /**
  * Energie & Tarif: woran Preise gemessen werden (Bundesschnitt), woher sie
@@ -86,7 +88,7 @@ export default async function EnergySettingsPage() {
   return (
     <div className="page-medium">
       <PageHeader
-        back={{ href: "/profil", label: "Profil" }}
+        back={{ href: "/profil", label: "Profil", mobileOnly: true }}
         title="Energie & Tarif"
         subtitle={prices.length > 0 ? `${plural(prices.length, "Ort", "Orte")} mit Preis` : "Noch keine Preise"}
       />

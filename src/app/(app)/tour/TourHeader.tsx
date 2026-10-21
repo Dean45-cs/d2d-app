@@ -84,7 +84,7 @@ export function TourHeader({
       </button>
       <p className="mt-1 truncate text-subhead text-ink-2">{place}</p>
       {/* An der Tuer das wichtigste Argument: wer liefert, zu welchem Preis. */}
-      {territory && <ProviderLine info={territory.provider} className="mt-1" />}
+      {territory && <ProviderLine info={territory.provider} className="mt-1 lg:max-w-md" />}
     </header>
   );
 }

@@ -157,7 +157,7 @@ export function Invitations({
   return (
     <>
       <PageHeader
-        back={{ href: "/profil", label: "Profil" }}
+        back={{ href: "/profil", label: "Profil", mobileOnly: true }}
         title="Einladungen"
         subtitle={
           [
