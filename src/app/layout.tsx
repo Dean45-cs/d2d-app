@@ -3,7 +3,7 @@ import "./globals.css";
 import { ServiceWorker } from "@/components/ServiceWorker";
 
 export const metadata: Metadata = {
-  title: "Carlsson Sales",
+  title: { default: "Carlsson Sales", template: "%s · Carlsson Sales" },
   description: "Gebiete, Türerfassung und Energiepreise für den Haustürvertrieb von Strom und Gas.",
   manifest: "/manifest.webmanifest",
   applicationName: "Carlsson Sales",

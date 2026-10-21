@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { requireUser } from "@/lib/auth";
 import { permissionsFor } from "@/lib/permissions";
 import { navigation } from "@/lib/nav";
@@ -11,6 +12,7 @@ import { IconCalendar, IconChart, IconSparkles, IconTarget } from "@/components/
 import { LogoutCell } from "./LogoutCell";
 
 export const dynamic = "force-dynamic";
+export const metadata: Metadata = { title: "Profil" };
 
 const TARIFRECHNER = process.env.NEXT_PUBLIC_TARIFRECHNER_URL ?? "https://portal-ep24.de/menues/tarifrechner/";
 

@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { requireUser } from "@/lib/auth";
 import { permissionsFor } from "@/lib/permissions";
@@ -5,6 +6,7 @@ import { listReasons } from "@/lib/queries";
 import { ReasonSettings } from "./ReasonSettings";
 
 export const dynamic = "force-dynamic";
+export const metadata: Metadata = { title: "Ablehnungsgründe" };
 
 /** Ablehnungsgruende des Teams - auch die ausgeblendeten. */
 export default async function ReasonsPage() {

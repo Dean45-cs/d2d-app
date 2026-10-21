@@ -22,6 +22,7 @@
   --color-bg: var(--bg);
   --color-surface: var(--surface);
   --color-surface-2: var(--surface-2);
+  --color-map-ground: var(--map-ground);
   --color-fill: var(--fill);
   --color-fill-strong: var(--fill-strong);
   --color-ink: var(--ink);
@@ -126,6 +127,9 @@
   --bg: #f2f2f7;
   --surface: #ffffff;
   --surface-2: #f2f2f7;
+  /* Grund einer Karte, solange die Kacheln laden - hebt sich hell vom
+     Seitengrund ab (--surface-2 waere dort unsichtbar). */
+  --map-ground: #e5e5ea;
   --fill: rgb(118 118 128 / 0.12);
   --fill-strong: rgb(118 118 128 / 0.2);
   --ink: #0b0b0d;
@@ -172,6 +176,7 @@
     --bg: #000000;
     --surface: #1c1c1e;
     --surface-2: #2c2c2e;
+    --map-ground: #2c2c2e;
     --fill: rgb(118 118 128 / 0.24);
     --fill-strong: rgb(118 118 128 / 0.34);
     --ink: #f5f5f7;
@@ -197,6 +202,7 @@
   --bg: #000000;
   --surface: #1c1c1e;
   --surface-2: #2c2c2e;
+  --map-ground: #2c2c2e;
   --fill: rgb(118 118 128 / 0.24);
   --fill-strong: rgb(118 118 128 / 0.34);
   --ink: #f5f5f7;
@@ -543,6 +549,20 @@
     height: 14px;
     color: var(--muted);
     opacity: 0.7;
+  }
+
+  /* Raster aus Kacheln auf einer Flaeche (Abzeichen): Haarlinien rechts und
+     unten an jeder Kachel. Anders als gap-px auf grauem Grund bleibt eine
+     unvollstaendige letzte Reihe ruhig weiss statt als graue Luecke. */
+  .tile-grid {
+    background: var(--surface);
+    border-radius: var(--radius-xl);
+    overflow: hidden;
+  }
+  .tile-grid > * {
+    box-shadow:
+      1px 0 0 var(--separator),
+      0 1px 0 var(--separator);
   }
 
   /* -------------------------------- Knoepfe ------------------------------ */
@@ -1473,6 +1493,13 @@
 .sidebar-item[aria-current="page"] > svg {
   color: var(--accent-ink);
 }
+.sidebar-heading {
+  padding: 8px 12px 4px;
+  font-size: var(--text-footnote);
+  line-height: var(--text-footnote--line-height);
+  font-weight: 600;
+  color: var(--muted);
+}
 .sidebar-text {
   min-width: 0;
   overflow: hidden;
@@ -1486,6 +1513,17 @@
 .shell[data-sidebar="rail"] .rail-hide {
   display: none;
 }
+/* Schmal: Abschnittstitel werden zur Haarlinie zwischen den Gruppen -
+   unsichtbar, aber in voller Hoehe, liessen sie grosse Loecher. */
+.shell[data-sidebar="rail"] .sidebar-heading {
+  height: 1px;
+  margin: 0 14px 16px;
+  padding: 0;
+  overflow: hidden;
+  opacity: 1;
+  color: transparent;
+  background: var(--separator);
+}
 @media (max-width: 1023px) {
   .shell[data-sidebar="auto"] .sidebar-text {
     opacity: 0;
@@ -1493,6 +1531,15 @@
   }
   .shell[data-sidebar="auto"] .rail-hide {
     display: none;
+  }
+  .shell[data-sidebar="auto"] .sidebar-heading {
+    height: 1px;
+    margin: 0 14px 16px;
+    padding: 0;
+    overflow: hidden;
+    opacity: 1;
+    color: transparent;
+    background: var(--separator);
   }
 }
 
@@ -1587,6 +1634,8 @@
 }
 .tray-btn > span {
   min-width: 0;
+  -webkit-hyphens: auto;
+  hyphens: auto;
   overflow-wrap: anywhere;
 }
 .tray-btn-setup {
@@ -1639,7 +1688,7 @@
    ========================================================================== */
 
 .map-view {
-  background: var(--surface-2);
+  background: var(--map-ground);
 }
 
 .map-ctrl,
@@ -1846,7 +1895,10 @@
 
 /* ----------------------------- MapLibre ------------------------------- */
 
-.maplibregl-map {
+/* Bibliotheks-Styles laden nach dieser Datei - mit .map-view davor gewinnen
+   die eigenen Regeln trotzdem (sonst grauer Leaflet-Grund im Dunkeln,
+   Helvetica statt Systemschrift, weisse Tooltips). */
+.map-view .maplibregl-map {
   font-family: var(--font-sans);
 }
 .map-popup .maplibregl-popup-content {
@@ -1912,10 +1964,10 @@
 
 /* -------------------------- Rueckfall: Leaflet ------------------------- */
 
-.leaflet-container {
+.map-view .leaflet-container {
   /* Keine Hoehe hier: die kommt per Klasse vom Aufrufer (ungeschichtet
      wuerde sie die Tailwind-Klassen ueberstimmen). */
-  background: var(--surface-2);
+  background: var(--map-ground);
   font-family: var(--font-sans);
   z-index: 0;
 }
@@ -1931,7 +1983,7 @@
 :root[data-theme="dark"] .leaflet-tile-pane {
   filter: grayscale(0.7) invert(0.92) hue-rotate(180deg) brightness(0.9) contrast(0.92);
 }
-.leaflet-tooltip {
+.map-view .leaflet-tooltip {
   background: var(--glass-strong);
   color: var(--ink);
   border: 0;
@@ -1941,7 +1993,7 @@
   line-height: var(--text-footnote--line-height);
   padding: 8px 12px;
 }
-.leaflet-tooltip-top::before {
+.map-view .leaflet-tooltip-top::before {
   border-top-color: transparent;
 }
 .leaflet-control-attribution {

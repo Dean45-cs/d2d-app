@@ -88,7 +88,7 @@ export function TeamTable({
   return (
     <>
       <PageHeader
-        back={{ href: "/profil", label: "Profil" }}
+        back={{ href: "/profil", label: "Profil", mobileOnly: true }}
         title="Mitglieder"
         subtitle={[
           `${active.length} aktiv`,

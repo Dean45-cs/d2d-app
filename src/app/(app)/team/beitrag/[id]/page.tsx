@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { hasPermission } from "@/lib/permissions";
 import { requireUser } from "@/lib/auth";
@@ -7,6 +8,7 @@ import { EmptyState, PageHeader } from "@/components/ui";
 import { IconChat } from "@/components/icons";
 
 export const dynamic = "force-dynamic";
+export const metadata: Metadata = { title: "Beitrag" };
 
 /**
  * Ein einzelner Beitrag mit allen Kommentaren - hierhin fuehrt ein Tipp auf

@@ -174,10 +174,11 @@ export function ReasonSheet({
             type="button"
             disabled={busy}
             onClick={() => pick(reason)}
-            className="flex min-h-14 items-center gap-3 rounded-xl bg-surface px-3 text-left text-subhead font-semibold transition-transform active:scale-[0.97] disabled:opacity-40"
+            className="flex min-h-14 items-center gap-2.5 rounded-xl bg-surface px-3 text-left text-subhead font-semibold transition-transform active:scale-[0.97] disabled:opacity-40"
           >
             <ReasonTile name={reason.icon} />
-            <span className="min-w-0 flex-1 leading-tight">{reason.label}</span>
+            {/* Lange Woerter ("Haustürgeschäfte") nach Silben trennen statt mitten im Wort abzuhacken. */}
+            <span className="min-w-0 flex-1 leading-tight hyphens-auto">{reason.label}</span>
           </button>
         ))}
       </div>
@@ -476,9 +477,10 @@ export function HouseSheet({
           onType(value);
           if (value === "MFH" && bells.length === 0) setAdding(true);
         }}
+        // Auf dem Handy ohne Zeichen - sonst passt "Mehrfamilienhaus" nicht ganz hinein.
         options={[
-          { value: "EFH", label: "Einfamilienhaus", icon: <IconHome className="h-4 w-4" /> },
-          { value: "MFH", label: "Mehrfamilienhaus", icon: <IconBuilding className="h-4 w-4" /> },
+          { value: "EFH", label: "Einfamilienhaus", icon: <IconHome className="hidden h-4 w-4 shrink-0 sm:block" /> },
+          { value: "MFH", label: "Mehrfamilienhaus", icon: <IconBuilding className="hidden h-4 w-4 shrink-0 sm:block" /> },
         ]}
       />
 

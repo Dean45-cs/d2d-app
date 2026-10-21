@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { permissionsFor, structureIds } from "@/lib/permissions";
 import { requireUser } from "@/lib/auth";
 import { listMembers, listAccessibleTerritories } from "@/lib/queries";
@@ -18,6 +19,7 @@ import { MAP_VIEWS } from "./views";
 import { progressShare, territoryProgress } from "@/lib/progress";
 
 export const dynamic = "force-dynamic";
+export const metadata: Metadata = { title: "Gebiete" };
 
 export default async function TerritoriesPage() {
   const user = await requireUser();
@@ -106,8 +108,9 @@ export default async function TerritoriesPage() {
                       </ProgressRing>
                     }
                     title={t.name}
+                    wrap
                     subtitle={[
-                      isLeader ? (t.assignee_name ?? "Frei") : t.city || null,
+                      isLeader ? (t.assignee_name ?? "Nicht zugeteilt") : t.city || null,
                       progress.label,
                       t.sale_count > 0 ? plural(t.sale_count, "Abschluss", "Abschlüsse") : null,
                     ]

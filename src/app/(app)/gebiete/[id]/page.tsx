@@ -1,9 +1,10 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { handoverSummary } from "@/lib/territory-handover";
+import { doorStateIn, handoverSummary } from "@/lib/territory-handover";
 import { TerritoryHandover } from "@/components/TerritoryHandover";
 import { canAccessTerritory, permissionsFor, structureIds } from "@/lib/permissions";
-import { requireUser } from "@/lib/auth";
+import { getCurrentUser, requireUser } from "@/lib/auth";
 import { getDb } from "@/lib/db";
 import { doorStatus } from "@/lib/doors";
 import {
@@ -11,6 +12,7 @@ import {
   listMembers,
   listStreets,
   listHouseNumbers,
+  listDoorbells,
   listAccessibleTerritories,
   listVisits,
   type HouseNumberWithStats,
@@ -37,6 +39,13 @@ import {
 import { StreetList } from "./StreetList";
 
 export const dynamic = "force-dynamic";
+
+/** Der Name im Fenstertitel - nur, wer das Gebiet sehen darf, erfaehrt ihn. */
+export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
+  const user = await getCurrentUser();
+  const territory = user ? getTerritory(Number((await params).id), user.team_id) : null;
+  return { title: user && territory && canAccessTerritory(user, territory) ? territory.name : "Gebiet" };
+}
 
 const STATUS_LABEL: Record<string, string> = {
   OPEN: "Offen",
@@ -95,6 +104,26 @@ export default async function TerritoryDetailPage({
       })
     : [];
 
+  // Offene Tueren je Haus wie in der Uebergabe: im Mehrfamilienhaus zaehlt jede Klingel.
+  // So zeigen Kopf, Arbeitsstand und Kartenfilter dieselben Zahlen.
+  const bellsByHouse = new Map<number, ReturnType<typeof listDoorbells>>();
+  for (const bell of listDoorbells(houseNumbers.map((house) => house.id))) {
+    const list = bellsByHouse.get(bell.house_number_id) ?? [];
+    list.push(bell);
+    bellsByHouse.set(bell.house_number_id, list);
+  }
+  const doorCounts = (house: HouseNumberWithStats) => {
+    const bells = bellsByHouse.get(house.id) ?? [];
+    let openDoors = 0;
+    let retryDoors = 0;
+    for (const door of bells.length ? bells : [house]) {
+      const state = doorStateIn(house, door);
+      if (state === "OPEN" || state === "RETRY") openDoors++;
+      if (state === "RETRY") retryDoors++;
+    }
+    return { openDoors, retryDoors };
+  };
+
   // Jede Hausnummer mit Lage wird eine Tuer auf der Arbeitskarte.
   const streetName = new Map(streets.map((street) => [street.id, street.name]));
   const doors: WorkDoor[] = houseNumbers.flatMap((house) =>
@@ -114,6 +143,7 @@ export default async function TerritoryDetailPage({
             bellsDone: house.bell_done_count,
             lastAt: house.last_visit_at,
             lastBy: house.last_visit_user,
+            ...doorCounts(house),
           },
         ]
       : [],

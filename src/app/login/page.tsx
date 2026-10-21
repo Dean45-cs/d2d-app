@@ -6,7 +6,7 @@ import { LogoMark } from "@/components/Logo";
 import { LoginForm } from "./LoginForm";
 
 export const dynamic = "force-dynamic";
-export const metadata: Metadata = { title: "Anmelden · Carlsson Sales" };
+export const metadata: Metadata = { title: "Anmelden" };
 
 export default async function LoginPage() {
   const user = await getCurrentUser();

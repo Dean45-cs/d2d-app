@@ -353,7 +353,7 @@ export function MapView({
       )}
 
       {!engine && (
-        <div className="absolute inset-0 z-[600] grid place-items-center bg-surface-2">
+        <div className="absolute inset-0 z-[600] grid place-items-center bg-map-ground">
           <div className="map-loading" aria-hidden />
           <p className="sr-only">Karte wird geladen</p>
         </div>

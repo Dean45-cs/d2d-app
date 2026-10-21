@@ -143,14 +143,26 @@ export function ProviderSummary({
             </span>
           }
           title={info ? info.provider || "Grundversorger unbekannt" : "Noch kein Preis"}
+          wrap={!info}
           subtitle={
-            info
-              ? [sourceNote(info), info.manual && info.validFrom ? `ab ${dateLabel(info.validFrom)}` : info.manual ? "Preisblatt" : "Tagesquelle"]
-                  .filter(Boolean)
-                  .join(" · ")
-              : "Für diesen Ort ist kein Tarif hinterlegt."
+            info ? (
+              <>
+                <span className="block truncate">
+                  {[sourceNote(info), info.manual && info.validFrom ? `ab ${dateLabel(info.validFrom)}` : info.manual ? "Preisblatt" : "Tagesquelle"]
+                    .filter(Boolean)
+                    .join(" · ")}
+                </span>
+                {/* Das Verkaufsargument als eigene Zeile - rechts daneben war fuer Ort und Name kein Platz. */}
+                {lead && (
+                  <span className={`block truncate ${lead.step >= 3 ? "font-semibold text-accent-ink" : ""}`}>
+                    {PRICE_LEVELS[lead.step].pitch}
+                  </span>
+                )}
+              </>
+            ) : (
+              "Für diesen Ort ist kein Tarif hinterlegt."
+            )
           }
-          detail={lead ? PRICE_LEVELS[lead.step].pitch : undefined}
         />
       </li>
       {info && (

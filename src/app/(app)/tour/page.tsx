@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { hasPermission } from "@/lib/permissions";
 import { requireUser } from "@/lib/auth";
 import { getDb } from "@/lib/db";
@@ -20,6 +21,7 @@ import { berlinMidnight, berlinSlot } from "@/lib/format";
 import type { Territory } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
+export const metadata: Metadata = { title: "Klinken" };
 
 export default async function TourPage({
   searchParams,

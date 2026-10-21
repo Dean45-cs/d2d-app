@@ -1,7 +1,8 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { hasPermission } from "@/lib/permissions";
-import { requireUser } from "@/lib/auth";
+import { getCurrentUser, requireUser } from "@/lib/auth";
 import { dailySeries, totals } from "@/lib/queries";
 import { activeDays, bestDay, getProfile, listFeed, teamTotals, type FeedScope } from "@/lib/community";
 import { firstName, metricByKey, milestoneProgress, rank, saleStreak } from "@/lib/ranking";
@@ -18,6 +19,12 @@ import { IconCalendar, IconTrophy } from "@/components/icons";
 
 export const dynamic = "force-dynamic";
 
+export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
+  const user = await getCurrentUser();
+  const profile = user ? getProfile(Number((await params).id), user.team_id, user.id) : null;
+  return { title: profile?.name ?? "Profil" };
+}
+
 const TABS = [
   { key: "beitraege", label: "Beiträge" },
   { key: "abschluesse", label: "Abschlüsse" },
@@ -28,7 +35,7 @@ type TabKey = (typeof TABS)[number]["key"];
 
 /**
  * Profil einer Person: wer sie ist (Bild, ein Satz, Abonnenten) und was sie
- * leistet - Zahlen, Level, Abzeichen, die letzten zwei Wochen. Daneben (auf
+ * leistet - Zahlen, Level, Meilensteine, die letzten zwei Wochen. Daneben (auf
  * dem Handy darunter) ihre Beitraege. Wer ein Profil oeffnet, soll sehen,
  * was moeglich ist.
  */
@@ -182,7 +189,7 @@ export default async function ProfilePage({
                   </span>
                   {progress.next !== null ? (
                     <span className="min-w-0 flex-1">
-                      <span className="block truncate text-footnote font-semibold text-ink-2">Nächstes Abzeichen</span>
+                      <span className="block truncate text-footnote font-semibold text-ink-2">Nächster Meilenstein</span>
                       <span className="flex items-baseline justify-between gap-2">
                         <span className="truncate text-headline">{milestoneLabel(progress.next)}</span>
                         <span className="kpi shrink-0 text-subhead text-muted">
@@ -191,7 +198,7 @@ export default async function ProfilePage({
                       </span>
                     </span>
                   ) : (
-                    <span className="min-w-0 flex-1 text-headline">Alle Abzeichen erreicht</span>
+                    <span className="min-w-0 flex-1 text-headline">Alle Meilensteine erreicht</span>
                   )}
                 </div>
                 {progress.next !== null && (
@@ -199,11 +206,11 @@ export default async function ProfilePage({
                     className="mt-3"
                     value={sales - progress.from}
                     max={progress.next - progress.from}
-                    label={`${sales} von ${progress.next} Abschlüssen bis zum nächsten Abzeichen`}
+                    label={`${sales} von ${progress.next} Abschlüssen bis zum nächsten Meilenstein`}
                   />
                 )}
                 {progress.reached.length > 0 && (
-                  <ul className="mt-4 flex flex-wrap gap-2" aria-label="Erreichte Abzeichen">
+                  <ul className="mt-4 flex flex-wrap gap-2" aria-label="Erreichte Meilensteine">
                     {progress.reached.map((milestone) => (
                       <li key={milestone}>
                         <Pill tone="accent">{milestoneLabel(milestone)}</Pill>
@@ -262,9 +269,12 @@ export default async function ProfilePage({
   );
 }
 
-/** "Erster Vertrag" bzw. "25 Abschlüsse". */
+/**
+ * "Erster Abschluss" bzw. "25 Abschlüsse". Meilensteine, nicht Abzeichen: die
+ * Abzeichen mit Medaillen stehen unter Erfolge - zwei Dinge, zwei Namen.
+ */
 function milestoneLabel(milestone: number): string {
-  return milestone === 1 ? "Erster Vertrag" : `${milestone} Abschlüsse`;
+  return milestone === 1 ? "Erster Abschluss" : `${milestone} Abschlüsse`;
 }
 
 /** "12.09." aus "2026-09-12". */

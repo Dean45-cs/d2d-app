@@ -132,12 +132,23 @@ export function AreaMap({ areas, legend, className, onSelect, children }: Props)
           <div className="pointer-events-none absolute inset-x-2 top-2 z-[500] flex flex-wrap gap-2">{children}</div>
         )}
         {legend && legend.length > 0 && (
-          <ul className="map-chip pointer-events-none absolute bottom-2 left-2 z-[500] gap-4" aria-label="Legende">
+          // Rechts bleibt die Spalte der Kartenknoepfe frei; reicht der Platz nicht, bricht die Legende um.
+          <ul
+            className="map-chip pointer-events-none absolute bottom-2 left-2 right-14 z-[500] w-fit flex-wrap gap-x-3 gap-y-1 px-3 py-2 text-caption-2"
+            aria-label="Legende"
+          >
             {legend.map((entry) => (
-              <li key={entry.label} className="flex items-center gap-2">
+              <li key={entry.label} className="flex items-center gap-1.5">
+                {/* Wie die Flaeche auf der Karte: Randfarbe, Fuellung und - fuer
+                    pausierte Gebiete - gestrichelt. Offen und Pause teilen die
+                    Farbe und unterscheiden sich nur am Strich. */}
                 <span
-                  className="h-2.5 w-2.5 rounded-full"
-                  style={{ background: TONE_LEGEND[entry.tone] }}
+                  className="h-2.5 w-2.5 rounded-xs border-2"
+                  style={{
+                    borderColor: TONE_LEGEND[entry.tone],
+                    borderStyle: entry.tone === "paused" ? "dashed" : "solid",
+                    background: `color-mix(in srgb, ${TONE_LEGEND[entry.tone]} ${entry.tone === "active" ? 16 : 8}%, transparent)`,
+                  }}
                   aria-hidden="true"
                 />
                 {entry.label}

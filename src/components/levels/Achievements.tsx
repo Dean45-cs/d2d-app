@@ -105,35 +105,37 @@ export function Achievements({ achievements }: { achievements: Achievement[] }) 
         })}
       </div>
 
-      {ACHIEVEMENT_TIERS.filter((entry) => tier === "all" || entry.id === tier).map((entry) => {
-        const badges = ordered.filter((badge) => badge.tier === entry.id);
-        if (!badges.length) return null;
-        return (
-          <div key={entry.id}>
-            <ListLabel>{`${entry.label} · ${entry.difficulty}`}</ListLabel>
-            <ul className="grid grid-cols-3 gap-px overflow-hidden rounded-xl bg-separator sm:grid-cols-4 lg:grid-cols-6">
-              {badges.map((achievement) => (
-                <li key={achievement.id} className="bg-surface">
-                  <button
-                    type="button"
-                    onClick={() => setOpen(achievement)}
-                    className="cell-tap flex h-full w-full flex-col items-center gap-2 px-2 py-4 text-center"
-                    aria-label={`${achievement.title}: ${achievement.unlocked ? "erreicht" : `${number(achievement.current)} von ${number(achievement.target)}`}`}
-                  >
-                    <Badge achievement={achievement} size={56} />
-                    <span className="line-clamp-2 text-footnote font-semibold">{achievement.title}</span>
-                    <span className="text-caption text-muted">
-                      {achievement.unlocked
-                        ? "Erreicht"
-                        : `${number(Math.min(achievement.current, achievement.target))}/${number(achievement.target)}`}
-                    </span>
-                  </button>
-                </li>
-              ))}
-            </ul>
-          </div>
-        );
-      })}
+      <div className="space-y-6">
+        {ACHIEVEMENT_TIERS.filter((entry) => tier === "all" || entry.id === tier).map((entry) => {
+          const badges = ordered.filter((badge) => badge.tier === entry.id);
+          if (!badges.length) return null;
+          return (
+            <div key={entry.id}>
+              <ListLabel>{`${entry.label} · ${entry.difficulty}`}</ListLabel>
+              <ul className="tile-grid grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-6">
+                {badges.map((achievement) => (
+                  <li key={achievement.id}>
+                    <button
+                      type="button"
+                      onClick={() => setOpen(achievement)}
+                      className="cell-tap flex h-full w-full flex-col items-center gap-2 px-2 py-4 text-center"
+                      aria-label={`${achievement.title}: ${achievement.unlocked ? "erreicht" : `${number(achievement.current)} von ${number(achievement.target)}`}`}
+                    >
+                      <Badge achievement={achievement} size={56} />
+                      <span className="line-clamp-2 text-footnote font-semibold">{achievement.title}</span>
+                      <span className="text-caption text-muted">
+                        {achievement.unlocked
+                          ? "Erreicht"
+                          : `${number(Math.min(achievement.current, achievement.target))}/${number(achievement.target)}`}
+                      </span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          );
+        })}
+      </div>
 
       {open && <AchievementSheet achievement={open} onClose={() => setOpen(null)} />}
     </section>

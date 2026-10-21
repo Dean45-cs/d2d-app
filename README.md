@@ -21,7 +21,7 @@ Eine Web-App für Door-to-Door-Teams im Energievertrieb:
 - **Abonnieren** – wer Kollegen abonniert, bekommt eine Push-Nachricht aufs Handy,
   sobald sie einen Vertrag machen
 - **Profil** – wie bei Twitter, aber mit den eigenen Zahlen: Abschlüsse, Quoten, Platz
-  im Team, Serie, Bestwert und Abzeichen
+  im Team, Serie, Bestwert und Meilensteine
 - **Installierbar auf iPhone und iPad** – eigenes Symbol, Vollbild ohne Browserleiste,
   Erfassung funktioniert auch ohne Empfang
 
@@ -345,7 +345,7 @@ sich, „Dabei seit“, Abonnenten und Abonnierte, darunter die Reiter **Beiträ
 - Abschluss- und Antreffquote
 - **Serie**: Arbeitstage in Folge mit mindestens einem Abschluss (Tage ohne Türen
   unterbrechen nicht), **bester Tag**, Termine
-- **Abzeichen** für 1, 5, 10, 25, 50, 100 … Abschlüsse und ein Balken bis zum nächsten
+- **Meilensteine** für 1, 5, 10, 25, 50, 100 … Abschlüsse und ein Balken bis zum nächsten
 - Verlauf der letzten 14 Tage
 
 Über „Profil bearbeiten“ ändert jeder sein Bild und den Text über sich selbst; Name,

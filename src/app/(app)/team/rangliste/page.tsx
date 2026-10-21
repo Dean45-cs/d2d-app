@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { requireUser } from "@/lib/auth";
 import { teamTotals, type PersonTotals } from "@/lib/community";
@@ -23,6 +24,7 @@ import { OpponentPicker } from "./OpponentPicker";
 import { TEAM_VIEWS } from "../views";
 
 export const dynamic = "force-dynamic";
+export const metadata: Metadata = { title: "Rangliste" };
 
 const RANGE_TITLE: Record<RangeKey, string> = {
   "1": "Heute",

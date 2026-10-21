@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { hasPermission, permissionsFor } from "@/lib/permissions";
 import { requireUser } from "@/lib/auth";
@@ -12,6 +13,7 @@ import { IconTrophy, IconUsers } from "@/components/icons";
 import { TEAM_VIEWS } from "./views";
 
 export const dynamic = "force-dynamic";
+export const metadata: Metadata = { title: "Feed" };
 
 /**
  * Team: was passiert - Abschluesse erscheinen von selbst, dazu Beitraege,
@@ -37,6 +39,7 @@ export default async function TeamPage({
   const top = week.filter((e) => e.rank !== null && e.sales > 0).slice(0, 5);
   const me = week.find((e) => e.user_id === user.id);
   const chase = chaseLine(sales, week, user.id);
+  const teamSales = week.reduce((sum, entry) => sum + entry.sales, 0);
   const suggestions = followSuggestions(user.team_id, user.id, 3);
   const rights = permissionsFor(user);
   const canManage = rights["team.manage"] || rights["structure.manage"] || rights["team.roles"];
@@ -52,7 +55,14 @@ export default async function TeamPage({
     <div className="page">
       <PageHeader
         title="Team"
-        subtitle={me?.rank && me.sales > 0 ? `Platz ${me.rank} diese Woche` : undefined}
+        subtitle={
+          // Immer eine Zeile - sonst springt die Segmentleiste beim Wechsel zu Rangliste und Erfolgen.
+          me?.rank && me.sales > 0
+            ? `Platz ${me.rank} diese Woche`
+            : teamSales > 0
+              ? `${teamSales} ${teamSales === 1 ? "Abschluss" : "Abschlüsse"} im Team diese Woche`
+              : "Diese Woche noch kein Abschluss"
+        }
         actions={
           canManage ? (
             <Link href="/einstellungen/mitglieder" className="icon-btn" aria-label="Mitglieder">

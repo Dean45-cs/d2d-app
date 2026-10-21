@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireUser } from "@/lib/auth";
@@ -8,6 +9,7 @@ import { Avatar, EmptyState, PageHeader } from "@/components/ui";
 import { IconUsers } from "@/components/icons";
 
 export const dynamic = "force-dynamic";
+export const metadata: Metadata = { title: "Abonnements" };
 
 /** Wen jemand abonniert hat - und wer ihn oder sie abonniert hat. */
 export default async function ConnectionsPage({

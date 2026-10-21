@@ -1,9 +1,15 @@
+import type { Metadata } from "next";
 import { hasPermission } from "@/lib/permissions";
-import { requireUser } from "@/lib/auth";
+import { getCurrentUser, requireUser } from "@/lib/auth";
 import { countAppointments, listAppointments, listMembers } from "@/lib/queries";
 import { AppointmentList } from "./AppointmentList";
 
 export const dynamic = "force-dynamic";
+
+export async function generateMetadata(): Promise<Metadata> {
+  const user = await getCurrentUser();
+  return { title: user && hasPermission(user, "appointments.team") ? "Termine" : "Meine Termine" };
+}
 
 export default async function AppointmentsPage() {
   const user = await requireUser();
@@ -26,8 +32,8 @@ export default async function AppointmentsPage() {
       faces={faces}
       back={
         hasPermission(user, "reports.team")
-          ? { href: "/start", label: "Übersicht" }
-          : { href: "/tour", label: "Klinken" }
+          ? { href: "/start", label: "Übersicht", mobileOnly: true }
+          : { href: "/tour", label: "Klinken", mobileOnly: true }
       }
     />
   );

@@ -8,7 +8,7 @@ import { JoinForm } from "./JoinForm";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = {
-  title: "Einladung · Carlsson Sales",
+  title: "Einladung",
   robots: { index: false, follow: false },
   referrer: "no-referrer",
 };

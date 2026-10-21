@@ -166,7 +166,7 @@ export function Sidebar({ sections, user }: { sections: NavSection[]; user: NavU
         {sections.map((section, index) => (
           <div key={section.title ?? index}>
             {section.title && (
-              <p className="sidebar-text px-3 pb-1 pt-2 text-footnote font-semibold text-muted">{section.title}</p>
+              <p className="sidebar-text sidebar-heading">{section.title}</p>
             )}
             <ul className="space-y-1">
               {section.items.map((item) => {

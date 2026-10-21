@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { canAccessTerritory, canManageMember, permissionsFor } from "@/lib/permissions";
 import { redirect } from "next/navigation";
 import { requireUser } from "@/lib/auth";
@@ -5,6 +6,7 @@ import { listMembers, listTerritories, memberStats } from "@/lib/queries";
 import { TeamTable } from "./TeamTable";
 
 export const dynamic = "force-dynamic";
+export const metadata: Metadata = { title: "Mitglieder" };
 
 /**
  * Mitglieder verwalten: Liste (Handy) bzw. Tabelle (Rechner) und die
