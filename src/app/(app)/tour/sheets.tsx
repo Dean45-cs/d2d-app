@@ -10,6 +10,7 @@ import {
   IconBuilding,
   IconCheck,
   IconCloudUp,
+  IconCrosshair,
   IconHome,
   IconNavigate,
   IconPencil,
@@ -35,11 +36,14 @@ import { normalizeSlot, quickSlots, slotDate, slotLabel, slotTime, toSlot } from
 import { parseDoorbellLines, type DoorbellInput } from "@/lib/doorbells";
 import { MAX_NOT_HOME_ATTEMPTS } from "@/lib/doors";
 import { routeUrl } from "@/lib/map";
+import { byDistance, distanceText, type Distance } from "@/lib/geo/nearby";
 import { PRODUCTS, formatTime, type Bell, type EnergyType, type TerritoryLite } from "./model";
 
 /* ------------------------------------------------------------------------ */
 /*                            Strasse und Gebiet                             */
 /* ------------------------------------------------------------------------ */
+
+export type StreetOrder = "list" | "near";
 
 export function StreetSheet({
   territories,
@@ -47,6 +51,13 @@ export function StreetSheet({
   streets,
   streetId,
   progress,
+  distances,
+  territoryDistances,
+  accuracy,
+  order,
+  onOrder,
+  nearby,
+  onNearby,
   onTerritory,
   onPick,
   onClose,
@@ -56,30 +67,103 @@ export function StreetSheet({
   streets: StreetWithStats[];
   streetId: number | null;
   progress: Map<number, { open: number; total: number }>;
+  /** Entfernung je Strasse ab dem eigenen Standort - ohne Standort null. */
+  distances: Map<number, Distance> | null;
+  territoryDistances: Map<number, Distance> | null;
+  /** Genauigkeit des Standorts (m) - ungenau heisst "ca.". */
+  accuracy: number;
+  order: StreetOrder;
+  onOrder: (order: StreetOrder) => void;
+  /** Die naechste offene Tuer ("Lindenstraße 14 · 80 m") - oder warum es keine gibt. */
+  nearby: { line: string; busy: boolean };
+  onNearby: () => void;
   onTerritory: (id: number) => void;
   onPick: (id: number) => void;
   onClose: () => void;
 }) {
   const [query, setQuery] = useState("");
   const needle = query.trim().toLocaleLowerCase("de-DE");
-  const shown = needle ? streets.filter((s) => s.name.toLocaleLowerCase("de-DE").includes(needle)) : streets;
+  const byNear = order === "near" && distances !== null;
+  const located = distances !== null;
+
+  /*
+   * Die Reihenfolge steht, solange das Blatt offen ist: im Gehen aendern
+   * sich die Entfernungen laufend, und eine Zeile soll nicht unter dem
+   * Finger wegspringen. Die Zahlen daneben laufen trotzdem mit.
+   */
+  const ranked = useMemo(
+    () =>
+      byNear && distances
+        ? byDistance(
+            streets,
+            (s) => distances.get(s.id)?.meters,
+            (s) => progress.get(s.id)?.open === 0,
+          )
+        : streets,
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [streets, byNear],
+  );
+  const places = useMemo(
+    () => (byNear && territoryDistances ? byDistance(territories, (t) => territoryDistances.get(t.id)?.meters) : territories),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [territories, byNear],
+  );
+  const shown = needle ? ranked.filter((s) => s.name.toLocaleLowerCase("de-DE").includes(needle)) : ranked;
 
   return (
     <Sheet title="Wo bist du?" onClose={onClose}>
+      <ul className="list list-icons mb-4">
+        <li>
+          <Cell
+            onClick={onNearby}
+            disabled={nearby.busy}
+            icon={
+              <span className="glyph glyph-round text-accent-ink">
+                <IconCrosshair className={`h-4 w-4 ${nearby.busy ? "animate-pulse" : ""}`} />
+              </span>
+            }
+            title="Nächste offene Tür"
+            subtitle={nearby.line}
+            tone="accent"
+            chevron
+            ariaLabel={`Nächste offene Tür in meiner Nähe – ${nearby.line}`}
+          />
+        </li>
+      </ul>
+
       {territories.length > 1 && (
         <div className="chips -mx-4 mb-4 px-4" role="group" aria-label="Gebiet">
-          {territories.map((t) => (
-            <button
-              key={t.id}
-              type="button"
-              className="chip"
-              aria-pressed={t.id === territoryId}
-              onClick={() => onTerritory(t.id)}
-            >
-              {t.name}
-            </button>
-          ))}
+          {places.map((t) => {
+            const distance = territoryDistances?.get(t.id);
+            return (
+              <button
+                key={t.id}
+                type="button"
+                className="chip"
+                aria-pressed={t.id === territoryId}
+                onClick={() => onTerritory(t.id)}
+              >
+                {t.name}
+                {distance && (
+                  <span className="font-normal text-muted">{distanceText(distance, accuracy)}</span>
+                )}
+              </button>
+            );
+          })}
         </div>
+      )}
+
+      {located && streets.length > 1 && (
+        <Segmented<StreetOrder>
+          ariaLabel="Straßen ordnen"
+          className="mb-4"
+          value={order}
+          onChange={onOrder}
+          options={[
+            { value: "near", label: "Nach Nähe" },
+            { value: "list", label: "Reihenfolge" },
+          ]}
+        />
       )}
 
       {streets.length > 6 && (
@@ -102,6 +186,7 @@ export function StreetSheet({
         <ul className="list">
           {shown.map((s) => {
             const p = progress.get(s.id);
+            const distance = distances?.get(s.id);
             return (
               <li key={s.id}>
                 <Cell
@@ -113,6 +198,7 @@ export function StreetSheet({
                         ? `Alle ${p.total} erledigt`
                         : `${p.open} von ${p.total} offen`
                       : s.house_numbers || "Ohne Hausnummern",
+                    distance ? distanceText(distance, accuracy) : null,
                     s.sale_count > 0 ? `${s.sale_count} ${s.sale_count === 1 ? "Abschluss" : "Abschlüsse"}` : null,
                   ]
                     .filter(Boolean)

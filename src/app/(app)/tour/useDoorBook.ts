@@ -212,10 +212,15 @@ export function useDoorBook(
     [bellFacts],
   );
 
-  /** Ein Mehrfamilienhaus ist erst fertig, wenn jede Klingel dran war. */
+  /**
+   * Ein Mehrfamilienhaus ist erst fertig, wenn jede Klingel dran war - oder
+   * die ganze Adresse gesperrt ist (wie beim Server, HOUSE_TOUCHED): sonst
+   * fuehrte "weiter" und "in meiner Naehe" an eine Tuer, an der niemand klingeln darf.
+   */
   const isDone = useCallback(
     (house: HouseNumberWithStats) => {
       const key = doneKey(house.street_id, house.number);
+      if (factsOf(key, house).blocked_at) return true;
       if (typeOf(house) === "MFH") {
         const bells = bellsOf(key, house.id);
         return bells.length > 0 && bells.every((bell) => isBellDone(key, bell));
