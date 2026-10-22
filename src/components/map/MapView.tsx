@@ -5,6 +5,8 @@ import "maplibre-gl/dist/maplibre-gl.css";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { circleToArea } from "@/lib/geo/area";
 import { IconFit, IconLayers, IconMinus, IconNavigate, IconPlus } from "@/components/icons";
+import { usePowerSaving } from "@/components/PowerSave";
+import { powerSaving, whileActive } from "@/lib/power";
 import { useMapConfig } from "./MapConfig";
 import { createLeafletEngine, loadLeaflet } from "./leaflet-engine";
 import {
@@ -50,6 +52,7 @@ interface Props {
 }
 
 const TYPE_KEY = "d2d.mapType";
+const LOCATE: PositionOptions = { enableHighAccuracy: true, maximumAge: 10_000, timeout: 20_000 };
 
 function readMapType(): MapType {
   try {
@@ -77,6 +80,9 @@ function isDark(): boolean {
 /**
  * Eine Karte der App. Zeigt Apple Karten, wenn es eingerichtet ist, sonst
  * (oder wenn Apple ausfaellt) OpenStreetMap - mit denselben Bedienelementen.
+ *
+ * Im Super-Energiesparmodus: einfache Aufloesung, kein Satellitenbild, und
+ * der eigene Standort kommt nur auf Antippen (einmal, nicht fortlaufend).
  */
 export function MapView({
   start = GERMANY,
@@ -89,6 +95,7 @@ export function MapView({
   onLocation,
 }: Props) {
   const config = useMapConfig();
+  const saving = usePowerSaving();
   const containerRef = useRef<HTMLDivElement | null>(null);
   const engineRef = useRef<MapEngine | null>(null);
   const onEngineRef = useRef(onEngine);
@@ -121,6 +128,8 @@ export function MapView({
     let cancelled = false;
     const element = containerRef.current;
     if (!element) return;
+    // Gilt fuer diese Karte. Umgeschaltet wird im Profil - dort ist keine Karte offen.
+    const savingNow = powerSaving();
 
     (async () => {
       let created: MapEngine;
@@ -134,7 +143,7 @@ export function MapView({
         } else if (provider === "openfreemap") {
           const ml = await loadMapLibre();
           if (cancelled) return;
-          created = await createMapLibreEngine(ml, element, startRef.current, config.styles, isDark());
+          created = await createMapLibreEngine(ml, element, startRef.current, config.styles, isDark(), savingNow);
           if (cancelled) {
             created.destroy();
             return;
@@ -142,7 +151,7 @@ export function MapView({
         } else {
           const L = await loadLeaflet();
           if (cancelled) return;
-          created = createLeafletEngine(L, element, startRef.current, config.tileUrl);
+          created = createLeafletEngine(L, element, startRef.current, config.tileUrl, savingNow);
         }
       } catch (error) {
         console.error("[karte]", error);
@@ -155,7 +164,8 @@ export function MapView({
         }
         return;
       }
-      const type = readMapType();
+      // Satellitenbilder sind die schwersten Kacheln - im Energiesparmodus nie.
+      const type = savingNow ? "standard" : readMapType();
       if (created.canSwitchType) created.setMapType(type);
       setMapType(type);
       engineRef.current = created;
@@ -193,10 +203,16 @@ export function MapView({
   onLocationRef.current = onLocation;
   const meLayer = useRef<MapLayer | null>(null);
 
+  // powerSaving() statt saving: das ist beim ersten Durchlauf noch "aus".
   useEffect(() => {
-    if (autoLocate) setWatching(true);
-  }, [autoLocate]);
+    if (autoLocate && !powerSaving()) setWatching(true);
+  }, [autoLocate, saving]);
 
+  /*
+   * Verfolgt wird nur, solange die Karte zu sehen ist und bedient wird
+   * (whileActive). Im Energiesparmodus einmal orten - der naechste Tipp auf
+   * den Standort-Knopf ortet wieder.
+   */
   useEffect(() => {
     if (!watching) return;
     if (!navigator.geolocation) {
@@ -204,28 +220,53 @@ export function MapView({
       setWatching(false);
       return;
     }
-    const id = navigator.geolocation.watchPosition(
-      (position) => {
-        setLocateNote(null);
-        const next: UserLocation = {
-          point: [position.coords.latitude, position.coords.longitude],
-          accuracy: position.coords.accuracy,
-        };
-        setLocation(next);
-        onLocationRef.current?.(next);
+    const receive = (position: GeolocationPosition) => {
+      setLocateNote(null);
+      const next: UserLocation = {
+        point: [position.coords.latitude, position.coords.longitude],
+        accuracy: position.coords.accuracy,
+      };
+      setLocation(next);
+      onLocationRef.current?.(next);
+    };
+    const fail = (error: GeolocationPositionError) => {
+      setLocateNote(
+        error.code === error.PERMISSION_DENIED
+          ? "Standort nicht freigegeben – in den Einstellungen des Browsers erlauben."
+          : "Standort gerade nicht verfügbar.",
+      );
+      onLocationRef.current?.(null);
+    };
+    if (powerSaving()) {
+      let cancelled = false;
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          if (cancelled) return;
+          receive(position);
+          setWatching(false);
+        },
+        (error) => {
+          if (cancelled) return;
+          fail(error);
+          setWatching(false);
+        },
+        LOCATE,
+      );
+      return () => {
+        cancelled = true;
+      };
+    }
+    let id: number | null = null;
+    return whileActive(
+      () => {
+        id = navigator.geolocation.watchPosition(receive, fail, LOCATE);
       },
-      (error) => {
-        setLocateNote(
-          error.code === error.PERMISSION_DENIED
-            ? "Standort nicht freigegeben – in den Einstellungen des Browsers erlauben."
-            : "Standort gerade nicht verfügbar.",
-        );
-        onLocationRef.current?.(null);
+      () => {
+        if (id !== null) navigator.geolocation.clearWatch(id);
+        id = null;
       },
-      { enableHighAccuracy: true, maximumAge: 10_000, timeout: 20_000 },
     );
-    return () => navigator.geolocation.clearWatch(id);
-  }, [watching]);
+  }, [watching, saving]);
 
   // Blauer Punkt mit Genauigkeitskreis - wie in jeder Karten-App.
   useEffect(() => {
@@ -254,9 +295,9 @@ export function MapView({
   function locate() {
     if (location && engine) {
       engine.setView(location.point, Math.max(engine.zoom(), 16));
-    } else {
-      centerOnNextFix.current = true;
     }
+    // Ohne Standort, oder im Energiesparmodus mit einem womoeglich alten: zum frischen.
+    if (!location || !engine || saving) centerOnNextFix.current = true;
     setWatching(true);
   }
 
@@ -302,7 +343,7 @@ export function MapView({
 
       {controls && engine && (
         <div className="pointer-events-none absolute bottom-8 right-2 z-[500] flex flex-col items-end gap-2">
-          {engine.canSwitchType && (
+          {engine.canSwitchType && !saving && (
             <button
               type="button"
               className="map-ctrl pointer-events-auto"

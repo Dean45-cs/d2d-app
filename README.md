@@ -205,9 +205,11 @@ Mit Standortfreigabe weiß Klinken, wo man steht, und rechnet alles auf dem Ger�
 Die Entfernungen sind ehrlich: ist der Standort ungenau (über 50 m) oder hat eine
 Hausnummer in OpenStreetMap keinen eigenen Punkt (dann zählt das Nachbarhaus), steht
 „ca.“ davor; ab 1 km Ungenauigkeit (etwa Ortung über die IP am Rechner) schlägt die App
-nichts vor. Geortet wird genau (GPS), solange die Tour offen ist; im Hintergrund ruht
-die Ortung, um den Akku zu schonen. Rechenkern: `src/lib/geo/nearby.ts`, Tests in
-`scripts/tests/nearby.test.ts`.
+nichts vor. Geortet wird genau (GPS), solange die Tour offen ist; im Hintergrund und
+wenn zwei Minuten niemand das Handy bedient (Gespräch an der Tür), ruht die Ortung, um
+den Akku zu schonen – der nächste Tipp weckt sie. Im
+[Super-Energiesparmodus](#akku-und-super-energiesparmodus) ortet nur „In meiner Nähe“.
+Rechenkern: `src/lib/geo/nearby.ts`, Tests in `scripts/tests/nearby.test.ts`.
 
 Die Ablehnungsgründe sind vorbelegt (zufrieden mit Anbieter, kein Interesse, Vertrag läuft
 noch, muss mit Partner sprechen, keine Haustürgeschäfte …) und unter **Einstellungen**
@@ -772,8 +774,8 @@ Empfang von selbst weitermacht.
 
 Dafür speichert der Service Worker neben JavaScript, CSS und Icons auch die zuletzt
 geöffneten Seiten (höchstens 30, höchstens 7 Tage alt); Klinken und Termine frischt die
-App auf Handy und Tablet im Hintergrund auf (höchstens alle 5 Minuten, nicht im
-Datensparmodus). Gezeigt werden diese Seiten nur ohne Netz. Weil sie Teamdaten enthalten,
+App auf Handy und Tablet im Hintergrund auf (höchstens alle 5 Minuten, im
+Super-Energiesparmodus alle 30, nicht im Datensparmodus). Gezeigt werden diese Seiten nur ohne Netz. Weil sie Teamdaten enthalten,
 werden sie gelöscht, sobald die Anmeldeseite erscheint – beim Abmelden, nach einer
 abgelaufenen Sitzung und beim Kontowechsel auf einem geteilten Gerät. Abmelden geht nur
 mit Verbindung; ohne Netz sagt die App das, statt nur so zu tun – die Sitzung bliebe
@@ -781,6 +783,42 @@ sonst auf dem Server bestehen.
 
 Alles Weitere – Livegang in 15 Minuten, App-Store-Weg, Stolpersteine – steht in
 [docs/IPHONE-IPAD.md](docs/IPHONE-IPAD.md).
+
+### Akku und Super-Energiesparmodus
+
+Ein Tag an der Tür soll mit einer Ladung auskommen. Darum spart die App **immer**, ohne
+dass jemand etwas einstellt:
+
+- **Ortung nur bei Bedienung:** GPS läuft (beim Klinken und auf der Gebietskarte) nur,
+  solange die App sichtbar ist und bedient wird. Zwei Minuten ohne Tippen – etwa im
+  Gespräch an der Tür – und die Ortung ruht; der nächste Tipp weckt sie wieder.
+- **Kein Nachfragen im Hintergrund:** Offene Aufträge fragt die App nur alle 60 Sekunden
+  und nur, solange sie zu sehen ist; die Uhr für fällige Termine steht im Hintergrund
+  still.
+- **Ruhige Grafik:** Der Standort-Punkt auf der Karte pulsiert dreimal je neuer Position
+  statt endlos; Vektorkarten zeichnen höchstens in doppelter Auflösung (auf 3×-Displays
+  kaum zu sehen, aber weniger als halb so viele Pixel); Profilbilder laden erst, wenn
+  sie ins Bild kommen.
+
+Wem das nicht reicht, schaltet unter **Profil → Dieses Gerät → Super-Energiesparmodus**
+alles ab, was Akku kostet und an der Tür nicht gebraucht wird (gilt nur für dieses
+Gerät, wirkt sofort):
+
+| Was | Normal | Super-Energiesparmodus |
+| --- | --- | --- |
+| Oberfläche | hell oder dunkel wie das System | immer dunkel – schwarze Pixel leuchten auf OLED-Displays nicht |
+| Glas, weiche Schatten | Unschärfe hinter Leisten und Blättern | feste Flächen, keine Unschärfe |
+| Animationen und Übergänge | an | aus |
+| Standort beim Klinken | läuft mit (bei Bedienung) | nur beim Tippen auf „In meiner Nähe“; gilt 2 Minuten |
+| Standort auf der Karte | verfolgt im Gebiet von selbst | nur einmal je Tipp auf den Standort-Knopf |
+| Karten | bis doppelte Auflösung, Satellitenbild wählbar | einfache Auflösung, ohne Überblenden, kein Satellitenbild |
+| Offene Aufträge abfragen | alle 60 s, solange die App zu sehen ist | nur beim Öffnen, Zurückkehren und bei Empfang |
+| Klinken/Termine für den Start ohne Netz speichern | alle 5 min | alle 30 min |
+
+Unverändert bleibt alles, was die Arbeit an der Tür braucht: Erfassen, Nachsenden ohne
+Empfang, Termine, Push-Nachrichten. Ohne frischen Standort speichert ein Eintrag keine
+Position (ein zwei Minuten alter Stand gilt noch). Umsetzung: `src/lib/power.ts`, Tests in
+`scripts/tests/power.test.ts`.
 
 ---
 

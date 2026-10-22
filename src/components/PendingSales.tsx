@@ -11,8 +11,11 @@ import { Sheet } from "@/components/Sheet";
 import { useToast } from "@/components/Toast";
 import { IconCheckCircle, IconExternal } from "@/components/icons";
 import { Cell } from "@/components/ui";
+import { powerSaving } from "@/lib/power";
 
 const TARIFRECHNER = process.env.NEXT_PUBLIC_TARIFRECHNER_URL ?? "https://portal-ep24.de/menues/tarifrechner/";
+/** So oft fragt die offene App nach Vorgaengen von anderen Geraeten. */
+const POLL_MS = 60_000;
 
 /**
  * Offene Auftraege: im Tarifrechner begonnen, hier noch nicht bestaetigt.
@@ -111,7 +114,12 @@ export function PendingSales({
     window.addEventListener(SALE_DRAFT_EVENT, merge);
     window.addEventListener("online", refresh);
     window.addEventListener("focus", returned);
-    const timer = window.setInterval(refresh, 30_000);
+    // Vorgaenge von einem anderen Geraet: nachfragen nur, solange die App zu
+    // sehen ist - jede Anfrage weckt das Funkmodul. Im Energiesparmodus gar
+    // nicht im Takt, nur bei den Ereignissen oben.
+    const timer = window.setInterval(() => {
+      if (document.visibilityState === "visible" && !powerSaving()) refresh();
+    }, POLL_MS);
     return () => {
       window.removeEventListener(SALE_DRAFT_EVENT, merge);
       window.removeEventListener("online", refresh);

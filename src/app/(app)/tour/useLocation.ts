@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { LatLng } from "@/lib/geo/area";
+import { SAVE_FIX_MS, powerSaving, whileActive } from "@/lib/power";
+import { usePowerSaving } from "@/components/PowerSave";
 
 export interface Fix {
   point: LatLng;
@@ -11,11 +13,13 @@ export interface Fix {
   at: number;
 }
 
-export type LocationStatus = "searching" | "ok" | "denied" | "unavailable" | "unsupported";
+/** "off": Super-Energiesparmodus - geortet wird nur auf Antippen. */
+export type LocationStatus = "searching" | "ok" | "off" | "denied" | "unavailable" | "unsupported";
 
 /** Was "In meiner Nähe" dazu sagt, wenn es keinen Standort gibt. */
 export const LOCATION_NOTE: Record<Exclude<LocationStatus, "ok">, string> = {
   searching: "Standort wird gesucht …",
+  off: "Energiesparmodus – Standort auf Antippen",
   denied: "Standort nicht freigegeben – in den Einstellungen des Browsers erlauben",
   unavailable: "Standort gerade nicht verfügbar",
   unsupported: "Dieses Gerät gibt den Standort nicht frei",
@@ -32,12 +36,18 @@ const ONCE_LIMIT = 12_000;
 
 /**
  * Der eigene Standort, solange die Tour offen ist. Genau (GPS), denn
- * Haeuser stehen 15 Meter auseinander. Im Hintergrund ruht die Ortung -
- * das schont den Akku ueber einen langen Tag. Ein Funkloch oder eine
- * Zeitueberschreitung loescht den letzten Stand nicht: der ist meist nur
- * Sekunden alt und besser als keiner.
+ * Haeuser stehen 15 Meter auseinander. Im Hintergrund und waehrend niemand
+ * die App bedient (Gespraech an der Tuer) ruht die Ortung - das schont den
+ * Akku ueber einen langen Tag; der naechste Tipp weckt sie. Ein Funkloch
+ * oder eine Zeitueberschreitung loescht den letzten Stand nicht: der ist
+ * meist nur Sekunden alt und besser als keiner.
+ *
+ * Im Super-Energiesparmodus ortet nur `locate` ("In meiner Nähe"), und der
+ * Stand verfaellt nach SAVE_FIX_MS - danach stimmen Entfernungen und die
+ * mitgespeicherte Position nicht mehr.
  */
 export function useLocation() {
+  const saving = usePowerSaving();
   const [fix, setFix] = useState<Fix | null>(null);
   const [status, setStatus] = useState<LocationStatus>("searching");
   const last = useRef<Fix | null>(null);
@@ -68,24 +78,39 @@ export function useLocation() {
       setStatus("unsupported");
       return;
     }
+    // powerSaving() statt saving: das ist beim ersten Durchlauf noch "aus".
+    if (powerSaving()) {
+      setStatus((current) => (current === "denied" ? current : last.current ? "ok" : "off"));
+      return;
+    }
+    if (!last.current) setStatus((current) => (current === "off" ? "searching" : current));
     let watch: number | null = null;
-    const start = () => {
-      if (watch !== null || document.visibilityState === "hidden") return;
-      watch = navigator.geolocation.watchPosition(receive, fail, WATCH);
-    };
-    const stop = () => {
-      if (watch !== null) navigator.geolocation.clearWatch(watch);
-      watch = null;
-    };
-    // Zurueck in der App (auch nach dem Freigeben in den Einstellungen): wieder orten.
-    const onVisibility = () => (document.visibilityState === "hidden" ? stop() : start());
-    start();
-    document.addEventListener("visibilitychange", onVisibility);
-    return () => {
-      document.removeEventListener("visibilitychange", onVisibility);
-      stop();
-    };
-  }, [receive, fail]);
+    // Zurueck in der App (auch nach dem Freigeben in den Einstellungen) oder
+    // wieder bedient: wieder orten.
+    return whileActive(
+      () => {
+        watch = navigator.geolocation.watchPosition(receive, fail, WATCH);
+      },
+      () => {
+        if (watch !== null) navigator.geolocation.clearWatch(watch);
+        watch = null;
+      },
+    );
+  }, [receive, fail, saving]);
+
+  // Energiesparmodus: ein alter Stand gilt nicht mehr.
+  useEffect(() => {
+    if (!saving || !fix) return;
+    const timer = window.setTimeout(
+      () => {
+        last.current = null;
+        setFix(null);
+        setStatus((current) => (current === "ok" ? "off" : current));
+      },
+      Math.max(0, fix.at + SAVE_FIX_MS - Date.now()),
+    );
+    return () => window.clearTimeout(timer);
+  }, [saving, fix]);
 
   /** Jetzt einmal frisch orten - fuer den Knopf "In meiner Nähe". */
   const locate = useCallback(

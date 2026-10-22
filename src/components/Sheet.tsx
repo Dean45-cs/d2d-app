@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { IconX } from "./icons";
+import { powerSaving } from "@/lib/power";
 
 interface Props {
   /** Ueberschrift - kurz, in der Sprache der Tuer. */
@@ -42,7 +43,7 @@ export function Sheet({ title, subtitle, onClose, children, footer, action, widt
   const requestClose = useCallback(() => {
     setClosing((already) => {
       if (already) return already;
-      const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches || powerSaving();
       window.setTimeout(() => closeRef.current(), reduce ? 0 : CLOSE_MS);
       return true;
     });
