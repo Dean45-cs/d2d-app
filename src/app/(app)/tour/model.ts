@@ -14,6 +14,8 @@ export type TerritoryLite = {
   city: string;
   postal_code: string;
   provider: ProviderInfo | null;
+  /** Nicht (mehr) in der Tour - nur wegen eigener Termine dabei. Dort schlaegt "in der Naehe" nichts vor. */
+  appointmentsOnly: boolean;
 };
 
 export type EnergyType = "STROM" | "GAS" | "BEIDES";

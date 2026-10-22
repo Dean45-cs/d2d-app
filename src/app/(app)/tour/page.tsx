@@ -182,6 +182,7 @@ export default async function TourPage({
           city: t.city,
           area: readArea(t.area_json),
         }),
+        appointmentsOnly: !ownTerritoryIds.has(t.id),
       }))}
       streets={streets}
       loadedTerritories={[...loaded]}

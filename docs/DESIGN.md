@@ -223,7 +223,11 @@ Alle in `src/components/`. Stil per Klassen aus `globals.css` (`@layer component
   die fehlende Haus- oder Klingelauswahl, danach „Nicht da“, „Ohne Abschluss“,
   „Termin“ und „Auftrag starten“. Inhalt und Toasts halten Abstand zur gemessenen
   Höhe der Leiste. Strom und Gas haben jeweils eine beschriftete Preiszeile mit
-  Versorger und eigener Preisstufe.
+  Versorger und eigener Preisstufe. Der Standort meldet sich nur, wenn er etwas
+  sagt: der Hinweis „Nächste offene Tür“ erst, wenn die gewählte Tür weit weg ist
+  (nicht bei jedem Schritt die Straße hinauf), keine Entfernung, wenn man davorsteht,
+  „ca.“ statt falscher Genauigkeit. Listen, die nach Nähe geordnet sind, springen
+  nicht, solange das Blatt offen ist – nur die Zahlen laufen mit.
 - **Rechner/iPad**: zweispaltig (`lg:grid-cols-[minmax(0,1fr)_minmax(0,380px)]`),
   Tabellen (`table.table`) erlaubt, wo Spalten vergleichen.
 

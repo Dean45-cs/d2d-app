@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, type ReactNode } from "react";
-import { IconChevronLeft, IconChevronRight, IconKeypad } from "@/components/icons";
+import { IconChevronLeft, IconChevronRight, IconCrosshair, IconKeypad, IconPin } from "@/components/icons";
 
 export interface DoorStatusLine {
   /** Kleines Zeichen vor dem Satz (Ergebnis, Sperre, Versuch). */
@@ -13,7 +13,8 @@ export interface DoorStatusLine {
  * Die Hausnummer als Held: gross, rund, unverwechselbar - auch in der
  * Sonne. Darueber der Strassenname klein, darunter in einem Satz, was an
  * dieser Tuer los war. Wischen oder die Pfeile springen zum Nachbarhaus,
- * ein Tipp auf die Nummer oeffnet das Haus.
+ * ein Tipp auf die Nummer oeffnet das Haus. "In meiner Nähe" stellt die
+ * naechste offene Tuer ab dem eigenen Standort ein.
  */
 export function DoorHero({
   number,
@@ -26,6 +27,9 @@ export function DoorHero({
   onNext,
   onOpen,
   onType,
+  distance,
+  locating = false,
+  onNearby,
   empty,
 }: {
   number: string | null;
@@ -41,6 +45,12 @@ export function DoorHero({
   onOpen: () => void;
   /** Hausnummer eintippen (Strassen ohne Liste, fehlende Nummer). */
   onType: () => void;
+  /** Wie weit die Tuer weg ist ("120 m entfernt") - steht man davor, nichts. */
+  distance?: string | null;
+  /** Gerade wird geortet - der Knopf wartet. */
+  locating?: boolean;
+  /** Naechste offene Tuer ab dem eigenen Standort. */
+  onNearby: () => void;
   /** Statt einer Nummer: Strasse erledigt, keine Nummern, ... */
   empty?: ReactNode;
 }) {
@@ -117,11 +127,30 @@ export function DoorHero({
         </p>
       )}
       {number && detail && <p className="mt-1 max-w-full truncate text-footnote text-muted">{detail}</p>}
+      {number && distance && (
+        <p className="mt-1 flex max-w-full items-center gap-1 text-footnote text-muted">
+          <IconPin className="h-3.5 w-3.5 shrink-0" />
+          <span className="truncate">{distance}</span>
+        </p>
+      )}
 
-      <button type="button" onClick={onType} className="btn btn-plain btn-sm mt-2">
-        <IconKeypad className="h-4 w-4" />
-        Nummer eingeben
-      </button>
+      <div className="mt-2 flex flex-wrap justify-center gap-x-1">
+        <button type="button" onClick={onType} className="btn btn-plain btn-sm">
+          <IconKeypad className="h-4 w-4" />
+          Nummer eingeben
+        </button>
+        <button
+          type="button"
+          onClick={onNearby}
+          disabled={locating}
+          aria-busy={locating}
+          className="btn btn-plain btn-sm"
+          aria-label="Nächste offene Tür in meiner Nähe"
+        >
+          <IconCrosshair className={`h-4 w-4 ${locating ? "animate-pulse" : ""}`} />
+          {locating ? "Orte …" : "In meiner Nähe"}
+        </button>
+      </div>
     </section>
   );
 }

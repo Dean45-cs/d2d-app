@@ -30,6 +30,23 @@ import {
   forgetQueuedBell,
 } from "@/lib/offline-queue";
 import { routeUrl } from "@/lib/map";
+import type { LatLng } from "@/lib/geo/area";
+import { distanceLabel, meters } from "@/lib/geo/route";
+import {
+  AT_DOOR,
+  FAR_FROM_DOOR,
+  ROUGH_ACCURACY,
+  SUGGEST_ACCURACY,
+  USABLE_ACCURACY,
+  byDistance,
+  distanceText,
+  nearest,
+  placeHouses,
+  streetDistances,
+  territoryDistances,
+  worthSuggesting,
+  type Distance,
+} from "@/lib/geo/nearby";
 import { firstName } from "@/lib/ranking";
 import type { LevelProgress } from "@/lib/levels";
 import { levelFeedbackText, type LevelFeedback } from "@/lib/level-feedback";
@@ -39,6 +56,7 @@ import { HouseStrip, type ChipState, type HouseChip } from "./HouseStrip";
 import { OutcomeTray, type TrayAction } from "./OutcomeTray";
 import { TourAppointments } from "./TourAppointments";
 import { TourHeader } from "./TourHeader";
+import { TourNearby } from "./TourNearby";
 import {
   AppointmentSheet,
   BlockSheet,
@@ -48,6 +66,7 @@ import {
   ReasonSheet,
   SaleSheet,
   StreetSheet,
+  type StreetOrder,
 } from "./sheets";
 import {
   bellSlot,
@@ -62,6 +81,7 @@ import {
   type TerritoryLite,
 } from "./model";
 import { useDoorBook } from "./useDoorBook";
+import { LOCATION_NOTE, useLocation, type Fix } from "./useLocation";
 import { useQueue } from "./useQueue";
 
 interface Props {
@@ -180,7 +200,14 @@ export function TourClient({
   const [onlyOpen, setOnlyOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [lastTyped, setLastTyped] = useState("");
-  const [position, setPosition] = useState<{ lat: number; lng: number } | null>(null);
+  /** Strassenwahl nach Naehe oder in der Reihenfolge des Gebiets. */
+  const [streetOrder, setStreetOrder] = useState<StreetOrder>("near");
+  /** Gerade wird fuer "In meiner Nähe" geortet. */
+  const [locating, setLocating] = useState(false);
+  /** Weggetippter Hinweis: wo und an welcher Tuer - er kommt erst ein Stueck weiter wieder. */
+  const [dismissedNearby, setDismissedNearby] = useState<{ at: LatLng; door: string } | null>(null);
+  /** Strasse in einem nahen Gebiet, das gerade laedt - danach geht "In meiner Nähe" dort weiter. */
+  const [nearbyAfterLoad, setNearbyAfterLoad] = useState<number | null>(null);
   /* Die Uhr des Geraets - erst nach dem Einblenden; "heute" entscheidet die Tuer. */
   const [now, setNow] = useState<Date | null>(null);
 
@@ -194,6 +221,7 @@ export function TourClient({
   useEffect(() => {
     const storedProduct = recall("d2d_product");
     if (storedProduct === "STROM" || storedProduct === "GAS" || storedProduct === "BEIDES") setProduct(storedProduct);
+    if (recall("d2d_street_order") === "list") setStreetOrder("list");
   }, []);
 
   /*
@@ -247,17 +275,18 @@ export function TourClient({
     return () => window.clearInterval(timer);
   }, []);
 
-  useEffect(() => {
-    if (!navigator.geolocation) return;
-    // Mitlaufen statt einmal beim Oeffnen: sonst traegt jeder Eintrag der Tour
-    // die Stelle, an der die App aufging - und die Route zum Termin fuehrt dorthin.
-    const watch = navigator.geolocation.watchPosition(
-      (pos) => setPosition({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
-      () => setPosition(null),
-      { enableHighAccuracy: false, maximumAge: 60_000, timeout: 15_000 },
-    );
-    return () => navigator.geolocation.clearWatch(watch);
-  }, []);
+  /*
+   * Der Standort laeuft mit, solange die Tour offen ist: fuer "In meiner
+   * Nähe" und die Entfernungen - das bleibt auf dem Geraet.
+   */
+  const location = useLocation();
+  const fix = location.fix;
+  /*
+   * Gespeichert wird er mit jedem Eintrag (die Route zum Termin fuehrt
+   * dorthin). Das ist eine Mitarbeiterortung, siehe README. Wer sie nicht
+   * will, setzt hier null - "In meiner Nähe" bleibt davon unberuehrt.
+   */
+  const position = fix ? { lat: fix.point[0], lng: fix.point[1] } : null;
 
   // Der Toast steht ueber der Ergebnisleiste, solange diese Seite offen ist.
   useEffect(() => {
@@ -317,15 +346,6 @@ export function TourClient({
 
   const openHouses = houses.filter((h) => !book.isDone(h));
 
-  // Keine Nummer gewaehlt: die erste offene Tuer der Strasse steht bereit.
-  useEffect(() => {
-    if (houseNumber || houses.length === 0) return;
-    const first = houses.find((h) => !book.isDone(h));
-    if (first) setHouseNumber(first.number);
-    // Nur beim Wechsel der Strasse oder wenn die Auswahl leer wurde.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [houseNumber, houses]);
-
   const currentHouse = useMemo(
     () => houses.find((h) => sameNumber(h.number, houseNumber)) ?? null,
     [houses, houseNumber],
@@ -357,6 +377,98 @@ export function TourClient({
     [appointments, now],
   );
 
+  /* ---------------------------- In der Naehe ----------------------------- */
+
+  /** Ein Standort, der fuer Entfernungen taugt - am Rechner kaeme sonst die Ortung ueber die IP. */
+  const near = fix && fix.accuracy <= USABLE_ACCURACY ? fix : null;
+  const accuracy = near?.accuracy ?? 0;
+  const doorDone = book.isDone;
+
+  /** Wo jede Tuer liegt - ohne eigenen Punkt beim Nachbarhaus. */
+  const spots = useMemo(() => placeHouses(houseNumbers, streets), [houseNumbers, streets]);
+
+  /** Wo vorgeschlagen werden darf: nicht in Gebieten, die nur wegen eines Termins dabei sind. */
+  const workHouses = useMemo(() => {
+    const appointmentsOnly = new Set(territories.filter((t) => t.appointmentsOnly).map((t) => t.id));
+    const territoryOf = new Map(streets.map((s) => [s.id, s.territory_id]));
+    return houseNumbers.filter((house) => {
+      const id = territoryOf.get(house.street_id);
+      return id !== undefined && !appointmentsOnly.has(id);
+    });
+  }, [houseNumbers, streets, territories]);
+
+  /** Die naechste offene Tuer ab hier - der Vorschlag wechselt erst, wenn eine andere deutlich naeher ist. */
+  const suggested = useRef<number | null>(null);
+  const nearestDoor = useMemo(
+    () =>
+      near
+        ? nearest(
+            near.point,
+            workHouses.filter((house) => !doorDone(house)),
+            (house) => spots.get(house.id),
+            (house) => house.id === suggested.current,
+          )
+        : null,
+    [near, workHouses, doorDone, spots],
+  );
+  useEffect(() => {
+    suggested.current = nearestDoor?.item.id ?? null;
+  }, [nearestDoor]);
+
+  /** Entfernung je Strasse (bis zur naechsten offenen Tuer) und je Gebiet. */
+  const streetDistance = useMemo(
+    () => (near ? streetDistances(near.point, streets, houseNumbers, spots, (house) => !doorDone(house)) : null),
+    [near, streets, houseNumbers, spots, doorDone],
+  );
+  const territoryDistance = useMemo(
+    () => (streetDistance ? territoryDistances(streets, streetDistance) : null),
+    [streets, streetDistance],
+  );
+
+  const currentSpot = currentHouse ? spots.get(currentHouse.id) : undefined;
+  const currentDistance: Distance | null =
+    near && currentSpot ? { meters: meters(near.point, currentSpot.point), approx: currentSpot.approx } : null;
+
+  /** "Lindenstraße 14" */
+  function addressOf(house: HouseNumberWithStats): string {
+    return `${streets.find((s) => s.id === house.street_id)?.name ?? ""} ${house.number}`.trim();
+  }
+
+  /*
+   * Keine Nummer gewaehlt: eine offene Tuer der Strasse steht bereit - mit
+   * Standort die naechstgelegene, denn dort faengt man an; sonst die erste.
+   */
+  useEffect(() => {
+    if (houseNumber || houses.length === 0) return;
+    const open = houses.filter((h) => !book.isDone(h));
+    const first = (near ? nearest(near.point, open, (h) => spots.get(h.id))?.item : null) ?? open[0];
+    if (first) setHouseNumber(first.number);
+    // Nur beim Wechsel der Strasse oder wenn die Auswahl leer wurde - nicht bei jedem Schritt.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [houseNumber, houses]);
+
+  /*
+   * Gebiete, deren Hausnummern noch nicht geladen sind (Teamleitung in
+   * fremden Gebieten), kennen nur den Punkt ihrer Strassen. Liegt so eine
+   * Strasse deutlich naeher als jede geladene offene Tuer, ist dort die
+   * naechste Tuer zu suchen - nach dem Laden.
+   */
+  function closerUnloaded(from: LatLng, than: number): { street: StreetWithStats; distance: Distance } | null {
+    const candidates = streets.filter(
+      (s) => !loaded.has(s.territory_id) && !territories.find((t) => t.id === s.territory_id)?.appointmentsOnly,
+    );
+    if (candidates.length === 0) return null;
+    const distances = streetDistances(from, candidates, [], spots, () => true);
+    const [best] = byDistance(candidates, (s) => distances.get(s.id)?.meters);
+    const distance = best ? distances.get(best.id) : undefined;
+    return best && distance && distance.meters + FAR_FROM_DOOR < than ? { street: best, distance } : null;
+  }
+  const unloadedNearby = near ? closerUnloaded(near.point, nearestDoor?.distance.meters ?? Infinity) : null;
+
+  function territoryName(id: number): string {
+    return territories.find((t) => t.id === id)?.name ?? "Das Gebiet";
+  }
+
   /* ------------------------------ Auswahl -------------------------------- */
 
   const chooseStreet = useCallback((id: number | null) => {
@@ -385,6 +497,114 @@ export function TourClient({
     const after = houses.slice(index + 1).find((h) => !book.isDone(h));
     const before = houses.slice(0, Math.max(0, index)).find((h) => !book.isDone(h));
     return (after ?? before)?.number ?? null;
+  }
+
+  /** Eine Tuer einstellen - auch in einer anderen Strasse oder einem anderen Gebiet. */
+  function goToHouse(house: HouseNumberWithStats) {
+    const target = streets.find((s) => s.id === house.street_id);
+    if (!target) return;
+    setTerritoryId(target.territory_id);
+    if (target.id !== streetId) {
+      setStreetId(target.id);
+      remember("d2d_street", String(target.id));
+    }
+    setHouseNumber(house.number);
+    setBellLabel("");
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  /**
+   * "In meiner Nähe": zur naechsten offenen Tuer in allen eigenen Gebieten.
+   * Ein alter oder grober Standort wird vorher aufgefrischt - die Tuer soll stimmen.
+   */
+  async function goNearby() {
+    if (locating) return;
+    let here: Fix | null = fix;
+    let status = location.status;
+    if (!here || Date.now() - here.at > 30_000 || here.accuracy > ROUGH_ACCURACY) {
+      setLocating(true);
+      const fresh = await location.locate();
+      setLocating(false);
+      here = fresh.fix ?? here;
+      status = fresh.status;
+    }
+    if (!here) {
+      toast(LOCATION_NOTE[status === "ok" ? "unavailable" : status]);
+      return;
+    }
+    if (here.accuracy > USABLE_ACCURACY) {
+      toast(`Standort zu ungenau (± ${distanceLabel(here.accuracy)}) – kurz warten oder ins Freie gehen`);
+      return;
+    }
+    const open = workHouses.filter((house) => !doorDone(house));
+    const found = nearest(here.point, open, (house) => spots.get(house.id));
+    const elsewhere = closerUnloaded(here.point, found?.distance.meters ?? Infinity);
+    if (elsewhere) {
+      openArea(elsewhere.street);
+      return;
+    }
+    if (!found) {
+      toast(open.length > 0 ? "Zu den offenen Türen ist keine Lage bekannt" : "Keine offene Tür in deinen Gebieten");
+      return;
+    }
+    setSheet(null);
+    const line = `${addressOf(found.item)} · ${distanceText(found.distance, here.accuracy)}`;
+    if (found.item.id === currentHouse?.id) {
+      toast(`Nächste offene Tür: ${line}`);
+      return;
+    }
+    goToHouse(found.item);
+    const spot = spots.get(found.item.id)!;
+    toast(
+      line,
+      // Weiter weg als ein paar Haeuser: der Weg dorthin gleich dazu.
+      found.distance.meters > FAR_FROM_DOOR
+        ? {
+            action: {
+              label: "Route",
+              onClick: () => {
+                window.open(routeUrl(spot.point[0], spot.point[1], "walk"), "_blank", "noopener");
+              },
+            },
+          }
+        : {},
+    );
+  }
+
+  /** Ein nahes, noch nicht geladenes Gebiet oeffnen - sind seine Tueren da, geht "In meiner Nähe" dort weiter. */
+  function openArea(target: StreetWithStats) {
+    setSheet(null);
+    setTerritoryId(target.territory_id);
+    chooseStreet(target.id);
+    setNearbyAfterLoad(target.id);
+    toast(`${territoryName(target.territory_id)} liegt näher – Türen werden geladen`);
+  }
+
+  useEffect(() => {
+    if (nearbyAfterLoad === null) return;
+    // Inzwischen selbst woanders hingewechselt: nicht mehr ungefragt springen.
+    if (nearbyAfterLoad !== streetId) {
+      setNearbyAfterLoad(null);
+      return;
+    }
+    if (housesPending) return;
+    setNearbyAfterLoad(null);
+    void goNearby();
+    // Nur wenn das Laden fertig ist - goNearby sieht dann die frischen Tueren.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [nearbyAfterLoad, streetId, housesPending]);
+
+  /**
+   * Beim Wechsel ins Gebiet: die naechste Strasse mit offenen Tueren, ohne
+   * Standort die erste offene. Ohne geladene Hausnummern ist "offen"
+   * unbekannt - dann kommt die Strasse in Frage.
+   */
+  function entryStreet(territory: number): number | null {
+    const list = streets.filter((s) => s.territory_id === territory);
+    const open = list.filter((s) => (progress.get(s.id)?.open ?? 1) > 0);
+    const pool = open.length > 0 ? open : list;
+    const ranked = streetDistance ? byDistance(pool, (s) => streetDistance.get(s.id)?.meters) : pool;
+    return ranked[0]?.id ?? null;
   }
 
   function goToAppointment(item: AppointmentRow) {
@@ -925,7 +1145,90 @@ export function TourClient({
   const queuedToday = pending.filter(
     (entry) => (entry.url ?? "/api/visits") === "/api/visits" && new Date(entry.createdAt).toDateString() === today,
   ).length;
-  const nextStreet = streetsOfTerritory.find((s) => s.id !== streetId && (progress.get(s.id)?.open ?? 0) > 0) ?? null;
+  const next = streetDone ? pickNextStreet() : null;
+  const nextStreet = next?.street ?? null;
+
+  /*
+   * Nach einer fertigen Strasse: die naechste mit offenen Tueren - die
+   * naechstgelegene ab dem eigenen Standort, sonst ab dieser Strasse, sonst
+   * in der Reihenfolge des Gebiets.
+   */
+  function pickNextStreet(): { street: StreetWithStats; distance: Distance | null } | null {
+    const open = streetsOfTerritory.filter((s) => s.id !== streetId && (progress.get(s.id)?.open ?? 0) > 0);
+    if (open.length === 0) return null;
+    const from: LatLng | null = near?.point ?? (street?.lat != null && street.lng != null ? [street.lat, street.lng] : null);
+    if (!from) return { street: open[0], distance: null };
+    const distances =
+      near && streetDistance ? streetDistance : streetDistances(from, open, houseNumbers, spots, (house) => !doorDone(house));
+    const [best] = byDistance(open, (s) => distances.get(s.id)?.meters);
+    // Eine Entfernung nennen nur, wenn sie ab dem eigenen Standort gemessen ist.
+    return { street: best, distance: near ? (distances.get(best.id) ?? null) : null };
+  }
+
+  /*
+   * Hinweis auf eine naehere offene Tuer - nur, wenn die gewaehlte weit weg
+   * ist (nach der Fahrt ins Gebiet, die Strasse von gestern ist noch
+   * eingestellt). Ohne eigene Lage zaehlt die Strasse der Tuer.
+   */
+  const nearbyHint = (() => {
+    if (!near || housesPending) return null;
+    const suggestion = unloadedNearby?.distance ?? nearestDoor?.distance;
+    if (!suggestion) return null;
+    if (!unloadedNearby && nearestDoor?.item.id === currentHouse?.id) return null;
+    if (
+      dismissedNearby &&
+      dismissedNearby.door === currentKey &&
+      meters(dismissedNearby.at, near.point) < FAR_FROM_DOOR
+    ) {
+      return null;
+    }
+    const reference = currentDistance ?? (streetId ? (streetDistance?.get(streetId) ?? null) : null);
+    if (street && (!reference || !worthSuggesting(reference, suggestion, near.accuracy))) return null;
+    if (!street && near.accuracy > SUGGEST_ACCURACY) return null;
+    const distance = distanceText(suggestion, near.accuracy);
+
+    if (unloadedNearby) {
+      const target = unloadedNearby.street;
+      return {
+        place: target.name,
+        distance,
+        context: territoryName(target.territory_id),
+        route: target.lat != null && target.lng != null ? routeUrl(target.lat, target.lng, "walk") : null,
+        go: () => openArea(target),
+      };
+    }
+    const house = nearestDoor!.item;
+    const target = streets.find((s) => s.id === house.street_id);
+    const spot = spots.get(house.id)!;
+    return {
+      place: addressOf(house),
+      distance,
+      context: target && target.territory_id !== territoryId ? territoryName(target.territory_id) : null,
+      route: routeUrl(spot.point[0], spot.point[1], "walk"),
+      go: () => goToHouse(house),
+    };
+  })();
+
+  /* Wie weit die gewaehlte Tuer weg ist - steht man davor (oder ist der Standort zu grob dafuer), nichts. */
+  const doorDistance =
+    currentDistance && currentDistance.meters >= Math.max(2 * AT_DOOR, accuracy)
+      ? `${distanceText(currentDistance, accuracy)} entfernt`
+      : null;
+
+  /** Fuer "Nächste offene Tür in meiner Nähe" in der Strassenwahl: wohin, oder warum nicht. */
+  const nearbyLine = locating
+    ? LOCATION_NOTE.searching
+    : near
+      ? unloadedNearby
+        ? `${territoryName(unloadedNearby.street.territory_id)} · ${distanceText(unloadedNearby.distance, near.accuracy)} – Türen laden`
+        : nearestDoor
+        ? `${addressOf(nearestDoor.item)} · ${distanceText(nearestDoor.distance, near.accuracy)}`
+        : workHouses.some((house) => !doorDone(house))
+          ? "Zu den offenen Türen ist keine Lage bekannt"
+          : "Keine offene Tür in deinen Gebieten"
+      : location.status === "ok"
+        ? "Standort zu ungenau"
+        : LOCATION_NOTE[location.status];
 
   const setupActions: TrayAction[] = !street
     ? [{ label: "Straße wählen", icon: <IconMap className="h-6 w-6" />, onClick: () => setSheet("street"), primary: true }]
@@ -973,6 +1276,17 @@ export function TourClient({
       <div className="space-y-4 lg:sticky lg:top-6 lg:col-start-2 lg:row-start-2">
         <TourAppointments appointments={dueAppointments} now={now} onPick={goToAppointment} />
 
+        {nearbyHint && (
+          <TourNearby
+            place={nearbyHint.place}
+            distance={nearbyHint.distance}
+            context={nearbyHint.context}
+            route={nearbyHint.route}
+            onGo={nearbyHint.go}
+            onDismiss={() => near && setDismissedNearby({ at: near.point, door: currentKey })}
+          />
+        )}
+
         <PendingSales userId={userId} onProgress={receiveProgress} />
 
         <DoorHero
@@ -988,6 +1302,9 @@ export function TourClient({
             if (!housesPending) setSheet("house");
           }}
           onType={() => setSheet("number")}
+          distance={housesPending ? null : doorDistance}
+          locating={locating}
+          onNearby={() => void goNearby()}
           empty={
             streetDone ? (
               <div className="flex flex-col items-center gap-2">
@@ -999,6 +1316,11 @@ export function TourClient({
                   <button type="button" className="btn btn-primary btn-sm" onClick={() => chooseStreet(nextStreet.id)}>
                     Weiter: {nextStreet.name}
                   </button>
+                )}
+                {next?.distance && (
+                  <p className="text-footnote text-muted">
+                    Nächste offene Tür dort · {distanceText(next.distance, accuracy)}
+                  </p>
                 )}
               </div>
             ) : !street ? (
@@ -1059,10 +1381,20 @@ export function TourClient({
           streets={streetsOfTerritory}
           streetId={streetId}
           progress={progress}
+          distances={streetDistance}
+          territoryDistances={territoryDistance}
+          accuracy={accuracy}
+          order={streetOrder}
+          onOrder={(order) => {
+            setStreetOrder(order);
+            remember("d2d_street_order", order);
+          }}
+          nearby={{ line: nearbyLine, busy: locating }}
+          onNearby={() => void goNearby()}
           onTerritory={(id) => {
             setTerritoryId(id);
             // Sonst stuende die Strasse eines anderen Gebiets unter dem neuen Namen.
-            chooseStreet(streets.find((s) => s.territory_id === id)?.id ?? null);
+            chooseStreet(entryStreet(id));
           }}
           onPick={(id) => {
             chooseStreet(id);

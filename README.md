@@ -173,6 +173,42 @@ weitergeht, hängt am Brett:
 Wer ausdrücklich keinen Besuch will, bekommt über **Sperren** einen dauerhaften Eintrag
 fürs ganze Team – aufheben kann ihn nur die Teamleitung.
 
+### In meiner Nähe
+
+Mit Standortfreigabe weiß Klinken, wo man steht, und rechnet alles auf dem Gerät
+(Luftlinie, ohne Netz und ohne Kartendienst):
+
+- **„In meiner Nähe“** unter der Hausnummer (und oben in „Wo bist du?“) springt zur
+  **nächsten offenen Tür** in allen eigenen Gebieten – auch in eine andere Straße oder
+  ein anderes Gebiet – und nennt die Entfernung. Ist sie weiter weg, bietet der Hinweis
+  gleich die Fußgänger-Route an. Gebiete, die nur wegen eigener Termine in der Tour
+  stehen, schlägt die App nicht vor.
+- **Weit weg von der gewählten Tür?** Steht man mindestens 150 m entfernt und liegt eine
+  offene Tür höchstens halb so weit weg (etwa nach der Fahrt ins Gebiet, wenn noch die
+  Straße von gestern eingestellt ist), erscheint über der Hausnummer der Hinweis
+  „Nächste offene Tür · 80 m“ – ein Tipp stellt sie ein, das × blendet ihn aus, bis man
+  ein Stück weitergegangen ist. Beim Gang die Straße hinauf bleibt es ruhig.
+- **Entfernung zur gewählten Tür** steht unter der Hausnummer („390 m entfernt“) –
+  steht man davor, nichts.
+- **Wo bist du?** zeigt die Entfernung zu jedem Gebiet und jeder Straße (bis zur nächsten
+  offenen Tür dort) und ordnet **nach Nähe** – erledigte Straßen nach hinten; „Reihenfolge“
+  schaltet auf die Reihenfolge des Gebiets zurück (die Wahl merkt sich das Gerät). Beim
+  Gebietswechsel öffnet die nächstgelegene Straße mit offenen Türen.
+- **Straße gewechselt?** Mit Standort steht die nächstgelegene offene Tür der Straße
+  bereit statt der ersten – dort fängt man an. Danach geht es wie gewohnt die Straße
+  hinauf.
+- **Straße erledigt:** „Weiter“ führt in die nächstgelegene Straße mit offenen Türen,
+  samt Entfernung.
+- **Teamleitung in fremden Gebieten:** Deren Häuser lädt die Tour erst bei Bedarf. Liegt
+  so ein Gebiet deutlich näher, lädt „In meiner Nähe“ es und sucht dort weiter.
+
+Die Entfernungen sind ehrlich: ist der Standort ungenau (über 50 m) oder hat eine
+Hausnummer in OpenStreetMap keinen eigenen Punkt (dann zählt das Nachbarhaus), steht
+„ca.“ davor; ab 1 km Ungenauigkeit (etwa Ortung über die IP am Rechner) schlägt die App
+nichts vor. Geortet wird genau (GPS), solange die Tour offen ist; im Hintergrund ruht
+die Ortung, um den Akku zu schonen. Rechenkern: `src/lib/geo/nearby.ts`, Tests in
+`scripts/tests/nearby.test.ts`.
+
 Die Ablehnungsgründe sind vorbelegt (zufrieden mit Anbieter, kein Interesse, Vertrag läuft
 noch, muss mit Partner sprechen, keine Haustürgeschäfte …) und unter **Einstellungen**
 frei änderbar: umbenennen, ausblenden, sortieren, eigene ergänzen. Jeder Grund trägt ein
@@ -898,7 +934,8 @@ deshalb gesperrt und im Verlustfall gelöscht.
 Wird beim Erfassen die Standortfreigabe erteilt, wird zusätzlich die Position des
 Erfassenden gespeichert – das ist eine Mitarbeiterortung und gehört mit dem Betriebsrat
 bzw. den Beschäftigten abgestimmt. Wer das nicht möchte: in
-`src/app/(app)/tour/TourClient.tsx` den `navigator.geolocation`-Block entfernen.
+`src/app/(app)/tour/TourClient.tsx` die Konstante `position` auf `null` setzen. „In meiner
+Nähe“ bleibt dann erhalten – dafür verlässt der Standort das Gerät nicht.
 
 Ein erkennbares Verbot („Keine Werbung“, „Für Vertreter verboten“) und ein ausdrückliches
 „kein Interesse“ sind bindend: dafür gibt es die Sperre, die serverseitig auch beim
