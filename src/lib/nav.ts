@@ -22,6 +22,7 @@ export type IconName =
   | "team"
   | "profile"
   | "calendar"
+  | "contacts"
   | "bolt"
   | "comment"
   | "trophy"
@@ -72,6 +73,8 @@ export function navigation(role: Role, rights: PermissionSet, userId?: number): 
     label: rights["appointments.team"] ? "Termine" : "Meine Termine",
     icon: "calendar",
   };
+  // Kundenliste: wer hinter den Abschluessen steht, fuer den Anruf nach Vertragsende.
+  const kunden: NavItem[] = rights["customers.manage"] ? [{ href: "/kunden", label: "Kunden", icon: "contacts" }] : [];
   const gebiete: NavItem = {
     href: "/gebiete",
     label: rights["territories.view_all"] ? "Gebiete" : "Meine Gebiete",
@@ -110,12 +113,12 @@ export function navigation(role: Role, rights: PermissionSet, userId?: number): 
       href: "/profil",
       label: "Profil",
       icon: "profile",
-      match: ["/einstellungen", ...me, ...(reports ? [] : ["/start"])],
+      match: ["/einstellungen", "/kunden", ...me, ...(reports ? [] : ["/start"])],
     },
   ];
 
   const sidebar: NavSection[] = [
-    { items: [start, tour, termine] },
+    { items: [start, tour, termine, ...kunden] },
     { title: "Karte", items: [gebiete, preise] },
     { title: "Team", items: [feed, rangliste, erfolge] },
     ...(admin.length > 0 ? [{ title: "Verwaltung", items: admin }] : []),
@@ -125,7 +128,7 @@ export function navigation(role: Role, rights: PermissionSet, userId?: number): 
     tabs,
     sidebar,
     admin,
-    items: [start, tour, termine, gebiete, preise, feed, rangliste, erfolge, ...admin],
+    items: [start, tour, termine, ...kunden, gebiete, preise, feed, rangliste, erfolge, ...admin],
   };
 }
 

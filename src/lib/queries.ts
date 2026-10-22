@@ -1161,8 +1161,8 @@ export interface AppointmentRow {
   doorbell_label: string | null;
 }
 
-/** Die Hausnummer eines Termins mit bekannter Lage - Schreibweise egal. */
-const APPOINTMENT_HOUSE = `h.street_id = v.street_id
+/** Die Hausnummer eines Termins (oder Auftrags) mit bekannter Lage - Schreibweise egal. */
+export const APPOINTMENT_HOUSE = `h.street_id = v.street_id
   AND lower(replace(h.number, ' ', '')) = lower(replace(v.house_number, ' ', ''))
   AND h.lat IS NOT NULL AND h.lng IS NOT NULL LIMIT 1`;
 

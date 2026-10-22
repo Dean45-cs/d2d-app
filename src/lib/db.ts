@@ -384,6 +384,34 @@ function migrate(db: Database.Database) {
     );
     CREATE INDEX IF NOT EXISTS idx_visit_requests_visit ON visit_requests(visit_id);
   `);
+  /*
+   * Kundenliste: wer hinter einem Abschluss steht, traegt die Teamleitung
+   * nachtraeglich aus dem Buchungsportal ein - samt Rufnummer und
+   * Vertragsende, damit das Team nach Ablauf wieder anrufen und neu beraten
+   * kann. Haengt am Besuch: wird der Abschluss zurueckgenommen, verschwinden
+   * auch die Kundendaten - personenbezogene Daten ohne Auftrag bleiben nicht liegen.
+   */
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS sale_customers (
+      visit_id        INTEGER PRIMARY KEY REFERENCES visits(id) ON DELETE CASCADE,
+      team_id         INTEGER NOT NULL REFERENCES teams(id) ON DELETE CASCADE,
+      name            TEXT NOT NULL DEFAULT '',
+      phone           TEXT NOT NULL DEFAULT '',
+      customer_number TEXT NOT NULL DEFAULT '',
+      contract_start  TEXT,
+      contract_months INTEGER,
+      contract_end    TEXT,
+      note            TEXT NOT NULL DEFAULT '',
+      recontacted_at  TEXT,
+      recontacted_by  INTEGER REFERENCES users(id) ON DELETE SET NULL,
+      updated_by      INTEGER REFERENCES users(id) ON DELETE SET NULL,
+      updated_at      TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+    CREATE INDEX IF NOT EXISTS idx_sale_customers_recall ON sale_customers (team_id, contract_end)
+      WHERE recontacted_at IS NULL;
+    -- Die Kundenliste zaehlt und blaettert nur Abschluesse - ohne durch alle Tueren des Teams zu laufen.
+    CREATE INDEX IF NOT EXISTS idx_visits_team_sales ON visits (team_id, created_at) WHERE outcome = 'SALE';
+  `);
 }
 
 function migrateInvitations(db: Database.Database) {

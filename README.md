@@ -11,6 +11,9 @@ Eine Web-App für Door-to-Door-Teams im Energievertrieb:
   erst die anschließende Bestätigung zählt als Abschluss
 - **Termine mit Uhrzeit** – Vorschläge für den Abend, Rufnummer dazu, und am nächsten Tag
   stehen sie oben auf der Tour
+- **Kundenliste** – die Teamleitung ordnet jedem Auftrag nachträglich den Kunden aus dem
+  Buchungsportal zu, mit Rufnummer und Vertragsende; vor Ablauf steht er unter „Fällig“
+  zum Anrufen, Besuchen und Umberaten
 - **Preise auf der Karte** – zeigt, wo der Grundversorger besonders teuer ist; Preise in Sekunden
   vom Preisblatt eingetragen oder als Tabelle aus Excel übernommen
 - **Übersicht** – Antreff- und Abschlussquoten je Mitarbeiter, Gebiet und Zeitraum
@@ -76,12 +79,13 @@ angelegt – praktisch zum Ausprobieren, für den Echtbetrieb weglassen.
 | Vergleich (Rangliste, Profile mit Zahlen) | ✅ | ✅ |
 | Feed: posten, kommentieren, abonnieren | ✅ | ✅ |
 | Fremde Beiträge und Kommentare löschen | ✅ | – |
+| Kundenliste: Kunden zuordnen, Wiedervorlage, Export | ✅ | – |
 | Energiekarte | ✅ | ✅ |
 
 Die Tabelle beschreibt die Rollenstandards. Unter **Profil › Verwaltung › Rechte** lassen
-sich 20 Rechte pro Person auf **Standard**, **Erlauben** oder **Entziehen** setzen:
+sich 21 Rechte pro Person auf **Standard**, **Erlauben** oder **Entziehen** setzen:
 Gebiete erstellen/sehen/bearbeiten/zuteilen/löschen, Besuchskorrekturen, Türsperren,
-Teamtermine, Teamauswertung, Mitglieder- und Strukturverwaltung, Rollen,
+Teamtermine, Kundenliste, Teamauswertung, Mitglieder- und Strukturverwaltung, Rollen,
 Berechtigungen, Einladungen, Energiepreise und Referenzwerte, Tagesquelle,
 Ablehnungsgründe und Feedmoderation. Ein ausdrücklicher Entzug hat Vorrang vor
 automatischen Rechten; „Standard“ folgt der aktuellen Rolle und Struktur.
@@ -119,8 +123,8 @@ Die Sicherheitstests laufen über `npm test`, einschließlich
 Auf dem Handy schwebt unten eine Reiterleiste aus Glas: **Klinken · Karte · Team ·
 Profil**, mit dem Recht „Teamauswertung“ vorne zusätzlich **Übersicht**. Der Vertrieb
 landet direkt beim Klinken. „Karte“ umfasst Gebiete und Preise, „Team“ Feed, Rangliste
-und Erfolge, „Profil“ die eigenen Listen, das Gerät und – je nach Recht – die
-Verwaltung (Mitglieder, Einladungen, Rechte, Ablehnungsgründe, Energie & Tarif). Auf
+und Erfolge, „Profil“ die eigenen Listen (mit dem Recht „Kundenliste pflegen“ auch
+**Kunden**), das Gerät und – je nach Recht – die Verwaltung (Mitglieder, Einladungen, Rechte, Ablehnungsgründe, Energie & Tarif). Auf
 iPad und Rechner steht alles in einer einklappbaren Seitenleiste. Alte Adressen
 (`/feed`, `/vergleich`, `/level`, `/auswertung`, `/mehr`, `/einladungen`,
 `/berechtigungen`, `/einstellungen`) leiten auf die neuen weiter.
@@ -267,6 +271,44 @@ eine inzwischen geänderte Zuteilung erfordert ein erneutes Laden der Seite. Die
 Die Datenbank wird beim nächsten Serverstart automatisch erweitert. Nach dem Update
 einen laufenden Server neu starten. Tests: `npm test` (einschließlich
 `scripts/tests/sales-reminders-handover.test.ts`).
+
+## Kundenliste
+
+An der Tür nimmt die App keine Kundendaten auf – Name, Anschrift und Unterschrift landen im
+Tarifrechner des Partners. Damit das Team einen Kunden nach Ende der Vertragslaufzeit
+trotzdem wieder anrufen oder besuchen und neu beraten kann, trägt die Teamleitung ihn
+nachträglich ein: unter **Kunden** (Seitenleiste, auf dem Handy unter Profil) steht jeder
+bestätigte Abschluss des Teams mit Adresse, Produkt, Datum und Verkäufer.
+
+Ein Tipp auf einen Auftrag öffnet das Blatt mit den Angaben aus dem Buchungsportal:
+
+- **Kunde** und **Telefon** – die Rufnummer wird so gespeichert, wie sie im Portal steht
+- **Kunden- oder Auftragsnummer** (optional) – um den Vertrag im Portal wiederzufinden
+- **Lieferbeginn** und **Laufzeit** – daraus rechnet die App das **Vertragsende**
+  (1.11.2026 mit 12 Monaten endet am 31.10.2027); es bleibt von Hand änderbar, denn das
+  Portal hat das letzte Wort. Bei Strom und Gas zählt das frühere Ende.
+- **Notiz** – Tarif, beste Zeit zum Anrufen …
+
+Drei Ansichten:
+
+- **Fällig** – Verträge, die in den nächsten **60 Tagen** enden oder schon ausgelaufen sind
+  (die ausgelaufenen rot oben). In der Zeile: anrufen und als **umberaten** abhaken (mit
+  „Rückgängig“). Die nächsten drei stehen auch auf der **Übersicht** unter „Umberatung fällig“.
+- **Ohne Kunde** – Abschlüsse, denen noch Name und Rufnummer fehlen: die Liste zum Abarbeiten
+  nach dem Blick ins Buchungsportal.
+- **Alle** – mit Suche nach Name, Rufnummer, Kundennummer, Straße, Ort und Verkäufer.
+
+Wird nach dem Umberaten ein neues Vertragsende eingetragen, beginnt die Wiedervorlage von
+vorn. **Export** lädt die ganze Liste als CSV für Excel (Rufnummern bleiben Text, damit die
+führende Null nicht verschwindet). Ohne gewählte Ansicht öffnet die Seite dort, wo gerade
+etwas zu tun ist: erst „Fällig“, dann „Ohne Kunde“.
+
+Die Liste sieht und pflegt, wer das Recht **„Kundenliste pflegen“** hat – standardmäßig die
+Teamleitung, unter **Rechte** auch einzeln vergebbar; sie umfasst dann alle Aufträge des
+Teams. Kundendaten hängen am Abschluss: wird der Abschluss zurückgenommen, sind sie mit
+weg. „Kundendaten entfernen“ löscht sie, ohne den Abschluss anzutasten. Rechenregeln in
+`src/lib/contracts.ts`, Abfragen in `src/lib/customers.ts`, Tests in
+`scripts/tests/customers.test.ts`.
 
 ## Level, XP und Abzeichen
 
@@ -873,6 +915,7 @@ src/
       start/          Übersicht (Team) bzw. Meine Zahlen
       tour/           Türerfassung (das Herzstück)
       termine/        Vereinbarte Termine
+      kunden/         Kundenliste: Kunde je Auftrag, Vertragsende, Wiedervorlage
       team/           Feed, Beitrag, Rangliste, Erfolge
       profil/         Profil-Übersicht, Profil mit Zahlen, Abonnenten
       gebiete/        Gebiete und Straßen
@@ -890,6 +933,8 @@ src/
     push.ts           Push-Nachrichten senden (Server)
     push-client.ts    Push ein- und ausschalten (Browser)
     appointments.ts   Terminzeiten, Vorschläge, Beschriftung
+    customers.ts      Kundenliste: Abfragen, Speichern, Wiedervorlage
+    contracts.ts      Vertragsende, Fälligkeit, Datumsformate
     doors.ts          Türstatus: offen, Wiedervorlage, fertig, gesperrt
     energy/           Preise, Bewertung, Tabellen-Import, Städteliste, Tagesquelle
     geo/              Flächenberechnung, Aufteilung, OpenStreetMap-Abfragen
@@ -949,9 +994,15 @@ Die App speichert **personenbezogene Daten**, sobald an der Tür etwas zustande 
 
 - **Türeinträge** hängen an der Hausnummer bzw. am Namen des Klingelschilds.
 - **Termine** speichern Name und Rufnummer des Ansprechpartners.
+- Die **Kundenliste** speichert Name, Rufnummer, Kundennummer und Vertragslaufzeit je
+  Auftrag – von der Teamleitung aus dem Buchungsportal übernommen.
 
-Kundendaten zum Vertrag, Unterschrift und Widerrufsbelehrung entstehen dagegen im
-Tarifrechner des Partners – diese App nimmt sie bewusst nicht auf. Für das, was hier liegt,
+Unterschrift, Widerrufsbelehrung und die übrigen Vertragsdaten entstehen dagegen im
+Tarifrechner des Partners – diese App nimmt sie bewusst nicht auf. **Anrufe zum Umberaten
+sind Telefonwerbung:** bei Privatkunden nur mit vorheriger ausdrücklicher Einwilligung
+(§ 7 UWG), die dokumentiert vorliegen muss (§ 7a UWG) – am besten schon im Auftrag
+eingeholt und im Buchungsportal vermerkt. Ohne Einwilligung bleibt der Besuch an der Tür.
+Für das, was hier liegt,
 braucht es trotzdem eine Rechtsgrundlage, eine Information der Kundschaft und eine
 Löschfrist; das gehört mit dem eigenen Datenschutzbeauftragten abgestimmt. Die App gibt
 keine Frist vor und löscht nichts von selbst.

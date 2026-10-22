@@ -4,12 +4,14 @@ import { permissionsFor } from "@/lib/permissions";
 import { navigation } from "@/lib/nav";
 import { getLevelProgress } from "@/lib/level-queries";
 import { countAppointments } from "@/lib/queries";
+import { countCustomers } from "@/lib/customers";
+import { berlinToday } from "@/lib/contracts";
 import { Avatar, Cell, ListLabel, PageHeader } from "@/components/ui";
 import { NAV_ICONS } from "@/components/nav-icons";
 import { InstallCell } from "@/components/InstallHint";
 import { PushRows } from "@/components/community/PushToggle";
 import { PowerSaveCell } from "@/components/PowerSave";
-import { IconCalendar, IconChart, IconSparkles, IconTarget } from "@/components/icons";
+import { IconCalendar, IconChart, IconContacts, IconSparkles, IconTarget } from "@/components/icons";
 import { LogoutCell } from "./LogoutCell";
 
 export const dynamic = "force-dynamic";
@@ -28,6 +30,7 @@ export default async function ProfileHubPage() {
   const nav = navigation(user.role, rights, user.id);
   const level = getLevelProgress(user.team_id, user.id);
   const openAppointments = countAppointments(user.team_id, { userId: user.id }).open;
+  const dueCustomers = rights["customers.manage"] ? countCustomers(user.team_id, berlinToday()).due : 0;
 
   return (
     <div className="page-narrow">
@@ -60,6 +63,16 @@ export default async function ProfileHubPage() {
             detail={openAppointments > 0 ? openAppointments : undefined}
           />
         </li>
+        {rights["customers.manage"] && (
+          <li>
+            <Cell
+              href="/kunden"
+              icon={<Glyph><IconContacts className="h-4 w-4" /></Glyph>}
+              title="Kunden"
+              detail={dueCustomers > 0 ? `${dueCustomers} fällig` : undefined}
+            />
+          </li>
+        )}
         <li>
           <Cell href="/team/erfolge" icon={<Glyph><IconSparkles className="h-4 w-4" /></Glyph>} title="Erfolge" />
         </li>
