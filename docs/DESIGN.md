@@ -169,6 +169,14 @@ Eingabefelder haben immer `text-body` (17 px) – unter 16 px zoomt iOS.
   Scrollen kleiner; Rückmeldungen sind Toasts (kurz, nicht blockierend, mit
   „Rückgängig“ statt Rückfragen).
 - `prefers-reduced-motion` und Super-Energiesparmodus: alle Animationen ≈ 0 ms.
+- **Laden:** Jede Seite hat ihr `loading.tsx` – nur dann lädt Next.js sie vorab, und
+  das Skelett steht beim Tippen sofort da. Was feststeht (Titel, Zurück,
+  Segmentleiste, Abschnittstitel), steht echt da; grau ist nur, was vom Server kommt.
+  Der Lichtstreif läuft über `transform` (ruckelt nicht, während die Seite aufgebaut
+  wird); das Grau blendet erst nach 80 ms ein, damit bei schneller Antwort nichts
+  aufblitzt. Hat ein Bereich Unterseiten (`team`, `gebiete`, `profil`), liegt seine
+  Startseite in einer Route-Gruppe (`(feed)`, `(liste)`, `(hub)`) – sonst sähe man auf
+  dem Weg zur Unterseite erst das Skelett der Startseite.
 - Nichts läuft endlos, solange es nicht lädt: der Standort-Punkt pulsiert dreimal je
   neuer Position, dann ruht er (eine Dauerschleife hält die Grafik den ganzen Tag wach).
 - **Super-Energiesparmodus** (`data-power="save"` am `<html>`, Schalter im Profil):
@@ -191,7 +199,7 @@ Alle in `src/components/`. Stil per Klassen aus `globals.css` (`@layer component
 | `Pill`, `StatusBadge` | `ui.tsx` | Plaketten (neutral, accent, danger, warn, ink) |
 | `Avatar` | `ui.tsx` | Bild oder Kürzel |
 | `EmptyState`, `InlineError`, `Notice` | `ui.tsx` | Leer, Fehler, ruhiger Hinweis |
-| `Skeleton*` | `ui.tsx` | Ladeplatzhalter (Kopf, Liste, Kennzahlen) |
+| `Skeleton*` | `ui.tsx` | Ladeplatzhalter: `SkeletonHeader` (echter `PageHeader`, fester Titel steht schon da), `SkeletonText` (Balken in der Zeile seiner Schrift), `SkeletonList`, `SkeletonStats`, `SkeletonPost`, `SkeletonChips`, `SkeletonSegmented` |
 | `OutcomeGlyph` | `ui.tsx` | Ergebnis eines Besuchs als Zeichen (bei Ablehnung das Zeichen des Grundes, neutral) |
 | `ReasonIcon`, `ReasonTile` | `ReasonIcon.tsx` | Zeichen eines Ablehnungsgrunds; als Kachel im Symbolton (`sm` 24, `md` 32, `lg` 48) |
 | `Medal` | `levels/Medal.tsx` | Medaille eines erreichten Abzeichens im Metall der Stufe |

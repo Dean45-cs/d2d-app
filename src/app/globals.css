@@ -374,10 +374,10 @@
 }
 @keyframes shimmer {
   from {
-    background-position: 200% 0;
+    transform: translateX(-100%);
   }
   to {
-    background-position: -200% 0;
+    transform: translateX(100vw);
   }
 }
 @keyframes check-pop {
@@ -1302,15 +1302,39 @@
 
   /* ------------------------------ Platzhalter ---------------------------- */
 
+  /*
+   * Graue Form, darueber zieht ein Lichtstreif. Der Streif laeuft ueber
+   * transform: das rechnet die Grafikkarte, und er laeuft weiter, waehrend
+   * der Browser die eigentliche Seite aufbaut - genau dann ist er zu sehen.
+   * Alle Streifen sind gleich breit und gleich schnell, so zieht eine Welle
+   * ueber die Seite statt vieler einzelner.
+   * Erst nach einem Wimpernschlag sichtbar: ist die Seite sofort da, blitzt
+   * kein Grau auf.
+   */
   .skeleton {
-    background: linear-gradient(
-      90deg,
-      var(--fill) 25%,
-      var(--fill-strong) 37%,
-      var(--fill) 63%
-    );
-    background-size: 200% 100%;
-    animation: shimmer 1.4s linear infinite;
+    position: relative;
+    overflow: hidden;
+    /* Safari schneidet den Streif sonst nicht an den runden Ecken ab. */
+    isolation: isolate;
+    background: var(--fill);
+    animation: fade-in var(--dur-2) var(--ease-out) 80ms both;
+  }
+  .skeleton::after {
+    content: "";
+    position: absolute;
+    inset: 0 auto 0 0;
+    width: 240px;
+    background: linear-gradient(90deg, transparent, var(--fill), transparent);
+    transform: translateX(-100%);
+    animation: shimmer 1.6s ease-in-out infinite;
+  }
+  /* Balken in einer Textzeile: die Zeile behaelt die Hoehe ihrer Schrift. */
+  .skeleton-text {
+    display: inline-block;
+    max-width: 100%;
+    height: 0.75em;
+    vertical-align: middle;
+    border-radius: var(--radius-full);
   }
 
   .rise {

@@ -9,8 +9,9 @@ import {
   IconPerson,
 } from "./icons";
 import { ReasonIcon } from "./ReasonIcon";
+import { PageHeader } from "./PageHeader";
 
-export { PageHeader } from "./PageHeader";
+export { PageHeader };
 
 /*
  * Bausteine ohne Zustand - laufen in Server- und Client-Komponenten.
@@ -444,6 +445,15 @@ export function Notice({ children, icon }: { children: ReactNode; icon?: ReactNo
 
 /* ------------------------------ Ladezustaende --------------------------- */
 
+/*
+ * Platzhalter zeigen die Seite, bevor ihre Daten da sind (loading.tsx jeder
+ * Seite). Was schon feststeht - Titel, Ruecksprung, Segmentleiste,
+ * Abschnittstitel - steht echt da; grau ist nur, was vom Server kommt. Jeder
+ * Balken sitzt in der Zeile der Schrift, die spaeter dort steht: kommt der
+ * Inhalt, springt nichts.
+ */
+
+/** Grauer Balken mit fester Groesse - fuer Flaechen ohne Schrift. */
 export function SkeletonLine({
   width = "100%",
   height = 12,
@@ -462,16 +472,53 @@ export function SkeletonLine({
   );
 }
 
-/** Platzhalter einer gruppierten Liste - Kreis und zwei Balken je Zeile. */
-export function SkeletonList({ rows = 4, icon = true }: { rows?: number; icon?: boolean }) {
+/**
+ * Grauer Balken in einer Textzeile. Steht er in einem Element mit
+ * Schriftklasse (text-body, text-large-title ...), ist die Zeile genau so
+ * hoch wie spaeter mit Text.
+ */
+export function SkeletonText({ width = "60%", className = "" }: { width?: string | number; className?: string }) {
+  return <span className={`skeleton skeleton-text ${className}`} style={{ width }} aria-hidden="true" />;
+}
+
+/*
+ * Breiten, die nach Text aussehen - nicht nach einer Treppe. Gedeckelt, damit
+ * auf dem Rechner kein Balken quer ueber die Seite laeuft.
+ */
+const TITLE_WIDTHS = [64, 48, 72, 56, 40, 60, 52, 68].map((p) => `min(${p}%, ${p / 4}rem)`);
+const SUBTITLE_WIDTHS = [40, 32, 46, 28, 36, 30, 44, 34].map((p) => `min(${p}%, ${p / 3}rem)`);
+
+/**
+ * Platzhalter einer gruppierten Liste - aufgebaut wie Cell: Zeichen, Titel,
+ * Untertitel. icon: rund (Profilbild), "glyph" (Zeichen-Kachel) oder keins.
+ */
+export function SkeletonList({
+  rows = 4,
+  icon = true,
+  subtitle = true,
+  rowClassName = "",
+}: {
+  rows?: number;
+  icon?: boolean | "glyph" | "ring";
+  subtitle?: boolean;
+  rowClassName?: string;
+}) {
+  const shape =
+    icon === "glyph" ? "h-8 w-8 rounded-md" : icon === "ring" ? "h-9 w-9 rounded-full" : "h-8 w-8 rounded-full";
   return (
-    <div className="list" aria-hidden="true">
+    <div className={`list ${icon ? "list-icons" : ""}`} aria-hidden="true">
       {Array.from({ length: rows }, (_, i) => (
-        <div key={i} className="cell min-h-15">
-          {icon && <span className="skeleton h-8 w-8 shrink-0 rounded-full" />}
-          <span className="min-w-0 flex-1 space-y-2">
-            <SkeletonLine width={`${72 - i * 8}%`} height={12} />
-            <SkeletonLine width={`${44 - i * 4}%`} height={8} />
+        <div key={i} className={`cell ${rowClassName}`}>
+          {icon && <span className={`skeleton shrink-0 ${shape}`} />}
+          <span className="min-w-0 flex-1">
+            <span className="block text-body">
+              <SkeletonText width={TITLE_WIDTHS[i % TITLE_WIDTHS.length]} />
+            </span>
+            {subtitle && (
+              <span className="block text-footnote">
+                <SkeletonText width={SUBTITLE_WIDTHS[i % SUBTITLE_WIDTHS.length]} />
+              </span>
+            )}
           </span>
         </div>
       ))}
@@ -479,28 +526,113 @@ export function SkeletonList({ rows = 4, icon = true }: { rows?: number; icon?: 
   );
 }
 
-/** Platzhalter einer Seite mit grossem Titel. */
-export function SkeletonHeader() {
+/**
+ * Kopf einer ladenden Seite - derselbe PageHeader wie auf der Seite, also
+ * dieselbe Hoehe. Steht der Titel fest, steht er schon da; der Ruecksprung
+ * funktioniert sofort. children: etwa die Segmentleiste.
+ */
+export function SkeletonHeader({
+  title,
+  back,
+  subtitle = true,
+  children,
+}: {
+  /** Fehlt, wenn er von den Daten abhaengt (Name eines Gebiets). */
+  title?: string;
+  back?: { href: string; label: string; mobileOnly?: boolean };
+  subtitle?: boolean;
+  children?: ReactNode;
+}) {
   return (
-    <div className="space-y-2 pb-4 pt-12" aria-hidden="true">
-      <SkeletonLine width="44%" height={32} className="rounded-lg" />
-      <SkeletonLine width="28%" height={12} />
+    <PageHeader
+      title={title ?? <SkeletonText width="min(56%, 18rem)" />}
+      subtitle={subtitle ? <SkeletonText width="min(40%, 14rem)" /> : undefined}
+      back={back}
+    >
+      {children}
+    </PageHeader>
+  );
+}
+
+/** Platzhalter einer Segmentleiste, deren Wahl erst die Seite kennt (Zeitraum, Filter). */
+export function SkeletonSegmented({ className = "" }: { className?: string }) {
+  return <span className={`skeleton block h-11 rounded-full ${className}`} aria-hidden="true" />;
+}
+
+/** Platzhalter einer Reihe Filterchips. */
+export function SkeletonChips({ widths, className = "" }: { widths: number[]; className?: string }) {
+  return (
+    <div className={`chips ${className}`} aria-hidden="true">
+      {widths.map((width, i) => (
+        <span key={i} className="skeleton h-9 shrink-0 rounded-full" style={{ width }} />
+      ))}
     </div>
   );
 }
 
-export function SkeletonStats({ count = 4 }: { count?: number }) {
+/** Platzhalter der Kennzahlen - aufgebaut wie StatGrid. */
+export function SkeletonStats({
+  count = 4,
+  columns,
+  size = "md",
+  hint = true,
+}: {
+  count?: number;
+  columns?: 2 | 3 | 4;
+  size?: "md" | "lg";
+  hint?: boolean;
+}) {
+  const cols = columns ?? (count >= 4 ? 4 : (count as 2 | 3));
+  const grid = cols === 4 ? "grid-cols-2 md:grid-cols-4" : cols === 3 ? "grid-cols-3" : "grid-cols-2";
   return (
-    <div
-      className={`grid gap-px overflow-hidden rounded-xl bg-separator ${count >= 4 ? "grid-cols-2 md:grid-cols-4" : "grid-cols-3"}`}
-      aria-hidden="true"
-    >
+    <div className={`grid gap-px overflow-hidden rounded-xl bg-separator ${grid}`} aria-hidden="true">
       {Array.from({ length: count }, (_, i) => (
-        <div key={i} className="space-y-2 bg-surface px-4 py-4">
-          <SkeletonLine width="50%" height={10} />
-          <SkeletonLine width="40%" height={24} className="rounded-md" />
+        <div key={i} className="flex min-w-0 flex-col bg-surface px-4 py-3">
+          <span className="text-footnote">
+            <SkeletonText width="56%" />
+          </span>
+          <span className={size === "lg" ? "text-large-title" : "text-title-1"}>
+            <SkeletonText width="40%" />
+          </span>
+          {hint && (
+            <span className="text-footnote">
+              <SkeletonText width="64%" />
+            </span>
+          )}
         </div>
       ))}
+    </div>
+  );
+}
+
+/** Platzhalter eines Beitrags im Feed: Bild, Name, Zeit, Text, Herz und Kommentar. */
+export function SkeletonPost({ lines = 2 }: { lines?: number }) {
+  return (
+    <div className="rounded-xl bg-surface px-4 pb-2 pt-4" aria-hidden="true">
+      <div className="flex items-center gap-3">
+        <span className="skeleton h-10 w-10 shrink-0 rounded-full" />
+        <span className="min-w-0 flex-1">
+          <span className="block text-headline">
+            <SkeletonText width="44%" />
+          </span>
+          <span className="block text-footnote">
+            <SkeletonText width="22%" />
+          </span>
+        </span>
+      </div>
+      {lines > 0 && (
+        <div className="mt-3 text-body">
+          {Array.from({ length: lines }, (_, i) => (
+            <span key={i} className="block">
+              <SkeletonText width={i === lines - 1 ? "58%" : "94%"} />
+            </span>
+          ))}
+        </div>
+      )}
+      <div className="mt-2 flex h-11 items-center gap-6">
+        <SkeletonLine width={44} height={16} />
+        <SkeletonLine width={44} height={16} />
+      </div>
     </div>
   );
 }

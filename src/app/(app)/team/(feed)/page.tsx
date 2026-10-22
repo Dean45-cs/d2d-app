@@ -10,7 +10,7 @@ import { FollowButton } from "@/components/community/FollowButton";
 import { PushBanner } from "@/components/community/PushToggle";
 import { Avatar, Cell, ListLabel, PageHeader, SegmentedLinks } from "@/components/ui";
 import { IconTrophy, IconUsers } from "@/components/icons";
-import { TEAM_VIEWS } from "./views";
+import { TEAM_VIEWS } from "../views";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Feed" };

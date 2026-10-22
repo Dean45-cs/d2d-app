@@ -20,7 +20,8 @@ export function PageHeader({
   children,
   hideLargeTitle = false,
 }: {
-  title: string;
+  /** Text; beim Laden auch ein Platzhalter (SkeletonHeader). */
+  title: ReactNode;
   subtitle?: ReactNode;
   /**
    * Ruecksprung links oben, etwa "Gebiete". mobileOnly: die Seite steht ab
