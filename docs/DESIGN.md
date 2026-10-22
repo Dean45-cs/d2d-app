@@ -104,8 +104,9 @@ Alle Textpaare ≥ 4,5 : 1, alle Bedien-/Grafikpaare ≥ 3 : 1. Bei
   (Glanzverlauf von oben), Rand `--glass-edge` (0,5 px Lichtkante innen),
   Schatten `--elev-glass` / `--elev-float`.
 - Unschärfe `--glass-blur: blur(22px) saturate(180%)`.
-- **Rückfälle:** ohne `backdrop-filter`, bei `prefers-reduced-transparency` und
-  bei `prefers-contrast: more` wird Glas zur festen Fläche `--glass-solid`.
+- **Rückfälle:** ohne `backdrop-filter`, bei `prefers-reduced-transparency`, bei
+  `prefers-contrast: more` und im Super-Energiesparmodus (`data-power="save"`) wird
+  Glas zur festen Fläche `--glass-solid`.
 - Glas nur für Dinge, die **über** Inhalt schweben. Inhalt selbst liegt auf
   `--surface`. Nie Glas auf Glas, nie Karte in Karte.
 
@@ -167,7 +168,12 @@ Eingabefelder haben immer `text-body` (17 px) – unter 16 px zoomt iOS.
 - Blätter lassen sich am Griff nach unten wegziehen; die Reiterleiste wird beim
   Scrollen kleiner; Rückmeldungen sind Toasts (kurz, nicht blockierend, mit
   „Rückgängig“ statt Rückfragen).
-- `prefers-reduced-motion`: alle Animationen ≈ 0 ms.
+- `prefers-reduced-motion` und Super-Energiesparmodus: alle Animationen ≈ 0 ms.
+- Nichts läuft endlos, solange es nicht lädt: der Standort-Punkt pulsiert dreimal je
+  neuer Position, dann ruht er (eine Dauerschleife hält die Grafik den ganzen Tag wach).
+- **Super-Energiesparmodus** (`data-power="save"` am `<html>`, Schalter im Profil):
+  setzt zugleich `data-theme="dark"` und eine schwarze Statusleiste. Schon vor React
+  gesetzt (`POWER_SCRIPT` in `src/lib/power.ts`), damit nichts hell aufblitzt.
 
 ---
 

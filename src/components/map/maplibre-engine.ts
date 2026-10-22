@@ -59,6 +59,8 @@ export async function createMapLibreEngine(
   start: MapStart,
   styles: { light: string; dark: string },
   dark: boolean,
+  /** Super-Energiesparmodus (src/lib/power.ts) */
+  saving = false,
 ): Promise<MapEngine> {
   const map: MlMap = new ml.Map({
     container: element,
@@ -71,6 +73,15 @@ export async function createMapLibreEngine(
     pitchWithRotate: false,
     touchPitch: false,
     maxZoom: 19,
+    /*
+     * Akku: hoechstens doppelte Aufloesung. Auf 3x-Displays ist der
+     * Unterschied kaum zu sehen, die Grafik zeichnet aber nicht einmal die
+     * Haelfte der Pixel. Im Energiesparmodus einfache Aufloesung, Schrift
+     * ohne Ueberblenden und abgelaufene Kacheln nicht neu laden.
+     */
+    pixelRatio: Math.min(window.devicePixelRatio || 1, saving ? 1 : 2),
+    fadeDuration: saving ? 0 : 300,
+    refreshExpiredTiles: !saving,
   });
   map.touchZoomRotate.disableRotation();
   map.keyboard.disableRotation();

@@ -418,6 +418,32 @@
 }
 
 /* ==========================================================================
+   Super-Energiesparmodus (data-power="save", Schalter im Profil)
+   Dunkel (setzt zugleich data-theme="dark" - auf OLED-Displays leuchten
+   schwarze Pixel nicht), Glas wird feste Flaeche ohne Unschaerfe und weiche
+   Schatten, nichts bewegt sich. src/lib/power.ts
+   ========================================================================== */
+
+:root[data-power="save"] {
+  --glass-bg: var(--glass-solid);
+  --glass-strong: var(--glass-solid);
+  --glass-sheen: none;
+  --glass-blur: none;
+  /* Kein "none": die Schatten stehen in Listen mit der Lichtkante. */
+  --elev-glass: 0 0 #0000;
+  --elev-float: 0 0 #0000;
+}
+
+:root[data-power="save"] *,
+:root[data-power="save"] *::before,
+:root[data-power="save"] *::after {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
+  scroll-behavior: auto !important;
+}
+
+/* ==========================================================================
    Bausteine
    ========================================================================== */
 
@@ -1869,7 +1895,9 @@
   height: 24px;
   border-radius: var(--radius-full);
   background: color-mix(in srgb, var(--ink) 22%, transparent);
-  animation: map-me-pulse 2s var(--ease-out) infinite;
+  /* Dreimal je neuer Position, dann ruht er - ein Dauerpuls hielte die
+     Grafik den ganzen Tag wach. */
+  animation: map-me-pulse 2s var(--ease-out) 3;
 }
 .map-me-dot {
   position: relative;

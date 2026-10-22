@@ -16,6 +16,8 @@ export function createLeafletEngine(
   element: HTMLElement,
   start: MapStart,
   tileUrl: string,
+  /** Super-Energiesparmodus (src/lib/power.ts): Zoomen und Kacheln ohne Animation. */
+  saving = false,
 ): MapEngine {
 
   const map = L.map(element, {
@@ -24,6 +26,9 @@ export function createLeafletEngine(
     zoomControl: false,
     // Tausende Adresspunkte zeichnet die Leinwand deutlich fluessiger als SVG.
     preferCanvas: true,
+    zoomAnimation: !saving,
+    fadeAnimation: !saving,
+    markerZoomAnimation: !saving,
   });
   L.tileLayer(tileUrl, {
     maxZoom: 19,

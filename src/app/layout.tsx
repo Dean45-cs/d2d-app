@@ -1,6 +1,8 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { ServiceWorker } from "@/components/ServiceWorker";
+import { PowerMode } from "@/components/PowerSave";
+import { POWER_SCRIPT } from "@/lib/power";
 
 export const metadata: Metadata = {
   title: { default: "Carlsson Sales", template: "%s · Carlsson Sales" },
@@ -44,10 +46,13 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="de">
+    // Der Energiesparmodus setzt data-power/data-theme schon vor React (POWER_SCRIPT).
+    <html lang="de" suppressHydrationWarning>
       <body>
+        <script dangerouslySetInnerHTML={{ __html: POWER_SCRIPT }} />
         {children}
         <ServiceWorker />
+        <PowerMode />
       </body>
     </html>
   );

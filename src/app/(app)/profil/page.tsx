@@ -8,6 +8,7 @@ import { Avatar, Cell, ListLabel, PageHeader } from "@/components/ui";
 import { NAV_ICONS } from "@/components/nav-icons";
 import { InstallCell } from "@/components/InstallHint";
 import { PushRows } from "@/components/community/PushToggle";
+import { PowerSaveCell } from "@/components/PowerSave";
 import { IconCalendar, IconChart, IconSparkles, IconTarget } from "@/components/icons";
 import { LogoutCell } from "./LogoutCell";
 
@@ -67,6 +68,7 @@ export default async function ProfileHubPage() {
       <ListLabel>Dieses Gerät</ListLabel>
       <ul className="list list-icons">
         <PushRows />
+        <PowerSaveCell />
         <InstallCell />
       </ul>
 

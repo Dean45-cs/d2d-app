@@ -365,6 +365,7 @@ export function Avatar({
       <img
         src={src}
         alt=""
+        loading="lazy"
         decoding="async"
         className={`shrink-0 rounded-full object-cover ring-1 ring-separator ${className}`}
         style={{ width: size, height: size }}

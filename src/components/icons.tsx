@@ -524,6 +524,15 @@ export function IconOffline(props: IconProps) {
     </Line>
   );
 }
+export function IconBattery(props: IconProps) {
+  return (
+    <Line {...props}>
+      <rect x="2.75" y="7" width="16" height="10" rx="2.5" />
+      <path d="M21 10.5v3" />
+      <rect x="5.25" y="9.5" width="4.5" height="5" rx="1" fill="currentColor" stroke="none" />
+    </Line>
+  );
+}
 export function IconCloudUp(props: IconProps) {
   return (
     <Line {...props}>

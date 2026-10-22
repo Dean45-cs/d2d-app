@@ -269,10 +269,22 @@ export function TourClient({
     if (next) setTerritoryId(next.territory_id);
   }, [streets, territories]);
 
+  // Die Uhr fuer "heute faellig" - im Hintergrund steht sie still (Akku) und
+  // stellt sich beim Zurueckkommen sofort.
   useEffect(() => {
-    setNow(new Date());
-    const timer = window.setInterval(() => setNow(new Date()), 60_000);
-    return () => window.clearInterval(timer);
+    let timer: number | undefined;
+    const tick = () => {
+      window.clearInterval(timer);
+      if (document.visibilityState === "hidden") return;
+      setNow(new Date());
+      timer = window.setInterval(() => setNow(new Date()), 60_000);
+    };
+    tick();
+    document.addEventListener("visibilitychange", tick);
+    return () => {
+      document.removeEventListener("visibilitychange", tick);
+      window.clearInterval(timer);
+    };
   }, []);
 
   /*

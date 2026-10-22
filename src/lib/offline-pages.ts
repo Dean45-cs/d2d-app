@@ -6,6 +6,8 @@
  * nichts davon. Laeuft ausschliesslich im Browser.
  */
 
+import { powerSaving } from "./power";
+
 /** Wie der Service Worker seine Seitenablage benennt (d2d-pages-<Version>). */
 const PAGE_CACHE_PREFIX = "d2d-pages-";
 /** meta-Tag, das der Service Worker in jede gespeicherte Seite setzt. */
@@ -13,6 +15,8 @@ const COPY_MARK = "d2d-offline-copy";
 const WARMED_KEY = "d2d_pages_warmed_at";
 /** Seltener frischt die App die gespeicherten Seiten nicht auf - jede kostet einen ganzen Seitenaufruf. */
 export const WARM_INTERVAL_MS = 5 * 60 * 1000;
+/** Im Super-Energiesparmodus: seltener - der Start ohne Netz bleibt, nur mit etwas aelterem Stand. */
+export const SAVE_WARM_INTERVAL_MS = 30 * 60 * 1000;
 
 /** Die Seiten, die man an der Tuer ohne Netz braucht: Klinken und Termine. */
 export const FIELD_PAGES = ["/tour", "/termine"];
@@ -57,9 +61,13 @@ export function forgetOfflineCopy(): void {
 
 /**
  * Lohnt das Auffrischen gerade? Nur auf Handy und Tablet (dort faellt das
- * Netz weg), nicht im Datensparmodus und hoechstens alle WARM_INTERVAL_MS.
+ * Netz weg), nicht im Datensparmodus und hoechstens alle WARM_INTERVAL_MS
+ * (im Super-Energiesparmodus alle SAVE_WARM_INTERVAL_MS).
  */
-export function shouldWarm(now = Date.now()): boolean {
+export function shouldWarm(
+  now = Date.now(),
+  interval = powerSaving() ? SAVE_WARM_INTERVAL_MS : WARM_INTERVAL_MS,
+): boolean {
   if (!navigator.onLine || !navigator.serviceWorker?.controller) return false;
   const connection = (navigator as Navigator & { connection?: { saveData?: boolean } }).connection;
   if (connection?.saveData) return false;
@@ -69,7 +77,7 @@ export function shouldWarm(now = Date.now()): boolean {
   if (!mobile) return false;
   try {
     const last = Number(window.localStorage.getItem(WARMED_KEY) ?? 0);
-    if (now - last < WARM_INTERVAL_MS) return false;
+    if (now - last < interval) return false;
     window.localStorage.setItem(WARMED_KEY, String(now));
   } catch {
     // Ohne Speicher kein Merker - dann eben bei jedem Anstoss.
