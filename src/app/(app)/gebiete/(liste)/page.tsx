@@ -13,9 +13,9 @@ import {
   plural,
 } from "@/components/ui";
 import { IconMap } from "@/components/icons";
-import { NewTerritoryButton } from "./NewTerritory";
-import { TerritoryOverviewMap, type OverviewTerritory } from "./TerritoryOverviewMap";
-import { MAP_VIEWS } from "./views";
+import { NewTerritoryButton } from "../NewTerritory";
+import { TerritoryOverviewMap, type OverviewTerritory } from "../TerritoryOverviewMap";
+import { MAP_VIEWS } from "../views";
 import { progressShare, territoryProgress } from "@/lib/progress";
 
 export const dynamic = "force-dynamic";
