@@ -8,6 +8,7 @@ export const PERMISSIONS = [
   { key: "visits.correct", group: "Vertrieb", label: "Besuche korrigieren", description: "Auch ältere oder fremde Besuche im Team rückgängig machen." },
   { key: "doors.unblock", group: "Vertrieb", label: "Türsperren aufheben", description: "Sperren in zugänglichen Gebieten aufheben." },
   { key: "appointments.team", group: "Vertrieb", label: "Teamtermine verwalten", description: "Termine aller Teammitglieder sehen, verschieben und abhaken." },
+  { key: "customers.manage", group: "Vertrieb", label: "Kundenliste pflegen", description: "Den Aufträgen des Teams Kunden mit Telefonnummer und Vertragsende zuordnen, auslaufende Verträge zur Umberatung sehen und die Liste exportieren." },
   { key: "reports.team", group: "Auswertung", label: "Teamauswertung sehen", description: "Übersicht und Auswertungen des gesamten Teams einschließlich Besuchsdetails sehen." },
   { key: "team.manage", group: "Verwaltung", label: "Mitglieder verwalten", description: "Mitglieder anlegen, bearbeiten, deaktivieren und Passwörter setzen. Im Vertrieb auf die eigene Struktur begrenzt." },
   { key: "team.roles", group: "Verwaltung", label: "Rollen ändern", description: "Teamleitungen ernennen oder zurückstufen. Dieses Recht gilt ausschließlich für Teamleitungen." },

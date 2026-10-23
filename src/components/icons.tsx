@@ -408,6 +408,17 @@ export function IconPerson(props: IconProps) {
     </Line>
   );
 }
+/** Kundenkarte: Person mit Angaben daneben - die Kundenliste. */
+export function IconContacts(props: IconProps) {
+  return (
+    <Line {...props}>
+      <rect x="3" y="5" width="18" height="14" rx="2.5" />
+      <circle cx="8.75" cy="10.25" r="2" />
+      <path d="M5.75 16c.45-1.55 1.6-2.5 3-2.5s2.55.95 3 2.5" />
+      <path d="M14.5 10h3.75M14.5 13.5h3.75" />
+    </Line>
+  );
+}
 export function IconUserPlus(props: IconProps) {
   return (
     <Line {...props}>

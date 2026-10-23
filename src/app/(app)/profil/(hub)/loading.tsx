@@ -19,7 +19,8 @@ export default function LoadingProfileHub() {
         </div>
       </div>
       <ListLabel>Meine Arbeit</ListLabel>
-      <SkeletonList rows={2} icon="glyph" subtitle={false} />
+      {/* Termine und Erfolge, dazu "Meine Zahlen" (Vertrieb) bzw. "Kunden" (Teamleitung). */}
+      <SkeletonList rows={3} icon="glyph" subtitle={false} />
       <ListLabel>Dieses Gerät</ListLabel>
       <SkeletonList rows={3} icon="glyph" subtitle={false} />
     </div>

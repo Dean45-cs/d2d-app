@@ -27,6 +27,9 @@ import {
   plural,
 } from "@/components/ui";
 import { PendingSales } from "@/components/PendingSales";
+import { ContractEndBlock } from "@/components/ContractEnd";
+import { countCustomers, listCustomers } from "@/lib/customers";
+import { berlinToday, contractStatus } from "@/lib/contracts";
 import { PriceBadge, ProviderSummary } from "@/components/ProviderRating";
 import { providerLookup, type ProviderInfo } from "@/lib/energy/provider";
 import { readArea } from "@/lib/geo/area";
@@ -77,6 +80,11 @@ export default async function StartPage({ searchParams }: { searchParams: Promis
   const openAppointments = countAppointments(user.team_id, appointmentScope).open;
   const territories = team ? listAccessibleTerritories(user) : [];
   const recent = listVisits(user.team_id, { ...scope, since, limit: 40 });
+  // Kundenliste: wessen Vertrag bald endet, steht hier, bis jemand umberaten hat.
+  const today = berlinToday();
+  const customers = hasPermission(user, "customers.manage");
+  const dueCustomers = customers ? countCustomers(user.team_id, today).due : 0;
+  const recalls = dueCustomers > 0 ? listCustomers(user.team_id, { view: "faellig", today, limit: 3 }) : [];
 
   const doors = sum.doors ?? 0;
   const met = sum.met ?? 0;
@@ -124,28 +132,51 @@ export default async function StartPage({ searchParams }: { searchParams: Promis
           </div>
         </section>
 
-        <section>
-          <SectionHeader title="Termine" count={openAppointments} href="/termine" />
-          {appointments.length === 0 ? (
-            <div className="surface">
-              <EmptyState icon={<IconCalendar className="h-5 w-5" />} title="Keine offenen Termine" />
-            </div>
-          ) : (
-            <ul className="list list-icons">
-              {appointments.slice(0, 5).map((item) => (
-                <li key={item.id}>
-                  <Cell
-                    href={`/termine?termin=${item.id}`}
-                    icon={<SlotBadge slot={item.follow_up_at} />}
-                    title={item.contact_name || "Ohne Namen"}
-                    subtitle={`${item.street_name ?? ""} ${item.house_number}`.trim()}
-                    trailing={team ? <Avatar name={item.user_name} src={faces.get(item.user_id)} size={28} /> : undefined}
-                  />
-                </li>
-              ))}
-            </ul>
+        <div className="space-y-8">
+          <section>
+            <SectionHeader title="Termine" count={openAppointments} href="/termine" />
+            {appointments.length === 0 ? (
+              <div className="surface">
+                <EmptyState icon={<IconCalendar className="h-5 w-5" />} title="Keine offenen Termine" />
+              </div>
+            ) : (
+              <ul className="list list-icons">
+                {appointments.slice(0, 5).map((item) => (
+                  <li key={item.id}>
+                    <Cell
+                      href={`/termine?termin=${item.id}`}
+                      icon={<SlotBadge slot={item.follow_up_at} />}
+                      title={item.contact_name || "Ohne Namen"}
+                      subtitle={`${item.street_name ?? ""} ${item.house_number}`.trim()}
+                      trailing={team ? <Avatar name={item.user_name} src={faces.get(item.user_id)} size={28} /> : undefined}
+                    />
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+
+          {recalls.length > 0 && (
+            <section>
+              <SectionHeader title="Umberatung fällig" count={dueCustomers} href="/kunden?ansicht=faellig" />
+              <ul className="list list-icons">
+                {recalls.map((item) => (
+                  <li key={item.visit_id}>
+                    <Cell
+                      href={`/kunden?ansicht=faellig&kunde=${item.visit_id}`}
+                      icon={<ContractEndBlock end={item.contract_end} today={today} />}
+                      title={item.name || "Ohne Namen"}
+                      subtitle={[`${item.street_name ?? ""} ${item.house_number}`.trim(), contractStatus(item.contract_end, today).label]
+                        .filter(Boolean)
+                        .join(" · ")}
+                      trailing={<Avatar name={item.user_name} src={faces.get(item.user_id)} size={28} />}
+                    />
+                  </li>
+                ))}
+              </ul>
+            </section>
           )}
-        </section>
+        </div>
 
         {team && (
           <section className="lg:col-span-2">
