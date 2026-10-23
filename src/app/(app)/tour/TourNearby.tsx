@@ -30,7 +30,7 @@ export function TourNearby({
   const caption = ["Nächste offene Tür", distance, context].filter(Boolean).join(" · ");
   return (
     // Kein Live-Bereich: die Entfernung aendert sich im Gehen staendig.
-    <section className="cell rounded-xl bg-surface pr-2" aria-label="Nächste offene Tür">
+    <section className="cell surface pr-2" aria-label="Nächste offene Tür">
       <button
         type="button"
         className="flex min-h-11 min-w-0 flex-1 items-center gap-3 rounded-lg text-left"

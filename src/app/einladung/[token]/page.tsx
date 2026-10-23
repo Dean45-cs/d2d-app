@@ -21,7 +21,7 @@ export default async function InvitationPage({ params }: { params: Promise<{ tok
   const { token } = await params;
   const invitation = publicInvitation(token);
   return (
-    <main className="min-h-dvh bg-bg px-4 pb-[max(2rem,env(safe-area-inset-bottom))] pt-[max(3rem,env(safe-area-inset-top))]">
+    <main className="brand-backdrop min-h-dvh px-4 pb-[max(2rem,env(safe-area-inset-bottom))] pt-[max(3rem,env(safe-area-inset-top))]">
       <div className="mx-auto w-full max-w-md">
         <Logo size={40} className="mb-8" />
         {invitation ? (

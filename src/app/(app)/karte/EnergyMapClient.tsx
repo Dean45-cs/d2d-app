@@ -568,7 +568,7 @@ function PriceDetail({
       }
     >
       {year !== null && delta !== null && (
-        <div className="mb-4 rounded-xl bg-surface px-4 py-4">
+        <div className="mb-4 surface px-4 py-4">
           <p className="text-footnote font-semibold text-ink-2">Musterhaushalt · {energy === "strom" ? "Strom" : "Gas"}</p>
           <p className="kpi text-large-title">{euro(year)}</p>
           <p className={`text-subhead font-semibold ${delta > 0 ? "text-accent-ink" : "text-muted"}`}>

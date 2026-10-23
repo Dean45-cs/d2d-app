@@ -170,7 +170,7 @@ function Composer({ viewer, onPosted }: { viewer: Viewer; onPosted: (post: FeedP
 
   const left = MAX_POST - text.length;
   return (
-    <form onSubmit={submit} className="mb-4 flex gap-3 rounded-xl bg-surface p-4">
+    <form onSubmit={submit} className="mb-4 flex gap-3 surface p-4">
       <Avatar name={viewer.name} src={viewer.avatar} size={36} />
       <div className="min-w-0 flex-1">
         <label htmlFor="compose" className="sr-only">
@@ -273,7 +273,7 @@ function PostCard({
   }
 
   return (
-    <article className="rounded-xl bg-surface px-4 pb-2 pt-4">
+    <article className="surface px-4 pb-2 pt-4">
       <header className="flex items-center gap-3">
         <Link href={`/profil/${post.user.id}`} className="shrink-0 rounded-full" aria-label={post.user.name}>
           <Avatar name={post.user.name} src={post.user.avatar} size={40} />

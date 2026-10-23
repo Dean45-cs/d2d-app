@@ -4,7 +4,7 @@ import { useEffect, useSyncExternalStore } from "react";
 import { usePathname } from "next/navigation";
 import { IconBattery } from "./icons";
 import { useToast } from "./Toast";
-import { Cell, Switch } from "./ui";
+import { Cell, Switch, ToneTile } from "./ui";
 import { applyPowerSaving, onPowerChange, powerSaving, setPowerSaving, storedPowerSaving } from "@/lib/power";
 
 /**
@@ -42,9 +42,9 @@ export function PowerSaveCell() {
     <li>
       <Cell
         icon={
-          <span className="glyph">
+          <ToneTile tone="slate">
             <IconBattery className="h-4 w-4" />
-          </span>
+          </ToneTile>
         }
         title="Super-Energiesparmodus"
         subtitle="Dunkel, ohne Effekte, Standort nur auf Antippen"

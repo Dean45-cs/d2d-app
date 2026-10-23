@@ -55,27 +55,27 @@
   /* Typostufen nach Apple HIG (iOS, Dynamic Type "Large"). Nur diese. */
   --text-hero: 6rem;
   --text-hero--line-height: 1;
-  --text-hero--letter-spacing: -0.02em;
+  --text-hero--letter-spacing: -0.035em;
   --text-hero--font-weight: 700;
   --text-display: 3rem;
   --text-display--line-height: 3.25rem;
-  --text-display--letter-spacing: -0.01em;
+  --text-display--letter-spacing: -0.028em;
   --text-display--font-weight: 700;
   --text-large-title: 2.125rem;
   --text-large-title--line-height: 2.5625rem;
-  --text-large-title--letter-spacing: 0.006em;
+  --text-large-title--letter-spacing: -0.014em;
   --text-large-title--font-weight: 700;
   --text-title-1: 1.75rem;
   --text-title-1--line-height: 2.125rem;
-  --text-title-1--letter-spacing: 0.006em;
+  --text-title-1--letter-spacing: -0.01em;
   --text-title-1--font-weight: 700;
   --text-title-2: 1.375rem;
   --text-title-2--line-height: 1.75rem;
-  --text-title-2--letter-spacing: 0.005em;
+  --text-title-2--letter-spacing: -0.008em;
   --text-title-2--font-weight: 700;
   --text-title-3: 1.25rem;
   --text-title-3--line-height: 1.5625rem;
-  --text-title-3--letter-spacing: 0.004em;
+  --text-title-3--letter-spacing: -0.006em;
   --text-title-3--font-weight: 600;
   --text-headline: 1.0625rem;
   --text-headline--line-height: 1.375rem;
@@ -111,6 +111,7 @@
   --radius-full: 9999px;
 
   /* ---------------------------- Tiefe & Bewegung ------------------------- */
+  --shadow-card: var(--elev-card);
   --shadow-glass: var(--elev-glass);
   --shadow-float: var(--elev-float);
   --shadow-thumb: var(--elev-thumb);
@@ -124,34 +125,39 @@
    ========================================================================== */
 
 :root {
-  --bg: #f2f2f7;
+  /* Neutrale mit einem Hauch Gruen: gehoeren zur Marke statt zum
+     Lavendelgrau der Systemvorgabe. */
+  --bg: #f2f4f3;
   --surface: #ffffff;
-  --surface-2: #f2f2f7;
+  --surface-2: #f2f4f3;
   /* Grund einer Karte, solange die Kacheln laden - hebt sich hell vom
      Seitengrund ab (--surface-2 waere dort unsichtbar). */
-  --map-ground: #e5e5ea;
-  --fill: rgb(118 118 128 / 0.12);
-  --fill-strong: rgb(118 118 128 / 0.2);
-  --ink: #0b0b0d;
-  --ink-2: #3c3c43;
-  --muted: #68686f;
-  --separator: rgb(60 60 67 / 0.16);
-  --scrim: rgb(0 0 0 / 0.28);
+  --map-ground: #e3e7e5;
+  --fill: rgb(70 90 80 / 0.1);
+  --fill-strong: rgb(70 90 80 / 0.17);
+  --ink: #0b1510;
+  --ink-2: #36413b;
+  --muted: #5f6964;
+  --separator: rgb(40 60 50 / 0.13);
+  --scrim: rgb(4 14 9 / 0.32);
   --seg-thumb: #ffffff;
-  --hover: rgb(118 118 128 / 0.08);
-  --press: rgb(118 118 128 / 0.16);
+  --hover: rgb(70 90 80 / 0.07);
+  --press: rgb(70 90 80 / 0.14);
 
   /* Material "Liquid Glass" */
-  --glass-bg: rgb(250 250 252 / 0.74);
-  --glass-strong: rgb(250 250 252 / 0.86);
-  --glass-solid: #f9f9fb;
+  --glass-bg: rgb(250 252 251 / 0.74);
+  --glass-strong: rgb(250 252 251 / 0.86);
+  --glass-solid: #f8faf9;
   --glass-sheen: linear-gradient(180deg, rgb(255 255 255 / 0.55), rgb(255 255 255 / 0) 55%);
-  --glass-edge: inset 0 0.5px 0 0 rgb(255 255 255 / 0.9), inset 0 0 0 0.5px rgb(0 0 0 / 0.07);
+  --glass-edge: inset 0 0.5px 0 0 rgb(255 255 255 / 0.9), inset 0 0 0 0.5px rgb(10 30 20 / 0.07);
   --glass-blur: blur(22px) saturate(180%);
 
-  --elev-glass: 0 1px 2px rgb(0 0 0 / 0.05), 0 10px 30px -10px rgb(0 0 0 / 0.22);
-  --elev-float: 0 2px 6px rgb(0 0 0 / 0.06), 0 28px 60px -18px rgb(0 0 0 / 0.32);
-  --elev-thumb: 0 1px 2px rgb(0 0 0 / 0.08), 0 3px 8px rgb(0 0 0 / 0.1);
+  /* Inhaltsflaechen liegen auf dem Grund: feine Kante, weicher Schatten. */
+  --elev-card: 0 0 0 1px rgb(16 40 28 / 0.045), 0 1px 2px rgb(16 40 28 / 0.04),
+    0 10px 28px -14px rgb(16 40 28 / 0.16);
+  --elev-glass: 0 1px 2px rgb(10 30 20 / 0.06), 0 10px 30px -10px rgb(10 30 20 / 0.24);
+  --elev-float: 0 2px 6px rgb(10 30 20 / 0.07), 0 28px 60px -18px rgb(10 30 20 / 0.34);
+  --elev-thumb: 0 1px 2px rgb(10 30 20 / 0.08), 0 3px 8px rgb(10 30 20 / 0.1);
 
   /* Bewegung: kurz und federnd, nie im Weg */
   --dur-1: 150ms;
@@ -174,24 +180,25 @@
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
     --bg: #000000;
-    --surface: #1c1c1e;
-    --surface-2: #2c2c2e;
-    --map-ground: #2c2c2e;
-    --fill: rgb(118 118 128 / 0.24);
-    --fill-strong: rgb(118 118 128 / 0.34);
-    --ink: #f5f5f7;
-    --ink-2: #d1d1d6;
-    --muted: #a1a1a8;
-    --separator: rgb(84 84 88 / 0.6);
-    --scrim: rgb(0 0 0 / 0.5);
-    --seg-thumb: #636366;
-    --hover: rgb(118 118 128 / 0.14);
-    --press: rgb(118 118 128 / 0.24);
-    --glass-bg: rgb(30 30 32 / 0.72);
-    --glass-strong: rgb(30 30 32 / 0.86);
-    --glass-solid: #1f1f21;
+    --surface: #141917;
+    --surface-2: #1f2522;
+    --map-ground: #1f2522;
+    --fill: rgb(120 140 130 / 0.2);
+    --fill-strong: rgb(120 140 130 / 0.3);
+    --ink: #f3f6f4;
+    --ink-2: #d0d7d3;
+    --muted: #a3aca7;
+    --separator: rgb(84 100 92 / 0.5);
+    --scrim: rgb(0 0 0 / 0.55);
+    --seg-thumb: #59625d;
+    --hover: rgb(120 140 130 / 0.12);
+    --press: rgb(120 140 130 / 0.22);
+    --glass-bg: rgb(26 32 29 / 0.72);
+    --glass-strong: rgb(26 32 29 / 0.86);
+    --glass-solid: #1a201d;
     --glass-sheen: linear-gradient(180deg, rgb(255 255 255 / 0.07), rgb(255 255 255 / 0) 55%);
     --glass-edge: inset 0 0.5px 0 0 rgb(255 255 255 / 0.2), inset 0 0 0 0.5px rgb(255 255 255 / 0.09);
+    --elev-card: inset 0 0.5px 0 rgb(255 255 255 / 0.06), 0 0 0 1px rgb(255 255 255 / 0.045);
     --elev-glass: 0 1px 2px rgb(0 0 0 / 0.4), 0 12px 32px -10px rgb(0 0 0 / 0.7);
     --elev-float: 0 2px 6px rgb(0 0 0 / 0.4), 0 28px 60px -18px rgb(0 0 0 / 0.8);
     --elev-thumb: 0 1px 2px rgb(0 0 0 / 0.3), 0 3px 8px rgb(0 0 0 / 0.3);
@@ -200,24 +207,25 @@
 
 :root[data-theme="dark"] {
   --bg: #000000;
-  --surface: #1c1c1e;
-  --surface-2: #2c2c2e;
-  --map-ground: #2c2c2e;
-  --fill: rgb(118 118 128 / 0.24);
-  --fill-strong: rgb(118 118 128 / 0.34);
-  --ink: #f5f5f7;
-  --ink-2: #d1d1d6;
-  --muted: #a1a1a8;
-  --separator: rgb(84 84 88 / 0.6);
-  --scrim: rgb(0 0 0 / 0.5);
-  --seg-thumb: #636366;
-  --hover: rgb(118 118 128 / 0.14);
-  --press: rgb(118 118 128 / 0.24);
-  --glass-bg: rgb(30 30 32 / 0.72);
-  --glass-strong: rgb(30 30 32 / 0.86);
-  --glass-solid: #1f1f21;
+  --surface: #141917;
+  --surface-2: #1f2522;
+  --map-ground: #1f2522;
+  --fill: rgb(120 140 130 / 0.2);
+  --fill-strong: rgb(120 140 130 / 0.3);
+  --ink: #f3f6f4;
+  --ink-2: #d0d7d3;
+  --muted: #a3aca7;
+  --separator: rgb(84 100 92 / 0.5);
+  --scrim: rgb(0 0 0 / 0.55);
+  --seg-thumb: #59625d;
+  --hover: rgb(120 140 130 / 0.12);
+  --press: rgb(120 140 130 / 0.22);
+  --glass-bg: rgb(26 32 29 / 0.72);
+  --glass-strong: rgb(26 32 29 / 0.86);
+  --glass-solid: #1a201d;
   --glass-sheen: linear-gradient(180deg, rgb(255 255 255 / 0.07), rgb(255 255 255 / 0) 55%);
   --glass-edge: inset 0 0.5px 0 0 rgb(255 255 255 / 0.2), inset 0 0 0 0.5px rgb(255 255 255 / 0.09);
+  --elev-card: inset 0 0.5px 0 rgb(255 255 255 / 0.06), 0 0 0 1px rgb(255 255 255 / 0.045);
   --elev-glass: 0 1px 2px rgb(0 0 0 / 0.4), 0 12px 32px -10px rgb(0 0 0 / 0.7);
   --elev-float: 0 2px 6px rgb(0 0 0 / 0.4), 0 28px 60px -18px rgb(0 0 0 / 0.8);
   --elev-thumb: 0 1px 2px rgb(0 0 0 / 0.3), 0 3px 8px rgb(0 0 0 / 0.3);
@@ -255,6 +263,7 @@
     --glass-strong: var(--glass-solid);
     --glass-blur: none;
     --glass-edge: inset 0 0 0 1px var(--ink);
+    --elev-card: 0 0 0 1px var(--muted);
     --separator: var(--muted);
     --muted: var(--ink-2);
   }
@@ -470,6 +479,7 @@
   .surface {
     background: var(--surface);
     border-radius: var(--radius-xl);
+    box-shadow: var(--elev-card);
   }
 
   /* ----------------------------- Seitenraster ---------------------------- */
@@ -529,6 +539,7 @@
     --sep-inset: 16px;
     background: var(--surface);
     border-radius: var(--radius-xl);
+    box-shadow: var(--elev-card);
     overflow: hidden;
   }
   .list-icons {
@@ -583,6 +594,7 @@
   .tile-grid {
     background: var(--surface);
     border-radius: var(--radius-xl);
+    box-shadow: var(--elev-card);
     overflow: hidden;
   }
   .tile-grid > * {
@@ -610,6 +622,7 @@
     transition:
       transform var(--dur-1) var(--ease-spring),
       background-color var(--dur-1) var(--ease-out),
+      filter var(--dur-1) var(--ease-out),
       opacity var(--dur-1) var(--ease-out);
   }
   .btn:active:not(:disabled) {
@@ -619,15 +632,18 @@
     opacity: 0.4;
     cursor: not-allowed;
   }
-  /* Hauptaktion: gruen getoent und umrandet - nie gefuellt. Gefuellt ist
-     nur ein Ergebnis (Abschluss). */
+  /* Hauptaktion: tiefgruener Verlauf mit Lichtkante, weisse Schrift -
+     eine je Bildschirm. */
   .btn-primary {
-    background: var(--accent-tint);
-    color: var(--accent-ink);
-    box-shadow: inset 0 0 0 1px var(--accent-edge);
+    background: var(--primary);
+    color: var(--on-primary);
+    box-shadow: var(--elev-primary);
   }
   .btn-primary:hover:not(:disabled) {
-    background: var(--accent-tint-strong);
+    filter: brightness(1.07);
+  }
+  .btn-primary:active:not(:disabled) {
+    filter: brightness(0.95);
   }
   .btn-secondary {
     background: var(--fill);
@@ -882,9 +898,15 @@
   }
   .chip[aria-pressed="true"],
   .chip[aria-current="page"] {
-    background: var(--accent-tint);
-    color: var(--accent-ink);
-    box-shadow: inset 0 0 0 1px var(--accent-edge);
+    background: var(--primary);
+    color: var(--on-primary);
+    box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.2), 0 1px 2px rgb(8 60 30 / 0.25);
+  }
+  /* Auf dem gruenen Chip: Abschluss-Haken weiss statt gruen auf gruen. */
+  .chip[aria-pressed="true"] .glyph-result,
+  .chip[aria-current="page"] .glyph-result {
+    background: #ffffff;
+    color: var(--primary-bottom);
   }
 
   /* -------------------------------- Plaketten ---------------------------- */
@@ -957,11 +979,11 @@
     color: var(--on-accent);
   }
 
-  /* Kachel eines Ablehnungsgrunds (ReasonTile): Verlauf im Symbolton aus
-     brand.css, feine Lichtkante oben, helles Zeichen mit getoenter Flaeche.
-     Nur wo Gruende gewaehlt, gepflegt oder ausgewertet werden - in
-     Verlaeufen steht dasselbe Zeichen neutral im .glyph. */
-  .reason-tile {
+  /* Kachel im Symbolton (ReasonTile, ToneTile): Verlauf aus brand.css, feine
+     Lichtkante oben, helles Zeichen mit getoenter Flaeche. Fuer Gruende, wo
+     sie gewaehlt, gepflegt oder ausgewertet werden, und fuer die Eintraege
+     der Menues (Profil) - in Verlaeufen steht ein Grund neutral im .glyph. */
+  .tone-tile {
     --duo: 0.3;
     display: inline-grid;
     flex-shrink: 0;
@@ -976,49 +998,58 @@
       inset 0 -0.5px 0 rgb(0 0 0 / 0.14),
       0 1px 2px rgb(0 0 0 / 0.08);
   }
-  .reason-tile svg {
+  .tone-tile svg {
     filter: drop-shadow(0 0.5px 0.5px rgb(0 0 0 / 0.18));
   }
-  .reason-tile-sm {
+  .tone-tile-sm {
     width: 24px;
     height: 24px;
     border-radius: var(--radius-xs);
   }
-  .reason-tile-lg {
+  .tone-tile-lg {
     width: 48px;
     height: 48px;
     border-radius: var(--radius-md);
   }
-  .reason-tile-round {
+  .tone-tile-round {
     border-radius: var(--radius-full);
   }
-  .reason-tile[data-tone="blue"] {
+  [data-tone="blue"] {
     --tone-hi: var(--tone-blue-hi);
     --tone-lo: var(--tone-blue-lo);
   }
-  .reason-tile[data-tone="indigo"] {
+  [data-tone="indigo"] {
     --tone-hi: var(--tone-indigo-hi);
     --tone-lo: var(--tone-indigo-lo);
   }
-  .reason-tile[data-tone="purple"] {
+  [data-tone="purple"] {
     --tone-hi: var(--tone-purple-hi);
     --tone-lo: var(--tone-purple-lo);
   }
-  .reason-tile[data-tone="magenta"] {
+  [data-tone="magenta"] {
     --tone-hi: var(--tone-magenta-hi);
     --tone-lo: var(--tone-magenta-lo);
   }
-  .reason-tile[data-tone="teal"] {
+  [data-tone="teal"] {
     --tone-hi: var(--tone-teal-hi);
     --tone-lo: var(--tone-teal-lo);
   }
-  .reason-tile[data-tone="slate"] {
+  [data-tone="slate"] {
     --tone-hi: var(--tone-slate-hi);
     --tone-lo: var(--tone-slate-lo);
   }
-  .reason-tile[data-tone="brown"] {
+  [data-tone="brown"] {
     --tone-hi: var(--tone-brown-hi);
     --tone-lo: var(--tone-brown-lo);
+  }
+
+  /* Kuerzel ohne Bild: je Person ein fester Symbolton, damit man Kollegen
+     im Feed und in Listen auf einen Blick auseinanderhaelt. */
+  .avatar-initials {
+    background: linear-gradient(180deg, var(--tone-hi), var(--tone-lo));
+    color: #ffffff;
+    text-shadow: 0 0.5px 1px rgb(0 0 0 / 0.2);
+    box-shadow: inset 0 0.5px 0 rgb(255 255 255 / 0.35), inset 0 -0.5px 0 rgb(0 0 0 / 0.12);
   }
 
   /* Medaille eines erreichten Abzeichens (levels/Medal.tsx): Metall als
@@ -1297,7 +1328,117 @@
     font-family: var(--font-rounded);
     font-weight: 700;
     font-variant-numeric: tabular-nums;
-    letter-spacing: -0.01em;
+    letter-spacing: -0.025em;
+  }
+
+  /* ------------------------------ Kopfkarte ------------------------------ */
+
+  /* Markenflaeche der Uebersicht (HeroStats): tiefes Gruen mit Licht von
+     oben rechts, der Ring der Marke als Wasserzeichen. Weisse Schrift
+     >= 9:1, leise Schrift >= 4.5:1. */
+  .hero {
+    /* Platzhalter auf der Markenflaeche: helle statt graue Balken */
+    --fill: rgb(255 255 255 / 0.14);
+    position: relative;
+    isolation: isolate;
+    overflow: hidden;
+    padding: 20px;
+    border-radius: var(--radius-xl);
+    background:
+      radial-gradient(110% 80% at 100% 0%, var(--brand-glow), transparent 60%),
+      linear-gradient(160deg, var(--brand-deep), var(--brand-deeper));
+    color: #ffffff;
+    box-shadow:
+      inset 0 1px 0 rgb(255 255 255 / 0.12),
+      0 1px 2px rgb(6 40 20 / 0.2),
+      0 18px 40px -20px rgb(8 70 36 / 0.55);
+  }
+  .hero-mark {
+    position: absolute;
+    top: -44px;
+    right: -44px;
+    z-index: -1;
+    width: 196px;
+    height: 196px;
+    color: #ffffff;
+    opacity: 0.08;
+    pointer-events: none;
+  }
+  .hero-body {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+  .hero-label {
+    font-size: var(--text-footnote);
+    line-height: var(--text-footnote--line-height);
+    font-weight: 600;
+    color: rgb(255 255 255 / 0.8);
+  }
+  .hero-hint {
+    margin-top: 2px;
+    font-size: var(--text-caption);
+    line-height: var(--text-caption--line-height);
+    color: rgb(255 255 255 / 0.72);
+  }
+  .hero-pill {
+    display: inline-flex;
+    align-items: center;
+    min-height: 26px;
+    padding: 2px 10px;
+    border-radius: var(--radius-full);
+    background: rgb(255 255 255 / 0.14);
+    box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.14);
+    font-size: var(--text-footnote);
+    line-height: var(--text-footnote--line-height);
+    font-weight: 600;
+    white-space: nowrap;
+  }
+  .hero-stats {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    padding-top: 16px;
+    border-top: 1px solid rgb(255 255 255 / 0.14);
+  }
+  .hero-stats > * + * {
+    padding-left: 12px;
+    border-left: 1px solid rgb(255 255 255 / 0.14);
+  }
+  .hero-stats > * {
+    padding-right: 8px;
+  }
+  @media (min-width: 768px) {
+    .hero {
+      padding: 24px 28px;
+    }
+    .hero-body {
+      flex-direction: row;
+      align-items: flex-end;
+      gap: 32px;
+    }
+    .hero-body > :first-child {
+      width: 32%;
+    }
+    .hero-stats {
+      flex: 1;
+      padding-top: 0;
+      border-top: 0;
+    }
+    .hero-stats > * + * {
+      padding-left: 20px;
+    }
+  }
+
+  /* Seiten vor der App (Anmelden, Einladung): Licht der Marke von oben,
+     die Bildmarke mit gruen getoentem Schatten. */
+  .brand-backdrop {
+    background:
+      radial-gradient(90% 55% at 50% -8%, var(--backdrop-glow), transparent 72%),
+      radial-gradient(60% 40% at 100% 100%, var(--backdrop-glow-2), transparent 70%),
+      var(--bg);
+  }
+  .brand-mark {
+    filter: drop-shadow(0 2px 3px rgb(6 60 30 / 0.18)) drop-shadow(0 14px 22px rgb(14 120 60 / 0.3));
   }
 
   /* ------------------------------ Platzhalter ---------------------------- */
@@ -1389,6 +1530,15 @@
   }
 }
 
+/* Auf dem gewaehlten (gruenen) Chip bleibt Nebenschrift hell. In der
+   Helfer-Ebene, weil text-muted & Co. sonst die Komponenten-Ebene schlagen. */
+@layer utilities {
+  .chip[aria-pressed="true"] :is(.text-muted, .text-ink-2, .text-danger),
+  .chip[aria-current="page"] :is(.text-muted, .text-ink-2, .text-danger) {
+    color: rgb(255 255 255 / 0.8);
+  }
+}
+
 /* Schale, Ergebnisleiste und eigene Kartenteile liegen in der Komponenten-
    Ebene, damit Tailwind-Helfer (md:hidden ...) sie uebersteuern koennen.
    Nur die Anpassungen fremder Bibliotheken (MapLibre, Leaflet) stehen
@@ -1457,7 +1607,7 @@
   transition: opacity var(--dur-2) var(--ease-out);
 }
 .tabbar-item[aria-current="page"] {
-  background: var(--fill);
+  background: var(--accent-soft);
   color: var(--accent-ink);
 }
 /* Beim Rollen nach unten schrumpft die Leiste auf den aktiven Reiter. */
@@ -1536,7 +1686,7 @@
   background: var(--hover);
 }
 .sidebar-item[aria-current="page"] {
-  background: var(--accent-tint);
+  background: var(--accent-soft);
   color: var(--accent-ink);
   font-weight: 600;
 }
@@ -1700,12 +1850,12 @@
   cursor: not-allowed;
 }
 .tray-btn-primary {
-  background: linear-gradient(var(--accent-tint-strong), var(--accent-tint-strong)), var(--surface);
-  color: var(--accent-ink);
-  box-shadow: inset 0 0 0 1.5px var(--accent-edge);
+  background: var(--primary);
+  color: var(--on-primary);
+  box-shadow: var(--elev-primary);
 }
 .tray-btn-primary > svg {
-  color: var(--accent-ink);
+  color: var(--on-primary);
 }
 :root[data-tray] .toast {
   bottom: calc(var(--tabbar-h) + var(--tabbar-bottom) + var(--tour-tray-height, 144px) + 16px);
@@ -1725,7 +1875,7 @@
     background: var(--fill);
   }
   .tray-btn-primary {
-    background: var(--accent-tint);
+    background: var(--primary);
   }
   :root[data-tray] .toast {
     bottom: 24px;
@@ -2001,9 +2151,9 @@
   white-space: nowrap;
 }
 .map-popup-actions a.is-primary {
-  background: var(--accent-tint);
-  color: var(--accent-ink);
-  box-shadow: inset 0 0 0 1px var(--accent-edge);
+  background: var(--primary);
+  color: var(--on-primary);
+  box-shadow: var(--elev-primary);
 }
 .maplibregl-ctrl-attrib {
   font-size: 10px;

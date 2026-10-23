@@ -221,7 +221,7 @@ export function AppointmentList({
           subtitle={`${slotLabel(detail.follow_up_at, now ?? undefined)} · ${address(detail)}`}
           onClose={() => setDetail(null)}
         >
-          {detail.reason_note && <p className="mb-4 rounded-xl bg-surface px-4 py-3 text-body">„{detail.reason_note}“</p>}
+          {detail.reason_note && <p className="mb-4 surface px-4 py-3 text-body">„{detail.reason_note}“</p>}
           <ul className="list list-icons">
             {detail.contact_phone && (
               <li>

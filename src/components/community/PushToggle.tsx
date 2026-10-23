@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { IconBell, IconX } from "@/components/icons";
 import { useToast } from "@/components/Toast";
-import { Cell, Switch } from "@/components/ui";
+import { Cell, Switch, ToneTile } from "@/components/ui";
 import {
   disablePush,
   enablePush,
@@ -74,9 +74,9 @@ export function PushRows() {
       <li>
         <Cell
           icon={
-            <span className="glyph">
+            <ToneTile tone="magenta">
               <IconBell className="h-4 w-4" />
-            </span>
+            </ToneTile>
           }
           title="Push-Nachrichten"
           subtitle={available ? undefined : PUSH_HINT[state]}
@@ -128,7 +128,7 @@ export function PushBanner() {
 
   if (state === null || dismissed || (state !== "off" && state !== "ios-install")) return null;
   return (
-    <div className="mb-4 flex items-center gap-3 rounded-xl bg-surface py-2 pl-4 pr-2">
+    <div className="mb-4 flex items-center gap-3 surface py-2 pl-4 pr-2">
       <span className="glyph">
         <IconBell className="h-4 w-4" />
       </span>

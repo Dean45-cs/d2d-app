@@ -3,9 +3,9 @@ import {
   SkeletonHeader,
   SkeletonList,
   SkeletonSegmented,
-  SkeletonStats,
   SkeletonText,
 } from "@/components/ui";
+import { SkeletonHero } from "@/components/HeroStats";
 
 /** Hoehe je Tag im Verlauf - sieht nach Wochen aus, nicht nach einem Muster. */
 const BARS = [38, 62, 24, 80, 54, 12, 0, 46, 70, 30, 88, 58, 20, 66];
@@ -19,7 +19,7 @@ export default function LoadingStart() {
         <SkeletonSegmented className="max-w-md" />
       </SkeletonHeader>
 
-      <SkeletonStats size="lg" />
+      <SkeletonHero />
 
       <div className="mt-8 grid grid-cols-1 gap-8 lg:grid-cols-3">
         <section className="lg:col-span-2">
@@ -28,7 +28,7 @@ export default function LoadingStart() {
             <div className="flex h-[184px] gap-1 pb-6 pr-8">
               {BARS.map((height, i) => (
                 <span key={i} className="flex min-w-0 flex-1 items-end justify-center">
-                  <span className="skeleton block w-full max-w-2 rounded-full" style={{ height: `${Math.max(height, 4)}%` }} />
+                  <span className="skeleton block w-full max-w-3 rounded-full" style={{ height: `${Math.max(height, 4)}%` }} />
                 </span>
               ))}
             </div>

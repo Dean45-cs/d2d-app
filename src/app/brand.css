@@ -6,14 +6,32 @@
    steht in globals.css. Werte und Kontraste sind in docs/DESIGN.md belegt.
    ========================================================================== */
 :root {
-  /* Energie-Gruen. Drei Rollen, nie vermischen:
-     --accent       Fuellung und Bedienelemente (Ring, Fortschritt, aktiver Reiter)
+  /* Energie-Gruen. Rollen, nie vermischen:
+     --accent       Fuellung und Bedienelemente (Ring, Fortschritt, Schalter)
                     >= 3:1 auf Weiss und auf --bg
      --accent-ink   Schrift und kleine Zeichen in Gruen, >= 4.5:1 auch auf der Toenung
-     --accent-vivid nur zum Toenen (color-mix), nie als Schrift */
-  --accent: #1f9d4c;
-  --accent-ink: #0d6b32;
+     --accent-vivid nur zum Toenen (color-mix), nie als Schrift
+     --primary-*    die Hauptaktion: tiefgruener Verlauf mit weisser Schrift,
+                    schon am hellen Ende >= 4.5:1 */
+  --accent: #15904a;
+  --accent-ink: #0c6a34;
   --accent-vivid: #2fd161;
+  --primary-top: #16884a;
+  --primary-bottom: #0d6634;
+  --primary: linear-gradient(180deg, var(--primary-top), var(--primary-bottom));
+  --on-primary: #ffffff;
+  --elev-primary: inset 0 1px 0 rgb(255 255 255 / 0.22), inset 0 0 0 1px rgb(0 0 0 / 0.08),
+    0 1px 2px rgb(8 60 30 / 0.22), 0 8px 18px -8px rgb(14 108 53 / 0.55);
+  /* Leise Auswahl (aktiver Reiter, Seitenleiste) */
+  --accent-soft: color-mix(in srgb, var(--accent) 12%, transparent);
+  /* Markenflaeche (Kopfkarte der Uebersicht, Anmeldung): tiefes Gruen,
+     weisse Schrift >= 9:1 */
+  --brand-deep: #0f4d2a;
+  --brand-deeper: #0a361e;
+  --brand-glow: rgb(70 214 128 / 0.35);
+  /* Licht hinter der Anmeldung */
+  --backdrop-glow: rgb(46 190 105 / 0.2);
+  --backdrop-glow-2: rgb(46 190 105 / 0.08);
   /* Zeichen auf voller Akzentflaeche (Haekchen eines Abschlusses) */
   --on-accent: #ffffff;
   --accent-tint: color-mix(in srgb, var(--accent-vivid) 16%, transparent);
@@ -27,9 +45,12 @@
   --warn-tint: color-mix(in srgb, #ff9f0a 16%, transparent);
 
   /* Diagramme: Tueren neutral, Abschluesse im Akzent (>= 3:1 auf Weiss) */
-  --chart-doors: #8e8e93;
-  --chart-met: #3c3c43;
+  --chart-doors: #8a978f;
+  --chart-met: #36413b;
   --chart-sales: var(--accent);
+  /* Verlauf: die Tuer-Saeule ist nur die Spur, in der die Abschluesse
+     stehen - jeder Tag steht zusaetzlich als Text daneben (sr-only, title). */
+  --chart-doors-soft: #c9d2cd;
 
   /* Teilgebiete auf der Karte. Vier Farben, als Satz gegen Rot-Gruen-
      Schwaeche geprueft; die Zahl im Kreis bleibt die eigentliche
@@ -76,6 +97,15 @@
     --accent: #30d158;
     --accent-ink: #34d66b;
     --accent-vivid: #30d158;
+    --primary-top: #16884a;
+    --primary-bottom: #0e6b37;
+    --elev-primary: inset 0 1px 0 rgb(255 255 255 / 0.18), inset 0 0 0 1px rgb(255 255 255 / 0.04),
+      0 1px 2px rgb(0 0 0 / 0.5), 0 8px 20px -8px rgb(23 144 76 / 0.45);
+    --accent-soft: color-mix(in srgb, var(--accent) 18%, transparent);
+    --brand-deep: #0e4426;
+    --brand-deeper: #062414;
+    --backdrop-glow: rgb(48 209 88 / 0.16);
+    --backdrop-glow-2: rgb(48 209 88 / 0.06);
     --on-accent: #062611;
     --accent-tint: color-mix(in srgb, var(--accent-vivid) 20%, transparent);
     --accent-tint-strong: color-mix(in srgb, var(--accent-vivid) 30%, transparent);
@@ -84,8 +114,9 @@
     --danger-tint: color-mix(in srgb, #ff453a 18%, transparent);
     --warn: #ffb547;
     --warn-tint: color-mix(in srgb, #ff9f0a 20%, transparent);
-    --chart-doors: #8e8e93;
-    --chart-met: #d1d1d6;
+    --chart-doors: #8e9a94;
+    --chart-met: #d0d7d3;
+    --chart-doors-soft: #36403b;
     --plot-1: #3987e5;
     --plot-2: #c98500;
     --plot-3: #d55181;
@@ -103,6 +134,15 @@
   --accent: #30d158;
   --accent-ink: #34d66b;
   --accent-vivid: #30d158;
+  --primary-top: #16884a;
+  --primary-bottom: #0e6b37;
+  --elev-primary: inset 0 1px 0 rgb(255 255 255 / 0.18), inset 0 0 0 1px rgb(255 255 255 / 0.04),
+    0 1px 2px rgb(0 0 0 / 0.5), 0 8px 20px -8px rgb(23 144 76 / 0.45);
+  --accent-soft: color-mix(in srgb, var(--accent) 18%, transparent);
+  --brand-deep: #0e4426;
+  --brand-deeper: #062414;
+  --backdrop-glow: rgb(48 209 88 / 0.16);
+  --backdrop-glow-2: rgb(48 209 88 / 0.06);
   --on-accent: #062611;
   --accent-tint: color-mix(in srgb, var(--accent-vivid) 20%, transparent);
   --accent-tint-strong: color-mix(in srgb, var(--accent-vivid) 30%, transparent);
@@ -111,8 +151,9 @@
   --danger-tint: color-mix(in srgb, #ff453a 18%, transparent);
   --warn: #ffb547;
   --warn-tint: color-mix(in srgb, #ff9f0a 20%, transparent);
-  --chart-doors: #8e8e93;
-  --chart-met: #d1d1d6;
+  --chart-doors: #8e9a94;
+  --chart-met: #d0d7d3;
+  --chart-doors-soft: #36403b;
   --plot-1: #3987e5;
   --plot-2: #c98500;
   --plot-3: #d55181;

@@ -16,7 +16,7 @@ export default function LoadingProfile() {
       <PageHeader title={<SkeletonText width={128} />} hideLargeTitle />
       <div className="grid grid-cols-1 gap-8 lg:grid-cols-[minmax(0,380px)_minmax(0,1fr)] lg:items-start">
         <div className="min-w-0 space-y-8">
-          <div className="flex flex-col items-center rounded-xl bg-surface px-4 py-6 text-center" aria-hidden="true">
+          <div className="flex flex-col items-center surface px-4 py-6 text-center" aria-hidden="true">
             <span className="skeleton h-22 w-22 rounded-full" />
             <span className="mt-3 block w-full text-title-1">
               <SkeletonText width="min(60%, 14rem)" />
@@ -36,7 +36,7 @@ export default function LoadingProfile() {
             <SectionHeader title="Leistung" href="/team/rangliste?range=30" linkLabel="Rangliste" />
             <div className="space-y-4">
               <SkeletonStats count={4} columns={2} />
-              <div className="flex items-center gap-4 rounded-xl bg-surface p-4" aria-hidden="true">
+              <div className="flex items-center gap-4 surface p-4" aria-hidden="true">
                 <span className="skeleton h-16 w-16 shrink-0 rounded-full" />
                 <span className="min-w-0 flex-1">
                   <span className="block text-footnote">

@@ -47,17 +47,25 @@ export function DailyBars({ data, height = 168 }: { data: DayPoint[]; height?: n
           {data.map((d, index) => (
             <li key={d.day} className="flex h-full min-w-0 flex-1 flex-col items-center">
               <div
-                className="flex w-full flex-1 items-end justify-center gap-1"
+                className="flex w-full flex-1 items-end justify-center"
                 title={`${formatDay(d.day, weekly)}: ${d.doors} Türen, ${d.sales} Abschlüsse`}
               >
+                {/* Eine Saeule je Tag: die Tueren als ruhige Spur, die Abschluesse
+                    darin von unten im Akzent - der Anteil ist die Quote. */}
                 <span
-                  className="w-full max-w-2 rounded-full bg-[var(--chart-doors)]"
+                  className="relative w-full max-w-3 overflow-hidden rounded-full bg-[var(--chart-doors-soft)]"
                   style={{ height: `${d.doors ? Math.max(4, (d.doors / max) * 100) : 0}%` }}
-                />
-                <span
-                  className="w-full max-w-2 rounded-full bg-[var(--chart-sales)]"
-                  style={{ height: `${d.sales ? Math.max(4, (d.sales / max) * 100) : 0}%` }}
-                />
+                >
+                  {d.sales > 0 && (
+                    <span
+                      className="absolute inset-x-0 bottom-0 rounded-full bg-[var(--chart-sales)]"
+                      style={{ height: `${Math.min(100, (d.sales / Math.max(d.doors, 1)) * 100)}%`, minHeight: 6 }}
+                    />
+                  )}
+                </span>
+                <span className="sr-only">
+                  {formatDay(d.day, weekly)}: {d.doors} Türen, {d.sales} Abschlüsse
+                </span>
               </div>
               <span className="h-6 whitespace-nowrap pt-2 text-caption-2 text-muted">
                 {index % labelEvery === 0 ? shortDay(d.day) : ""}
@@ -67,7 +75,7 @@ export function DailyBars({ data, height = 168 }: { data: DayPoint[]; height?: n
         </ol>
       </div>
       <figcaption className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-footnote text-ink-2">
-        <Legend color="var(--chart-doors)" label="Türen" />
+        <Legend color="var(--chart-doors-soft)" label="Türen" />
         <Legend color="var(--chart-sales)" label="Abschlüsse" />
         {weekly && <span className="text-muted">je Woche</span>}
       </figcaption>

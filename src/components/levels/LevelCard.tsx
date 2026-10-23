@@ -42,7 +42,7 @@ export function LevelSummary({
       {href && <IconChevronRight className="cell-chevron" />}
     </>
   );
-  const cls = "flex items-center gap-4 rounded-xl bg-surface p-4";
+  const cls = "flex items-center gap-4 surface p-4";
   return href ? (
     <Link href={href} className={`${cls} cell-tap`}>
       {content}

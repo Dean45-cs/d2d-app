@@ -6,9 +6,12 @@ stehen in `src/app/brand.css` (Marke: Akzent, Signale, Datenfarben) und
 dort nicht steht, gibt es nicht – Tailwinds eigene Farben, Schriftgrößen,
 Radien und Schatten sind per `@theme { --color-*: initial; … }` gelöscht.
 
-Leitbild: iOS 26. **Navigation und Bedienelemente aus Glas**, **Inhalt auf
-ruhigen, festen Flächen**. Fast einfarbig, genau **ein Akzent** (Energie-Grün).
-Kompakt, ohne Erklärtexte, eine Hauptaktion je Bildschirm.
+Leitbild: iOS 26 mit eigener Handschrift („Tiefgrün“). **Navigation und
+Bedienelemente aus Glas**, **Inhalt auf ruhigen, festen Flächen mit feiner
+Kante und weichem Schatten**. Neutrale mit einem Hauch Grün statt Systemgrau,
+genau **ein Akzent** (Energie-Grün), die **Hauptaktion kräftig** (tiefgrüner
+Verlauf, weiße Schrift). Kompakt, ohne Erklärtexte, eine Hauptaktion je
+Bildschirm.
 
 ---
 
@@ -18,36 +21,51 @@ Kompakt, ohne Erklärtexte, eine Hauptaktion je Bildschirm.
 
 | Token | Hell | Dunkel | Rolle |
 | --- | --- | --- | --- |
-| `--bg` | `#f2f2f7` | `#000000` | Seitengrund (gruppiert) |
-| `--surface` | `#ffffff` | `#1c1c1e` | Inhaltsfläche: Listen, Kennzahlen, Beiträge |
-| `--surface-2` | `#f2f2f7` | `#2c2c2e` | Fläche auf Fläche (selten) |
-| `--map-ground` | `#e5e5ea` | `#2c2c2e` | Kartengrund, solange Kacheln laden (hebt sich vom Seitengrund ab) |
-| `--fill` / `--fill-strong` | `#767680` 12 % / 20 % | 24 % / 34 % | Felder, Segmentleisten, Ringe-Spur |
-| `--ink` | `#0b0b0d` | `#f5f5f7` | Text |
-| `--ink-2` | `#3c3c43` | `#d1d1d6` | Beschriftung von Kennzahlen |
-| `--muted` | `#68686f` | `#a1a1a8` | Untertitel, Zeitangaben |
-| `--separator` | `#3c3c43` 16 % | `#545458` 60 % | Haarlinien (eingerückt bis zur Schrift) |
+| `--bg` | `#f2f4f3` | `#000000` | Seitengrund (gruppiert) |
+| `--surface` | `#ffffff` | `#141917` | Inhaltsfläche: Listen, Kennzahlen, Beiträge |
+| `--surface-2` | `#f2f4f3` | `#1f2522` | Fläche auf Fläche (selten) |
+| `--map-ground` | `#e3e7e5` | `#1f2522` | Kartengrund, solange Kacheln laden (hebt sich vom Seitengrund ab) |
+| `--fill` / `--fill-strong` | `#465a50` 10 % / 17 % | `#788c82` 20 % / 30 % | Felder, Segmentleisten, Ringe-Spur |
+| `--ink` | `#0b1510` | `#f3f6f4` | Text |
+| `--ink-2` | `#36413b` | `#d0d7d3` | Beschriftung von Kennzahlen |
+| `--muted` | `#5f6964` | `#a3aca7` | Untertitel, Zeitangaben |
+| `--separator` | `#283c32` 13 % | `#54645c` 50 % | Haarlinien (eingerückt bis zur Schrift) |
+| `--elev-card` | Kante 4,5 % + weicher Schatten | Lichtkante innen | Kante und Schatten jeder Inhaltsfläche (`.surface`, `.list`, `.tile-grid`, `StatGrid`) |
+
+Alle Neutralen sind leicht ins Grün gezogen, damit Grund, Linien und Schrift zur
+Marke gehören. Der Seitengrund im Dunkeln bleibt Schwarz (OLED).
 
 ### Marke (brand.css)
 
 | Token | Hell | Dunkel | Rolle |
 | --- | --- | --- | --- |
-| `--accent` | `#1f9d4c` | `#30d158` | Füllung: Ringe, Fortschritt, aktiver Reiter, Abschluss-Zeichen |
-| `--accent-ink` | `#0d6b32` | `#34d66b` | Grüne **Schrift** und kleine Zeichen |
-| `--accent-tint` | Grün 16 % | Grün 20 % | Getönte Aktion (Primärknopf), Auswahl |
+| `--accent` | `#15904a` | `#30d158` | Füllung: Ringe, Fortschritt, Schalter, Abschluss-Zeichen |
+| `--accent-ink` | `#0c6a34` | `#34d66b` | Grüne **Schrift** und kleine Zeichen |
+| `--accent-tint` | Grün 16 % | Grün 20 % | Getönte Zweitaktion (`icon-btn-accent`), Auswahl in Listen |
+| `--accent-soft` | Akzent 12 % | Akzent 18 % | Leise Auswahl: aktiver Reiter, Seitenleiste |
+| `--primary` (`-top` → `-bottom`) | `#16884a` → `#0d6634` | `#16884a` → `#0e6b37` | **Hauptaktion**: `.btn-primary`, `.tray-btn-primary`, gewählter `.chip` |
+| `--on-primary` | `#ffffff` | `#ffffff` | Schrift und Zeichen auf `--primary` |
+| `--elev-primary` | Lichtkante + grüner Schatten | Lichtkante + Schatten | Tiefe der Hauptaktion |
+| `--brand-deep` → `--brand-deeper` | `#0f4d2a` → `#0a361e` | `#0e4426` → `#062414` | Markenfläche (Kopfkarte der Übersicht) |
+| `--brand-glow`, `--backdrop-glow(-2)` | Grün 35 % / 20 % / 8 % | Grün 35 % / 16 % / 6 % | Licht auf der Markenfläche bzw. hinter Anmelden/Einladung |
 | `--on-accent` | `#ffffff` | `#062611` | Zeichen auf voller Akzentfläche – **nur Zeichen, keine Schrift** |
 | `--danger` / `--danger-tint` | `#c9182a` | `#ff6b6b` | Fehler, Löschen – nur klein, immer mit Wort oder Zeichen |
 | `--warn` / `--warn-tint` | `#a35a00` | `#ffb547` | Warnung (veraltet, prüfen) |
-| `--chart-doors` / `--chart-met` / `--chart-sales` | grau / dunkel / Akzent | grau / hell / Akzent | Diagramme, Fitness-Ringe |
+| `--chart-doors` / `--chart-met` / `--chart-sales` | grüngrau / dunkel / Akzent | grüngrau / hell / Akzent | Diagramme, Fitness-Ringe |
+| `--chart-doors-soft` | `#c9d2cd` | `#36403b` | Tür-Säule im Verlauf – nur Spur für die Abschlüsse darin, Werte je Tag zusätzlich als Text |
 | `--plot-1…4` | unverändert | dunkel angepasst | Teilgebiete (CVD-geprüfter Satz) |
 | `--price-0…4`, `--price-none` | grau → tiefgrün | dunkel → hellgrün | Preisstufen der Energiekarte (sequenziell, Helligkeit steigt) |
-| `--tone-{blue,indigo,purple,magenta,teal,slate,brown}-{hi,lo}` | Verlauf hell → satt | gleich | Kacheln der Ablehnungsgründe (`ReasonTile`) – nur dort |
+| `--tone-{blue,indigo,purple,magenta,teal,slate,brown}-{hi,lo}` | Verlauf hell → satt | gleich | Symbolkacheln (`ReasonTile`, `ToneTile`) und Kürzel-Avatare |
 
 **Regeln**
 
-- Aktionen sind **getönt** (`.btn-primary` = Tönung + `--accent-ink`) oder umrandet,
-  nie flächig grün. Volle grüne Fläche mit Haken (`.glyph-result`) bedeutet
-  ausschließlich **Abschluss** – im Toast, in Kontakten, im Feed.
+- Die **Hauptaktion ist kräftig**: tiefgrüner Verlauf `--primary` mit weißer
+  Schrift und Lichtkante (`.btn-primary`, `.tray-btn-primary`), eine je
+  Bildschirm. Gewählte Chips tragen denselben Verlauf, flacher. Zweitaktionen
+  sind grau (`.btn-secondary`) oder getönt (`icon-btn-accent`).
+- Der **grüne Kreis mit Haken** (`.glyph-result`) bedeutet ausschließlich
+  **Abschluss** – im Toast, in Kontakten, im Feed. Auf einem gewählten Chip wird
+  er weiß.
 - Rot und Bernstein sind Signale, nie Dekoration, nie allein (immer Wort/Zeichen).
 - **Keine Emojis.** Ablehnungsgründe tragen ein Zeichen aus `ReasonIcon.tsx`
   (Schlüssel in `src/lib/reason-icons.ts`). Wo Gründe gewählt, gepflegt oder
@@ -55,42 +73,50 @@ Kompakt, ohne Erklärtexte, eine Hauptaktion je Bildschirm.
   (`OutcomeGlyph`) neutral im `.glyph`, damit der grüne Abschluss das einzige
   Farbsignal der Liste bleibt.
 - Symboltöne haben kein Grün, Rot oder Bernstein und sind keine Bedienfarben.
-  Weißes Zeichen auf dem hellen Ende des Verlaufs ≥ 3 : 1.
+  Weißes Zeichen auf dem hellen Ende des Verlaufs ≥ 3 : 1. Sie färben
+  Ablehnungsgründe, die Einträge der Menüs (Profil: `ToneTile`) und Kürzel ohne
+  Profilbild – jede Person hat über `personTone(name)` überall denselben Ton.
 - Medaillen der Abzeichen (`levels/Medal.tsx`) sind Bildfarben wie das Logo:
   Bronze, Silber, Gold, Platin (Lavendel), Diamant (Eisblau); ab Gold mit
   Perlkranz. Das Zeichen sitzt eingraviert in der dunkelsten Metallfarbe.
-- Schrift auf voller Akzentfläche ist verboten (hell nur 3,5 : 1) – dafür die Tönung.
+- Schrift auf voller `--accent`-Fläche ist verboten (hell nur 4,1 : 1) – dafür
+  `--primary` (≥ 4,5 : 1 schon am hellen Ende) oder die Tönung.
 
 ### Gemessene Kontraste (WCAG 2.x)
 
 | Paar | Vordergrund | Hintergrund | Kontrast |
 | --- | --- | --- | --- |
-| `--ink` (hell) | `#0b0b0d` | Fläche `#ffffff` | 19.66 |
-| `--ink-2` (hell) | `#3c3c43` | Fläche `#ffffff` | 10.94 |
-| `--muted` (hell) | `#68686f` | Fläche `#ffffff` | 5.53 |
-| `--muted` (hell) | `#68686f` | Grund `#f2f2f7` | 4.95 |
-| `--muted` auf `--fill` (hell) | `#68686f` | Feld auf Weiß | 4.81 |
-| `--accent-ink` (hell) | `#0d6b32` | Fläche `#ffffff` | 6.63 |
-| `--accent-ink` (hell) | `#0d6b32` | Grund `#f2f2f7` | 5.94 |
-| `--accent-ink` auf Tönung (hell) | `#0d6b32` | Tönung auf Weiß | 5.90 |
-| `--accent-ink` auf Tönung (hell) | `#0d6b32` | Tönung auf Grund | 5.35 |
-| `--accent` Bedienelement (hell) | `#1f9d4c` | Fläche `#ffffff` | 3.51 (≥ 3 : 1 Grafik) |
-| `--on-accent` Zeichen (hell) | `#ffffff` | `--accent` | 3.51 (≥ 3 : 1 Grafik) |
+| `--ink` (hell) | `#0b1510` | Fläche `#ffffff` | 18.60 |
+| `--ink-2` (hell) | `#36413b` | Fläche `#ffffff` | 10.63 |
+| `--muted` (hell) | `#5f6964` | Fläche `#ffffff` | 5.69 |
+| `--muted` (hell) | `#5f6964` | Grund `#f2f4f3` | 5.15 |
+| `--muted` auf `--fill` (hell) | `#5f6964` | Feld auf Weiß | 4.93 |
+| `--accent-ink` (hell) | `#0c6a34` | Fläche `#ffffff` | 6.72 |
+| `--accent-ink` (hell) | `#0c6a34` | Grund `#f2f4f3` | 6.08 |
+| `--accent-ink` auf Tönung (hell) | `#0c6a34` | Tönung auf Weiß | 5.78 |
+| `--on-primary` (hell + dunkel) | `#ffffff` | `--primary-top` `#16884a` | 4.51 |
+| `--on-primary` (hell) | `#ffffff` | `--primary-bottom` `#0d6634` | 7.08 |
+| `--on-primary` (dunkel) | `#ffffff` | `--primary-bottom` `#0e6b37` | 6.61 |
+| Schrift auf Markenfläche | `#ffffff` | `--brand-deep` `#0f4d2a` | 9.93 |
+| leise Schrift auf Markenfläche | Weiß 80 % | `--brand-deep` | 6.97 |
+| `--accent` Bedienelement (hell) | `#15904a` | Fläche `#ffffff` | 4.10 (≥ 3 : 1 Grafik) |
+| `--chart-doors` (hell) | `#8a978f` | Fläche `#ffffff` | 3.04 (≥ 3 : 1 Grafik) |
 | `--danger` (hell) | `#c9182a` | Fläche `#ffffff` | 5.76 |
-| `--danger` auf Tönung (hell) | `#c9182a` | Tönung | 4.89 |
-| `--warn` (hell) | `#a35a00` | Grund `#f2f2f7` | 4.68 |
-| `--ink` (dunkel) | `#f5f5f7` | Fläche `#1c1c1e` | 15.63 |
-| `--ink-2` (dunkel) | `#d1d1d6` | Fläche `#1c1c1e` | 11.18 |
-| `--muted` (dunkel) | `#a1a1a8` | Fläche `#1c1c1e` | 6.63 |
-| `--muted` (dunkel) | `#a1a1a8` | Fläche 2 `#2c2c2e` | 5.43 |
-| `--accent-ink` (dunkel) | `#34d66b` | Fläche `#1c1c1e` | 8.89 |
-| `--accent-ink` auf Tönung (dunkel) | `#34d66b` | Tönung auf Fläche | 6.00 |
+| `--warn` (hell) | `#a35a00` | Grund `#f2f4f3` | 4.73 |
+| `--ink` (dunkel) | `#f3f6f4` | Fläche `#141917` | 16.34 |
+| `--ink-2` (dunkel) | `#d0d7d3` | Fläche `#141917` | 12.14 |
+| `--muted` (dunkel) | `#a3aca7` | Fläche `#141917` | 7.63 |
+| `--muted` (dunkel) | `#a3aca7` | Fläche 2 `#1f2522` | 6.70 |
+| `--accent-ink` (dunkel) | `#34d66b` | Fläche `#141917` | 9.29 |
 | `--on-accent` Zeichen (dunkel) | `#062611` | `--accent` | 8.03 |
-| `--danger` (dunkel) | `#ff6b6b` | Fläche `#1c1c1e` | 6.13 |
-| `--warn` (dunkel) | `#ffb547` | Fläche `#1c1c1e` | 9.68 |
+| `--danger` (dunkel) | `#ff6b6b` | Fläche `#141917` | 6.41 |
+| `--warn` (dunkel) | `#ffb547` | Fläche `#141917` | 10.12 |
 
-Alle Textpaare ≥ 4,5 : 1, alle Bedien-/Grafikpaare ≥ 3 : 1. Bei
-`prefers-contrast: more` wird Glas fest, Haarlinien und `--muted` dunkler.
+Alle Textpaare ≥ 4,5 : 1, alle Bedien-/Grafikpaare ≥ 3 : 1 – bis auf die
+Tür-Säule im Verlauf (`--chart-doors-soft`), die nur Spur ist; ihre Werte stehen
+je Tag als Text (`title`, für Bildschirmleser `sr-only`). Bei
+`prefers-contrast: more` wird Glas fest, Flächen bekommen eine volle Kante,
+Haarlinien und `--muted` werden dunkler.
 
 ---
 
@@ -108,15 +134,19 @@ Alle Textpaare ≥ 4,5 : 1, alle Bedien-/Grafikpaare ≥ 3 : 1. Bei
   `prefers-contrast: more` und im Super-Energiesparmodus (`data-power="save"`) wird
   Glas zur festen Fläche `--glass-solid`.
 - Glas nur für Dinge, die **über** Inhalt schweben. Inhalt selbst liegt auf
-  `--surface`. Nie Glas auf Glas, nie Karte in Karte.
+  `--surface` mit `--elev-card` (feine Kante, weicher Schatten) – immer über die
+  Klasse `.surface` (bzw. `.list`, `.tile-grid`), nie `rounded-xl bg-surface`
+  von Hand. Nie Glas auf Glas, nie Karte in Karte.
 
 ---
 
 ## 3. Schrift
 
 Systemschrift (`-apple-system` → SF Pro; Rückfall Segoe UI/Roboto/Inter).
-Große Zahlen (`.kpi`) in SF Pro Rounded. **Alle Zahlen tabellarisch** (`html`
-setzt `font-variant-numeric: tabular-nums`).
+Große Zahlen (`.kpi`) in SF Pro Rounded, leicht enger gesetzt. **Alle Zahlen
+tabellarisch** (`html` setzt `font-variant-numeric: tabular-nums`). Titel ab
+`title-3` laufen etwas enger als die Systemvorgabe (−0,6 % bis −3,5 %) – das
+lässt sie gesetzt statt voreingestellt wirken.
 
 | Klasse | Größe / Zeile | Gewicht | Verwendung |
 | --- | --- | --- | --- |
@@ -194,10 +224,12 @@ Alle in `src/components/`. Stil per Klassen aus `globals.css` (`@layer component
 | `PageHeader` | `PageHeader.tsx` | Werkzeugleiste (Zurück, Aktionen) + großer Titel; wird beim Scrollen zu Glas mit kleinem Titel. `back.mobileOnly` für Seiten, die ab dem iPad selbst in der Seitenleiste stehen |
 | `Cell` | `ui.tsx` | Zeile einer gruppierten Liste (`ul.list`, `ul.list list-icons`) – Link, Knopf oder statisch; `wrap` lässt den Untertitel zweizeilig umbrechen statt ihn abzuschneiden |
 | `ListLabel`, `SectionHeader` | `ui.tsx` | Gruppenüberschrift (Versalien, klein) bzw. Abschnittstitel mit „Alle“ |
+| `HeroStats`, `SkeletonHero` | `HeroStats.tsx` | Kopfkarte der Übersicht auf der Markenfläche: Abschlüsse groß mit Quote, darunter Türen, Gespräche, Termine; der Ring der Marke als Wasserzeichen |
 | `StatGrid` | `ui.tsx` | Kennzahlen auf einer Fläche, Haarlinien dazwischen |
 | `ProgressRing`, `ProgressBar` | `ui.tsx` | Fortschritt im Akzent |
 | `Pill`, `StatusBadge` | `ui.tsx` | Plaketten (neutral, accent, danger, warn, ink) |
-| `Avatar` | `ui.tsx` | Bild oder Kürzel |
+| `Avatar` | `ui.tsx` | Bild oder Kürzel; das Kürzel im festen Symbolton der Person (`personTone`) |
+| `ToneTile` | `ui.tsx` | Zeichen auf einer Kachel im Symbolton – Einträge der Menüs wie in den iOS-Einstellungen |
 | `EmptyState`, `InlineError`, `Notice` | `ui.tsx` | Leer, Fehler, ruhiger Hinweis |
 | `Skeleton*` | `ui.tsx` | Ladeplatzhalter: `SkeletonHeader` (echter `PageHeader`, fester Titel steht schon da), `SkeletonText` (Balken in der Zeile seiner Schrift), `SkeletonList`, `SkeletonStats`, `SkeletonPost`, `SkeletonChips`, `SkeletonSegmented` |
 | `OutcomeGlyph` | `ui.tsx` | Ergebnis eines Besuchs als Zeichen (bei Ablehnung das Zeichen des Grundes, neutral) |
@@ -218,6 +250,8 @@ Alle in `src/components/`. Stil per Klassen aus `globals.css` (`@layer component
 
 ### Muster
 
+- **Übersicht** beginnt mit der Kopfkarte (`HeroStats`) – die einzige
+  tiefgrüne Fläche der Seite. Andere Seiten bleiben bei `StatGrid`.
 - **Gruppierte Liste statt Karten.** Überschrift `ListLabel`, darunter
   `ul.list` mit `Cell`s. Kein Erklärtext – höchstens eine `list-footer`-Zeile.
 - **Eine Hauptaktion je Bildschirm** – oben rechts in der Werkzeugleiste als
@@ -254,6 +288,9 @@ Punkt – Tür/Ziel. Der Ring wächst von 3 Uhr bis 12 Uhr von schmal zu breit u
 läuft so auf den Punkt zu. App-Symbol: Energie-Grün mit Licht von oben links,
 feiner Lichtkante, heller Marke mit weichem Schatten und leicht leuchtendem
 Punkt. Wortmarke in der Systemschrift, „Carlsson“ fett, „Sales“ normal.
+Seiten vor der App (Anmelden, Einladung, Nicht gefunden) liegen auf
+`.brand-backdrop` (grünes Licht von oben); die Bildmarke beim Anmelden wirft
+einen grün getönten Schatten (`.brand-mark`).
 Dateien: `public/logo.svg`, `public/logo-mark.svg`, `public/icon.svg`,
 `public/icon-maskable.svg`; PNGs (inkl. Benachrichtigungs-Symbol
 `badge-96.png`) erzeugt `scripts/build-icons.mjs`.

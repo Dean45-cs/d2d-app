@@ -19,7 +19,7 @@ export default function LoadingTeam() {
       <div className="grid grid-cols-1 gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,340px)] lg:items-start">
         <div className="min-w-0">
           <SkeletonChips widths={[64, 108]} className="mb-4" />
-          <div className="mb-4 flex items-center gap-3 rounded-xl bg-surface p-4" aria-hidden="true">
+          <div className="mb-4 flex items-center gap-3 surface p-4" aria-hidden="true">
             <span className="skeleton h-9 w-9 shrink-0 rounded-full" />
             <span className="flex min-h-11 flex-1 items-center text-body">
               <SkeletonText width="min(48%, 12rem)" />
