@@ -243,6 +243,7 @@ Alle in `src/components/`. Stil per Klassen aus `globals.css` (`@layer component
 | `useConfirm` | `useConfirm.tsx` | Rückfrage nur für Unumkehrbares (Löschen) |
 | `TabBar`, `Sidebar` | `AppNav.tsx` | Schwebende Glas-Reiterleiste (Handy) / einklappbare Seitenleiste (iPad, Rechner) |
 | `DailyBars`, `ReasonBars`, `HourBars` | `charts.tsx` | Diagramme |
+| `ProfileRadar` | `ProfileRadar.tsx` | Netzdiagramm der Übersicht: sechs Achsen gegen den Zeitraum davor (gestrichelt = wie vorher, Rand = doppelt so viel), Achse antippen zeigt die Zahlen dahinter |
 | `ActivityRings`, `LevelSummary`, `LevelBadge` | `levels/LevelCard.tsx` | Fitness-Ringe, Level |
 | `ProviderSummary`, `PriceBadge` | `ProviderRating.tsx` | Grundversorger und Preisstufe |
 | `Logo`, `LogoMark` | `Logo.tsx` | Marke |

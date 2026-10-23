@@ -10,6 +10,7 @@ import {
   listMembers,
   listVisits,
   memberStats,
+  profileCounts,
   reasonStats,
   totals,
 } from "@/lib/queries";
@@ -27,6 +28,7 @@ import {
 } from "@/components/ui";
 import { PendingSales } from "@/components/PendingSales";
 import { HeroStats } from "@/components/HeroStats";
+import { ProfileRadar, type ProfileSubject } from "@/components/ProfileRadar";
 import { ContractEndBlock } from "@/components/ContractEnd";
 import { countCustomers, listCustomers } from "@/lib/customers";
 import { berlinToday, contractStatus } from "@/lib/contracts";
@@ -38,7 +40,8 @@ import { ShowMore } from "@/components/ShowMore";
 import { IconCalendar, IconChart, IconMap } from "@/components/icons";
 import { normalizeSlot, parseSlot } from "@/lib/appointments";
 import { berlinSlot, greeting, sqlDateTime, todayLong } from "@/lib/format";
-import { parseRange, rangeToSince, type RangeKey } from "@/lib/ranges";
+import { parseRange, previousRange, rangeToSince, type RangeKey } from "@/lib/ranges";
+import { addProfiles, EMPTY_PROFILE } from "@/lib/profile";
 import { progressShare, territoryProgress } from "@/lib/progress";
 
 export const dynamic = "force-dynamic";
@@ -53,6 +56,14 @@ const RANGE_TITLE: Record<RangeKey, string> = {
   "7": "Letzte 7 Tage",
   "30": "Letzte 30 Tage",
   all: "Gesamt",
+};
+
+/** Womit das Profil vergleicht - bei "Gesamt" gibt es nichts davor. */
+const PREVIOUS_TITLE: Record<RangeKey, string | null> = {
+  "1": "Gestern",
+  "7": "7 Tage davor",
+  "30": "30 Tage davor",
+  all: null,
 };
 
 /**
@@ -85,6 +96,27 @@ export default async function StartPage({ searchParams }: { searchParams: Promis
   const customers = hasPermission(user, "customers.manage");
   const dueCustomers = customers ? countCustomers(user.team_id, today).due : 0;
   const recalls = dueCustomers > 0 ? listCustomers(user.team_id, { view: "faellig", today, limit: 3 }) : [];
+  // Profil: jede Achse gegen den gleich langen Zeitraum davor - Team gesamt und je Person.
+  const before = previousRange(key);
+  const profileNow = profileCounts(user.team_id, { userId: team ? undefined : user.id, since });
+  const profileBefore = before ? profileCounts(user.team_id, { userId: team ? undefined : user.id, ...before }) : null;
+  const profileOf = (id: number) => ({
+    now: profileNow.get(id) ?? EMPTY_PROFILE,
+    before: profileBefore ? (profileBefore.get(id) ?? EMPTY_PROFILE) : null,
+  });
+  const profiles: ProfileSubject[] = team
+    ? [
+        {
+          id: 0,
+          name: "Team",
+          now: addProfiles(profileNow.values()),
+          before: profileBefore ? addProfiles(profileBefore.values()) : null,
+        },
+        ...[...members]
+          .sort((a, b) => a.user_name.localeCompare(b.user_name, "de"))
+          .map((m) => ({ id: m.user_id, name: m.user_name, ...profileOf(m.user_id) })),
+      ]
+    : [{ id: user.id, name: user.name, ...profileOf(user.id) }];
 
   const doors = sum.doors ?? 0;
   const met = sum.met ?? 0;
@@ -124,12 +156,22 @@ export default async function StartPage({ searchParams }: { searchParams: Promis
       />
 
       <div className="mt-8 grid grid-cols-1 gap-8 lg:grid-cols-3">
-        <section className="lg:col-span-2">
-          <SectionHeader title="Verlauf" />
-          <div className="surface p-4">
-            <DailyBars data={series} height={184} />
-          </div>
-        </section>
+        {/* Verlauf und Profil nebeneinander, sobald beide genug Breite haben. */}
+        <div className="grid grid-cols-1 gap-8 lg:col-span-2 xl:grid-cols-2">
+          <section className="flex flex-col">
+            <SectionHeader title="Verlauf" />
+            {/* Neben dem hoeheren Profil mittig statt oben mit Loch darunter. */}
+            <div className="surface flex-1 p-4 xl:flex xl:flex-col xl:justify-center">
+              <DailyBars data={series} height={184} />
+            </div>
+          </section>
+          <ProfileRadar
+            subjects={profiles}
+            currentLabel={RANGE_TITLE[key]}
+            previousLabel={PREVIOUS_TITLE[key]}
+            className="flex flex-col"
+          />
+        </div>
 
         <div className="space-y-8">
           <section>

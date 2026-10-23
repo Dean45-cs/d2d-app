@@ -1,6 +1,7 @@
 import { appointmentUtc } from "./appointment-time";
-import { berlinSlot } from "./format";
+import { berlinParts, berlinSlot } from "./format";
 import { getDb } from "./db";
+import { EMPTY_PROFILE, type ProfileCounts } from "./profile";
 import { canAccessTerritory, permissionsFor } from "./permissions";
 import { bellKey, MAX_BELLS_PER_HOUSE, normalizeFloor, normalizeLabel } from "./doorbells";
 import { MAX_NOT_HOME_ATTEMPTS } from "./doors";
@@ -1418,6 +1419,125 @@ export function dailySeries(
         GROUP BY day ORDER BY day`,
     )
     .all(...params) as Array<{ day: string; doors: number; met: number; sales: number }>;
+}
+
+/**
+ * Rohzahlen fuer das Profil der Uebersicht, je Person. Tueren zaehlen nach
+ * dem Zeitpunkt des Besuchs, Termine nach ihrer Uhrzeit: faellig ist, was im
+ * Zeitraum lag und schon vorbei ist - fuer den, dem der Termin gehoert (auch
+ * nach einer Gebietsuebergabe), wie unter Termine.
+ */
+export function profileCounts(
+  teamId: number,
+  opts: { userId?: number; since?: string; until?: string; now?: Date } = {},
+): Map<number, ProfileCounts> {
+  const db = getDb();
+  const where: string[] = ["team_id = ?"];
+  const params: (string | number)[] = [teamId];
+  if (opts.userId) {
+    where.push("user_id = ?");
+    params.push(opts.userId);
+  }
+  if (opts.since) {
+    where.push("created_at >= ?");
+    params.push(opts.since);
+  }
+  if (opts.until) {
+    where.push("created_at < ?");
+    params.push(opts.until);
+  }
+  const byUser = new Map<number, ProfileCounts>();
+  const entry = (userId: number) => {
+    let counts = byUser.get(userId);
+    if (!counts) {
+      counts = { ...EMPTY_PROFILE };
+      byUser.set(userId, counts);
+    }
+    return counts;
+  };
+
+  // SQLite kennt Europe/Berlin nicht: Stunden buendeln und in JS auf Berliner
+  // Tage verteilen - wie bei den Abzeichen (level-queries.ts).
+  const hours = db
+    .prepare(
+      `SELECT user_id, strftime('%Y-%m-%d %H:00:00', created_at) AS hour,
+              COUNT(*) AS doors,
+              SUM(outcome IN ('MET_NO_SALE','APPOINTMENT','SALE')) AS met,
+              SUM(outcome = 'APPOINTMENT') AS appointments,
+              SUM(outcome = 'SALE') AS sales
+         FROM visits WHERE ${where.join(" AND ")}
+        GROUP BY user_id, hour`,
+    )
+    .all(...params) as Array<{
+    user_id: number;
+    hour: string | null;
+    doors: number;
+    met: number;
+    appointments: number;
+    sales: number;
+  }>;
+  const days = new Map<number, Set<string>>();
+  for (const row of hours) {
+    const counts = entry(row.user_id);
+    counts.doors += row.doors;
+    counts.met += row.met;
+    counts.appointments += row.appointments;
+    counts.sales += row.sales;
+    if (!row.hour) continue;
+    const { year, month, day } = berlinParts(new Date(`${row.hour.replace(" ", "T")}Z`));
+    const seen = days.get(row.user_id) ?? new Set<string>();
+    seen.add(`${year}-${month}-${day}`);
+    days.set(row.user_id, seen);
+  }
+  for (const [userId, seen] of days) entry(userId).days = seen.size;
+
+  const products = db
+    .prepare(
+      `SELECT user_id, SUM(energy_type <> '') AS known, SUM(energy_type = 'BEIDES') AS combo
+         FROM visits WHERE ${where.join(" AND ")} AND outcome = 'SALE'
+        GROUP BY user_id`,
+    )
+    .all(...params) as Array<{ user_id: number; known: number; combo: number }>;
+  for (const row of products) {
+    const counts = entry(row.user_id);
+    counts.knownSales = row.known;
+    counts.comboSales = row.combo;
+  }
+
+  // Termine stehen in Berliner Ortszeit ("2026-10-16 18:05") - die Grenzen deshalb auch.
+  const owner = "COALESCE(follow_up_user_id, user_id)";
+  const slot = (sql: string) => berlinSlot(new Date(`${sql.replace(" ", "T")}Z`));
+  const now = berlinSlot(opts.now);
+  const end = opts.until && slot(opts.until) < now ? slot(opts.until) : now;
+  const due: string[] = [
+    // Mit Person: "+" haelt SQLite vom Teamindex fern - wie in countAppointments.
+    opts.userId ? "+team_id = ?" : "team_id = ?",
+    "outcome = 'APPOINTMENT'",
+    "follow_up_at IS NOT NULL",
+    "follow_up_at < ?",
+  ];
+  const dueParams: (string | number)[] = [teamId, end];
+  if (opts.since) {
+    due.push("follow_up_at >= ?");
+    dueParams.push(slot(opts.since));
+  }
+  if (opts.userId) {
+    due.push(`${owner} = ?`);
+    dueParams.push(opts.userId);
+  }
+  const appointments = db
+    .prepare(
+      `SELECT ${owner} AS user_id, COUNT(*) AS due, SUM(follow_up_done_at IS NOT NULL) AS done
+         FROM visits WHERE ${due.join(" AND ")}
+        GROUP BY ${owner}`,
+    )
+    .all(...dueParams) as Array<{ user_id: number; due: number; done: number }>;
+  for (const row of appointments) {
+    const counts = entry(row.user_id);
+    counts.dueAppointments = row.due;
+    counts.doneAppointments = row.done;
+  }
+  return byUser;
 }
 
 /* ============================ Energiepreise ============================= */
