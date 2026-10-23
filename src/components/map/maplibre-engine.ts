@@ -31,7 +31,15 @@ import { ringsOf } from "./types";
 export type MapLibre = typeof import("maplibre-gl");
 
 export function loadMapLibre(): Promise<MapLibre> {
-  return import("maplibre-gl").then((module) => (module.default ?? module) as MapLibre);
+  return import("maplibre-gl").then((ml) => {
+    /*
+     * MapLibre sucht seinen Web-Worker neben der eigenen Datei. Nach dem
+     * Buendeln liegt er aber unter einem anderen Namen - ohne ausdruecklichen
+     * Pfad zeichnet die Karte keine Gebiete und keine Hausnummern.
+     */
+    ml.setWorkerUrl(new URL("maplibre-gl/dist/maplibre-gl-worker.mjs", import.meta.url).href);
+    return ml;
+  });
 }
 
 const LOAD_TIMEOUT_MS = 15_000;
@@ -94,10 +102,10 @@ export async function createMapLibreEngine(
       window.clearTimeout(timer);
       resolve();
     });
-    map.once("error", (event: { error?: Error }) => {
+    map.once("error", (event) => {
       if (map.loaded()) return;
       window.clearTimeout(timer);
-      reject(event.error ?? new Error("Die Karte lädt nicht"));
+      reject(new Error(event.error?.message || "Die Karte lädt nicht"));
     });
   }).catch((error) => {
     map.remove();
