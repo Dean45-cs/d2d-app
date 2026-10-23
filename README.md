@@ -30,7 +30,8 @@ Eine Web-App für Door-to-Door-Teams im Energievertrieb:
 - **Installierbar auf iPhone und iPad** – eigenes Symbol, Vollbild ohne Browserleiste,
   Erfassung funktioniert auch ohne Empfang
 
-Die Oberfläche ist mobil-first (der Außendienst arbeitet am Handy), das Leitungs-Dashboard
+Die Oberfläche ist mobil-first (der Außendienst klinkt mit Handy oder iPad – Klinken ist
+für beide eigens ausgelegt, siehe [Auf dem iPad](#auf-dem-ipad)), das Leitungs-Dashboard
 funktioniert zusätzlich am Desktop.
 
 **Installation auf dem Handy und Weg in den App Store:
@@ -127,7 +128,8 @@ Profil**, mit dem Recht „Teamauswertung“ vorne zusätzlich **Übersicht**. D
 landet direkt beim Klinken. „Karte“ umfasst Gebiete und Preise, „Team“ Feed, Rangliste
 und Erfolge, „Profil“ die eigenen Listen (mit dem Recht „Kundenliste pflegen“ auch
 **Kunden**), das Gerät und – je nach Recht – die Verwaltung (Mitglieder, Einladungen, Rechte, Ablehnungsgründe, Energie & Tarif). Auf
-iPad und Rechner steht alles in einer einklappbaren Seitenleiste. Alte Adressen
+iPad (ab 744 pt Breite, also auch iPad mini hochkant) und Rechner steht alles in einer
+einklappbaren Seitenleiste; beim Klinken bleibt sie im Auto-Modus schmal. Alte Adressen
 (`/feed`, `/vergleich`, `/level`, `/auswertung`, `/mehr`, `/einladungen`,
 `/berechtigungen`, `/einstellungen`) leiten auf die neuen weiter.
 
@@ -178,6 +180,29 @@ weitergeht, hängt am Brett:
 
 Wer ausdrücklich keinen Besuch will, bekommt über **Sperren** einen dauerhaften Eintrag
 fürs ganze Team – aufheben kann ihn nur die Teamleitung.
+
+### Auf dem iPad
+
+Klinken ist fürs iPad eigens ausgelegt – hochkant wie quer, vom iPad mini bis zum
+13-Zoll-Modell ([hochkant](docs/screenshots/klinken-ipad-hoch-hell.png),
+[quer](docs/screenshots/klinken-ipad-quer-hell.png),
+[quer dunkel](docs/screenshots/klinken-ipad-quer-dunkel.png)):
+
+- **Die Ergebnisknöpfe stehen immer an derselben Stelle** – unten angedockt, wie viele
+  Termine, Hinweise oder offene Aufträge auch darüber stehen. Gleiche Anordnung wie am
+  Handy (oben „Nicht da“ / „Ohne Abschluss“, unten „Termin“ / „Auftrag starten“), nur
+  größer: 76 pt hoch, quer als Tastenfeld 88 pt. Hält man das iPad unten an den Ecken,
+  erreicht der Daumen die äußeren Knöpfe – „Nicht da“ also mit der haltenden Hand.
+- **Hochkant**: eine Spalte – oben die Straße, darunter die große Nummer (128 pt),
+  dann Klingelbrett und alle Häuser der Straße als Raster auf einen Blick, unten die
+  Knöpfe. Wer ein Haus weit unten im Raster wählt, bekommt die Nummer zurück ins Bild.
+- **Quer**: links Straße, Preise, Klingelbrett und Häuser (rollen), rechts die Tür
+  mit Nummer und Knöpfen (steht). Die Seitenleiste bleibt dafür schmal; wer sie
+  aufklappt, behält sie – die Spalten passen sich der verbleibenden Breite an.
+- **„Rückgängig“** erscheint direkt über den Knöpfen, quer mittig über der Türspalte.
+- **Blätter** (Ablehnungsgrund, Termin …) öffnen als Dialog in der Mitte; die Gründe
+  stehen in drei breiten Spalten. Ist die Bildschirmtastatur offen (Name, Telefon),
+  rückt der Dialog darüber – „Speichern“ bleibt sichtbar.
 
 ### In meiner Nähe
 

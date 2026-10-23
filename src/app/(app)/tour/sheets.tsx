@@ -252,15 +252,16 @@ export function ReasonSheet({
   }
 
   return (
-    <Sheet title="Gespräch ohne Abschluss" subtitle={place} onClose={onClose}>
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+    // Auf dem iPad breit: drei Spalten, in denen auch "Keine Haustürgeschäfte" ohne Trennstrich passt.
+    <Sheet title="Gespräch ohne Abschluss" subtitle={place} onClose={onClose} width="lg">
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:gap-2.5">
         {reasons.map((reason) => (
           <button
             key={reason.id}
             type="button"
             disabled={busy}
             onClick={() => pick(reason)}
-            className="flex min-h-14 items-center gap-2.5 surface px-3 text-left text-subhead font-semibold transition-transform active:scale-[0.97] disabled:opacity-40"
+            className="flex min-h-14 items-center gap-2.5 surface px-3 text-left text-subhead font-semibold transition-transform active:scale-[0.97] disabled:opacity-40 md:min-h-16 md:text-headline"
           >
             <ReasonTile name={reason.icon} />
             {/* Lange Woerter ("Haustürgeschäfte") nach Silben trennen statt mitten im Wort abzuhacken. */}

@@ -71,21 +71,21 @@ export function DoorHero({
 
   return (
     <section
-      className="flex select-none flex-col items-center py-2 text-center"
+      className="door-hero flex select-none flex-col items-center py-2 text-center"
       aria-label="Aktuelle Tür"
       onPointerDown={onPointerDown}
       onPointerUp={onPointerUp}
       onPointerCancel={() => (start.current = null)}
     >
-      <div className="grid w-full grid-cols-[44px_minmax(0,1fr)_44px] items-center gap-2">
+      <div className="grid w-full grid-cols-[44px_minmax(0,1fr)_44px] items-center gap-2 md:grid-cols-[56px_minmax(0,1fr)_56px]">
         <button
           type="button"
-          className="icon-btn icon-btn-fill"
+          className="icon-btn icon-btn-fill door-step"
           onClick={onPrev}
           disabled={!canPrev}
           aria-label="Vorige Hausnummer"
         >
-          <IconChevronLeft className="h-5 w-5" />
+          <IconChevronLeft className="h-5 w-5 md:h-6 md:w-6" />
         </button>
 
         {number ? (
@@ -95,7 +95,7 @@ export function DoorHero({
             className="min-w-0 rounded-2xl px-2"
             aria-label={`Hausnummer ${number}${bell ? `, Klingel ${bell.label}` : ""} – Haus öffnen`}
           >
-            <span key={number} className="kpi number-in block truncate text-hero">
+            <span key={number} className="kpi number-in door-number block truncate" data-long={number.length > 4 || undefined}>
               {number}
             </span>
           </button>
@@ -105,12 +105,12 @@ export function DoorHero({
 
         <button
           type="button"
-          className="icon-btn icon-btn-fill"
+          className="icon-btn icon-btn-fill door-step"
           onClick={onNext}
           disabled={!canNext}
           aria-label="Nächste Hausnummer"
         >
-          <IconChevronRight className="h-5 w-5" />
+          <IconChevronRight className="h-5 w-5 md:h-6 md:w-6" />
         </button>
       </div>
 
