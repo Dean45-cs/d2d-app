@@ -20,6 +20,28 @@ const nextConfig: NextConfig = {
   },
 
   /*
+   * Grundschutz fuer jede Antwort: nicht in fremde Seiten einbetten (gegen
+   * untergeschobene Klicks), Dateitypen nicht raten, keine vollen Adressen
+   * an fremde Seiten weitergeben, nur HTTPS. Standort darf nur die App
+   * selbst abfragen, Kamera und Mikrofon niemand.
+   */
+  async headers() {
+    return [
+      {
+        source: "/:path*",
+        headers: [
+          { key: "X-Frame-Options", value: "DENY" },
+          { key: "Content-Security-Policy", value: "frame-ancestors 'none'" },
+          { key: "X-Content-Type-Options", value: "nosniff" },
+          { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+          { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=(self)" },
+          { key: "Strict-Transport-Security", value: "max-age=31536000" },
+        ],
+      },
+    ];
+  },
+
+  /*
    * Alte Adressen aus Lesezeichen und Push-Nachrichten fuehren an ihren
    * neuen Platz. Die Suchparameter (Zeitraum, Kennzahl, Ansicht) bleiben
    * erhalten. Bewusst nicht dauerhaft (307), damit Browser nichts fuer

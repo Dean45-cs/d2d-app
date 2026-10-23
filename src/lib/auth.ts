@@ -126,13 +126,62 @@ export class AuthError extends Error {
   }
 }
 
+let dummyHash: string | null = null;
+
+/**
+ * Unbekannte E-Mail: trotzdem einmal rechnen. Sonst verriete die kurze
+ * Antwortzeit, welche Adressen ein Konto haben.
+ */
+function burnPasswordCheck(password: string): void {
+  dummyHash ??= hashPassword(crypto.randomBytes(16).toString("hex"));
+  verifyPassword(password, dummyHash);
+}
+
 export function authenticate(email: string, password: string): User | null {
   const row = getDb()
     .prepare("SELECT * FROM users WHERE lower(email) = lower(?) AND active = 1")
     .get(email.trim()) as (User & { password_hash: string }) | undefined;
-  if (!row) return null;
+  if (!row) {
+    burnPasswordCheck(password);
+    return null;
+  }
   if (!verifyPassword(password, row.password_hash)) return null;
   const { password_hash: _ignored, ...user } = row;
   void _ignored;
   return user;
+}
+
+export const MIN_PASSWORD_LENGTH = 8;
+export const MAX_PASSWORD_LENGTH = 128;
+
+/**
+ * Das eigene Passwort aendern - nur mit dem bisherigen. Alle anderen
+ * Anmeldungen (etwa auf einem verlorenen Handy) enden, ebenso deren
+ * Push-Anmeldungen; dieses Geraet meldet die Route gleich wieder an.
+ * Gibt false zurueck, wenn das bisherige Passwort nicht stimmt.
+ */
+export function changeOwnPassword(userId: number, current: string, next: string): boolean {
+  if (next.length < MIN_PASSWORD_LENGTH) {
+    throw new Error(`Das neue Passwort braucht mindestens ${MIN_PASSWORD_LENGTH} Zeichen.`);
+  }
+  if (next.length > MAX_PASSWORD_LENGTH) {
+    throw new Error(`Das neue Passwort darf höchstens ${MAX_PASSWORD_LENGTH} Zeichen haben.`);
+  }
+  const db = getDb();
+  const row = db.prepare("SELECT password_hash FROM users WHERE id = ? AND active = 1").get(userId) as
+    | { password_hash: string }
+    | undefined;
+  if (!row) throw new AuthError("Nicht angemeldet", 401);
+  if (!verifyPassword(current, row.password_hash)) return false;
+  if (verifyPassword(next, row.password_hash)) {
+    throw new Error("Das neue Passwort ist dasselbe wie das bisherige.");
+  }
+  db.transaction(() => {
+    db.prepare("UPDATE users SET password_hash = ?, session_version = session_version + 1 WHERE id = ?").run(
+      hashPassword(next),
+      userId,
+    );
+    db.prepare("DELETE FROM push_subscriptions WHERE user_id = ?").run(userId);
+  })();
+  return true;
 }

@@ -13,6 +13,7 @@ import { PushRows } from "@/components/community/PushToggle";
 import { PowerSaveCell } from "@/components/PowerSave";
 import { IconCalendar, IconChart, IconContacts, IconSparkles, IconTarget } from "@/components/icons";
 import { LogoutCell } from "./LogoutCell";
+import { PasswordCell } from "./PasswordCell";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Profil" };
@@ -119,6 +120,11 @@ export default async function ProfileHubPage() {
             title="Tarifrechner"
           />
         </li>
+      </ul>
+
+      <ListLabel>Konto</ListLabel>
+      <ul className="list list-icons">
+        <PasswordCell />
       </ul>
 
       <ul className="list mt-6">

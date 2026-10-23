@@ -65,7 +65,9 @@ SEED_LEADER_EMAIL=chef@meinefirma.de SEED_LEADER_PASSWORD='EinLangesPasswort' np
 Mit `SEED_DEMO=1` werden zusätzlich zwei Beispiel-Mitarbeiter und zwei Beispiel-Gebiete
 angelegt – praktisch zum Ausprobieren, für den Echtbetrieb weglassen.
 
-**Das Startpasswort nach dem ersten Login ändern** (Team → Passwort neu setzen).
+**Das Startpasswort nach dem ersten Login ändern** (Profil › Konto › Passwort ändern).
+Das kann jede Person selbst – mit dem bisherigen Passwort; danach sind alle anderen
+Geräte abgemeldet. Neu gesetzt von der Leitung wird es unter Profil › Verwaltung › Mitglieder.
 
 ---
 
@@ -1002,6 +1004,13 @@ npm run energy:check    # Preistabelle der Tagesquelle prüfen
 - Die Datenbank liegt unter `data/d2d.db` (`DATABASE_PATH`). Für Backups reicht es, diese
   Datei zu sichern – am besten über `sqlite3 data/d2d.db ".backup backup.db"`.
 - HTTPS verwenden: das Session-Cookie wird in Produktion nur über HTTPS gesetzt.
+- Anmelden ist gegen Durchprobieren gebremst: nach 8 Fehlversuchen für dieselbe E-Mail vom
+  selben Absender (bzw. 40 von einem Absender insgesamt) wartet die App 15 Minuten. Der
+  Absender kommt aus `Fly-Client-IP` oder dem letzten Eintrag von `X-Forwarded-For` – hinter
+  einem eigenen Proxy muss der diesen Kopf setzen. Dieselbe Bremse gilt für das bisherige
+  Passwort beim Ändern.
+- Jede Antwort trägt Grundschutz-Kopfzeilen (kein Einbetten in fremde Seiten, `nosniff`,
+  HSTS, Standort nur für die App selbst) – siehe `next.config.ts`.
 - Kartenkacheln kommen standardmäßig von OpenStreetMap. Für dauerhaften Betrieb mit
   vielen Nutzern einen eigenen Kachel-Dienst über `NEXT_PUBLIC_MAP_TILE_URL` eintragen
   und die Nutzungsbedingungen des Anbieters beachten. Dasselbe gilt für die Straßensuche
