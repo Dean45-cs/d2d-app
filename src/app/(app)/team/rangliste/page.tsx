@@ -180,7 +180,7 @@ function MyPlace({
   comparedTo: string;
 }) {
   return (
-    <section className="mb-6 rounded-xl bg-surface p-4" aria-label="Dein Platz">
+    <section className="mb-6 surface p-4" aria-label="Dein Platz">
       <div className="flex items-end justify-between gap-4">
         <div>
           <p className="text-footnote font-semibold text-ink-2">Dein Platz</p>
@@ -263,7 +263,7 @@ function MeVersusTeam({ me, totals }: { me: RankEntry; totals: PersonTotals[] })
   return (
     <section>
       <ListLabel>Du und das Team</ListLabel>
-      <div className="rounded-xl bg-surface p-4">
+      <div className="surface p-4">
         <p className="mb-4 flex items-center gap-4 text-footnote text-muted">
           <span className="inline-flex items-center gap-2">
             <span className="h-2 w-4 rounded-full bg-[var(--chart-doors)]" aria-hidden="true" />
@@ -362,7 +362,7 @@ function HeadToHead({
         <ListLabel>Direktvergleich</ListLabel>
         <OpponentPicker options={options} current={other.user_id} />
       </div>
-      <div className="rounded-xl bg-surface p-4">
+      <div className="surface p-4">
         <div className="mb-2 grid grid-cols-[1fr_auto_1fr] items-center gap-2">
           <span className="flex min-w-0 items-center gap-2">
             <Avatar name={me.user_name} src={meAvatar} size={32} />

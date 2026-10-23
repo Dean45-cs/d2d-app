@@ -6,7 +6,7 @@ import { getLevelProgress } from "@/lib/level-queries";
 import { countAppointments } from "@/lib/queries";
 import { countCustomers } from "@/lib/customers";
 import { berlinToday } from "@/lib/contracts";
-import { Avatar, Cell, ListLabel, PageHeader } from "@/components/ui";
+import { Avatar, Cell, ListLabel, PageHeader, ToneTile, type SymbolTone } from "@/components/ui";
 import { NAV_ICONS } from "@/components/nav-icons";
 import { InstallCell } from "@/components/InstallHint";
 import { PushRows } from "@/components/community/PushToggle";
@@ -52,13 +52,13 @@ export default async function ProfileHubPage() {
       <ul className="list list-icons">
         {!rights["reports.team"] && (
           <li>
-            <Cell href="/start" icon={<Glyph><IconChart className="h-4 w-4" /></Glyph>} title="Meine Zahlen" />
+            <Cell href="/start" icon={<ToneTile tone="teal"><IconChart className="h-4 w-4" /></ToneTile>} title="Meine Zahlen" />
           </li>
         )}
         <li>
           <Cell
             href="/termine"
-            icon={<Glyph><IconCalendar className="h-4 w-4" /></Glyph>}
+            icon={<ToneTile tone="indigo"><IconCalendar className="h-4 w-4" /></ToneTile>}
             title={rights["appointments.team"] ? "Termine" : "Meine Termine"}
             detail={openAppointments > 0 ? openAppointments : undefined}
           />
@@ -67,14 +67,14 @@ export default async function ProfileHubPage() {
           <li>
             <Cell
               href="/kunden"
-              icon={<Glyph><IconContacts className="h-4 w-4" /></Glyph>}
+              icon={<ToneTile tone="blue"><IconContacts className="h-4 w-4" /></ToneTile>}
               title="Kunden"
               detail={dueCustomers > 0 ? `${dueCustomers} fällig` : undefined}
             />
           </li>
         )}
         <li>
-          <Cell href="/team/erfolge" icon={<Glyph><IconSparkles className="h-4 w-4" /></Glyph>} title="Erfolge" />
+          <Cell href="/team/erfolge" icon={<ToneTile tone="brown"><IconSparkles className="h-4 w-4" /></ToneTile>} title="Erfolge" />
         </li>
       </ul>
 
@@ -96,9 +96,9 @@ export default async function ProfileHubPage() {
                   <Cell
                     href={item.href}
                     icon={
-                      <Glyph>
+                      <ToneTile tone={ADMIN_TONES[item.icon] ?? "slate"}>
                         <Icon className="h-4 w-4" />
-                      </Glyph>
+                      </ToneTile>
                     }
                     title={item.label}
                   />
@@ -115,7 +115,7 @@ export default async function ProfileHubPage() {
           <Cell
             href={TARIFRECHNER}
             external
-            icon={<Glyph><IconTarget className="h-4 w-4" /></Glyph>}
+            icon={<ToneTile tone="teal"><IconTarget className="h-4 w-4" /></ToneTile>}
             title="Tarifrechner"
           />
         </li>
@@ -132,6 +132,11 @@ export default async function ProfileHubPage() {
   );
 }
 
-function Glyph({ children }: { children: React.ReactNode }) {
-  return <span className="glyph">{children}</span>;
-}
+/** Ton je Verwaltungseintrag - wie die farbigen Zeichen der iOS-Einstellungen. */
+const ADMIN_TONES: Partial<Record<string, SymbolTone>> = {
+  users: "blue",
+  invite: "indigo",
+  shield: "slate",
+  list: "purple",
+  cog: "teal",
+};

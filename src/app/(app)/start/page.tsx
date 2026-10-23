@@ -22,11 +22,11 @@ import {
   PageHeader,
   ProgressRing,
   SectionHeader,
-  StatGrid,
   percent,
   plural,
 } from "@/components/ui";
 import { PendingSales } from "@/components/PendingSales";
+import { HeroStats } from "@/components/HeroStats";
 import { ContractEndBlock } from "@/components/ContractEnd";
 import { countCustomers, listCustomers } from "@/lib/customers";
 import { berlinToday, contractStatus } from "@/lib/contracts";
@@ -114,13 +114,12 @@ export default async function StartPage({ searchParams }: { searchParams: Promis
 
       <PendingSales userId={user.id} />
 
-      <StatGrid
-        size="lg"
-        items={[
+      <HeroStats
+        lead={{ label: "Abschlüsse", value: sales, hint: `${percent(sales, met)} Quote` }}
+        stats={[
           { label: "Türen", value: doors, hint: `${sum.not_home ?? 0} nicht da` },
           { label: "Gespräche", value: met, hint: `${percent(met, doors)} angetroffen` },
           { label: "Termine", value: sum.appointments ?? 0, hint: `${percent(sum.appointments ?? 0, met)} der Gespräche` },
-          { label: "Abschlüsse", value: sales, accent: sales > 0, hint: `${percent(sales, met)} Quote` },
         ]}
       />
 

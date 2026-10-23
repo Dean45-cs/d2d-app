@@ -12,7 +12,7 @@ export const metadata: Metadata = { title: "Nicht gefunden" };
  */
 export default function NotFound() {
   return (
-    <main className="min-h-dvh bg-bg px-4 pb-[max(2rem,env(safe-area-inset-bottom))] pt-[max(3rem,env(safe-area-inset-top))]">
+    <main className="brand-backdrop min-h-dvh px-4 pb-[max(2rem,env(safe-area-inset-bottom))] pt-[max(3rem,env(safe-area-inset-top))]">
       <div className="mx-auto w-full max-w-md">
         <Logo size={40} className="mb-8" />
         <EmptyState

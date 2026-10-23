@@ -320,7 +320,7 @@ function IconPicker({ value, onChange }: { value: string; onChange: (key: (typeo
       <div
         role="radiogroup"
         aria-labelledby="reason-icon-label"
-        className="grid grid-cols-6 gap-1 rounded-xl bg-surface p-2 sm:grid-cols-9"
+        className="grid grid-cols-6 gap-1 surface p-2 sm:grid-cols-9"
         onKeyDown={onKeyDown}
       >
         {REASON_ICONS.map((entry, i) => (

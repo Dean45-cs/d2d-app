@@ -100,7 +100,7 @@ export default async function ProfilePage({
       <div className="grid grid-cols-1 gap-8 lg:grid-cols-[minmax(0,380px)_minmax(0,1fr)] lg:items-start">
         <div className="min-w-0 space-y-8">
           {/* ------------------------------ Person ------------------------------ */}
-          <section className="flex flex-col items-center rounded-xl bg-surface px-4 py-6 text-center">
+          <section className="flex flex-col items-center surface px-4 py-6 text-center">
             <Avatar name={profile.name} src={profile.avatar} size={88} />
             <p className="mt-3 max-w-full break-words text-title-1">{profile.name}</p>
             <p className="mt-1 flex flex-wrap items-center justify-center gap-2 text-subhead text-muted">
@@ -182,7 +182,7 @@ export default async function ProfilePage({
                 ]}
               />
 
-              <div className="rounded-xl bg-surface p-4">
+              <div className="surface p-4">
                 <div className="flex items-center gap-3">
                   <span className="glyph">
                     <IconTrophy className="h-4 w-4" />
@@ -224,7 +224,7 @@ export default async function ProfilePage({
 
           <section>
             <SectionHeader title="Letzte 14 Tage" />
-            <div className="rounded-xl bg-surface p-4">
+            <div className="surface p-4">
               <DailyBars data={series} height={150} />
             </div>
           </section>

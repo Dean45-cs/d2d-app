@@ -323,7 +323,7 @@ export function ReasonTile({
   const glyph = size === "lg" ? "h-7 w-7" : size === "sm" ? "h-4 w-4" : "h-5 w-5";
   return (
     <span
-      className={`reason-tile ${size === "md" ? "" : `reason-tile-${size}`} ${round ? "reason-tile-round" : ""} ${className}`}
+      className={`tone-tile ${size === "md" ? "" : `tone-tile-${size}`} ${round ? "tone-tile-round" : ""} ${className}`}
       data-tone={icon.tone}
       aria-hidden="true"
     >

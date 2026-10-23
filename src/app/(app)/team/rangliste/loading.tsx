@@ -19,7 +19,7 @@ export default function LoadingRanking() {
       <SkeletonChips widths={[100, 92, 84, 112]} className="mb-6" />
       <div className="grid grid-cols-1 gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,380px)] lg:items-start">
         <div>
-          <section className="mb-6 rounded-xl bg-surface p-4" aria-hidden="true">
+          <section className="mb-6 surface p-4" aria-hidden="true">
             <div className="flex items-end justify-between gap-4">
               <div className="min-w-0 flex-1">
                 <p className="text-footnote font-semibold text-ink-2">Dein Platz</p>

@@ -42,7 +42,7 @@ export default async function AchievementsPage() {
       <div className="grid grid-cols-1 gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,400px)] lg:items-start">
         <div className="space-y-8">
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-            <section aria-labelledby="today-heading" className="rounded-xl bg-surface p-4">
+            <section aria-labelledby="today-heading" className="surface p-4">
               <div className="mb-4 flex items-baseline justify-between gap-2">
                 <h2 id="today-heading" className="text-headline">
                   Heute

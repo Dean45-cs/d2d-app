@@ -33,7 +33,7 @@ export function JoinForm({ token }: { token: string }) {
 
   if (done) {
     return (
-      <div role="status" className="flex flex-col items-center rounded-xl bg-surface px-6 py-12 text-center">
+      <div role="status" className="flex flex-col items-center surface px-6 py-12 text-center">
         <span className="glyph glyph-lg glyph-round glyph-result check-pop mb-4">
           <IconCheck className="h-6 w-6" />
         </span>

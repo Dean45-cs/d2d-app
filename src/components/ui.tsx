@@ -197,7 +197,7 @@ export function StatGrid({
         ? "grid-cols-3"
         : "grid-cols-2";
   return (
-    <dl className={`grid gap-px overflow-hidden rounded-xl bg-separator ${grid}`}>
+    <dl className={`grid gap-px overflow-hidden rounded-xl bg-separator shadow-card ${grid}`}>
       {items.map((item) => (
         // justify-end: in umgekehrter Spalte heisst das "oben" - Beschriftungen stehen auf einer
         // Hoehe, auch wenn nur eine Nachbarzelle einen Zusatz traegt.
@@ -336,7 +336,27 @@ export function StatusBadge({ status }: { status: string }) {
 
 /* --------------------------------- Person ------------------------------- */
 
-/** Profilbild oder Kuerzel ("Alex Krüger" wird "AK") im neutralen Kreis. */
+/** Die Symboltoene aus brand.css - fuer Kacheln und Kuerzel. */
+export type SymbolTone = "blue" | "indigo" | "purple" | "magenta" | "teal" | "slate" | "brown";
+const PERSON_TONES: SymbolTone[] = ["blue", "teal", "purple", "brown", "indigo", "magenta", "slate"];
+
+/** Fester Ton je Name: dieselbe Person hat ueberall dieselbe Farbe. */
+export function personTone(name: string): SymbolTone {
+  let hash = 0;
+  for (const char of name.trim().toLocaleLowerCase("de-DE")) hash = (hash * 31 + char.codePointAt(0)!) | 0;
+  return PERSON_TONES[Math.abs(hash) % PERSON_TONES.length];
+}
+
+/** Zeichen auf einer Kachel im Symbolton - die Eintraege der Menues (Profil). */
+export function ToneTile({ tone, children }: { tone: SymbolTone; children: ReactNode }) {
+  return (
+    <span className="tone-tile" data-tone={tone} aria-hidden="true">
+      {children}
+    </span>
+  );
+}
+
+/** Profilbild oder Kuerzel ("Alex Krüger" wird "AK") im Ton der Person. */
 export function Avatar({
   name,
   src,
@@ -383,7 +403,10 @@ export function Avatar({
     : "";
   return (
     <span
-      className={`inline-grid shrink-0 place-items-center rounded-full bg-fill-strong font-semibold text-ink-2 ${className}`}
+      className={`inline-grid shrink-0 place-items-center rounded-full font-semibold ${
+        short ? "avatar-initials" : "bg-fill-strong text-ink-2"
+      } ${className}`}
+      data-tone={short ? personTone(name ?? "") : undefined}
       style={{ width: size, height: size, fontSize: Math.round(size * 0.38) }}
       aria-hidden="true"
     >
@@ -413,7 +436,7 @@ export function EmptyState({
   return (
     <div
       className={`flex flex-col items-center px-6 text-center ${
-        boxed ? "rounded-xl bg-surface py-12" : "py-8"
+        boxed ? "surface py-12" : "py-8"
       }`}
     >
       {icon && <span className="glyph glyph-lg glyph-round mb-4 text-muted">{icon}</span>}
@@ -436,7 +459,7 @@ export function InlineError({ children }: { children: ReactNode }) {
 /** Ruhiger Hinweis, wenn er wirklich gebraucht wird (kein Erklaertext). */
 export function Notice({ children, icon }: { children: ReactNode; icon?: ReactNode }) {
   return (
-    <div className="flex items-center gap-3 rounded-xl bg-surface px-4 py-3 text-subhead text-ink-2">
+    <div className="flex items-center gap-3 surface px-4 py-3 text-subhead text-ink-2">
       {icon && <span className="shrink-0 text-muted">{icon}</span>}
       <span className="min-w-0 flex-1">{children}</span>
     </div>
@@ -585,7 +608,7 @@ export function SkeletonStats({
   const cols = columns ?? (count >= 4 ? 4 : (count as 2 | 3));
   const grid = cols === 4 ? "grid-cols-2 md:grid-cols-4" : cols === 3 ? "grid-cols-3" : "grid-cols-2";
   return (
-    <div className={`grid gap-px overflow-hidden rounded-xl bg-separator ${grid}`} aria-hidden="true">
+    <div className={`grid gap-px overflow-hidden rounded-xl bg-separator shadow-card ${grid}`} aria-hidden="true">
       {Array.from({ length: count }, (_, i) => (
         <div key={i} className="flex min-w-0 flex-col bg-surface px-4 py-3">
           <span className="text-footnote">
@@ -608,7 +631,7 @@ export function SkeletonStats({
 /** Platzhalter eines Beitrags im Feed: Bild, Name, Zeit, Text, Herz und Kommentar. */
 export function SkeletonPost({ lines = 2 }: { lines?: number }) {
   return (
-    <div className="rounded-xl bg-surface px-4 pb-2 pt-4" aria-hidden="true">
+    <div className="surface px-4 pb-2 pt-4" aria-hidden="true">
       <div className="flex items-center gap-3">
         <span className="skeleton h-10 w-10 shrink-0 rounded-full" />
         <span className="min-w-0 flex-1">

@@ -44,7 +44,7 @@ export function TourAppointments({
     <>
       <button
         type="button"
-        className="cell cell-tap rounded-xl bg-surface"
+        className="cell cell-tap surface"
         onClick={() => setOpen(true)}
         aria-label={`${summary} – Termine öffnen`}
         aria-haspopup="dialog"

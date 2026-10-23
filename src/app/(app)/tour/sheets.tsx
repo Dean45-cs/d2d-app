@@ -260,7 +260,7 @@ export function ReasonSheet({
             type="button"
             disabled={busy}
             onClick={() => pick(reason)}
-            className="flex min-h-14 items-center gap-2.5 rounded-xl bg-surface px-3 text-left text-subhead font-semibold transition-transform active:scale-[0.97] disabled:opacity-40"
+            className="flex min-h-14 items-center gap-2.5 surface px-3 text-left text-subhead font-semibold transition-transform active:scale-[0.97] disabled:opacity-40"
           >
             <ReasonTile name={reason.icon} />
             {/* Lange Woerter ("Haustürgeschäfte") nach Silben trennen statt mitten im Wort abzuhacken. */}
