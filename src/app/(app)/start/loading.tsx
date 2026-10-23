@@ -6,11 +6,12 @@ import {
   SkeletonText,
 } from "@/components/ui";
 import { SkeletonHero } from "@/components/HeroStats";
+import { SkeletonProfile } from "@/components/ProfileRadar";
 
 /** Hoehe je Tag im Verlauf - sieht nach Wochen aus, nicht nach einem Muster. */
 const BARS = [38, 62, 24, 80, 54, 12, 0, 46, 70, 30, 88, 58, 20, 66];
 
-/** Platzhalter der Uebersicht: Zeitraum, Kennzahlen, Verlauf, Termine, Listen. */
+/** Platzhalter der Uebersicht: Zeitraum, Kennzahlen, Verlauf, Profil, Termine, Listen. */
 export default function LoadingStart() {
   return (
     <div className="page" aria-busy="true" aria-label="Zahlen werden geladen">
@@ -22,18 +23,25 @@ export default function LoadingStart() {
       <SkeletonHero />
 
       <div className="mt-8 grid grid-cols-1 gap-8 lg:grid-cols-3">
-        <section className="lg:col-span-2">
-          <SectionHeader title="Verlauf" />
-          <div className="surface p-4" aria-hidden="true">
-            <div className="flex h-[184px] gap-1 pb-6 pr-8">
-              {BARS.map((height, i) => (
-                <span key={i} className="flex min-w-0 flex-1 items-end justify-center">
-                  <span className="skeleton block w-full max-w-3 rounded-full" style={{ height: `${Math.max(height, 4)}%` }} />
-                </span>
-              ))}
+        <div className="grid grid-cols-1 gap-8 lg:col-span-2 xl:grid-cols-2">
+          <section className="flex flex-col">
+            <SectionHeader title="Verlauf" />
+            <div className="surface flex-1 p-4" aria-hidden="true">
+              <div className="flex h-[184px] gap-1 pb-6 pr-8">
+                {BARS.map((height, i) => (
+                  <span key={i} className="flex min-w-0 flex-1 items-end justify-center">
+                    <span className="skeleton block w-full max-w-3 rounded-full" style={{ height: `${Math.max(height, 4)}%` }} />
+                  </span>
+                ))}
+              </div>
             </div>
-          </div>
-        </section>
+          </section>
+
+          <section className="flex flex-col">
+            <SectionHeader title="Profil" />
+            <SkeletonProfile />
+          </section>
+        </div>
 
         <section>
           <SectionHeader title="Termine" href="/termine" />

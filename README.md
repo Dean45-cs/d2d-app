@@ -16,7 +16,9 @@ Eine Web-App für Door-to-Door-Teams im Energievertrieb:
   zum Anrufen, Besuchen und Umberaten
 - **Preise auf der Karte** – zeigt, wo der Grundversorger besonders teuer ist; Preise in Sekunden
   vom Preisblatt eingetragen oder als Tabelle aus Excel übernommen
-- **Übersicht** – Antreff- und Abschlussquoten je Mitarbeiter, Gebiet und Zeitraum
+- **Übersicht** – Antreff- und Abschlussquoten je Mitarbeiter, Gebiet und Zeitraum; dazu ein
+  **Profil** als Netzdiagramm (Fleiß, Antreffen, Termine, Abschluss, Kombi, Nachfassen) im
+  Vergleich zum gleich langen Zeitraum davor – fürs Team und je Person
 - **Rangliste** – je Kennzahl, der eigene Platz samt Abstand zum nächsten,
   Team-Schnitt, Bestwert und Direktvergleich mit einem Kollegen
 - **Team-Feed** – jeder Abschluss erscheint von selbst; dazu eigene Beiträge, Kommentare
