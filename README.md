@@ -986,6 +986,8 @@ npm run dev             # Entwicklung
 npm run build           # Produktionsbuild
 npm run start           # Produktionsserver
 npm run typecheck       # TypeScript prüfen
+npm run lint            # ESLint (Next.js- und React-Hooks-Regeln)
+npm test                # Tests
 npm run db:seed         # Datenbank einrichten
 npm run energy:refresh  # Tagesquelle abrufen (falls eingerichtet)
 npm run energy:check    # Preistabelle der Tagesquelle prüfen

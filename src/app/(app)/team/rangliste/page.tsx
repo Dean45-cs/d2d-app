@@ -75,7 +75,6 @@ export default async function ComparePage({
 
   const found = board.find((e) => e.user_id === user.id) ?? null;
   const me = found && !places ? { ...found, rank: null } : found;
-  const best = bestValue(board);
   const average = teamAverage(metric, totals);
 
   // Direktvergleich: gewaehlt oder - naheliegend - wer direkt vor mir steht.

@@ -267,7 +267,7 @@ export function TourClient({
     }
     setStreetId(next?.id ?? null);
     if (next) setTerritoryId(next.territory_id);
-  }, [streets, territories]);
+  }, [streets, territories, toast]);
 
   // Die Uhr fuer "heute faellig" - im Hintergrund steht sie still (Akku) und
   // stellt sich beim Zurueckkommen sofort.
