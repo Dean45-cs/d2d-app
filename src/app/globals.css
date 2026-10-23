@@ -15,6 +15,9 @@
   --radius-*: initial;
   --shadow-*: initial;
   --font-*: initial;
+  /* "md" = iPad: ab 744 pt - so schmal ist das iPad mini hochkant. Dieselbe
+     Grenze steht unten in den Medienabfragen und in Sheet.tsx. */
+  --breakpoint-md: 46.5rem;
 }
 
 @theme inline {
@@ -231,7 +234,7 @@
   --elev-thumb: 0 1px 2px rgb(0 0 0 / 0.3), 0 3px 8px rgb(0 0 0 / 0.3);
 }
 
-@media (min-width: 768px) {
+@media (min-width: 744px) {
   :root {
     --gutter: 24px;
   }
@@ -1170,7 +1173,7 @@
     opacity: 0;
     transition: opacity var(--dur-2) var(--ease-out);
   }
-  @media (min-width: 768px) {
+  @media (min-width: 744px) {
     .sheet {
       left: 50%;
       right: auto;
@@ -1190,6 +1193,19 @@
       transition:
         transform var(--dur-2) var(--ease-out),
         opacity var(--dur-2) var(--ease-out);
+    }
+  }
+  /* Offene Bildschirmtastatur (Sheet.tsx): das Blatt steht im sichtbaren
+     Teil darueber, Kopf und Hauptknopf bleiben zu sehen. */
+  .sheet[data-keyboard] {
+    bottom: calc(var(--keyboard-below) + 8px);
+    max-height: calc(var(--visible-height) - 16px);
+  }
+  @media (min-width: 744px) {
+    .sheet[data-keyboard] {
+      top: calc(var(--visible-top) + var(--visible-height) / 2);
+      bottom: auto;
+      max-height: min(760px, calc(var(--visible-height) - 32px));
     }
   }
   .sheet-grip {
@@ -1281,7 +1297,7 @@
     color: var(--ink);
     animation: toast-in var(--dur-3) var(--ease-spring) both;
   }
-  @media (min-width: 768px) {
+  @media (min-width: 744px) {
     .toast {
       bottom: 24px;
     }
@@ -1407,7 +1423,7 @@
   .hero-stats > * {
     padding-right: 8px;
   }
-  @media (min-width: 768px) {
+  @media (min-width: 744px) {
     .hero {
       padding: 24px 28px;
     }
@@ -1634,7 +1650,7 @@
 .shell {
   --shell-offset: 0px;
 }
-@media (min-width: 768px) {
+@media (min-width: 744px) {
   .shell[data-sidebar="auto"],
   .shell[data-sidebar="rail"] {
     --shell-offset: var(--rail-w);
@@ -1742,6 +1758,30 @@
     background: var(--separator);
   }
 }
+/* Klinken auf dem iPad: im Auto-Modus bleibt auch quer nur die Zeichen-
+   leiste - an der Tuer zaehlt jede Spalte fuer Haeuser und Ergebnisse.
+   Wer die Leiste ausdruecklich aufklappt ("full"), behaelt sie. */
+@media (min-width: 744px) and (max-width: 1279px) {
+  .shell[data-sidebar="auto"]:has(.tour) {
+    --shell-offset: var(--rail-w);
+  }
+  .shell[data-sidebar="auto"]:has(.tour) .sidebar-text {
+    opacity: 0;
+    pointer-events: none;
+  }
+  .shell[data-sidebar="auto"]:has(.tour) .rail-hide {
+    display: none;
+  }
+  .shell[data-sidebar="auto"]:has(.tour) .sidebar-heading {
+    height: 1px;
+    margin: 0 14px 16px;
+    padding: 0;
+    overflow: hidden;
+    opacity: 1;
+    color: transparent;
+    background: var(--separator);
+  }
+}
 
 .shell-main {
   min-width: 0;
@@ -1749,7 +1789,7 @@
   padding-left: max(var(--gutter), env(safe-area-inset-left));
   padding-right: max(var(--gutter), env(safe-area-inset-right));
 }
-@media (min-width: 768px) {
+@media (min-width: 744px) {
   .shell-main {
     margin-left: calc(var(--shell-offset) + 8px);
     padding-top: 24px;
@@ -1770,7 +1810,7 @@
     background-color var(--dur-2) var(--ease-out),
     box-shadow var(--dur-2) var(--ease-out);
 }
-@media (min-width: 768px) {
+@media (min-width: 744px) {
   .toolbar {
     margin-top: -24px;
   }
@@ -1794,6 +1834,148 @@
   transform: none;
 }
 
+/* ------------------------------ Klinken -------------------------------- */
+
+/*
+ * Aufbau der Tuer (TourClient): Kopf, Tuer, Ergebnisleiste, Haeuser.
+ * Handy: eine Spalte, die Leiste schwebt fest ueber der Reiterleiste.
+ *
+ * iPad und Rechner: die Leiste klebt unten an der Spalte der Tuer -
+ * immer an derselben Stelle, wie viele Termine oder Hinweise auch darueber
+ * stehen. Hochkant bleibt es eine Spalte (Haeuser als Raster statt
+ * Wischleiste). Quer ab 800 px Inhaltsbreite stehen links Kopf und
+ * Haeuser (rollen), rechts die Tuer und darunter die Leiste (stehen).
+ * Ob quer zwei Spalten passen, entscheidet die Breite neben der
+ * Seitenleiste (Containerabfrage) - nicht die des Fensters.
+ */
+.tour-grid {
+  max-width: 36rem;
+  margin-inline: auto;
+}
+.tour-lists {
+  margin-top: 24px;
+}
+
+@media (min-width: 744px) {
+  :root {
+    /* Abstand der Leiste zur Unterkante - ueber dem Home-Indikator. */
+    --tray-dock: max(16px, env(safe-area-inset-bottom));
+  }
+  /* Unten nur der Abstand der Leiste: sonst rollte die Seite ein Stueck. */
+  .shell-main:has(.tour) {
+    padding-bottom: var(--tray-dock);
+  }
+  /* Erst ab hier ein Container: aeltere Browser (Chrome bis 128) machten
+     ihn zum Bezugsrahmen positionierter Elemente - auf dem Handy liegt die
+     feste Leiste darin. Ab hier ist darin nichts fest positioniert. */
+  .tour {
+    container: tour / inline-size;
+  }
+  .tour-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+    max-width: 760px;
+    /* Kurze Strasse: die Leiste steht trotzdem unten am Rand. */
+    min-height: calc(100dvh - 24px - var(--tray-dock));
+  }
+  .tour-door {
+    display: flex;
+    flex-direction: column;
+  }
+  .tour-lists {
+    margin-top: 0;
+  }
+}
+
+@media (min-width: 744px) and (orientation: landscape) {
+  @container tour (min-width: 800px) {
+    .tour-grid {
+      display: grid;
+      /* Ab 400 px passt "Ohne Abschluss" in Titelgroesse auf eine Zeile. */
+      grid-template-columns: minmax(0, 1fr) clamp(400px, 40cqi, 440px);
+      grid-template-rows: auto 1fr;
+      column-gap: 32px;
+      row-gap: 24px;
+      max-width: 1200px;
+    }
+    .tour-head {
+      grid-column: 1;
+      grid-row: 1;
+    }
+    .tour-lists {
+      grid-column: 1;
+      grid-row: 2;
+    }
+    /* Die Tuer steht rechts, so hoch wie Platz ueber der Leiste ist; die
+       Nummer mittig darin. Kaeme zu viel zusammen, rollt nur diese Spalte -
+       die Leiste bleibt sichtbar. Innenabstand fuer Fokusring und Kanten. */
+    .tour-door {
+      grid-column: 2;
+      grid-row: 1 / -1;
+      align-self: start;
+      position: sticky;
+      top: 18px;
+      /* 206 px: die Leiste als zwei mal zwei Tasten, bis sie vermessen ist. */
+      height: calc(100dvh - 24px - var(--tray-dock) - var(--tour-tray-height, 206px) - 16px + 12px);
+      margin: -6px;
+      padding: 6px;
+      overflow-y: auto;
+      overscroll-behavior: contain;
+      scrollbar-width: none;
+    }
+    .tour-door::-webkit-scrollbar {
+      display: none;
+    }
+    .tour-door > .door-hero {
+      --door-size: 7rem;
+      margin-block: auto;
+    }
+    .tour-grid > .tray {
+      grid-column: 2;
+      grid-row: 1 / -1;
+      align-self: end;
+    }
+    /* Schmale Spalte: zwei mal zwei, Zeichen ueber dem Wort, wie ein
+       Tastenfeld - "Ohne Abschluss" bricht so nicht um. */
+    .tour-grid > .tray .tray-grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+    .tour-grid > .tray .tray-btn {
+      flex-direction: column;
+      gap: 6px;
+      min-height: 88px;
+      padding-inline: 10px;
+    }
+  }
+}
+
+/* Die Hausnummer: gross und rund. Lange ("12–14", "112 b") etwas kleiner,
+   damit sie ganz in die Zeile passt statt abgeschnitten zu werden. */
+.door-number {
+  font-size: var(--door-size, var(--text-hero));
+  line-height: 1;
+  letter-spacing: var(--text-hero--letter-spacing);
+}
+.door-number[data-long] {
+  font-size: calc(var(--door-size, var(--text-hero)) * 0.74);
+}
+@media (min-width: 744px) {
+  .door-hero {
+    --door-size: 8rem;
+  }
+  .door-step {
+    width: 56px;
+    height: 56px;
+  }
+  /* Raster statt Wischleiste: auf dem iPad passen alle Haeuser auf einen Blick. */
+  .chips.house-chips {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(6.25rem, 1fr));
+    overflow: visible;
+  }
+}
+
 /* --------------------- Ergebnisleiste an der Tuer --------------------- */
 
 /* Im Daumenbereich: auf dem Handy schwebend ueber der Reiterleiste. */
@@ -1808,6 +1990,12 @@
 }
 .tray-space {
   height: calc(var(--tour-tray-height, 144px) + 24px);
+}
+/* Die vier Ergebnisse: zwei mal zwei - auf jedem Geraet an derselben Stelle. */
+.tray-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
 }
 .tray-btn {
   display: flex;
@@ -1860,25 +2048,68 @@
 :root[data-tray] .toast {
   bottom: calc(var(--tabbar-h) + var(--tabbar-bottom) + var(--tour-tray-height, 144px) + 16px);
 }
-@media (min-width: 768px) {
+/*
+ * iPad und Rechner: dieselbe Leiste aus Glas, unten an der Spalte der Tuer
+ * angedockt (klebt beim Rollen) und groesser - der Finger trifft sie im
+ * Gehen, der Daumen der haltenden Hand erreicht die aeussere Spalte.
+ * Reihenfolge wie am Handy, damit die Hand von einem Geraet aufs andere passt.
+ */
+@media (min-width: 744px) {
   .tray {
-    position: static;
-    background: var(--surface);
-    box-shadow: none;
-    -webkit-backdrop-filter: none;
-    backdrop-filter: none;
+    position: sticky;
+    left: auto;
+    right: auto;
+    bottom: var(--tray-dock);
+    order: 1;
+    margin-top: auto;
+    padding: 10px;
   }
   .tray-space {
     display: none;
   }
   .tray-btn {
-    background: var(--fill);
+    gap: 12px;
+    min-height: 76px;
+    padding: 10px 14px;
+    font-size: var(--text-title-3);
+    line-height: var(--text-title-3--line-height);
+    letter-spacing: var(--text-title-3--letter-spacing);
+    /* Feine Kante: weisse Knoepfe auf hellem Glas sonst kaum als Knopf zu sehen. */
+    box-shadow: var(--elev-card);
   }
   .tray-btn-primary {
-    background: var(--primary);
+    box-shadow: var(--elev-primary);
   }
+  .tray-btn-setup {
+    gap: 6px;
+    font-size: var(--text-headline);
+    line-height: var(--text-headline--line-height);
+    letter-spacing: var(--text-headline--letter-spacing);
+  }
+  .tray-grid {
+    gap: 10px;
+  }
+  /* Rueckgaengig steht mittig ueber der Leiste - auch rechts in der Tuerspalte. */
   :root[data-tray] .toast {
-    bottom: 24px;
+    left: var(--tour-tray-x, 50%);
+    bottom: calc(var(--tray-dock) + var(--tour-tray-height, 184px) + 12px);
+    max-width: max(320px, var(--tour-tray-width, 560px));
+  }
+}
+/* Niedriges Fenster (Handy quer, kleines Fenster): eine Reihe, flacher -
+   sonst bliebe ueber der Leiste kaum Platz fuer die Tuer. */
+@media (min-width: 744px) and (max-height: 600px) {
+  .tray-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+  .tray-btn {
+    flex-direction: column;
+    gap: 4px;
+    min-height: 64px;
+    padding: 8px 10px;
+    font-size: var(--text-headline);
+    line-height: var(--text-headline--line-height);
+    letter-spacing: var(--text-headline--letter-spacing);
   }
 }
 

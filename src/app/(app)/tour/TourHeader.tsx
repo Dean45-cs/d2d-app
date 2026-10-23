@@ -39,7 +39,7 @@ export function TourHeader({
     : "Gebiet wählen";
 
   return (
-    <header className="pb-4">
+    <header className="pb-4 md:pb-0">
       <div className="flex h-11 items-center gap-2">
         <button
           type="button"
@@ -84,7 +84,7 @@ export function TourHeader({
       </button>
       <p className="mt-1 truncate text-subhead text-ink-2">{place}</p>
       {/* An der Tuer das wichtigste Argument: wer liefert, zu welchem Preis. */}
-      {territory && <ProviderLine info={territory.provider} className="mt-1 lg:max-w-md" />}
+      {territory && <ProviderLine info={territory.provider} className="mt-1 md:max-w-md" />}
     </header>
   );
 }

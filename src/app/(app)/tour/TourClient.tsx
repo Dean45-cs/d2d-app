@@ -53,7 +53,7 @@ import { levelFeedbackText, type LevelFeedback } from "@/lib/level-feedback";
 import { BellBoard, type BellRow } from "./BellBoard";
 import { DoorHero, type DoorStatusLine } from "./DoorHero";
 import { HouseStrip, type ChipState, type HouseChip } from "./HouseStrip";
-import { OutcomeTray, type TrayAction } from "./OutcomeTray";
+import { OutcomeTray, TRAY_ICON, type TrayAction } from "./OutcomeTray";
 import { TourAppointments } from "./TourAppointments";
 import { TourHeader } from "./TourHeader";
 import { TourNearby } from "./TourNearby";
@@ -493,6 +493,21 @@ export function TourClient({
   function pickHouse(number: string) {
     setHouseNumber(number);
     setBellLabel("");
+  }
+
+  /*
+   * Haus aus der Liste: bei langen Strassen (iPad hochkant, Raster) ist die
+   * grosse Nummer samt Klingelbrett dann oft schon aus dem Bild gerollt.
+   * Sie kommt zurueck - nur wenn sie nicht ohnehin zu sehen ist.
+   */
+  const doorRef = useRef<HTMLDivElement>(null);
+  function pickFromStrip(number: string) {
+    pickHouse(number);
+    const hero = doorRef.current?.querySelector<HTMLElement>(".door-hero");
+    if (!hero) return;
+    const box = hero.getBoundingClientRect();
+    const trayTop = document.querySelector(".tray")?.getBoundingClientRect().top ?? window.innerHeight;
+    if (box.top < 0 || box.bottom > trayTop) hero.scrollIntoView({ block: "center", behavior: "smooth" });
   }
 
   const currentIndex = houses.findIndex((h) => sameNumber(h.number, currentNumber));
@@ -1243,24 +1258,24 @@ export function TourClient({
         : LOCATION_NOTE[location.status];
 
   const setupActions: TrayAction[] = !street
-    ? [{ label: "Straße wählen", icon: <IconMap className="h-6 w-6" />, onClick: () => setSheet("street"), primary: true }]
+    ? [{ label: "Straße wählen", icon: <IconMap className={TRAY_ICON} />, onClick: () => setSheet("street"), primary: true }]
     : housesPending
       ? []
       : !currentNumber
         ? streetDone && nextStreet
-          ? [{ label: `Weiter: ${nextStreet.name}`, icon: <IconMap className="h-6 w-6" />, onClick: () => chooseStreet(nextStreet.id), primary: true }]
-          : [{ label: "Nummer eingeben", icon: <IconKeypad className="h-6 w-6" />, onClick: () => setSheet("number"), primary: true }]
+          ? [{ label: `Weiter: ${nextStreet.name}`, icon: <IconMap className={TRAY_ICON} />, onClick: () => chooseStreet(nextStreet.id), primary: true }]
+          : [{ label: "Nummer eingeben", icon: <IconKeypad className={TRAY_ICON} />, onClick: () => setSheet("number"), primary: true }]
         : doorLocked
-          ? [{ label: "Haus ansehen", icon: <IconHome className="h-6 w-6" />, onClick: () => setSheet("house") }]
+          ? [{ label: "Haus ansehen", icon: <IconHome className={TRAY_ICON} />, onClick: () => setSheet("house") }]
           : currentType === ""
             ? [
-                { label: "Einfamilienhaus", icon: <IconHome className="h-6 w-6" />, onClick: () => void chooseType("EFH"), primary: !suggestMfh },
-                { label: "Mehrfamilienhaus", icon: <IconBuilding className="h-6 w-6" />, onClick: () => void chooseType("MFH"), primary: suggestMfh },
+                { label: "Einfamilienhaus", icon: <IconHome className={TRAY_ICON} />, onClick: () => void chooseType("EFH"), primary: !suggestMfh },
+                { label: "Mehrfamilienhaus", icon: <IconBuilding className={TRAY_ICON} />, onClick: () => void chooseType("MFH"), primary: suggestMfh },
               ]
             : currentType === "MFH" && currentBells.length === 0
-              ? [{ label: "Klingelschilder anlegen", icon: <IconBell className="h-6 w-6" />, onClick: () => setSheet("house"), primary: true }]
+              ? [{ label: "Klingelschilder anlegen", icon: <IconBell className={TRAY_ICON} />, onClick: () => setSheet("house"), primary: true }]
               : currentType === "MFH" && !activeBell
-                ? [{ label: "Klingel wählen", icon: <IconBell className="h-6 w-6" />, onClick: () => setSheet("bells"), primary: true }]
+                ? [{ label: "Klingel wählen", icon: <IconBell className={TRAY_ICON} />, onClick: () => setSheet("bells"), primary: true }]
                 : [];
 
   const lastLine = (() => {
@@ -1269,88 +1284,89 @@ export function TourClient({
     return `${currentHouse?.last_visit_user ?? "Jemand"}, ${whenLabel(at)}`;
   })();
 
+  // Aufbau je Geraet (Handy, iPad hochkant/quer): globals.css, "Klinken".
   return (
-    <div className="mx-auto max-w-xl lg:grid lg:max-w-5xl lg:grid-cols-[minmax(0,1fr)_400px] lg:items-start lg:gap-8">
-      <div className="lg:col-span-2">
-        <TourHeader
-          street={street}
-          territory={territory}
-          todayDoors={(todayTotals.doors ?? 0) + queuedToday}
-          dueCount={dueAppointments.length}
-          pendingCount={pending.length}
-          online={online}
-          onStreet={() => setSheet("street")}
-          onDay={() => setSheet("day")}
-        />
-      </div>
-
-      {/* Rechts auf dem Rechner, oben auf dem Handy: die Tuer selbst. */}
-      <div className="space-y-4 lg:sticky lg:top-6 lg:col-start-2 lg:row-start-2">
-        <TourAppointments appointments={dueAppointments} now={now} onPick={goToAppointment} />
-
-        {nearbyHint && (
-          <TourNearby
-            place={nearbyHint.place}
-            distance={nearbyHint.distance}
-            context={nearbyHint.context}
-            route={nearbyHint.route}
-            onGo={nearbyHint.go}
-            onDismiss={() => near && setDismissedNearby({ at: near.point, door: currentKey })}
+    <div className="tour">
+      <div className="tour-grid">
+        <div className="tour-head">
+          <TourHeader
+            street={street}
+            territory={territory}
+            todayDoors={(todayTotals.doors ?? 0) + queuedToday}
+            dueCount={dueAppointments.length}
+            pendingCount={pending.length}
+            online={online}
+            onStreet={() => setSheet("street")}
+            onDay={() => setSheet("day")}
           />
-        )}
+        </div>
 
-        <PendingSales userId={userId} onProgress={receiveProgress} />
+        {/* Oben auf Handy und iPad hochkant, rechts auf dem iPad quer: die Tuer selbst. */}
+        <div ref={doorRef} className="tour-door space-y-4">
+          <TourAppointments appointments={dueAppointments} now={now} onPick={goToAppointment} />
 
-        <DoorHero
-          number={currentNumber || null}
-          bell={activeBell ? { label: activeBell.label, floor: activeBell.floor } : null}
-          status={status}
-          detail={detail}
-          canPrev={houses.length > 0 && currentIndex !== 0}
-          canNext={houses.length > 0 && currentIndex < houses.length - 1}
-          onPrev={() => step(-1)}
-          onNext={() => step(1)}
-          onOpen={() => {
-            if (!housesPending) setSheet("house");
-          }}
-          onType={() => setSheet("number")}
-          distance={housesPending ? null : doorDistance}
-          locating={locating}
-          onNearby={() => void goNearby()}
-          empty={
-            streetDone ? (
-              <div className="flex flex-col items-center gap-2">
-                <span className="glyph glyph-lg glyph-round glyph-result check-pop">
-                  <IconCheck className="h-6 w-6" />
-                </span>
-                <p className="text-title-3">Straße erledigt</p>
-                {nextStreet && (
-                  <button type="button" className="btn btn-primary btn-sm" onClick={() => chooseStreet(nextStreet.id)}>
-                    Weiter: {nextStreet.name}
-                  </button>
-                )}
-                {next?.distance && (
-                  <p className="text-footnote text-muted">
-                    Nächste offene Tür dort · {distanceText(next.distance, accuracy)}
-                  </p>
-                )}
-              </div>
-            ) : !street ? (
-              <button type="button" className="btn btn-primary" onClick={() => setSheet("street")}>
-                Straße wählen
-              </button>
-            ) : housesPending ? (
-              <p className="text-subhead text-muted" role="status">
-                {pendingText}
-              </p>
-            ) : (
-              <button type="button" className="kpi text-title-1 text-muted" onClick={() => setSheet("number")}>
-                Nr. eingeben
-              </button>
-            )
-          }
-        />
+          {nearbyHint && (
+            <TourNearby
+              place={nearbyHint.place}
+              distance={nearbyHint.distance}
+              context={nearbyHint.context}
+              route={nearbyHint.route}
+              onGo={nearbyHint.go}
+              onDismiss={() => near && setDismissedNearby({ at: near.point, door: currentKey })}
+            />
+          )}
 
+          <PendingSales userId={userId} onProgress={receiveProgress} />
+
+          <DoorHero
+            number={currentNumber || null}
+            bell={activeBell ? { label: activeBell.label, floor: activeBell.floor } : null}
+            status={status}
+            detail={detail}
+            canPrev={houses.length > 0 && currentIndex !== 0}
+            canNext={houses.length > 0 && currentIndex < houses.length - 1}
+            onPrev={() => step(-1)}
+            onNext={() => step(1)}
+            onOpen={() => {
+              if (!housesPending) setSheet("house");
+            }}
+            onType={() => setSheet("number")}
+            distance={housesPending ? null : doorDistance}
+            locating={locating}
+            onNearby={() => void goNearby()}
+            empty={
+              streetDone ? (
+                <div className="flex flex-col items-center gap-2">
+                  <span className="glyph glyph-lg glyph-round glyph-result check-pop">
+                    <IconCheck className="h-6 w-6" />
+                  </span>
+                  <p className="text-title-3">Straße erledigt</p>
+                  {/* "Weiter: …" ist die Hauptaktion in der Leiste darunter - hier nur, wohin es geht. */}
+                  {nextStreet && (
+                    <p className="text-footnote text-muted">
+                      Als Nächstes: {nextStreet.name}
+                      {next?.distance && ` · ${distanceText(next.distance, accuracy)}`}
+                    </p>
+                  )}
+                </div>
+              ) : !street ? (
+                <button type="button" className="btn btn-primary" onClick={() => setSheet("street")}>
+                  Straße wählen
+                </button>
+              ) : housesPending ? (
+                <p className="text-subhead text-muted" role="status">
+                  {pendingText}
+                </p>
+              ) : (
+                <button type="button" className="kpi text-title-1 text-muted" onClick={() => setSheet("number")}>
+                  Nr. eingeben
+                </button>
+              )
+            }
+          />
+        </div>
+
+        {/* Im Daumenbereich - wo genau, regelt globals.css je Geraet. */}
         <OutcomeTray
           disabled={busy}
           hint={streetDone && !housesPending ? "Straße erledigt" : trayHint}
@@ -1360,30 +1376,30 @@ export function TourClient({
           onAppointment={() => setSheet("appointment")}
           onSale={() => setSheet("sale")}
         />
-      </div>
 
-      <div className="mt-6 space-y-6 lg:col-start-1 lg:row-start-2 lg:mt-0">
-        {currentType === "MFH" && currentBells.length > 0 && !housesPending && (
-          <BellBoard
-            rows={bellRows}
-            selected={bellLabel}
-            next={nextOpenBell?.label ?? null}
-            faceOf={faceOf}
-            onPick={setBellLabel}
-            onEdit={() => setSheet("house")}
-          />
-        )}
-        {houses.length > 0 && (
-          <HouseStrip
-            chips={chips}
-            current={currentNumber || null}
-            openCount={openHouses.length}
-            onlyOpen={onlyOpen}
-            onToggleOpen={() => setOnlyOpen((value) => !value)}
-            onPick={pickHouse}
-          />
-        )}
-        <div className="tray-space" aria-hidden="true" />
+        <div className="tour-lists space-y-6">
+          {currentType === "MFH" && currentBells.length > 0 && !housesPending && (
+            <BellBoard
+              rows={bellRows}
+              selected={bellLabel}
+              next={nextOpenBell?.label ?? null}
+              faceOf={faceOf}
+              onPick={setBellLabel}
+              onEdit={() => setSheet("house")}
+            />
+          )}
+          {houses.length > 0 && (
+            <HouseStrip
+              chips={chips}
+              current={currentNumber || null}
+              openCount={openHouses.length}
+              onlyOpen={onlyOpen}
+              onToggleOpen={() => setOnlyOpen((value) => !value)}
+              onPick={pickFromStrip}
+            />
+          )}
+          <div className="tray-space" aria-hidden="true" />
+        </div>
       </div>
 
       {sheet === "street" && (

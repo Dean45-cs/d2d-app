@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { IconX } from "./icons";
 import { powerSaving } from "@/lib/power";
@@ -21,6 +21,10 @@ interface Props {
 }
 
 const CLOSE_MS = 220;
+/** Ab hier mittiger Dialog statt Blatt von unten - wie "md" in globals.css (iPad mini hochkant). */
+const IPAD = "(min-width: 744px)";
+/** So viel muss verdeckt sein, damit es eine Bildschirmtastatur ist (nicht nur die Leiste einer echten). */
+const KEYBOARD_MIN = 120;
 
 /**
  * Ein Blatt aus Glas, das von unten hereingleitet.
@@ -34,6 +38,8 @@ export function Sheet({ title, subtitle, onClose, children, footer, action, widt
   const [mounted, setMounted] = useState(false);
   const [closing, setClosing] = useState(false);
   const [drag, setDrag] = useState(0);
+  /** Sichtbarer Teil ueber der Bildschirmtastatur - null, solange keine offen ist. */
+  const [visible, setVisible] = useState<{ top: number; height: number; below: number } | null>(null);
   const sheetRef = useRef<HTMLDivElement>(null);
   const bodyRef = useRef<HTMLDivElement>(null);
   const start = useRef<{ y: number; t: number; fromBody: boolean } | null>(null);
@@ -65,7 +71,7 @@ export function Sheet({ title, subtitle, onClose, children, footer, action, widt
     const first = sheetRef.current?.querySelector<HTMLElement>(
       "[autofocus], input:not([type=hidden]), textarea, select",
     );
-    if (first && window.matchMedia("(min-width: 768px)").matches) first.focus();
+    if (first && window.matchMedia(IPAD).matches) first.focus();
     else sheetRef.current?.focus();
     return () => {
       window.removeEventListener("keydown", onKey);
@@ -74,10 +80,48 @@ export function Sheet({ title, subtitle, onClose, children, footer, action, widt
     };
   }, [mounted, requestClose]);
 
+  /*
+   * Bildschirmtastatur: iOS verkleinert nur den sichtbaren Bereich, nicht das
+   * Fenster. Ohne Nachfuehren laegen Telefonfeld und "Speichern" unter der
+   * Tastatur - auf dem iPad mitten im mittigen Dialog. So rueckt das Blatt in
+   * den sichtbaren Teil, das Feld mit dem Fokus bleibt im Blick.
+   */
+  useEffect(() => {
+    const viewport = window.visualViewport;
+    if (!mounted || !viewport) return;
+    let frame = 0;
+    const fit = () => {
+      const covered = window.innerHeight - viewport.height;
+      const next =
+        covered > KEYBOARD_MIN
+          ? { top: viewport.offsetTop, height: viewport.height, below: Math.max(0, covered - viewport.offsetTop) }
+          : null;
+      // Beim Rollen meldet iOS dieselben Masse oft mehrfach - dann nicht neu zeichnen.
+      setVisible((old) =>
+        old && next && old.top === next.top && old.height === next.height && old.below === next.below ? old : next,
+      );
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(() => {
+        const focused = document.activeElement;
+        if (covered > KEYBOARD_MIN && focused instanceof HTMLElement && sheetRef.current?.contains(focused)) {
+          focused.scrollIntoView({ block: "nearest" });
+        }
+      });
+    };
+    fit();
+    viewport.addEventListener("resize", fit);
+    viewport.addEventListener("scroll", fit);
+    return () => {
+      cancelAnimationFrame(frame);
+      viewport.removeEventListener("resize", fit);
+      viewport.removeEventListener("scroll", fit);
+    };
+  }, [mounted]);
+
   /* ---------------------------- Herunterziehen --------------------------- */
 
   function onPointerDown(event: React.PointerEvent) {
-    if (window.matchMedia("(min-width: 768px)").matches) return;
+    if (window.matchMedia(IPAD).matches) return;
     if (event.pointerType === "mouse" && event.button !== 0) return;
     const target = event.target as HTMLElement;
     if (target.closest("input, textarea, select, button, a, [data-no-drag]")) return;
@@ -110,6 +154,14 @@ export function Sheet({ title, subtitle, onClose, children, footer, action, widt
   if (!mounted) return null;
 
   const dragging = drag > 0;
+  const style = {
+    ...(visible && {
+      "--visible-top": `${visible.top}px`,
+      "--visible-height": `${visible.height}px`,
+      "--keyboard-below": `${visible.below}px`,
+    }),
+    ...(dragging && { transform: `translateY(${drag}px)`, transition: "none" }),
+  } as CSSProperties;
   return createPortal(
     <div className="fixed inset-0 z-50" role="presentation">
       <div className="scrim" data-closing={closing || undefined} onClick={requestClose} aria-hidden="true" />
@@ -125,7 +177,8 @@ export function Sheet({ title, subtitle, onClose, children, footer, action, widt
         onPointerUp={onPointerUp}
         onPointerCancel={onPointerUp}
         data-closing={closing || undefined}
-        style={dragging ? { transform: `translateY(${drag}px)`, transition: "none" } : undefined}
+        data-keyboard={visible ? "" : undefined}
+        style={style}
       >
         <div className="flex justify-center pt-2 md:hidden" aria-hidden="true">
           <span className="sheet-grip" />

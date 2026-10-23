@@ -17,9 +17,10 @@ export interface HouseChip {
 }
 
 /**
- * Alle Hausnummern der Strasse als Leiste zum Wischen. Form statt Farbe:
- * erledigt ist durchgestrichen, ein Abschluss traegt das volle Haekchen,
- * gesperrt das Verbotszeichen, ein Termin den Kalender.
+ * Alle Hausnummern der Strasse - auf dem Handy als Leiste zum Wischen, auf
+ * dem iPad als Raster auf einen Blick. Form statt Farbe: erledigt ist
+ * durchgestrichen, ein Abschluss traegt das volle Haekchen, gesperrt das
+ * Verbotszeichen, ein Termin den Kalender.
  */
 export function HouseStrip({
   chips,
@@ -38,10 +39,15 @@ export function HouseStrip({
 }) {
   const scroller = useRef<HTMLDivElement>(null);
 
-  // Die aktuelle Nummer bleibt im Blick, auch wenn die Leiste lang ist.
+  // Die aktuelle Nummer bleibt im Blick, auch wenn die Leiste lang ist. Nur
+  // seitlich: rollte die Seite mit, wanderte die grosse Nummer aus dem Bild.
   useEffect(() => {
-    const node = scroller.current?.querySelector<HTMLElement>("[aria-pressed=true]");
-    node?.scrollIntoView({ block: "nearest", inline: "center", behavior: "smooth" });
+    const strip = scroller.current;
+    const node = strip?.querySelector<HTMLElement>("[aria-pressed=true]");
+    if (!strip || !node || strip.scrollWidth <= strip.clientWidth) return;
+    const box = strip.getBoundingClientRect();
+    const chip = node.getBoundingClientRect();
+    strip.scrollBy({ left: chip.left + chip.width / 2 - (box.left + box.width / 2), behavior: "smooth" });
   }, [current]);
 
   const total = chips.length;
@@ -51,11 +57,11 @@ export function HouseStrip({
         <p className="text-footnote font-semibold text-ink-2">
           {openCount === 0 ? `Alle ${total} erledigt` : `${openCount} von ${total} offen`}
         </p>
-        <button type="button" className="chip min-h-8" aria-pressed={onlyOpen} onClick={onToggleOpen}>
+        <button type="button" className="chip min-h-8 md:min-h-10" aria-pressed={onlyOpen} onClick={onToggleOpen}>
           Nur offene
         </button>
       </div>
-      <div ref={scroller} className="chips -mx-4 px-4 pb-1 lg:mx-0 lg:flex-wrap lg:px-0">
+      <div ref={scroller} className="chips house-chips -mx-4 px-4 pb-1 md:mx-0 md:px-0 md:pb-0">
         {chips.map((chip) => {
           const active = current !== null && chip.number === current;
           const done = chip.state === "done" || chip.state === "blocked";
@@ -63,7 +69,7 @@ export function HouseStrip({
             <button
               key={chip.id}
               type="button"
-              className="chip min-w-11 justify-center px-4"
+              className="chip min-w-11 justify-center px-4 md:min-h-12 md:px-3"
               aria-pressed={active}
               aria-label={chip.label}
               title={chip.label}

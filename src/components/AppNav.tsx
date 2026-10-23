@@ -143,9 +143,10 @@ export function Sidebar({ sections, user }: { sections: NavSection[]; user: NavU
   function toggle() {
     const shell = document.querySelector<HTMLElement>(".shell");
     if (!shell) return;
-    const mode = shell.dataset.sidebar;
-    const wide = window.matchMedia("(min-width: 1024px)").matches;
-    const expanded = mode === "full" || (mode === "auto" && wide);
+    // Was gerade zu sehen ist, nicht was eingestellt ist: "auto" ist je nach
+    // Breite und Seite (beim Klinken auf dem iPad schmal) mal so, mal so.
+    const style = getComputedStyle(shell);
+    const expanded = parseFloat(style.getPropertyValue("--shell-offset")) > parseFloat(style.getPropertyValue("--rail-w"));
     const next = expanded ? "rail" : "full";
     shell.dataset.sidebar = next;
     document.cookie = `${SIDEBAR_COOKIE}=${next}; path=/; max-age=31536000; samesite=lax`;

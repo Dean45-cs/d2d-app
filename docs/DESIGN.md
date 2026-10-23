@@ -150,7 +150,7 @@ lässt sie gesetzt statt voreingestellt wirken.
 
 | Klasse | Größe / Zeile | Gewicht | Verwendung |
 | --- | --- | --- | --- |
-| `text-hero` | 96 / 96 | 700 | Hausnummer beim Klinken |
+| `text-hero` | 96 / 96 | 700 | Hausnummer beim Klinken (iPad 128, quer 112; ab fünf Zeichen ¾) |
 | `text-display` | 48 / 52 | 700 | Große Einzelzahl |
 | `text-large-title` | 34 / 41 | 700 | Seitentitel, Haupt-Kennzahl |
 | `text-title-1` | 28 / 34 | 700 | Kennzahlen im Raster |
@@ -171,13 +171,17 @@ Eingabefelder haben immer `text-body` (17 px) – unter 16 px zoomt iOS.
 ## 4. Raster, Radien, Abstände
 
 - **4-pt-Raster.** Abstände nur aus Tailwinds 4er-Schritten (`1` = 4 px …).
+- **iPad ab 744 pt** (`md`, so schmal ist das iPad mini hochkant): Seitenleiste
+  statt Reiterleiste, Blätter als mittiger Dialog. Dieselbe Grenze steht in
+  `@theme` (`--breakpoint-md`), in den Medienabfragen und in `Sheet.tsx`.
 - Seitenrand `--gutter`: 16 / 24 / 32 px (Handy / Tablet / Rechner).
 - Seitenbreiten: `.page` 1200 px, `.page-medium` 960 px, `.page-narrow` 680 px.
 - **Radien konzentrisch** (innen = außen − Abstand): `xs 4` · `sm 8` · `md 12`
   · `lg 16` · `xl 20` · `2xl 28` · `full`. Listen und Flächen `xl`, Blätter
   `2xl`, Felder `md`, Knöpfe und Plaketten `full`.
 - Tippflächen ≥ 44 pt (`.btn` 44, `.btn-sm` 36 mit unsichtbar erweiterter
-  Fläche, `.btn-lg` 56, Ergebnisknöpfe beim Klinken ≥ 56).
+  Fläche, `.btn-lg` 56, Ergebnisknöpfe beim Klinken 60, auf dem iPad 76 bzw.
+  quer 88, Hausnummern im Raster 48).
 - Sichere Bereiche: Reiterleiste, Blätter, Werkzeugleiste und Ergebnisleiste
   berücksichtigen `env(safe-area-inset-*)`.
 
@@ -237,7 +241,7 @@ Alle in `src/components/`. Stil per Klassen aus `globals.css` (`@layer component
 | `Medal` | `levels/Medal.tsx` | Medaille eines erreichten Abzeichens im Metall der Stufe |
 | `Segmented`, `SegmentedLinks` | `ui.tsx` | Wahl aus wenigen (auch Glas-Variante über Karten) |
 | `Switch` | `ui.tsx` | Kippschalter |
-| `Sheet` | `Sheet.tsx` | Blatt von unten (Handy, ziehbar) / mittiger Dialog (iPad, Rechner) |
+| `Sheet` | `Sheet.tsx` | Blatt von unten (Handy, ziehbar) / mittiger Dialog (iPad, Rechner); rückt bei offener Bildschirmtastatur in den sichtbaren Teil darüber (`visualViewport`), damit der Hauptknopf zu sehen bleibt |
 | `Menu`, `MenuItem` | `Menu.tsx` | Glas-Menü hinter „…“ |
 | `ToastProvider`, `useToast` | `Toast.tsx` | Eine Rückmeldung zur Zeit, optional mit Aktion („Rückgängig“) |
 | `useConfirm` | `useConfirm.tsx` | Rückfrage nur für Unumkehrbares (Löschen) |
@@ -277,8 +281,21 @@ Alle in `src/components/`. Stil per Klassen aus `globals.css` (`@layer component
   (nicht bei jedem Schritt die Straße hinauf), keine Entfernung, wenn man davorsteht,
   „ca.“ statt falscher Genauigkeit. Listen, die nach Nähe geordnet sind, springen
   nicht, solange das Blatt offen ist – nur die Zahlen laufen mit.
+- **Klinken auf dem iPad** (Aufbau in `globals.css`, Abschnitt „Klinken“): Die
+  Ergebnisleiste klebt unten an der Spalte der Tür (`position: sticky`) – immer an
+  derselben Stelle, egal wie viele Termine oder Hinweise darüber stehen, und in
+  derselben Anordnung wie am Handy (zwei mal zwei, „Auftrag starten“ unten rechts).
+  Hochkant eine Spalte: Kopf, Tür, Häuser als Raster, unten die Leiste. Quer (ab
+  800 px Inhaltsbreite, Containerabfrage auf `.tour`) links Kopf und Häuser zum
+  Rollen, rechts die Tür mit der Leiste darunter als Tastenfeld (Zeichen über dem
+  Wort); beide stehen. Der Toast „Rückgängig“ steht mittig über der Leiste. In
+  niedrigen Fenstern (≤ 600 px hoch) wird die Leiste einzeilig. Im Auto-Modus
+  bleibt die Seitenleiste beim Klinken bis 1279 px schmal. Wer im Raster ein Haus
+  weit unten wählt, bekommt die Nummer zurück ins Bild.
 - **Rechner/iPad**: zweispaltig (`lg:grid-cols-[minmax(0,1fr)_minmax(0,380px)]`),
-  Tabellen (`table.table`) erlaubt, wo Spalten vergleichen.
+  Tabellen (`table.table`) erlaubt, wo Spalten vergleichen. Containerabfragen nur
+  ab `md` und nie auf Vorfahren fest positionierter Elemente – ältere Browser
+  machten den Container zu deren Bezugsrahmen.
 
 ---
 
