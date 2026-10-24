@@ -13,7 +13,6 @@ import { reasonIconFor } from "./reason-icons";
  */
 
 declare global {
-  // eslint-disable-next-line no-var
   var __d2dDb: Database.Database | undefined;
 }
 

@@ -35,7 +35,6 @@ import type { LevelProgress } from "@/lib/levels";
 import { normalizeSlot, quickSlots, slotDate, slotLabel, slotTime, toSlot } from "@/lib/appointments";
 import { parseDoorbellLines, type DoorbellInput } from "@/lib/doorbells";
 import { MAX_NOT_HOME_ATTEMPTS } from "@/lib/doors";
-import { routeUrl } from "@/lib/map";
 import { byDistance, distanceText, type Distance } from "@/lib/geo/nearby";
 import { PRODUCTS, formatTime, type Bell, type EnergyType, type TerritoryLite } from "./model";
 

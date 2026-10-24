@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { AppointmentRow } from "@/lib/queries";
-import { Avatar, Cell, EmptyState, ListLabel, PageHeader, Segmented, SkeletonList } from "@/components/ui";
+import { Avatar, Cell, EmptyState, PageHeader, Segmented, SkeletonList } from "@/components/ui";
 import { Sheet } from "@/components/Sheet";
 import { useToast } from "@/components/Toast";
 import { IconCalendar, IconCheck, IconDoor, IconNavigate, IconPhone, IconUndo } from "@/components/icons";

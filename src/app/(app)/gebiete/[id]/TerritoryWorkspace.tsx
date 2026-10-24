@@ -210,7 +210,7 @@ export function TerritoryWorkspace({ area, doors, streets, canRing }: Props) {
       });
     }
     return () => layer.clear();
-  }, [layers, area, streets]);
+  }, [layers, area, streets, canRing]);
 
   // Tueren
   useEffect(() => {
@@ -248,7 +248,7 @@ export function TerritoryWorkspace({ area, doors, streets, canRing }: Props) {
       });
     }
     return () => layer.clear();
-  }, [layers, doors, filter]);
+  }, [layers, doors, filter, canRing]);
 
   // Laufroute
   useEffect(() => {
