@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { hasPermission } from "@/lib/permissions";
 import { getCurrentUser, requireUser } from "@/lib/auth";
 import { countAppointments, listAppointments, listMembers } from "@/lib/queries";
+import { cardSettings } from "@/lib/card-queries";
 import { AppointmentList } from "./AppointmentList";
 
 export const dynamic = "force-dynamic";
@@ -20,6 +21,7 @@ export default async function AppointmentsPage() {
   const faces: Record<number, string> = isLeader
     ? Object.fromEntries(listMembers(user.team_id).map((m) => [m.id, m.avatar]))
     : {};
+  const card = cardSettings(user.id);
 
   return (
     <AppointmentList
@@ -35,6 +37,8 @@ export default async function AppointmentsPage() {
           ? { href: "/start", label: "Übersicht", mobileOnly: true }
           : { href: "/tour", label: "Klinken", mobileOnly: true }
       }
+      userId={user.id}
+      sender={{ name: user.name, teamName: card.teamName, cardToken: card.token }}
     />
   );
 }

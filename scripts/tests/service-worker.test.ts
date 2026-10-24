@@ -205,7 +205,7 @@ test("a server that does not answer in time or is down (502-504) yields the stor
   assert.equal((await sw.navigate("/tour"))!.status, 500);
 });
 
-test("login, invitations, API and redirects are never stored", async () => {
+test("login, invitations, business cards, API and redirects are never stored", async () => {
   const sw = boot(async (input) => {
     const url = typeof input === "string" ? input : input.url;
     if (url.endsWith("/weiter")) {
@@ -215,8 +215,9 @@ test("login, invitations, API and redirects are never stored", async () => {
     }
     return html("Seite");
   });
-  for (const path of ["/login", "/einladung/abc", "/offline.html", "/weiter"]) await sw.navigate(path);
-  for (const path of ["/login", "/einladung/abc", "/offline.html", "/weiter"]) assert.equal(sw.caches.page(path), undefined, path);
+  const paths = ["/login", "/einladung/abc", "/k/AbCdEfGhIjKl", "/offline.html", "/weiter"];
+  for (const path of paths) await sw.navigate(path);
+  for (const path of paths) assert.equal(sw.caches.page(path), undefined, path);
 });
 
 test("the login page wipes every stored page - also one still on its way", async () => {

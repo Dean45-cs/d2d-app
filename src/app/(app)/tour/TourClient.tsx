@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { PendingSales } from "@/components/PendingSales";
+import { CardQrSheet, ConfirmSheet, useCardUrl, type Sender } from "@/components/BusinessCard";
 import { Sheet } from "@/components/Sheet";
 import { useToast } from "@/components/Toast";
 import { EmptyState, OutcomeGlyph } from "@/components/ui";
@@ -21,6 +22,7 @@ import { BUILDING_TYPE_LABEL, OUTCOME_LABEL } from "@/lib/types";
 import { bellKey, hasNamedBells, isNumberedLabel, numberedBells, type DoorbellInput } from "@/lib/doorbells";
 import { MAX_NOT_HOME_ATTEMPTS, doorFinished, doorStatus, whenLabel, type DoorFacts } from "@/lib/doors";
 import { slotLabel, slotOverdue, slotToday } from "@/lib/appointments";
+import { confirmationText } from "@/lib/confirmation";
 import {
   createVisitRequestId,
   discard as discardQueued,
@@ -103,6 +105,8 @@ interface Props {
   /** Offene eigene Termine - was davon heute ist, entscheidet das Geraet. */
   appointments: AppointmentRow[];
   tarifrechnerUrl: string;
+  /** Wer Terminbestaetigungen unterschreibt, samt Visitenkarte (falls eingeschaltet). */
+  sender: Sender;
 }
 
 /** Merker im Geraet lesen - im privaten Modus oder bei gesperrtem Speicher eben keiner. */
@@ -159,6 +163,7 @@ export function TourClient({
   recent,
   appointments,
   tarifrechnerUrl,
+  sender,
 }: Props) {
   const router = useRouter();
   const toast = useToast();
@@ -190,6 +195,9 @@ export function TourClient({
   const [bellLabel, setBellLabel] = useState("");
   const [product, setProduct] = useState<EnergyType>("BEIDES");
   const [sheet, setSheet] = useState<SheetName | null>(null);
+  /** Bestaetigung zum eben vereinbarten Termin - solange der Kunde noch an der Tuer steht. */
+  const [confirm, setConfirm] = useState<{ place: string; phone: string; text: string } | null>(null);
+  const cardUrl = useCardUrl(sender.cardToken);
   const [lastSaved, setLastSaved] = useState<{
     id: number;
     door: SavedDoor;
@@ -1022,6 +1030,20 @@ export function TourClient({
     if (result.status === "error") return;
     setSheet(null);
     report(result, `Termin ${slotLabel(values.slot)}`);
+    // Mit Rufnummer gleich die Bestaetigung anbieten - auch offline, WhatsApp und SMS senden nach.
+    if (values.phone) {
+      setConfirm({
+        place,
+        phone: values.phone,
+        text: confirmationText({
+          contactName: values.name,
+          slot: values.slot,
+          senderName: sender.name,
+          teamName: sender.teamName,
+          cardUrl,
+        }),
+      });
+    }
   }
 
   /**
@@ -1298,6 +1320,7 @@ export function TourClient({
             online={online}
             onStreet={() => setSheet("street")}
             onDay={() => setSheet("day")}
+            onCard={sender.cardToken ? () => setSheet("card") : undefined}
           />
         </div>
 
@@ -1447,6 +1470,18 @@ export function TourClient({
           now={now}
           busy={busy}
           onSubmit={(values) => void submitAppointment(values)}
+          onClose={() => setSheet(null)}
+        />
+      )}
+      {confirm && (
+        <ConfirmSheet place={confirm.place} phone={confirm.phone} text={confirm.text} onClose={() => setConfirm(null)} />
+      )}
+      {sheet === "card" && sender.cardToken && (
+        <CardQrSheet
+          token={sender.cardToken}
+          name={sender.name}
+          avatar={team.find((member) => member.id === userId)?.avatar || null}
+          teamName={sender.teamName}
           onClose={() => setSheet(null)}
         />
       )}

@@ -411,6 +411,17 @@ function migrate(db: Database.Database) {
     -- Die Kundenliste zaehlt und blaettert nur Abschluesse - ohne durch alle Tueren des Teams zu laufen.
     CREATE INDEX IF NOT EXISTS idx_visits_team_sales ON visits (team_id, created_at) WHERE outcome = 'SALE';
   `);
+
+  /*
+   * Digitale Visitenkarte (src/lib/business-card.ts): die Adresse ist ein
+   * Zufallswert, NULL heisst ausgeschaltet. Die Rufnummer am Konto steht nur
+   * auf der Karte, wenn die Person das will; die Ausweisnummer traegt die
+   * Teamleitung ein. Eindeutig ueber einen Index - ALTER TABLE kann kein UNIQUE.
+   */
+  addColumn(db, "users", "card_token", "TEXT");
+  addColumn(db, "users", "card_phone", "INTEGER NOT NULL DEFAULT 0");
+  addColumn(db, "users", "badge_number", "TEXT NOT NULL DEFAULT ''");
+  db.exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_users_card ON users (card_token) WHERE card_token IS NOT NULL");
 }
 
 function migrateInvitations(db: Database.Database) {

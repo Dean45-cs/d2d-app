@@ -85,6 +85,15 @@ export function MemberSheet({
     if (!ok) setRole(null);
   }
 
+  async function saveBadge(value: string) {
+    const next = value.trim();
+    const previous = m.badge_number ?? "";
+    if (next === previous) return;
+    await onPatch(m.id, { badge_number: next }, next ? "Ausweisnummer gespeichert" : "Ausweisnummer entfernt", {
+      badge_number: previous,
+    });
+  }
+
   async function changeManager(value: string) {
     const next = value ? Number(value) : null;
     setManager({ value: next, base: m.manager_id });
@@ -197,6 +206,34 @@ export function MemberSheet({
           </li>
         )}
       </ul>
+
+      <ListLabel>Visitenkarte</ListLabel>
+      <ul className="list">
+        <li>
+          {canManage ? (
+            <label className="cell">
+              <span className="shrink-0 text-body">Ausweis-Nr.</span>
+              <input
+                // Nach "Rückgängig" kommt der alte Wert vom Server - das Feld zeigt ihn dann wieder.
+                key={m.badge_number ?? ""}
+                className="field field-bare min-w-0 flex-1 text-right"
+                defaultValue={m.badge_number ?? ""}
+                placeholder="keine"
+                maxLength={40}
+                autoComplete="off"
+                spellCheck={false}
+                onBlur={(e) => void saveBadge(e.currentTarget.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") e.currentTarget.blur();
+                }}
+              />
+            </label>
+          ) : (
+            <Cell title="Ausweis-Nr." detail={m.badge_number || "–"} />
+          )}
+        </li>
+      </ul>
+      <p className="list-footer">Steht auf der Visitenkarte, sobald {first} sie im Profil einschaltet.</p>
 
       {m.territories.length > 0 && (
         <>

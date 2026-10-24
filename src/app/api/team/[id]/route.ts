@@ -54,6 +54,11 @@ export async function PATCH(
       fields.push("phone = ?");
       values.push(optionalText(body.phone, 40));
     }
+    if (body.badge_number !== undefined) {
+      // Steht auf der Visitenkarte - wie der Name Sache der Leitung, nicht der Person selbst.
+      fields.push("badge_number = ?");
+      values.push(optionalText(body.badge_number, 40));
+    }
     if (body.avatar !== undefined) {
       // Leerer Wert nimmt das Bild wieder weg.
       fields.push("avatar = ?");

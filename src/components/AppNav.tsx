@@ -137,7 +137,12 @@ const SIDEBAR_COOKIE = "cs_sidebar";
 export function Sidebar({ sections, user }: { sections: NavSection[]; user: NavUser }) {
   const pathname = usePathname();
   const { logout, busy } = useLogout(user.id);
-  const account: NavItem = { href: "/profil", label: "Profil", icon: "profile", match: [`/profil/${user.id}`] };
+  const account: NavItem = {
+    href: "/profil",
+    label: "Profil",
+    icon: "profile",
+    match: [`/profil/${user.id}`, "/profil/visitenkarte"],
+  };
   const active = activeHref([...sections.flatMap((s) => s.items), account], pathname);
 
   function toggle() {

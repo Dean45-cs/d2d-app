@@ -419,6 +419,17 @@ export function IconContacts(props: IconProps) {
     </Line>
   );
 }
+/** QR-Code: drei Ecken und ein Muster - die eigene Visitenkarte zum Scannen. */
+export function IconQr(props: IconProps) {
+  return (
+    <Line {...props}>
+      <rect x="4" y="4" width="6" height="6" rx="1.25" />
+      <rect x="14" y="4" width="6" height="6" rx="1.25" />
+      <rect x="4" y="14" width="6" height="6" rx="1.25" />
+      <path d="M14 14h2.5v2.5M20 14v.01M14 20h.01M17 20h3v-3" />
+    </Line>
+  );
+}
 export function IconUserPlus(props: IconProps) {
   return (
     <Line {...props}>
