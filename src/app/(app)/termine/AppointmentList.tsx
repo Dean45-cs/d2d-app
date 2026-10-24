@@ -5,10 +5,12 @@ import { useRouter } from "next/navigation";
 import type { AppointmentRow } from "@/lib/queries";
 import { Avatar, Cell, EmptyState, PageHeader, Segmented, SkeletonList } from "@/components/ui";
 import { Sheet } from "@/components/Sheet";
+import { ConfirmCells, useCardUrl, type Sender } from "@/components/BusinessCard";
 import { useToast } from "@/components/Toast";
 import { IconCalendar, IconCheck, IconDoor, IconNavigate, IconPhone, IconUndo } from "@/components/icons";
 import { routeUrl } from "@/lib/map";
 import { parseSlot, slotDate, slotLabel, slotOverdue, toSlot } from "@/lib/appointments";
+import { confirmationText } from "@/lib/confirmation";
 import { fetchWithTimeout } from "@/lib/offline-queue";
 
 type View = "open" | "done";
@@ -24,6 +26,8 @@ export function AppointmentList({
   isLeader,
   faces,
   back,
+  userId,
+  sender,
 }: {
   appointments: AppointmentRow[];
   /** Echte Anzahl - die Listen selbst sind begrenzt. */
@@ -32,6 +36,9 @@ export function AppointmentList({
   /** Profilbilder je Mitarbeiter-ID - nur fuer die Teamleitung. */
   faces: Record<number, string>;
   back: { href: string; label: string; mobileOnly?: boolean };
+  userId: number;
+  /** Unterschrift der Bestaetigung - nur fuer eigene Termine. */
+  sender: Sender;
 }) {
   const router = useRouter();
   const toast = useToast();
@@ -40,6 +47,7 @@ export function AppointmentList({
   const [detail, setDetail] = useState<AppointmentRow | null>(null);
   /* Was "heute" ist, entscheidet die Uhr des Geraets - nicht die des Servers. */
   const [now, setNow] = useState<Date | null>(null);
+  const cardUrl = useCardUrl(sender.cardToken);
 
   useEffect(() => {
     setNow(new Date());
@@ -255,6 +263,22 @@ export function AppointmentList({
             )}
             {isLeader && <li><Cell title="Verantwortlich" detail={detail.user_name} /></li>}
           </ul>
+          {/* Bestaetigen kann nur, wer selbst hingeht - und nur, solange der Termin noch kommt. */}
+          {detail.contact_phone && detail.user_id === userId && !detail.follow_up_done_at && now && !slotOverdue(detail.follow_up_at, now) && (
+            <ul className="list list-icons mt-4">
+              <ConfirmCells
+                phone={detail.contact_phone}
+                text={confirmationText({
+                  contactName: detail.contact_name,
+                  slot: detail.follow_up_at,
+                  senderName: sender.name,
+                  teamName: sender.teamName,
+                  cardUrl,
+                  now,
+                })}
+              />
+            </ul>
+          )}
           <button
             type="button"
             className={`btn btn-lg btn-block mt-4 ${detail.follow_up_done_at ? "btn-secondary" : "btn-primary"}`}

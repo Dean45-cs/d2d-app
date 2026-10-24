@@ -17,6 +17,7 @@ import { providerLookup } from "@/lib/energy/provider";
 import { readArea } from "@/lib/geo/area";
 import type { StreetWithStats } from "@/lib/queries";
 import { getLevelProgress } from "@/lib/level-queries";
+import { cardSettings } from "@/lib/card-queries";
 import { berlinMidnight, berlinSlot } from "@/lib/format";
 import type { Territory } from "@/lib/types";
 
@@ -167,6 +168,8 @@ export default async function TourPage({
 
   // Grundversorger je Gebiet: an der Tuer das wichtigste Argument.
   const providers = providerLookup(user.team_id);
+  // Unterschrift der Terminbestaetigung und die Visitenkarte zum Vorzeigen.
+  const card = cardSettings(user.id);
 
   return (
     <TourClient
@@ -198,6 +201,7 @@ export default async function TourPage({
         process.env.NEXT_PUBLIC_TARIFRECHNER_URL ??
         "https://portal-ep24.de/menues/tarifrechner/"
       }
+      sender={{ name: user.name, teamName: card.teamName, cardToken: card.token }}
     />
   );
 }

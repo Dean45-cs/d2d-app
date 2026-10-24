@@ -10,7 +10,9 @@ Eine Web-App für Door-to-Door-Teams im Energievertrieb:
 - **Auftrag erfassen** – öffnet den Tarifrechner des Partners und merkt einen offenen Auftrag vor;
   erst die anschließende Bestätigung zählt als Abschluss
 - **Termine mit Uhrzeit** – Vorschläge für den Abend, Rufnummer dazu, und am nächsten Tag
-  stehen sie oben auf der Tour
+  stehen sie oben auf der Tour; bestätigt per WhatsApp oder SMS mit einem Tipp
+- **Digitale Visitenkarte** – QR-Code an der Tür: Kunden sehen Bild, Name, Team und
+  Ausweisnummer live vom Server, und speichern den Kontakt
 - **Kundenliste** – die Teamleitung ordnet jedem Auftrag nachträglich den Kunden aus dem
   Buchungsportal zu, mit Rufnummer und Vertragsende; vor Ablauf steht er unter „Fällig“
   zum Anrufen, Besuchen und Umberaten
@@ -264,7 +266,30 @@ am Kopf der Tour; ein Tipp darauf stellt Straße, Hausnummer und Klingel ein.
 Gespeichert wird die **Ortszeit** (`2026-09-21 18:00`). Ob ein Termin „heute“ ist,
 entscheidet das Gerät und nicht der Server: vor der Tür zählt die Uhr an der Wand.
 
----
+### Termin bestätigen per WhatsApp oder SMS
+
+Wer beim Termin eine Rufnummer einträgt, bekommt nach dem Speichern gleich das Blatt
+**Termin bestätigen** – solange der Kunde noch an der Tür steht. Ein Tipp öffnet WhatsApp
+oder die Nachrichten-App mit fertigem Text:
+
+> Guten Tag Frau Müller,
+>
+> wie besprochen komme ich am Mittwoch, 28.10., um 18:00 Uhr wieder bei Ihnen vorbei – zur
+> Beratung zu Strom und Gas. Passt es doch nicht? Dann antworten Sie einfach auf diese Nachricht.
+>
+> Viele Grüße · Name · Team · Link zur [Visitenkarte](#digitale-visitenkarte)
+
+Der Text lässt sich in WhatsApp bzw. der SMS vor dem Senden noch ändern. Gesendet wird vom
+eigenen Handy – die App verschickt nichts selbst, braucht dafür keinen Dienst und kein Netz
+(WhatsApp und SMS senden nach). „Frau Müller“ oder „Familie Schmidt“ stehen in der Anrede;
+nur ein Nachname vom Klingelschild nicht, das klänge schroff. Am selben Tag heißt es „heute
+um 18:00 Uhr“, sonst mit Wochentag und Datum – „morgen“ wäre falsch, wenn jemand die
+Nachricht erst am nächsten Tag liest. Rufnummern mit 0 vorn gelten als deutsche Nummern
+(`+49`), „+49 (0)171 …“ wird richtig gelesen.
+
+Dieselben zwei Knöpfe stehen unter **Termine** im Blatt eines Termins – für die eigenen,
+offenen und noch nicht vorbeigegangenen. Die Teamleitung bestätigt keine Termine im Namen
+anderer. Rechenkern: `src/lib/confirmation.ts`, Tests in `scripts/tests/business-card.test.ts`.
 
 ### Terminerinnerungen per Push
 
@@ -338,6 +363,33 @@ Teams. Kundendaten hängen am Abschluss: wird der Abschluss zurückgenommen, sin
 weg. „Kundendaten entfernen“ löscht sie, ohne den Abschluss anzutasten. Rechenregeln in
 `src/lib/contracts.ts`, Abfragen in `src/lib/customers.ts`, Tests in
 `scripts/tests/customers.test.ts`.
+
+## Digitale Visitenkarte
+
+An der Haustür zählt Vertrauen: „Wer sind Sie, und für wen kommen Sie?“ Unter **Profil ›
+Visitenkarte** schaltet jede Person ihre eigene Karte ein. Danach steht beim Klinken oben
+neben den Terminen ein QR-Code-Knopf: der Kunde scannt mit der Kamera und sieht auf der
+Adresse der App
+
+- **Bild, Name, „Beratung Strom & Gas“ und das Team**
+- **„Aktiv im Team“ mit Datum und Uhrzeit des Abrufs** – ein Bildschirmfoto taugt so
+  nicht als Nachweis
+- die **Ausweisnummer** (trägt die Teamleitung unter Mitglieder ein) und seit wann die
+  Person dabei ist
+- auf Wunsch die **Rufnummer** zum Anrufen, und **Kontakt speichern** (vCard samt Bild)
+
+Der Link steht auch in jeder [Terminbestätigung](#termin-bestätigen-per-whatsapp-oder-sms);
+WhatsApp zeigt darunter Bild und Namen – der Kunde sieht schon im Chat, wer kommt.
+
+Die Adresse (`/k/…`) ist ein Zufallswert, keine laufende Nummer – das Team lässt sich von
+außen nicht durchzählen. **Neuer Link** macht den alten und jeden QR-Code dazu sofort
+ungültig; wer die Karte ausschaltet oder deaktiviert wird, hat keine mehr – die Seite meldet
+dann „nicht gültig“. Suchmaschinen bleiben draußen (`noindex`). Der QR-Code entsteht auf
+dem Gerät und steht deshalb auch im Treppenhaus ohne Netz. Regeln in
+`src/lib/business-card.ts`, Abfragen in `src/lib/card-queries.ts`, Tests in
+`scripts/tests/business-card.test.ts`.
+
+Der Name des Teams auf der Karte kommt aus `SEED_TEAM` bei der Ersteinrichtung.
 
 ## Level, XP und Abzeichen
 
@@ -943,14 +995,15 @@ src/
     (app)/            Bereich nach dem Login (Layout mit Navigation)
       start/          Übersicht (Team) bzw. Meine Zahlen
       tour/           Türerfassung (das Herzstück)
-      termine/        Vereinbarte Termine
+      termine/        Vereinbarte Termine, Bestätigung per WhatsApp/SMS
       kunden/         Kundenliste: Kunde je Auftrag, Vertragsende, Wiedervorlage
       team/           Feed, Beitrag, Rangliste, Erfolge
-      profil/         Profil-Übersicht, Profil mit Zahlen, Abonnenten
+      profil/         Profil-Übersicht, Profil mit Zahlen, Abonnenten, eigene Visitenkarte
       gebiete/        Gebiete und Straßen
       karte/          Energiepreise auf der Karte
       einstellungen/  Mitglieder, Einladungen, Rechte, Ablehnungsgründe, Energie & Tarif
     api/              REST-Endpunkte
+    k/[token]/        Öffentliche Visitenkarte, Kontakt (vCard) und Bild
     brand.css         Markenfarben (Akzent, Signale, Datenfarben)
     globals.css       Gestaltungssystem: Tokens, Glas, Schrift, Bausteine
   lib/
@@ -964,6 +1017,8 @@ src/
     appointments.ts   Terminzeiten, Vorschläge, Beschriftung
     customers.ts      Kundenliste: Abfragen, Speichern, Wiedervorlage
     contracts.ts      Vertragsende, Fälligkeit, Datumsformate
+    confirmation.ts   Terminbestätigung: Text, WhatsApp- und SMS-Links
+    business-card.ts  Visitenkarte: Link, vCard; Abfragen in card-queries.ts
     doors.ts          Türstatus: offen, Wiedervorlage, fertig, gesperrt
     energy/           Preise, Bewertung, Tabellen-Import, Städteliste, Tagesquelle
     geo/              Flächenberechnung, Aufteilung, OpenStreetMap-Abfragen
@@ -1063,6 +1118,13 @@ Erfassenden gespeichert – das ist eine Mitarbeiterortung und gehört mit dem B
 bzw. den Beschäftigten abgestimmt. Wer das nicht möchte: in
 `src/app/(app)/tour/TourClient.tsx` die Konstante `position` auf `null` setzen. „In meiner
 Nähe“ bleibt dann erhalten – dafür verlässt der Standort das Gerät nicht.
+
+Die **Visitenkarte** veröffentlicht Bild und Namen der Person – deshalb schaltet sie jede
+Person selbst ein und aus; die Rufnummer erscheint nur auf ausdrücklichen Wunsch. Die
+**Terminbestätigung** geht vom eigenen Handy per WhatsApp oder SMS an eine Nummer, die der
+Kunde für genau diesen Termin genannt hat – eine Nachricht zum vereinbarten Termin, keine
+Werbung. Ob WhatsApp auf dem Diensthandy genutzt werden darf, regelt der Betrieb; die SMS
+ist der Weg ohne Messenger.
 
 Ein erkennbares Verbot („Keine Werbung“, „Für Vertreter verboten“) und ein ausdrückliches
 „kein Interesse“ sind bindend: dafür gibt es die Sperre, die serverseitig auch beim

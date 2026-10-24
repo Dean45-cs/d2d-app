@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { IconCalendar, IconChevronDown, IconCloudUp, IconOffline } from "@/components/icons";
+import { IconCalendar, IconChevronDown, IconCloudUp, IconOffline, IconQr } from "@/components/icons";
 import { ProgressRing } from "@/components/ui";
 import { ProviderLine } from "@/components/ProviderRating";
 import type { StreetWithStats } from "@/lib/queries";
@@ -24,6 +24,7 @@ export function TourHeader({
   online,
   onStreet,
   onDay,
+  onCard,
 }: {
   street: StreetWithStats | null;
   territory: TerritoryLite | null;
@@ -33,6 +34,8 @@ export function TourHeader({
   online: boolean;
   onStreet: () => void;
   onDay: () => void;
+  /** Visitenkarte zum Vorzeigen - nur, wenn sie eingeschaltet ist. */
+  onCard?: () => void;
 }) {
   const place = territory
     ? [territory.name, [territory.postal_code, territory.city].filter(Boolean).join(" ")].filter(Boolean).join(" · ")
@@ -57,6 +60,11 @@ export function TourHeader({
           <button type="button" onClick={onDay} className="badge min-h-8 px-3" aria-label="Warteschlange öffnen">
             {online ? <IconCloudUp className="h-4 w-4" /> : <IconOffline className="h-4 w-4" />}
             {online ? `${pendingCount} warten` : pendingCount > 0 ? `Offline · ${pendingCount}` : "Offline"}
+          </button>
+        )}
+        {onCard && (
+          <button type="button" onClick={onCard} className="icon-btn" aria-label="Visitenkarte zeigen">
+            <IconQr className="h-6 w-6" />
           </button>
         )}
         <Link

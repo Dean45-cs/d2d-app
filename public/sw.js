@@ -90,6 +90,8 @@ function isAppPage(url) {
   const path = url.pathname;
   if (path === "/" || path.startsWith("/api/") || path.startsWith("/_next/")) return false;
   if (path === "/login" || path.startsWith("/login/") || path.startsWith("/einladung")) return false;
+  // Visitenkarten sind oeffentlich und zeigen den Stand des Abrufs - nie eine alte Kopie.
+  if (path.startsWith("/k/")) return false;
   // Dateien (offline.html, sw.js, Icons) sind keine Seiten.
   return !/\.[a-z0-9]+$/i.test(path);
 }

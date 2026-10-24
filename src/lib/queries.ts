@@ -25,7 +25,7 @@ export function listMembers(teamId: number): User[] {
   return getDb()
     .prepare(
       `SELECT id, team_id, manager_id, name, email, role, phone, active,
-              avatar_src(id, avatar) AS avatar, bio, created_at
+              avatar_src(id, avatar) AS avatar, bio, badge_number, created_at
          FROM users WHERE team_id = ? ORDER BY active DESC, role, name`,
     )
     .all(teamId) as User[];

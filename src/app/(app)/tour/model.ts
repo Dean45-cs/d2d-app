@@ -99,7 +99,8 @@ export type SheetName =
   | "house"
   | "block"
   | "day"
-  | "number";
+  | "number"
+  | "card";
 
 export const EMPTY_VISITS: Map<string, LocalVisits> = new Map();
 

@@ -17,6 +17,8 @@ export interface User {
   avatar: string;
   /** Kurzer Text ueber sich selbst - steht im Profil unter dem Namen. */
   bio: string;
+  /** Ausweisnummer fuer die Visitenkarte - nur in der Mitgliederliste geladen. */
+  badge_number?: string;
   created_at: string;
 }
 

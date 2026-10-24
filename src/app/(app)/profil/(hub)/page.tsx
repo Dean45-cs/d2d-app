@@ -5,13 +5,14 @@ import { navigation } from "@/lib/nav";
 import { getLevelProgress } from "@/lib/level-queries";
 import { countAppointments } from "@/lib/queries";
 import { countCustomers } from "@/lib/customers";
+import { cardSettings } from "@/lib/card-queries";
 import { berlinToday } from "@/lib/contracts";
 import { Avatar, Cell, ListLabel, PageHeader, ToneTile, type SymbolTone } from "@/components/ui";
 import { NAV_ICONS } from "@/components/nav-icons";
 import { InstallCell } from "@/components/InstallHint";
 import { PushRows } from "@/components/community/PushToggle";
 import { PowerSaveCell } from "@/components/PowerSave";
-import { IconCalendar, IconChart, IconContacts, IconSparkles, IconTarget } from "@/components/icons";
+import { IconCalendar, IconChart, IconContacts, IconQr, IconSparkles, IconTarget } from "@/components/icons";
 import { LogoutCell } from "./LogoutCell";
 import { PasswordCell } from "./PasswordCell";
 
@@ -32,6 +33,7 @@ export default async function ProfileHubPage() {
   const level = getLevelProgress(user.team_id, user.id);
   const openAppointments = countAppointments(user.team_id, { userId: user.id }).open;
   const dueCustomers = rights["customers.manage"] ? countCustomers(user.team_id, berlinToday()).due : 0;
+  const cardOn = cardSettings(user.id).token !== null;
 
   return (
     <div className="page-narrow">
@@ -62,6 +64,14 @@ export default async function ProfileHubPage() {
             icon={<ToneTile tone="indigo"><IconCalendar className="h-4 w-4" /></ToneTile>}
             title={rights["appointments.team"] ? "Termine" : "Meine Termine"}
             detail={openAppointments > 0 ? openAppointments : undefined}
+          />
+        </li>
+        <li>
+          <Cell
+            href="/profil/visitenkarte"
+            icon={<ToneTile tone="teal"><IconQr className="h-4 w-4" /></ToneTile>}
+            title="Visitenkarte"
+            detail={cardOn ? "An" : "Aus"}
           />
         </li>
         {rights["customers.manage"] && (
