@@ -5,7 +5,7 @@ Eine Web-App für Door-to-Door-Teams im Energievertrieb:
 - **Gebiete auf der Karte abstecken** – Fläche einkreisen, die Straßen holt die App
   selbst aus OpenStreetMap; auf Wunsch gleich ausgewogen auf mehrere Leute aufgeteilt
 - **Türen tracken** – nicht angetroffen / angetroffen / Termin / Abschluss, mit einem Daumen bedienbar;
-  Ein- und Mehrfamilienhäuser mit eigenem Klingelbrett, höchstens drei Versuche je Tür
+  Ein- und Mehrfamilienhäuser mit eigenem Klingelbrett, jede Tür beliebig oft erfassbar
 - **Ablehnungsgründe mit einem Tap** – konfigurierbare Kachel-Auswahl statt Freitext
 - **Auftrag erfassen** – öffnet den Tarifrechner des Partners und merkt einen offenen Auftrag vor;
   erst die anschließende Bestätigung zählt als Abschluss
@@ -142,12 +142,18 @@ einklappbaren Seitenleiste; beim Klinken bleibt sie im Auto-Modus schmal. Alte A
 ## Der Ablauf an der Tür
 
 1. Gebiet und Straße auswählen (bleibt stehen, bis gewechselt wird)
-2. Hausnummer antippen – bei Gebieten aus der Kartenauswahl stehen die Häuser der
-   Straße als Plaketten bereit (erfasste durchgestrichen), „weiter“ springt zur
-   nächsten offenen. Ohne hinterlegte Nummern: eintippen, `+1` zählt hoch.
-3. Eines der drei Ergebnisse tippen:
-   - **Nicht angetroffen** – sofort gespeichert. Nach dem dritten Versuch gilt die Tür als
-     abgearbeitet, damit niemand dieselbe Klingel ein viertes Mal läuft.
+2. Haus in der Liste antippen. Die Häuser der Straße stehen als **Tabelle** – nach dem
+   Vorbild der Glasfaser-Vertriebs-App der Telekom: links fett die Nummer, daneben der
+   Stand in Worten („Nicht angetroffen · 2×“, „Kein Interesse“, „Termin vereinbart“,
+   „Abschluss am 12.03.2026“), darunter wer zuletzt da war und wann, rechts das Zeichen.
+   Jede zweite Zeile ist leicht getönt, ein **grüner Balken** links markiert Häuser mit
+   Abschluss. Darüber **„Nr. filtern“** (statt blättern; fehlt eine Nummer, lässt sie sich
+   dort öffnen), **In meiner Nähe** und **Nur offene**. Die gewählte Nummer wird zur grünen
+   Plakette, und die Ergebnisleiste nennt darüber dieselbe Tür.
+3. Eines der Ergebnisse tippen. **Die Tür bleibt danach gewählt** – nichts springt von
+   selbst weiter, die Zeile zeigt sofort den neuen Stand (auch ohne Netz):
+   - **Nicht angetroffen** – sofort gespeichert. Gezählt wird jeder Versuch („3×“), eine
+     Grenze gibt es nicht: die Tür bleibt offen, bis jemand angetroffen wird.
    - **Angetroffen – kein Abschluss** – es öffnet sich die Kachel-Auswahl mit den
      Ablehnungsgründen; ein Tap speichert. Optional eine Notiz dazu.
    - **Termin vereinbart** – kurze Abfrage: Vorschläge wie „Morgen 18:00“ oder freie
@@ -171,16 +177,23 @@ einklappbaren Seitenleiste; beim Klinken bleibt sie im Auto-Modus schmal. Alte A
 5. Vertippt? „Letzten Eintrag rückgängig machen“ – für eigene Einträge bis 15 Minuten,
    die Teamleitung kann jederzeit korrigieren.
 
+**Keine Tür ist je „erledigt“.** Kunden lassen sich beliebig oft antreffen – auch nach
+einem Abschluss, denn Leute ziehen um und Verträge laufen aus. Ein Abschluss sperrt
+nichts: die Zeile zeigt „Abschluss am 12.03.2026“ (auch später, wenn danach schon wieder
+jemand da war), die Tür bleibt erfassbar. „Offen“ heißt nur: hier wurde noch niemand
+angetroffen – danach richten sich „Nur offene“, die Zählung „12 von 24 offen“ und
+„In meiner Nähe“. Zu ist eine Tür nur, wenn sie jemand ausdrücklich **sperrt**.
+
 Beim ersten Antippen einer Hausnummer fragt die App nach **Ein- oder Mehrfamilienhaus**.
 Im Mehrfamilienhaus werden die Klingelschilder angelegt – entweder die Namen vom Brett
-abtippen oder „6 Klingeln ohne Namen“. Danach zählt jede Klingel als eigene Tür, und wie es
-weitergeht, hängt am Brett:
+abtippen oder „6 Klingeln ohne Namen“. Danach zählt jede Klingel als eigene Tür.
 
-- **Namen am Brett**: nach jedem Ergebnis geht die Liste wieder auf und der Name wird
-  ausdrücklich gewählt. Geklingelt wird in der Reihenfolge, die man vorfindet – ein Eintrag
-  beim falschen Namen wäre schlimmer als ein Tipp mehr.
-- **„Klingel 1, 2, 3 …“** aus der Schnellanlage: die Reihenfolge sagt nichts aus, deshalb
-  springt die App wie gewohnt selbst zur nächsten offenen Klingel.
+Ein Mehrfamilienhaus **öffnet sich wie ein Ordner**: ein Tipp auf die Zeile, und man ist
+*im* Haus – oben „‹ Bahnhofstraße“ und „Nr. 12“, darunter nur seine Klingeln in der
+Reihenfolge am Brett (Name, Etage, Stand). Die Hausnummern der Straße sind dort bewusst
+weg. Klingel antippen, Ergebnis tippen – die Klingel bleibt gewählt, die nächste wählt
+man selbst. „Bearbeiten“ pflegt Schilder, Haustyp und Sperre; „‹ Bahnhofstraße“ führt
+zurück in die Straße, das Haus dabei im Blick. Ab neun Klingeln gibt es „Name filtern“.
 
 Wer ausdrücklich keinen Besuch will, bekommt über **Sperren** einen dauerhaften Eintrag
 fürs ganze Team – aufheben kann ihn nur die Teamleitung.
@@ -197,13 +210,13 @@ Klinken ist fürs iPad eigens ausgelegt – hochkant wie quer, vom iPad mini bis
   Handy (oben „Nicht da“ / „Ohne Abschluss“, unten „Termin“ / „Auftrag starten“), nur
   größer: 76 pt hoch, quer als Tastenfeld 88 pt. Hält man das iPad unten an den Ecken,
   erreicht der Daumen die äußeren Knöpfe – „Nicht da“ also mit der haltenden Hand.
-- **Hochkant**: eine Spalte – oben die Straße, darunter die große Nummer (128 pt),
-  dann Klingelbrett und alle Häuser der Straße als Raster auf einen Blick, unten die
-  Knöpfe. Wer ein Haus weit unten im Raster wählt, bekommt die Nummer zurück ins Bild.
-- **Quer**: links Straße, Preise, Klingelbrett und Häuser (rollen), rechts die Tür
-  mit Nummer und Knöpfen (steht). Die Seitenleiste bleibt dafür schmal; wer sie
-  aufklappt, behält sie – die Spalten passen sich der verbleibenden Breite an.
-- **„Rückgängig“** erscheint direkt über den Knöpfen, quer mittig über der Türspalte.
+- **Hochkant**: eine Spalte – oben die Straße, darunter die Liste der Häuser bzw. im
+  Mehrfamilienhaus der Klingeln, unten die Knöpfe. Wird eine gewählte Zeile von der
+  Leiste verdeckt, rollt die Liste genau so weit, dass sie darüber steht.
+- **Quer**: dieselbe Spalte, die vier Knöpfe nebeneinander (Zeichen über dem Wort) –
+  so passen mehr Zeilen ins Bild. Die Seitenleiste bleibt dafür schmal; wer sie
+  aufklappt, behält sie.
+- **„Rückgängig“** erscheint direkt über den Knöpfen.
 - **Blätter** (Ablehnungsgrund, Termin …) öffnen als Dialog in der Mitte; die Gründe
   stehen in drei breiten Spalten. Ist die Bildschirmtastatur offen (Name, Telefon),
   rückt der Dialog darüber – „Speichern“ bleibt sichtbar.
@@ -213,27 +226,27 @@ Klinken ist fürs iPad eigens ausgelegt – hochkant wie quer, vom iPad mini bis
 Mit Standortfreigabe weiß Klinken, wo man steht, und rechnet alles auf dem Gerät
 (Luftlinie, ohne Netz und ohne Kartendienst):
 
-- **„In meiner Nähe“** unter der Hausnummer (und oben in „Wo bist du?“) springt zur
-  **nächsten offenen Tür** in allen eigenen Gebieten – auch in eine andere Straße oder
-  ein anderes Gebiet – und nennt die Entfernung. Ist sie weiter weg, bietet der Hinweis
+- **„In meiner Nähe“** (Fadenkreuz neben „Nr. filtern“, und oben in „Wo bist du?“) wählt die
+  **nächste offene Tür** in allen eigenen Gebieten – auch in einer anderen Straße oder
+  einem anderen Gebiet (ein Mehrfamilienhaus öffnet sich gleich) – und nennt die
+  Entfernung. Das passiert nur auf Tipp, nie von selbst. Ist sie weiter weg, bietet der Hinweis
   gleich die Fußgänger-Route an. Gebiete, die nur wegen eigener Termine in der Tour
   stehen, schlägt die App nicht vor.
 - **Weit weg von der gewählten Tür?** Steht man mindestens 150 m entfernt und liegt eine
   offene Tür höchstens halb so weit weg (etwa nach der Fahrt ins Gebiet, wenn noch die
-  Straße von gestern eingestellt ist), erscheint über der Hausnummer der Hinweis
+  Straße von gestern eingestellt ist), erscheint über der Liste der Hinweis
   „Nächste offene Tür · 80 m“ – ein Tipp stellt sie ein, das × blendet ihn aus, bis man
   ein Stück weitergegangen ist. Beim Gang die Straße hinauf bleibt es ruhig.
-- **Entfernung zur gewählten Tür** steht unter der Hausnummer („390 m entfernt“) –
+- **Entfernung zur gewählten Tür** steht in der Ergebnisleiste („390 m entfernt“) –
   steht man davor, nichts.
 - **Wo bist du?** zeigt die Entfernung zu jedem Gebiet und jeder Straße (bis zur nächsten
   offenen Tür dort) und ordnet **nach Nähe** – erledigte Straßen nach hinten; „Reihenfolge“
   schaltet auf die Reihenfolge des Gebiets zurück (die Wahl merkt sich das Gerät). Beim
   Gebietswechsel öffnet die nächstgelegene Straße mit offenen Türen.
-- **Straße gewechselt?** Mit Standort steht die nächstgelegene offene Tür der Straße
-  bereit statt der ersten – dort fängt man an. Danach geht es wie gewohnt die Straße
-  hinauf.
-- **Straße erledigt:** „Weiter“ führt in die nächstgelegene Straße mit offenen Türen,
-  samt Entfernung.
+- **Straße gewechselt?** Dann ist noch keine Tür gewählt – man tippt die an, vor der man
+  steht.
+- **Keine offene Tür mehr in der Straße:** „Weiter: …“ in der Ergebnisleiste führt in die
+  nächstgelegene Straße mit offenen Türen.
 - **Teamleitung in fremden Gebieten:** Deren Häuser lädt die Tour erst bei Bedarf. Liegt
   so ein Gebiet deutlich näher, lädt „In meiner Nähe“ es und sucht dort weiter.
 
@@ -549,9 +562,8 @@ Die geladenen Hausnummern bleiben erhalten und werden an drei Stellen benutzt:
 - **Gebietsseite:** hinter jeder Straße steht „8 Nr.“ – aufgeklappt erscheint jedes
   Haus als Plakette: hohl = offen, grau = nochmal, getönt = erfasst, grün mit Haken = Abschluss. Damit sieht die
   Teamleitung, was tatsächlich abgearbeitet ist, nicht nur die Summe.
-- **An der Tür:** unter dem Eingabefeld stehen die Häuser der Straße zum Antippen –
-  erfasste sind durchgestrichen. Statt „+1“ heißt der Knopf dann **„weiter“** und
-  springt zur nächsten **offenen** Hausnummer. Wer lieber tippt, tippt weiter.
+- **An der Tür:** die Häuser der Straße stehen als Liste mit ihrem Stand; „Nr. filtern“
+  findet eine Nummer schnell, eine fehlende lässt sich dort von Hand öffnen.
 - **Wohneinheiten:** kennt OpenStreetMap die Zahl der Wohnungen im Haus, zählt sie in
   den Fortschritt ein (sonst gilt ein Haus als eine Tür). Der Tooltip einer Plakette
   verrät sie.
@@ -1019,7 +1031,7 @@ src/
     contracts.ts      Vertragsende, Fälligkeit, Datumsformate
     confirmation.ts   Terminbestätigung: Text, WhatsApp- und SMS-Links
     business-card.ts  Visitenkarte: Link, vCard; Abfragen in card-queries.ts
-    doors.ts          Türstatus: offen, Wiedervorlage, fertig, gesperrt
+    doors.ts          Türstatus: neu, nicht da, angetroffen, gesperrt (nur die Sperre schließt)
     energy/           Preise, Bewertung, Tabellen-Import, Städteliste, Tagesquelle
     geo/              Flächenberechnung, Aufteilung, OpenStreetMap-Abfragen
     offline-queue.ts  Puffer für Türeinträge ohne Netz

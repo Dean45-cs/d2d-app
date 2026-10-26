@@ -4,10 +4,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { PendingSales } from "@/components/PendingSales";
 import { CardQrSheet, ConfirmSheet, useCardUrl, type Sender } from "@/components/BusinessCard";
-import { Sheet } from "@/components/Sheet";
 import { useToast } from "@/components/Toast";
 import { EmptyState, OutcomeGlyph } from "@/components/ui";
-import { IconBan, IconBell, IconBuilding, IconCheck, IconHome, IconKeypad, IconMap, IconSparkles } from "@/components/icons";
+import { IconBan, IconBell, IconBuilding, IconHome, IconMap, IconPlus, IconSparkles } from "@/components/icons";
 import { beginSaleDraft } from "@/lib/sale-drafts-client";
 import type {
   AppointmentRow,
@@ -19,8 +18,8 @@ import type {
 } from "@/lib/queries";
 import type { RejectionReason, TeamFace, VisitOutcome } from "@/lib/types";
 import { BUILDING_TYPE_LABEL, OUTCOME_LABEL } from "@/lib/types";
-import { bellKey, hasNamedBells, isNumberedLabel, numberedBells, type DoorbellInput } from "@/lib/doorbells";
-import { MAX_NOT_HOME_ATTEMPTS, doorFinished, doorStatus, whenLabel, type DoorFacts } from "@/lib/doors";
+import { bellKey, isNumberedLabel, numberedBells, type DoorbellInput } from "@/lib/doorbells";
+import { doorStatus, whenLabel, type DoorFacts } from "@/lib/doors";
 import { slotLabel, slotOverdue, slotToday } from "@/lib/appointments";
 import { confirmationText } from "@/lib/confirmation";
 import {
@@ -49,13 +48,11 @@ import {
   worthSuggesting,
   type Distance,
 } from "@/lib/geo/nearby";
-import { firstName } from "@/lib/ranking";
 import type { LevelProgress } from "@/lib/levels";
 import { levelFeedbackText, type LevelFeedback } from "@/lib/level-feedback";
-import { BellBoard, type BellRow } from "./BellBoard";
-import { DoorHero, type DoorStatusLine } from "./DoorHero";
-import { HouseStrip, type ChipState, type HouseChip } from "./HouseStrip";
-import { OutcomeTray, TRAY_ICON, type TrayAction } from "./OutcomeTray";
+import { BuildingHeader } from "./BuildingHeader";
+import { DoorFilter, DoorTable, DoorTableAction, type DoorRow } from "./DoorTable";
+import { OutcomeTray, TRAY_ICON, type TrayAction, type TrayTarget } from "./OutcomeTray";
 import { TourAppointments } from "./TourAppointments";
 import { TourHeader } from "./TourHeader";
 import { TourNearby } from "./TourNearby";
@@ -64,7 +61,6 @@ import {
   BlockSheet,
   DaySheet,
   HouseSheet,
-  NumberSheet,
   ReasonSheet,
   SaleSheet,
   StreetSheet,
@@ -73,7 +69,9 @@ import {
 import {
   bellSlot,
   doneKey,
-  numberSuggestions,
+  doorLast,
+  doorText,
+  saleText,
   sameNumber,
   type Bell,
   type EnergyType,
@@ -142,11 +140,28 @@ function mustQueue(status: number): boolean {
 
 const LOGGED_OUT = "Abgemeldet – gemerkt. Bitte neu anmelden, dann wird nachgesendet";
 
+/** Eine Tuer, ueber die der Server nichts weiss - von Hand eingegeben. */
+const NO_VISIT = {
+  last_outcome: null,
+  last_reason_label: null,
+  last_reason_icon: null,
+  last_visit_at: null,
+  last_visit_user: null,
+  last_visit_user_id: null,
+};
+
+/** Schluessel der Zeile einer Hausnummer - "12 A" und "12a" sind dieselbe. */
+function houseRowKey(number: string): string {
+  return `h:${number.replace(/\s+/g, "").toLowerCase()}`;
+}
+
 /**
  * Klinken - die Tuer. Ein Bildschirm fuer eine Hand: oben, wo man ist;
- * in der Mitte die Hausnummer; unten im Daumenbereich die vier Ergebnisse.
- * Nach dem Speichern springt die App zur naechsten offenen Tuer, ein
- * Fehltipp laesst sich im Toast zuruecknehmen.
+ * darunter die Haeuser der Strasse als Liste; unten im Daumenbereich die
+ * vier Ergebnisse fuer die gewaehlte Tuer. Ein Mehrfamilienhaus oeffnet
+ * sich wie ein Ordner - drinnen stehen nur seine Klingeln. Nach dem
+ * Speichern bleibt die Tuer gewaehlt (nichts springt), ein Fehltipp
+ * laesst sich im Toast zuruecknehmen.
  */
 export function TourClient({
   userId,
@@ -206,8 +221,11 @@ export function TourClient({
   /** Was gesperrt werden soll - eine Klingel oder das ganze Haus. */
   const [blockTarget, setBlockTarget] = useState<Bell | "house" | null>(null);
   const [onlyOpen, setOnlyOpen] = useState(false);
+  /** Im Mehrfamilienhaus: die Liste zeigt nur dessen Klingeln. */
+  const [inside, setInside] = useState(false);
+  const [houseFilter, setHouseFilter] = useState("");
+  const [bellFilter, setBellFilter] = useState("");
   const [busy, setBusy] = useState(false);
-  const [lastTyped, setLastTyped] = useState("");
   /** Strassenwahl nach Naehe oder in der Reihenfolge des Gebiets. */
   const [streetOrder, setStreetOrder] = useState<StreetOrder>("near");
   /** Gerade wird fuer "In meiner Nähe" geortet. */
@@ -252,6 +270,8 @@ export function TourClient({
       remember("d2d_street", String(linked.id));
       setHouseNumber(params.get("house") ?? "");
       setBellLabel("");
+      // Ist es ein Mehrfamilienhaus, steht man gleich darin (sonst gilt das nicht).
+      setInside(Boolean(params.get("house")));
       // Das Gebiet der verlinkten Strasse bleibt beim Nachladen nach dem Speichern dabei.
       window.history.replaceState(null, "", `${window.location.pathname}?gebiet=${linked.territory_id}`);
       return;
@@ -272,6 +292,7 @@ export function TourClient({
     if (current !== null) {
       setHouseNumber("");
       setBellLabel("");
+      setInside(false);
     }
     setStreetId(next?.id ?? null);
     if (next) setTerritoryId(next.territory_id);
@@ -319,7 +340,6 @@ export function TourClient({
   /* ---------------------------- Abgeleitetes ----------------------------- */
 
   const faces = useMemo(() => new Map(team.map((person) => [person.id, person])), [team]);
-  const faceOf = useCallback((id: number | null | undefined) => (id ? (faces.get(id) ?? null) : null), [faces]);
 
   const territory = territories.find((t) => t.id === territoryId) ?? null;
   const street = useMemo(() => streets.find((s) => s.id === streetId) ?? null, [streets, streetId]);
@@ -358,13 +378,13 @@ export function TourClient({
     for (const house of houseNumbers) {
       const entry = map.get(house.street_id) ?? { open: 0, total: 0 };
       entry.total += 1;
-      if (!book.isDone(house)) entry.open += 1;
+      if (book.isOpen(house)) entry.open += 1;
       map.set(house.street_id, entry);
     }
     return map;
   }, [houseNumbers, book]);
 
-  const openHouses = houses.filter((h) => !book.isDone(h));
+  const openHouses = houses.filter((h) => book.isOpen(h));
 
   const currentHouse = useMemo(
     () => houses.find((h) => sameNumber(h.number, houseNumber)) ?? null,
@@ -380,8 +400,8 @@ export function TourClient({
   );
   const activeBell = currentBells.find((bell) => bellKey(bell.label) === bellKey(bellLabel)) ?? null;
   const suggestMfh = (currentHouse?.units ?? 0) > 1;
-  const namedBells = hasNamedBells(currentBells.map((bell) => bell.label));
-  const nextOpenBell = namedBells ? null : (currentBells.find((bell) => !book.isBellDone(currentKey, bell)) ?? null);
+  /** Man steht im Mehrfamilienhaus - die Hausnummern der Strasse sind weg. */
+  const inBuilding = inside && currentType === "MFH" && Boolean(currentNumber) && !housesPending;
 
   const houseFacts: DoorFacts = currentKey
     ? book.factsOf(currentKey, currentHouse ?? { blocked_at: null, not_home_count: 0, met_count: 0 })
@@ -402,7 +422,7 @@ export function TourClient({
   /** Ein Standort, der fuer Entfernungen taugt - am Rechner kaeme sonst die Ortung ueber die IP. */
   const near = fix && fix.accuracy <= USABLE_ACCURACY ? fix : null;
   const accuracy = near?.accuracy ?? 0;
-  const doorDone = book.isDone;
+  const doorOpen = book.isOpen;
 
   /** Wo jede Tuer liegt - ohne eigenen Punkt beim Nachbarhaus. */
   const spots = useMemo(() => placeHouses(houseNumbers, streets), [houseNumbers, streets]);
@@ -424,12 +444,12 @@ export function TourClient({
       near
         ? nearest(
             near.point,
-            workHouses.filter((house) => !doorDone(house)),
+            workHouses.filter((house) => doorOpen(house)),
             (house) => spots.get(house.id),
             (house) => house.id === suggested.current,
           )
         : null,
-    [near, workHouses, doorDone, spots],
+    [near, workHouses, doorOpen, spots],
   );
   useEffect(() => {
     suggested.current = nearestDoor?.item.id ?? null;
@@ -437,8 +457,8 @@ export function TourClient({
 
   /** Entfernung je Strasse (bis zur naechsten offenen Tuer) und je Gebiet. */
   const streetDistance = useMemo(
-    () => (near ? streetDistances(near.point, streets, houseNumbers, spots, (house) => !doorDone(house)) : null),
-    [near, streets, houseNumbers, spots, doorDone],
+    () => (near ? streetDistances(near.point, streets, houseNumbers, spots, (house) => doorOpen(house)) : null),
+    [near, streets, houseNumbers, spots, doorOpen],
   );
   const territoryDistance = useMemo(
     () => (streetDistance ? territoryDistances(streets, streetDistance) : null),
@@ -453,19 +473,6 @@ export function TourClient({
   function addressOf(house: HouseNumberWithStats): string {
     return `${streets.find((s) => s.id === house.street_id)?.name ?? ""} ${house.number}`.trim();
   }
-
-  /*
-   * Keine Nummer gewaehlt: eine offene Tuer der Strasse steht bereit - mit
-   * Standort die naechstgelegene, denn dort faengt man an; sonst die erste.
-   */
-  useEffect(() => {
-    if (houseNumber || houses.length === 0) return;
-    const open = houses.filter((h) => !book.isDone(h));
-    const first = (near ? nearest(near.point, open, (h) => spots.get(h.id))?.item : null) ?? open[0];
-    if (first) setHouseNumber(first.number);
-    // Nur beim Wechsel der Strasse oder wenn die Auswahl leer wurde - nicht bei jedem Schritt.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [houseNumber, houses]);
 
   /*
    * Gebiete, deren Hausnummern noch nicht geladen sind (Teamleitung in
@@ -495,43 +502,60 @@ export function TourClient({
     setStreetId(id);
     setHouseNumber("");
     setBellLabel("");
+    setInside(false);
+    setHouseFilter("");
     remember("d2d_street", id ? String(id) : null);
   }, []);
 
-  function pickHouse(number: string) {
+  /*
+   * Die gewaehlte Zeile soll im Bild sein - die Leiste waechst, sobald eine
+   * Tuer gewaehlt ist, und laege sonst darueber; ebenso nach dem Verlassen
+   * eines Hauses oder nach "In meiner Nähe". Gerollt wird nur so weit wie noetig.
+   */
+  const [reveal, setReveal] = useState<string | null>(null);
+  useEffect(() => {
+    if (!reveal) return;
+    setReveal(null);
+    // Ein Bild spaeter: erst dann hat die Leiste ihre neue Hoehe und der Platz darunter
+    // (--tour-tray-height) ist nachgezogen - sonst reicht es fuer die letzte Zeile nicht.
+    let frame = window.requestAnimationFrame(() => {
+      frame = window.requestAnimationFrame(() => {
+        const row = document.querySelector<HTMLElement>(`[data-door="${CSS.escape(reveal)}"]`);
+        if (!row) return;
+        const box = row.getBoundingClientRect();
+        const trayTop = document.querySelector(".tray")?.getBoundingClientRect().top ?? window.innerHeight;
+        if (box.bottom > trayTop - 8) window.scrollBy({ top: box.bottom - trayTop + 16, behavior: "smooth" });
+        else if (box.top < 8) window.scrollBy({ top: box.top - 16, behavior: "smooth" });
+      });
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [reveal]);
+
+  /** Eine Hausnummer der Strasse waehlen - ein Mehrfamilienhaus oeffnet sich. */
+  function pickHouse(number: string, mfh = false) {
     setHouseNumber(number);
     setBellLabel("");
+    setInside(mfh);
+    if (mfh) {
+      setBellFilter("");
+      window.scrollTo({ top: 0 });
+    } else {
+      setReveal(houseRowKey(number));
+    }
   }
 
-  /*
-   * Haus aus der Liste: bei langen Strassen (iPad hochkant, Raster) ist die
-   * grosse Nummer samt Klingelbrett dann oft schon aus dem Bild gerollt.
-   * Sie kommt zurueck - nur wenn sie nicht ohnehin zu sehen ist.
-   */
-  const doorRef = useRef<HTMLDivElement>(null);
-  function pickFromStrip(number: string) {
-    pickHouse(number);
-    const hero = doorRef.current?.querySelector<HTMLElement>(".door-hero");
-    if (!hero) return;
-    const box = hero.getBoundingClientRect();
-    const trayTop = document.querySelector(".tray")?.getBoundingClientRect().top ?? window.innerHeight;
-    if (box.top < 0 || box.bottom > trayTop) hero.scrollIntoView({ block: "center", behavior: "smooth" });
+  function pickBell(label: string) {
+    setBellLabel(label);
+    setReveal(`b:${bellKey(label)}`);
   }
 
-  const currentIndex = houses.findIndex((h) => sameNumber(h.number, currentNumber));
-  function step(delta: 1 | -1) {
-    if (houses.length === 0) return;
-    const index = currentIndex < 0 ? (delta > 0 ? -1 : houses.length) : currentIndex;
-    const target = houses[index + delta];
-    if (target) pickHouse(target.number);
-  }
-
-  /** Naechste offene Tuer nach der aktuellen - der Weg die Strasse hinauf. */
-  function nextOpenAfter(number: string): string | null {
-    const index = houses.findIndex((h) => sameNumber(h.number, number));
-    const after = houses.slice(index + 1).find((h) => !book.isDone(h));
-    const before = houses.slice(0, Math.max(0, index)).find((h) => !book.isDone(h));
-    return (after ?? before)?.number ?? null;
+  /** Raus aus dem Haus: zurueck zur Strasse, die Zeile des Hauses im Blick. */
+  function leaveBuilding() {
+    const number = currentNumber;
+    setInside(false);
+    setBellLabel("");
+    setHouseNumber("");
+    if (number) setReveal(houseRowKey(number));
   }
 
   /** Eine Tuer einstellen - auch in einer anderen Strasse oder einem anderen Gebiet. */
@@ -542,10 +566,9 @@ export function TourClient({
     if (target.id !== streetId) {
       setStreetId(target.id);
       remember("d2d_street", String(target.id));
+      setHouseFilter("");
     }
-    setHouseNumber(house.number);
-    setBellLabel("");
-    window.scrollTo({ top: 0, behavior: "smooth" });
+    pickHouse(house.number, book.typeOf(house) === "MFH");
   }
 
   /**
@@ -571,7 +594,7 @@ export function TourClient({
       toast(`Standort zu ungenau (± ${distanceLabel(here.accuracy)}) – kurz warten oder ins Freie gehen`);
       return;
     }
-    const open = workHouses.filter((house) => !doorDone(house));
+    const open = workHouses.filter((house) => doorOpen(house));
     const found = nearest(here.point, open, (house) => spots.get(house.id));
     const elsewhere = closerUnloaded(here.point, found?.distance.meters ?? Infinity);
     if (elsewhere) {
@@ -655,7 +678,12 @@ export function TourClient({
     remember("d2d_street", String(target.id));
     setHouseNumber(item.house_number);
     setBellLabel(item.doorbell_label ?? "");
-    window.scrollTo({ top: 0, behavior: "smooth" });
+    // Termin an einer Klingel: man steht gleich im Haus, die Klingel gewaehlt.
+    setInside(Boolean(item.doorbell_label));
+    setHouseFilter("");
+    setBellFilter("");
+    if (item.doorbell_label) window.scrollTo({ top: 0 });
+    else setReveal(houseRowKey(item.house_number));
   }
 
   /* -------------------------- Haus beschreiben --------------------------- */
@@ -713,6 +741,8 @@ export function TourClient({
     if (!currentKey || housesPending) return;
     const rollback = book.setType(currentKey, type);
     setBellLabel("");
+    // Mehrfamilienhaus: hinein - und gleich die Schilder anlegen, wenn noch keine da sind.
+    setInside(type === "MFH");
     if (type === "MFH" && currentBells.length === 0) setSheet("house");
     await describeHouse(
       { buildingType: type },
@@ -820,10 +850,9 @@ export function TourClient({
 
   async function save(
     outcome: VisitOutcome,
-    extra: { reasonId?: number | null; reasonNote?: string; followUpAt?: string; contactName?: string; contactPhone?: string } = {},
+    extra: { reason?: RejectionReason; reasonNote?: string; followUpAt?: string; contactName?: string; contactPhone?: string } = {},
   ): Promise<SaveResult> {
     const bell = activeBell;
-    const named = hasNamedBells(currentBells.map((item) => item.label));
     const number = currentNumber;
     const payload = {
       clientRequestId: createVisitRequestId(),
@@ -834,7 +863,7 @@ export function TourClient({
       doorbellLabel: bell?.label ?? "",
       doorbellFloor: bell?.floor ?? "",
       outcome,
-      reasonId: extra.reasonId ?? null,
+      reasonId: extra.reason?.id ?? null,
       reasonNote: extra.reasonNote ?? "",
       energyType: outcome === "SALE" ? product : "",
       followUpAt: extra.followUpAt ?? "",
@@ -845,40 +874,21 @@ export function TourClient({
       lng: position?.lng ?? null,
     };
 
-    // Zaehlt sofort - bis der Server den Eintrag selbst kennt, auch ohne Netz.
+    /*
+     * Zaehlt sofort und steht sofort in der Zeile - bis der Server den
+     * Eintrag selbst kennt, auch ohne Netz. Die Tuer bleibt gewaehlt: wohin
+     * es weitergeht, entscheidet man selbst.
+     */
     const markDone = () => {
       if (!currentKey) return;
       const base = bell ?? currentHouse ?? { blocked_at: null, not_home_count: 0, met_count: 0 };
-      book.countVisit(bell ? bellSlot(currentKey, bell.label) : currentKey, base, outcome === "NOT_HOME");
-    };
-
-    /*
-     * Weiter geht es so: im Mehrfamilienhaus zur naechsten offenen Klingel
-     * (bei Namen am Brett waehlt man selbst), sonst zur naechsten offenen
-     * Hausnummer der Strasse.
-     */
-    const advance = (): { nextBell: string | null; pickBell: boolean } => {
-      if (bell) {
-        const open = currentBells.filter(
-          (other) => bellKey(other.label) !== bellKey(bell.label) && !book.isBellDone(currentKey, other),
-        );
-        if (open.length > 0) {
-          if (named) {
-            setBellLabel("");
-            return { nextBell: null, pickBell: true };
-          }
-          setBellLabel(open[0].label);
-          return { nextBell: open[0].label, pickBell: false };
-        }
-      }
-      setBellLabel("");
-      if (houses.length === 0) {
-        setLastTyped(number);
-        setHouseNumber("");
-      } else {
-        setHouseNumber(nextOpenAfter(number) ?? "");
-      }
-      return { nextBell: null, pickBell: false };
+      book.countVisit(bell ? bellSlot(currentKey, bell.label) : currentKey, base, {
+        outcome,
+        reasonLabel: extra.reason?.label ?? null,
+        reasonIcon: extra.reason?.icon ?? null,
+        at: new Date().toISOString().slice(0, 19).replace("T", " "),
+        userId,
+      });
     };
 
     setBusy(true);
@@ -906,14 +916,11 @@ export function TourClient({
         return { status: "error" };
       }
       markDone();
-      const { nextBell, pickBell } = advance();
       router.refresh();
       return {
         status: "saved",
         id: data.id as number,
         door: { streetId: streetId!, number, label: bell?.label ?? "", notHome: outcome === "NOT_HOME" },
-        nextBell,
-        pickBell,
         progression: data.progression,
       };
     } catch {
@@ -928,8 +935,7 @@ export function TourClient({
         return { status: "error" };
       }
       markDone();
-      const { nextBell, pickBell } = advance();
-      return { status: "queued", nextBell, pickBell, loggedOut };
+      return { status: "queued", loggedOut };
     } finally {
       setBusy(false);
     }
@@ -952,9 +958,8 @@ export function TourClient({
           : `${text} · offline gemerkt`;
     // Rueckgaengig bleibt auch nach dem Toast erreichbar (Tagesblatt).
     setLastSaved(result.status === "saved" ? { id: result.id, door: result.door, text } : null);
-    const line = result.nextBell ? `${base} · weiter: ${result.nextBell}` : result.pickBell ? `${base} · Klingel wählen` : base;
     toast(
-      line,
+      base,
       result.status === "saved"
         ? { action: { label: "Rückgängig", onClick: () => void undo(result.id, result.door) } }
         : {},
@@ -983,38 +988,22 @@ export function TourClient({
       }
       setHouseNumber(door.number);
       setBellLabel(door.label);
+      setInside(Boolean(door.label));
       router.refresh();
     } catch {
       toast("Ohne Verbindung nicht möglich");
     }
   }
 
-  /** Was die Ergebnisknoepfe gerade blockiert - in einem Wort. */
-  const trayHint: string | null = !street
-    ? "Straße wählen"
-    : housesPending
-    ? "Hausnummern werden geladen"
-    : !currentNumber
-    ? "Hausnummer wählen"
-    : doorLocked
-      ? "Gesperrt – hier nicht klingeln"
-      : currentType === ""
-        ? "Was für ein Haus ist das?"
-        : currentType === "MFH" && currentBells.length === 0
-          ? "Erst Klingelschilder anlegen"
-          : currentType === "MFH" && !activeBell
-            ? "Klingel wählen"
-            : null;
-
   const place = `${street?.name ?? ""} ${currentNumber}${activeBell ? ` · ${activeBell.label}` : ""}`.trim();
 
   async function notHome() {
     const result = await save("NOT_HOME");
-    report(result, `Nr. ${currentNumber} nicht da`);
+    report(result, `${activeBell ? activeBell.label : `Nr. ${currentNumber}`} nicht da`);
   }
 
   async function chooseReason(reason: RejectionReason, note: string) {
-    const result = await save("MET_NO_SALE", { reasonId: reason.id, reasonNote: note });
+    const result = await save("MET_NO_SALE", { reason, reasonNote: note });
     if (result.status === "error") return;
     setSheet(null);
     report(result, reason.label);
@@ -1101,100 +1090,178 @@ export function TourClient({
     );
   }
 
-  const status = statusLine();
-  function statusLine(): DoorStatusLine | null {
-    if (!currentNumber) return null;
-    if (housesPending) return { text: pendingText };
-    const facts = doorFacts;
-    if (doorStatus(facts) === "BLOCKED" || houseFacts.blocked_at) {
-      const by = activeBell?.blocked_by_name ?? currentHouse?.blocked_by_name ?? null;
+  const nameOf = (id: number) => faces.get(id)?.name ?? (id === userId ? sender.name : null);
+
+  /** Eine Hausnummer als Zeile: Stand in Worten, ein Mehrfamilienhaus mit seinen Klingeln. */
+  function houseRow(house: HouseNumberWithStats): DoorRow {
+    const key = doneKey(house.street_id, house.number);
+    const facts = book.factsOf(key, house);
+    const blocked = Boolean(facts.blocked_at);
+    const type = book.typeOf(house);
+    const base = {
+      key: houseRowKey(house.number),
+      lead: house.number,
+      sale: house.last_sale_at !== null,
+      blocked,
+      selected: sameNumber(house.number, currentNumber),
+    };
+    if (type === "MFH" && !blocked) {
+      const bells = book.bellsOf(key, house.id);
+      const open = bells.filter((bell) => book.isBellOpen(key, bell)).length;
+      const meta = (
+        bells.length > 0
+          ? [
+              `${bells.length} Klingeln`,
+              open > 0 ? `${open} offen` : "alle angetroffen",
+              house.last_sale_at ? saleText(house.last_sale_at) : null,
+            ]
+          : ["Noch keine Klingelschilder"]
+      )
+        .filter(Boolean)
+        .join(" · ");
       return {
-        glyph: <IconBan className="h-4 w-4 text-danger" />,
-        text: by ? `Gesperrt von ${by}` : "Gesperrt",
+        ...base,
+        title: "Mehrfamilienhaus",
+        meta,
+        glyph: (
+          <span className="glyph glyph-round" aria-hidden="true">
+            <IconBuilding className="h-4 w-4" />
+          </span>
+        ),
+        drill: true,
+        ariaLabel: `Nr. ${house.number}, Mehrfamilienhaus, ${meta} – Haus öffnen`,
+        onClick: () => pickHouse(house.number, true),
       };
     }
-    const lastAt = activeBell ? activeBell.last_visit_at : (currentHouse?.last_visit_at ?? null);
-    const lastBy = activeBell ? activeBell.last_visit_user : (currentHouse?.last_visit_user ?? null);
-    const lastWhat = activeBell ? activeBell.last_outcome : (currentHouse?.last_outcome ?? null);
-    const last = lastAt ? `${lastBy ? firstName(lastBy) : "Jemand"}, ${whenLabel(lastAt)}` : null;
-    if (currentType === "MFH" && !activeBell) return null;
-    if (doorStatus(facts) === "RETRY") {
-      return { text: [`${facts.not_home_count}. Versuch von ${MAX_NOT_HOME_ATTEMPTS}`, last].filter(Boolean).join(" · ") };
-    }
-    if (doorFinished(facts) && lastWhat) {
-      return {
-        glyph: <OutcomeGlyph outcome={lastWhat} size="sm" />,
-        text: [OUTCOME_LABEL[lastWhat], last].filter(Boolean).join(" · "),
-      };
-    }
-    if (doorFinished(facts)) return { glyph: <IconCheck className="h-4 w-4" />, text: "Erledigt" };
-    return { text: last ? `Zuletzt ${last}` : "Noch niemand hier" };
+    const last = doorLast(house, book.lastOf(key), nameOf);
+    const text = doorText(facts, last, house.last_sale_at, house.blocked_by_name);
+    const meta = text.meta || (type === "" && house.units > 1 ? `${house.units} Wohneinheiten` : "");
+    return {
+      ...base,
+      title: text.title,
+      meta,
+      glyph: blocked ? (
+        <span className="glyph glyph-round text-danger" aria-hidden="true">
+          <IconBan className="h-4 w-4" />
+        </span>
+      ) : last.outcome ? (
+        <OutcomeGlyph outcome={last.outcome} reason={last.reasonIcon} />
+      ) : null,
+      ariaLabel: [`Nr. ${house.number}`, text.title, meta].filter(Boolean).join(", "),
+      onClick: () => pickHouse(house.number),
+    };
   }
 
-  const doneBells = currentBells.filter((bell) => book.isBellDone(currentKey, bell)).length;
-  const detail = housesPending
-    ? null
-    : currentType === "MFH"
-      ? currentBells.length > 0
-        ? `Mehrfamilienhaus · ${doneBells} von ${currentBells.length} Klingeln`
-        : "Mehrfamilienhaus · noch keine Schilder"
-      : suggestMfh
-        ? `${currentHouse?.units} Wohneinheiten`
-        : null;
+  /* Die Strasse: filtern statt blaettern - wie "Hausnummer filtern" in den Apps der Netzbetreiber. */
+  const needle = houseFilter.replace(/\s+/g, "").toLowerCase();
+  const typed = houseFilter.trim();
+  const typedKnown = !typed || houses.some((house) => sameNumber(house.number, typed));
+  const shownHouses = houses.filter(
+    (house) =>
+      (!onlyOpen || book.isOpen(house) || sameNumber(house.number, currentNumber)) &&
+      (!needle || house.number.replace(/\s+/g, "").toLowerCase().startsWith(needle)),
+  );
+  /** Von Hand eingegebene Nummer, die (noch) nicht in der Liste steht - sie steht oben, solange sie gewaehlt ist. */
+  const typedRow: DoorRow | null =
+    currentNumber && !currentHouse && !inBuilding && !housesPending
+      ? (() => {
+          const text = doorText(houseFacts, doorLast(NO_VISIT, book.lastOf(currentKey), nameOf), null, null);
+          return {
+            key: houseRowKey(currentNumber),
+            lead: currentNumber,
+            title: text.title,
+            meta: text.meta || "Von Hand eingegeben",
+            selected: true,
+            ariaLabel: `Nr. ${currentNumber}, ${text.title}`,
+            onClick: () => undefined,
+          };
+        })()
+      : null;
+  const houseRows = [...(typedRow ? [typedRow] : []), ...shownHouses.map(houseRow)];
 
-  const chips: HouseChip[] = houses
-    .filter((house) => !onlyOpen || !book.isDone(house) || sameNumber(house.number, currentNumber))
-    .map((house) => {
-      const key = doneKey(house.street_id, house.number);
-      const mfh = book.typeOf(house) === "MFH";
-      const bells = mfh ? book.bellsOf(key, house.id) : [];
-      const facts = book.factsOf(key, house);
-      const blocked = Boolean(facts.blocked_at);
-      const done = book.isDone(house);
-      const retry = !mfh && doorStatus(facts) === "RETRY";
-      const state: ChipState = blocked
-        ? "blocked"
-        : house.sale_count > 0
-          ? "sale"
-          : house.last_outcome === "APPOINTMENT"
-            ? "appointment"
-            : done
-              ? "done"
-              : retry
-                ? "retry"
-                : "open";
-      const suffix = mfh
-        ? bells.length > 0
-          ? `${bells.filter((bell) => book.isBellDone(key, bell)).length}/${bells.length}`
-          : undefined
-        : retry
-          ? `${facts.not_home_count}/${MAX_NOT_HOME_ATTEMPTS}`
-          : undefined;
+  function openTyped() {
+    if (!typed) return;
+    pickHouse(typed);
+    setHouseFilter("");
+  }
+  function submitHouseFilter() {
+    if (shownHouses.length === 1) {
+      const [only] = shownHouses;
+      pickHouse(only.number, book.typeOf(only) === "MFH");
+      setHouseFilter("");
+    } else if (!typedKnown) {
+      openTyped();
+    }
+  }
+
+  /* Im Haus: nur seine Klingeln, in der Reihenfolge am Brett. */
+  const bellNeedle = bellFilter.trim().toLocaleLowerCase("de-DE");
+  /** Filtern lohnt erst bei grossen Brettern - bei kleinen steht kein Schalter da, also gilt er auch nicht. */
+  const bigBoard = currentBells.length > 8;
+  const onlyOpenBells = onlyOpen && bigBoard;
+  const openBells = currentBells.filter((bell) => book.isBellOpen(currentKey, bell)).length;
+  const bellRows: DoorRow[] = currentBells
+    .map((bell, index) => ({ bell, index }))
+    .filter(
+      ({ bell }) =>
+        (!onlyOpenBells || book.isBellOpen(currentKey, bell) || bellKey(bell.label) === bellKey(bellLabel)) &&
+        (!bellNeedle ||
+          bell.label.toLocaleLowerCase("de-DE").includes(bellNeedle) ||
+          bell.floor.toLocaleLowerCase("de-DE").includes(bellNeedle)),
+    )
+    .map(({ bell, index }) => {
+      const facts = book.bellFacts(currentKey, bell);
+      const last = doorLast(bell, book.lastOf(bellSlot(currentKey, bell.label)), nameOf);
+      const text = doorText(facts, last, bell.last_sale_at, bell.blocked_by_name);
+      const name = bell.floor ? `${bell.label} · ${bell.floor}` : bell.label;
+      const status = [text.title, text.meta].filter(Boolean).join(" · ");
       return {
-        id: house.id,
-        number: house.number,
-        state,
-        suffix,
-        needsBells: mfh && bells.length === 0,
-        label: `Hausnummer ${house.number}${blocked ? ", gesperrt" : ""}${done && !blocked ? ", erledigt" : ""}${
-          suffix ? `, ${suffix}` : ""
-        }`,
+        key: `b:${bellKey(bell.label)}`,
+        lead: String(index + 1),
+        title: name,
+        meta: status,
+        sale: bell.last_sale_at !== null || last.outcome === "SALE",
+        blocked: Boolean(facts.blocked_at),
+        glyph: facts.blocked_at ? (
+          <span className="glyph glyph-round text-danger" aria-hidden="true">
+            <IconBan className="h-4 w-4" />
+          </span>
+        ) : last.outcome ? (
+          <OutcomeGlyph outcome={last.outcome} reason={last.reasonIcon} />
+        ) : null,
+        selected: bellKey(bell.label) === bellKey(bellLabel),
+        ariaLabel: `Klingel ${index + 1}, ${name}, ${status}`,
+        onClick: () => pickBell(bell.label),
       };
     });
+  function submitBellFilter() {
+    if (bellRows.length === 1) bellRows[0].onClick();
+  }
 
-  const bellRows: BellRow[] = currentBells.map((bell) => ({
-    bell,
-    facts: book.bellFacts(currentKey, bell),
-    done: book.isBellDone(currentKey, bell),
-  }));
+  /** Die gewaehlte Tuer in Worten - fuer die Leiste. */
+  const currentSaleAt = (activeBell ? activeBell.last_sale_at : (currentHouse?.last_sale_at ?? null)) ?? null;
+  const currentLast = doorLast(
+    activeBell ?? currentHouse ?? NO_VISIT,
+    book.lastOf(activeBell ? bellSlot(currentKey, activeBell.label) : currentKey),
+    nameOf,
+  );
+  const currentText = doorText(
+    { ...doorFacts, blocked_at: doorFacts.blocked_at ?? houseFacts.blocked_at },
+    currentLast,
+    currentSaleAt,
+    activeBell?.blocked_by_name ?? currentHouse?.blocked_by_name ?? null,
+  );
+  /** Ein frueherer Abschluss steht auch in der Leiste - vielleicht wohnt dort inzwischen jemand anders. */
+  const earlierSale = currentSaleAt && currentLast.outcome !== "SALE" ? saleText(currentSaleAt) : null;
 
-  const streetDone = houses.length > 0 && openHouses.length === 0 && !currentNumber;
+  /** Keine offene Tuer mehr: hier wurde ueberall schon jemand angetroffen (oder gesperrt). */
+  const streetDone = houses.length > 0 && openHouses.length === 0;
   // Offline gemerkte Tueren von heute zaehlen schon mit - der Server kennt sie erst nach dem Senden.
   const today = new Date().toDateString();
   const queuedToday = pending.filter(
     (entry) => (entry.url ?? "/api/visits") === "/api/visits" && new Date(entry.createdAt).toDateString() === today,
   ).length;
-  const next = streetDone ? pickNextStreet() : null;
+  const next = streetDone && !currentNumber ? pickNextStreet() : null;
   const nextStreet = next?.street ?? null;
 
   /*
@@ -1208,7 +1275,7 @@ export function TourClient({
     const from: LatLng | null = near?.point ?? (street?.lat != null && street.lng != null ? [street.lat, street.lng] : null);
     if (!from) return { street: open[0], distance: null };
     const distances =
-      near && streetDistance ? streetDistance : streetDistances(from, open, houseNumbers, spots, (house) => !doorDone(house));
+      near && streetDistance ? streetDistance : streetDistances(from, open, houseNumbers, spots, (house) => doorOpen(house));
     const [best] = byDistance(open, (s) => distances.get(s.id)?.meters);
     // Eine Entfernung nennen nur, wenn sie ab dem eigenen Standort gemessen ist.
     return { street: best, distance: near ? (distances.get(best.id) ?? null) : null };
@@ -1272,21 +1339,44 @@ export function TourClient({
         ? `${territoryName(unloadedNearby.street.territory_id)} · ${distanceText(unloadedNearby.distance, near.accuracy)} – Türen laden`
         : nearestDoor
         ? `${addressOf(nearestDoor.item)} · ${distanceText(nearestDoor.distance, near.accuracy)}`
-        : workHouses.some((house) => !doorDone(house))
+        : workHouses.some((house) => doorOpen(house))
           ? "Zu den offenen Türen ist keine Lage bekannt"
           : "Keine offene Tür in deinen Gebieten"
       : location.status === "ok"
         ? "Standort zu ungenau"
         : LOCATION_NOTE[location.status];
 
+  /** Was die Ergebnisknoepfe gerade blockiert - in einem Satz. */
+  const trayHint: string | null = !street
+    ? "Straße wählen"
+    : housesPending
+      ? "Hausnummern werden geladen"
+      : !currentNumber
+        ? houses.length === 0
+          ? "Hausnummer oben eingeben"
+          : streetDone
+            ? "Keine offene Tür mehr in dieser Straße"
+            : "Haus in der Liste wählen"
+        : doorLocked
+          ? "Gesperrt – hier nicht klingeln"
+          : currentType === ""
+            ? "Was für ein Haus ist das?"
+            : currentType === "MFH" && !inBuilding
+              ? "Mehrfamilienhaus"
+              : currentType === "MFH" && currentBells.length === 0
+                ? "Erst Klingelschilder anlegen"
+                : currentType === "MFH" && !activeBell
+                  ? "Klingel in der Liste wählen"
+                  : null;
+
   const setupActions: TrayAction[] = !street
     ? [{ label: "Straße wählen", icon: <IconMap className={TRAY_ICON} />, onClick: () => setSheet("street"), primary: true }]
     : housesPending
       ? []
       : !currentNumber
-        ? streetDone && nextStreet
+        ? nextStreet
           ? [{ label: `Weiter: ${nextStreet.name}`, icon: <IconMap className={TRAY_ICON} />, onClick: () => chooseStreet(nextStreet.id), primary: true }]
-          : [{ label: "Nummer eingeben", icon: <IconKeypad className={TRAY_ICON} />, onClick: () => setSheet("number"), primary: true }]
+          : []
         : doorLocked
           ? [{ label: "Haus ansehen", icon: <IconHome className={TRAY_ICON} />, onClick: () => setSheet("house") }]
           : currentType === ""
@@ -1294,11 +1384,31 @@ export function TourClient({
                 { label: "Einfamilienhaus", icon: <IconHome className={TRAY_ICON} />, onClick: () => void chooseType("EFH"), primary: !suggestMfh },
                 { label: "Mehrfamilienhaus", icon: <IconBuilding className={TRAY_ICON} />, onClick: () => void chooseType("MFH"), primary: suggestMfh },
               ]
-            : currentType === "MFH" && currentBells.length === 0
-              ? [{ label: "Klingelschilder anlegen", icon: <IconBell className={TRAY_ICON} />, onClick: () => setSheet("house"), primary: true }]
-              : currentType === "MFH" && !activeBell
-                ? [{ label: "Klingel wählen", icon: <IconBell className={TRAY_ICON} />, onClick: () => setSheet("bells"), primary: true }]
+            : currentType === "MFH" && !inBuilding
+              ? [{ label: "Haus öffnen", icon: <IconBuilding className={TRAY_ICON} />, onClick: () => pickHouse(currentNumber, true), primary: true }]
+              : currentType === "MFH" && currentBells.length === 0
+                ? [{ label: "Klingelschilder anlegen", icon: <IconBell className={TRAY_ICON} />, onClick: () => setSheet("house"), primary: true }]
                 : [];
+
+  /** Die gewaehlte Tuer ueber den Knoepfen - im Haus erst, wenn eine Klingel gewaehlt ist. */
+  const target: TrayTarget | null =
+    !currentNumber || housesPending || (inBuilding && !activeBell)
+      ? null
+      : activeBell
+        ? {
+            lead: String(currentBells.indexOf(activeBell) + 1),
+            title: activeBell.floor ? `${activeBell.label} · ${activeBell.floor}` : activeBell.label,
+            meta: [`Nr. ${currentNumber}`, currentText.title, earlierSale, doorDistance].filter(Boolean).join(" · "),
+            onInfo: () => setSheet("house"),
+          }
+        : {
+            lead: currentNumber,
+            title: `${street?.name ?? ""} ${currentNumber}`.trim(),
+            meta: [currentType === "MFH" ? "Mehrfamilienhaus" : currentText.title, earlierSale, doorDistance]
+              .filter(Boolean)
+              .join(" · "),
+            onInfo: () => setSheet("house"),
+          };
 
   const lastLine = (() => {
     const at = currentHouse?.last_visit_at;
@@ -1306,29 +1416,61 @@ export function TourClient({
     return `${currentHouse?.last_visit_user ?? "Jemand"}, ${whenLabel(at)}`;
   })();
 
+  const buildingDetail = [
+    "Mehrfamilienhaus",
+    currentBells.length > 0 ? `${currentBells.length} Klingeln` : null,
+    currentHouse?.last_sale_at ? saleText(currentHouse.last_sale_at) : null,
+  ]
+    .filter(Boolean)
+    .join(" · ");
+
   // Aufbau je Geraet (Handy, iPad hochkant/quer): globals.css, "Klinken".
   return (
     <div className="tour">
       <div className="tour-grid">
         <div className="tour-head">
-          <TourHeader
-            street={street}
-            territory={territory}
-            todayDoors={(todayTotals.doors ?? 0) + queuedToday}
-            dueCount={dueAppointments.length}
-            pendingCount={pending.length}
-            online={online}
-            onStreet={() => setSheet("street")}
-            onDay={() => setSheet("day")}
-            onCard={sender.cardToken ? () => setSheet("card") : undefined}
-          />
+          {inBuilding ? (
+            <BuildingHeader
+              street={street?.name ?? ""}
+              number={currentNumber}
+              detail={buildingDetail}
+              pendingCount={pending.length}
+              online={online}
+              onBack={leaveBuilding}
+              onEdit={() => setSheet("house")}
+              onDay={() => setSheet("day")}
+            />
+          ) : (
+            <TourHeader
+              street={street}
+              territory={territory}
+              todayDoors={(todayTotals.doors ?? 0) + queuedToday}
+              dueCount={dueAppointments.length}
+              pendingCount={pending.length}
+              online={online}
+              onStreet={() => setSheet("street")}
+              onDay={() => setSheet("day")}
+              onCard={sender.cardToken ? () => setSheet("card") : undefined}
+            />
+          )}
         </div>
 
-        {/* Oben auf Handy und iPad hochkant, rechts auf dem iPad quer: die Tuer selbst. */}
-        <div ref={doorRef} className="tour-door space-y-4">
-          <TourAppointments appointments={dueAppointments} now={now} onPick={goToAppointment} />
+        {/* Im Daumenbereich - wo genau, regelt globals.css je Geraet. */}
+        <OutcomeTray
+          disabled={busy}
+          target={target}
+          hint={trayHint}
+          setupActions={setupActions}
+          onNotHome={() => void notHome()}
+          onMet={() => setSheet("reason")}
+          onAppointment={() => setSheet("appointment")}
+          onSale={() => setSheet("sale")}
+        />
 
-          {nearbyHint && (
+        <div className="tour-lists space-y-4">
+          {!inBuilding && <TourAppointments appointments={dueAppointments} now={now} onPick={goToAppointment} />}
+
+          {!inBuilding && nearbyHint && (
             <TourNearby
               place={nearbyHint.place}
               distance={nearbyHint.distance}
@@ -1341,86 +1483,70 @@ export function TourClient({
 
           <PendingSales userId={userId} onProgress={receiveProgress} />
 
-          <DoorHero
-            number={currentNumber || null}
-            bell={activeBell ? { label: activeBell.label, floor: activeBell.floor } : null}
-            status={status}
-            detail={detail}
-            canPrev={houses.length > 0 && currentIndex !== 0}
-            canNext={houses.length > 0 && currentIndex < houses.length - 1}
-            onPrev={() => step(-1)}
-            onNext={() => step(1)}
-            onOpen={() => {
-              if (!housesPending) setSheet("house");
-            }}
-            onType={() => setSheet("number")}
-            distance={housesPending ? null : doorDistance}
-            locating={locating}
-            onNearby={() => void goNearby()}
-            empty={
-              streetDone ? (
-                <div className="flex flex-col items-center gap-2">
-                  <span className="glyph glyph-lg glyph-round glyph-result check-pop">
-                    <IconCheck className="h-6 w-6" />
-                  </span>
-                  <p className="text-title-3">Straße erledigt</p>
-                  {/* "Weiter: …" ist die Hauptaktion in der Leiste darunter - hier nur, wohin es geht. */}
-                  {nextStreet && (
-                    <p className="text-footnote text-muted">
-                      Als Nächstes: {nextStreet.name}
-                      {next?.distance && ` · ${distanceText(next.distance, accuracy)}`}
-                    </p>
-                  )}
-                </div>
-              ) : !street ? (
-                <button type="button" className="btn btn-primary" onClick={() => setSheet("street")}>
-                  Straße wählen
-                </button>
-              ) : housesPending ? (
-                <p className="text-subhead text-muted" role="status">
-                  {pendingText}
-                </p>
-              ) : (
-                <button type="button" className="kpi text-title-1 text-muted" onClick={() => setSheet("number")}>
-                  Nr. eingeben
-                </button>
-              )
-            }
-          />
-        </div>
-
-        {/* Im Daumenbereich - wo genau, regelt globals.css je Geraet. */}
-        <OutcomeTray
-          disabled={busy}
-          hint={streetDone && !housesPending ? "Straße erledigt" : trayHint}
-          setupActions={setupActions}
-          onNotHome={() => void notHome()}
-          onMet={() => setSheet("reason")}
-          onAppointment={() => setSheet("appointment")}
-          onSale={() => setSheet("sale")}
-        />
-
-        <div className="tour-lists space-y-6">
-          {currentType === "MFH" && currentBells.length > 0 && !housesPending && (
-            <BellBoard
-              rows={bellRows}
-              selected={bellLabel}
-              next={nextOpenBell?.label ?? null}
-              faceOf={faceOf}
-              onPick={setBellLabel}
-              onEdit={() => setSheet("house")}
-            />
-          )}
-          {houses.length > 0 && (
-            <HouseStrip
-              chips={chips}
-              current={currentNumber || null}
-              openCount={openHouses.length}
-              onlyOpen={onlyOpen}
-              onToggleOpen={() => setOnlyOpen((value) => !value)}
-              onPick={pickFromStrip}
-            />
-          )}
+          {inBuilding ? (
+            <>
+              {bigBoard && (
+                <DoorFilter
+                  value={bellFilter}
+                  onChange={setBellFilter}
+                  onSubmit={submitBellFilter}
+                  placeholder="Name filtern"
+                  label="Klingel nach Name oder Etage filtern"
+                  onlyOpen={onlyOpen}
+                  onToggleOpen={() => setOnlyOpen((value) => !value)}
+                />
+              )}
+              <DoorTable
+                label="Klingeln"
+                columns={["Nr.", "Klingel"]}
+                count={currentBells.length > 0 ? `${openBells} von ${currentBells.length} offen` : undefined}
+                rows={bellRows}
+                empty={currentBells.length === 0 ? "Noch keine Klingelschilder" : "Keine Klingel passt"}
+                footer={
+                  <DoorTableAction
+                    icon={<IconPlus className="h-5 w-5" />}
+                    label="Klingelschilder anlegen"
+                    onClick={() => setSheet("house")}
+                  />
+                }
+              />
+            </>
+          ) : housesPending ? (
+            <p className="py-8 text-center text-subhead text-muted" role="status">
+              {pendingText}
+            </p>
+          ) : street ? (
+            <>
+              <DoorFilter
+                value={houseFilter}
+                onChange={setHouseFilter}
+                onSubmit={submitHouseFilter}
+                placeholder={houses.length > 0 ? "Nr. filtern" : "Nr. eingeben"}
+                label={houses.length > 0 ? "Hausnummer filtern" : "Hausnummer eingeben"}
+                onlyOpen={onlyOpen}
+                onToggleOpen={() => setOnlyOpen((value) => !value)}
+                nearby={{ busy: locating, onClick: () => void goNearby() }}
+              />
+              <DoorTable
+                label="Häuser der Straße"
+                columns={["Nr.", "Stand"]}
+                count={
+                  houses.length === 0
+                    ? undefined
+                    : streetDone
+                      ? `Alle ${houses.length} angetroffen`
+                      : `${openHouses.length} von ${houses.length} offen`
+                }
+                rows={houseRows}
+                empty={houses.length === 0 ? "Keine Hausnummern hinterlegt" : "Keine Hausnummer passt"}
+                footer={
+                  typedKnown ? undefined : (
+                    <DoorTableAction icon={<IconPlus className="h-5 w-5" />} label={`Nr. ${typed} öffnen`} onClick={openTyped} />
+                  )
+                }
+              />
+            </>
+          ) : null}
           <div className="tray-space" aria-hidden="true" />
         </div>
       </div>
@@ -1488,21 +1614,6 @@ export function TourClient({
       {sheet === "sale" && (
         <SaleSheet place={place} product={product} busy={busy} onPick={startSale} onClose={() => setSheet(null)} />
       )}
-      {sheet === "bells" && currentNumber && !housesPending && (
-        <Sheet title="Klingel wählen" subtitle={`${street?.name ?? ""} ${currentNumber}`} onClose={() => setSheet(null)}>
-          <BellBoard
-            rows={bellRows}
-            selected={bellLabel}
-            next={nextOpenBell?.label ?? null}
-            faceOf={faceOf}
-            onPick={(label) => {
-              setBellLabel(label);
-              setSheet(null);
-            }}
-            onEdit={() => setSheet("house")}
-          />
-        </Sheet>
-      )}
       {sheet === "house" && currentNumber && !housesPending && (
         <HouseSheet
           title={`${street?.name ?? ""} ${currentNumber}`}
@@ -1514,6 +1625,7 @@ export function TourClient({
             blocked: Boolean(book.bellFacts(currentKey, bell).blocked_at),
           }))}
           lastLine={lastLine}
+          lastSaleAt={currentHouse?.last_sale_at ?? null}
           attempts={houseFacts.not_home_count}
           blocked={Boolean(houseFacts.blocked_at)}
           blockedBy={currentHouse?.blocked_by_name ?? null}
@@ -1570,16 +1682,6 @@ export function TourClient({
           onSend={() => void sendNow()}
           onDiscard={(localId) => {
             if (!discardQueued(localId)) toast("Eintrag konnte nicht entfernt werden");
-          }}
-          onClose={() => setSheet(null)}
-        />
-      )}
-      {sheet === "number" && (
-        <NumberSheet
-          suggestions={numberSuggestions(lastTyped || currentNumber)}
-          onOpen={(number) => {
-            pickHouse(number);
-            setSheet(null);
           }}
           onClose={() => setSheet(null)}
         />

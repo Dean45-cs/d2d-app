@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, type ReactNode } from "react";
-import { IconCalendar, IconChat, IconDoor, IconExternal } from "@/components/icons";
+import { IconCalendar, IconChat, IconDoor, IconExternal, IconInfo } from "@/components/icons";
 
 export interface TrayAction {
   label: string;
@@ -10,19 +10,34 @@ export interface TrayAction {
   primary?: boolean;
 }
 
+/** Die gewaehlte Tuer, auf die sich die Knoepfe beziehen. */
+export interface TrayTarget {
+  /** Hausnummer, wie in der linken Spalte der Liste. */
+  lead: string;
+  /** "Bahnhofstraße 23", "Müller · 2. OG" */
+  title: string;
+  /** Stand in Worten, dazu die Entfernung. */
+  meta?: string;
+  onInfo?: () => void;
+}
+
 /** Zeichen in der Leiste - auf dem iPad eine Stufe groesser. */
 export const TRAY_ICON = "h-6 w-6 md:h-7 md:w-7";
 
 /**
  * Die vier Ergebnisse im Daumenbereich: gross (60 pt, auf dem iPad 76 pt),
  * ruhig, eindeutig. Auf dem Handy schwebt die Leiste als Glas ueber der
- * Reiterleiste, auf iPad und Rechner klebt sie unten an der Spalte der Tuer.
+ * Reiterleiste, auf iPad und Rechner klebt sie unten an der Liste.
+ *
+ * Darueber steht, welche Tuer gewaehlt ist - nach dem Speichern bleibt sie
+ * es, bis man selbst eine andere antippt.
  *
  * Fehlende Einrichtung wird direkt hier angeboten. "Auftrag starten"
  * oeffnet den Tarifrechner; ein bestaetigter Abschluss kommt erst danach.
  */
 export function OutcomeTray({
   disabled,
+  target,
   hint,
   setupActions = [],
   onNotHome,
@@ -31,6 +46,7 @@ export function OutcomeTray({
   onSale,
 }: {
   disabled: boolean;
+  target?: TrayTarget | null;
   /** Naechster Schritt oder Grund, warum noch kein Ergebnis moeglich ist. */
   hint?: string | null;
   setupActions?: TrayAction[];
@@ -69,7 +85,26 @@ export function OutcomeTray({
   }, []);
 
   return (
-    <div ref={trayRef} className="tray glass-strong" role="group" aria-label={hint || "Ergebnis erfassen"}>
+    <div
+      ref={trayRef}
+      className="tray glass-strong"
+      role="group"
+      aria-label={hint || (target ? `Ergebnis für ${target.title}` : "Ergebnis erfassen")}
+    >
+      {target && (
+        <div className="tray-target">
+          <span className="door-lead door-lead-on">{target.lead}</span>
+          <span className="min-w-0 flex-1">
+            <span className="block truncate text-subhead font-semibold">{target.title}</span>
+            {target.meta && <span className="line-clamp-2 text-footnote text-ink-2">{target.meta}</span>}
+          </span>
+          {target.onInfo && (
+            <button type="button" className="icon-btn shrink-0" onClick={target.onInfo} aria-label={`${target.title} – Details`}>
+              <IconInfo className="h-5 w-5" />
+            </button>
+          )}
+        </div>
+      )}
       {hint ? (
         <>
           {/* Sagt der Knopf schon dasselbe ("Klingel wählen"), steht der Satz nur fuer Bildschirmleser da. */}

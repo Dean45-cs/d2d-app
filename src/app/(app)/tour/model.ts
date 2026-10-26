@@ -1,7 +1,9 @@
 import { bellKey } from "@/lib/doorbells";
+import { dayLabel, doorStatus, whenLabel, type DoorFacts } from "@/lib/doors";
 import type { ProviderInfo } from "@/lib/energy/provider";
 import type { LevelFeedback } from "@/lib/level-feedback";
-import type { LocalVisits } from "@/lib/tour-draft";
+import { firstName } from "@/lib/ranking";
+import type { LocalLast, LocalVisits } from "@/lib/tour-draft";
 import type { VisitOutcome } from "@/lib/types";
 
 /*
@@ -38,7 +40,10 @@ export interface Bell {
   not_home_count: number;
   met_count: number;
   last_outcome: VisitOutcome | null;
+  last_reason_label: string | null;
   last_reason_icon: string | null;
+  /** Letzter Abschluss an dieser Klingel - sperrt nichts. */
+  last_sale_at: string | null;
   last_visit_at: string | null;
   last_visit_user: string | null;
   /** Wer zuletzt hier geklingelt hat - dazu gehoert das Profilbild. */
@@ -54,7 +59,9 @@ export const NEW_BELL = {
   not_home_count: 0,
   met_count: 0,
   last_outcome: null,
+  last_reason_label: null,
   last_reason_icon: null,
+  last_sale_at: null,
   last_visit_at: null,
   last_visit_user: null,
   last_visit_user_id: null,
@@ -77,21 +84,16 @@ export type SaveResult =
       id: number;
       /** Die Tuer, an der gespeichert wurde - fuer "Rückgängig". */
       door: SavedDoor;
-      nextBell: string | null;
-      pickBell?: boolean;
       progression?: LevelFeedback;
     }
   | {
       status: "queued";
-      nextBell: string | null;
-      pickBell?: boolean;
       /** Gemerkt, weil die Anmeldung abgelaufen ist - nach dem neuen Anmelden wird nachgesendet. */
       loggedOut?: boolean;
     }
   | { status: "error" };
 
 export type SheetName =
-  | "bells"
   | "street"
   | "reason"
   | "appointment"
@@ -99,7 +101,6 @@ export type SheetName =
   | "house"
   | "block"
   | "day"
-  | "number"
   | "card";
 
 export const EMPTY_VISITS: Map<string, LocalVisits> = new Map();
@@ -135,10 +136,85 @@ export function formatTime(value: string, now = new Date()): string {
   return date.toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit" });
 }
 
-/** Naechste Hausnummern fuer Strassen ohne Liste: +1 und +2. */
-export function numberSuggestions(last: string): string[] {
-  const match = /^(\d+)/.exec(last.trim());
-  if (!match) return [];
-  const n = Number(match[1]);
-  return [String(n + 1), String(n + 2)];
+/** Was an einer Tuer zuletzt war - vom Server, oder eben erst hier erfasst. */
+export interface DoorLast {
+  outcome: VisitOutcome | null;
+  reasonLabel: string | null;
+  reasonIcon: string | null;
+  at: string | null;
+  userId: number | null;
+  userName: string | null;
 }
+
+/** Der lokal erfasste Eintrag gewinnt, bis der Server ihn selbst kennt. */
+export function doorLast(
+  server: {
+    last_outcome: VisitOutcome | null;
+    last_reason_label: string | null;
+    last_reason_icon: string | null;
+    last_visit_at: string | null;
+    last_visit_user: string | null;
+    last_visit_user_id: number | null;
+  },
+  local: LocalLast | null,
+  nameOf: (userId: number) => string | null,
+): DoorLast {
+  if (local) {
+    return {
+      outcome: local.outcome,
+      reasonLabel: local.reasonLabel,
+      reasonIcon: local.reasonIcon,
+      at: local.at,
+      userId: local.userId,
+      userName: nameOf(local.userId),
+    };
+  }
+  return {
+    outcome: server.last_outcome,
+    reasonLabel: server.last_reason_label,
+    reasonIcon: server.last_reason_icon,
+    at: server.last_visit_at,
+    userId: server.last_visit_user_id,
+    userName: server.last_visit_user,
+  };
+}
+
+/** "Abschluss am 12.03.2026", "Abschluss heute 14:20". */
+export function saleText(at: string): string {
+  const day = dayLabel(at);
+  return /^\d/.test(day) ? `Abschluss am ${day}` : `Abschluss ${day}`;
+}
+
+/**
+ * Der Stand einer Tuer in Worten, so wie ihn die Liste zeigt: was zuletzt
+ * war (Titel) und wer wann (Zeile darunter). Ein frueherer Abschluss bleibt
+ * sichtbar, auch wenn danach noch jemand da war - etwa nach einem Umzug.
+ */
+export function doorText(
+  facts: DoorFacts,
+  last: DoorLast,
+  saleAt: string | null,
+  blockedBy: string | null,
+): { title: string; meta: string } {
+  if (doorStatus(facts) === "BLOCKED") {
+    return { title: "Gesperrt", meta: blockedBy ? `von ${blockedBy}` : "Hier nicht klingeln" };
+  }
+  const who = last.at ? [last.userName ? firstName(last.userName) : "Jemand", whenLabel(last.at)].join(" · ") : "";
+  const earlierSale = saleAt && last.outcome !== "SALE" ? saleText(saleAt) : null;
+  const title =
+    last.outcome === null
+      ? "Noch nicht besucht"
+      : last.outcome === "NOT_HOME"
+        ? facts.not_home_count > 1
+          ? `Nicht angetroffen · ${facts.not_home_count}×`
+          : "Nicht angetroffen"
+        : last.outcome === "MET_NO_SALE"
+          ? (last.reasonLabel ?? "Kein Abschluss")
+          : last.outcome === "APPOINTMENT"
+            ? "Termin vereinbart"
+            : last.at
+              ? saleText(last.at)
+              : "Abschluss";
+  return { title, meta: [earlierSale, who].filter(Boolean).join(" · ") };
+}
+

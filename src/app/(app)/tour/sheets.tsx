@@ -34,9 +34,8 @@ import type { QueuedWrite } from "@/lib/offline-queue";
 import type { LevelProgress } from "@/lib/levels";
 import { normalizeSlot, quickSlots, slotDate, slotLabel, slotTime, toSlot } from "@/lib/appointments";
 import { parseDoorbellLines, type DoorbellInput } from "@/lib/doorbells";
-import { MAX_NOT_HOME_ATTEMPTS } from "@/lib/doors";
 import { byDistance, distanceText, type Distance } from "@/lib/geo/nearby";
-import { PRODUCTS, formatTime, type Bell, type EnergyType, type TerritoryLite } from "./model";
+import { PRODUCTS, formatTime, saleText, type Bell, type EnergyType, type TerritoryLite } from "./model";
 
 /* ------------------------------------------------------------------------ */
 /*                            Strasse und Gebiet                             */
@@ -481,6 +480,7 @@ export function HouseSheet({
   units,
   bells,
   lastLine,
+  lastSaleAt,
   attempts,
   blocked,
   blockedBy,
@@ -504,6 +504,8 @@ export function HouseSheet({
   /** `used`: an der Klingel haengen schon Eintraege - dann laesst sie sich nicht mehr entfernen. */
   bells: Array<{ bell: Bell; used: boolean; blocked: boolean }>;
   lastLine: string | null;
+  /** Letzter Abschluss an der Adresse - sperrt nichts, steht aber da. */
+  lastSaleAt: string | null;
   attempts: number;
   blocked: boolean;
   blockedBy: string | null;
@@ -573,8 +575,9 @@ export function HouseSheet({
       <ul className="list mt-4">
         {units > 1 && <li><Cell title="Wohneinheiten" detail={units} /></li>}
         <li><Cell title="Zuletzt" detail={lastLine ?? "Noch niemand"} /></li>
+        {lastSaleAt && <li><Cell title={saleText(lastSaleAt)} /></li>}
         {type !== "MFH" && attempts > 0 && (
-          <li><Cell title="Versuche" detail={`${attempts} von ${MAX_NOT_HOME_ATTEMPTS}`} /></li>
+          <li><Cell title="Nicht angetroffen" detail={`${attempts}×`} /></li>
         )}
         {route && (
           <li>
@@ -923,62 +926,6 @@ export function DaySheet({
       <Link href="/start" className="btn btn-plain btn-block mt-4">
         Alle Zahlen
       </Link>
-    </Sheet>
-  );
-}
-
-/* ------------------------------------------------------------------------ */
-/*                            Nummer eingeben                                */
-/* ------------------------------------------------------------------------ */
-
-export function NumberSheet({
-  suggestions,
-  onOpen,
-  onClose,
-}: {
-  suggestions: string[];
-  onOpen: (number: string) => void;
-  onClose: () => void;
-}) {
-  const [value, setValue] = useState("");
-  return (
-    <Sheet
-      title="Hausnummer"
-      onClose={onClose}
-      footer={
-        <button
-          type="button"
-          className="btn btn-primary btn-lg btn-block"
-          disabled={!value.trim()}
-          onClick={() => onOpen(value.trim())}
-        >
-          Öffnen
-        </button>
-      }
-    >
-      <input
-        className="field kpi h-20 text-center text-large-title"
-        inputMode="text"
-        autoComplete="off"
-        placeholder="12a"
-        value={value}
-        onChange={(e) => setValue(e.target.value.slice(0, 12))}
-        onKeyDown={(e) => {
-          if (e.key === "Enter" && value.trim()) onOpen(value.trim());
-        }}
-        enterKeyHint="go"
-        aria-label="Hausnummer"
-        autoFocus
-      />
-      {suggestions.length > 0 && (
-        <div className="mt-4 flex justify-center gap-2">
-          {suggestions.map((s) => (
-            <button key={s} type="button" className="chip min-w-16 justify-center" onClick={() => onOpen(s)}>
-              {s}
-            </button>
-          ))}
-        </div>
-      )}
     </Sheet>
   );
 }

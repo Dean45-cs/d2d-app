@@ -56,10 +56,6 @@
   --font-mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
 
   /* Typostufen nach Apple HIG (iOS, Dynamic Type "Large"). Nur diese. */
-  --text-hero: 6rem;
-  --text-hero--line-height: 1;
-  --text-hero--letter-spacing: -0.035em;
-  --text-hero--font-weight: 700;
   --text-display: 3rem;
   --text-display--line-height: 3.25rem;
   --text-display--letter-spacing: -0.028em;
@@ -146,6 +142,8 @@
   --seg-thumb: #ffffff;
   --hover: rgb(70 90 80 / 0.07);
   --press: rgb(70 90 80 / 0.14);
+  /* Jede zweite Zeile einer Tabelle (Klinken) - haelt die Zeile auch in der Sonne. */
+  --zebra: rgb(70 90 80 / 0.05);
 
   /* Material "Liquid Glass" */
   --glass-bg: rgb(250 252 251 / 0.74);
@@ -196,6 +194,7 @@
     --seg-thumb: #59625d;
     --hover: rgb(120 140 130 / 0.12);
     --press: rgb(120 140 130 / 0.22);
+    --zebra: rgb(120 140 130 / 0.08);
     --glass-bg: rgb(26 32 29 / 0.72);
     --glass-strong: rgb(26 32 29 / 0.86);
     --glass-solid: #1a201d;
@@ -223,6 +222,7 @@
   --seg-thumb: #59625d;
   --hover: rgb(120 140 130 / 0.12);
   --press: rgb(120 140 130 / 0.22);
+  --zebra: rgb(120 140 130 / 0.08);
   --glass-bg: rgb(26 32 29 / 0.72);
   --glass-strong: rgb(26 32 29 / 0.86);
   --glass-solid: #1a201d;
@@ -1837,23 +1837,16 @@
 /* ------------------------------ Klinken -------------------------------- */
 
 /*
- * Aufbau der Tuer (TourClient): Kopf, Tuer, Ergebnisleiste, Haeuser.
- * Handy: eine Spalte, die Leiste schwebt fest ueber der Reiterleiste.
- *
- * iPad und Rechner: die Leiste klebt unten an der Spalte der Tuer -
- * immer an derselben Stelle, wie viele Termine oder Hinweise auch darueber
- * stehen. Hochkant bleibt es eine Spalte (Haeuser als Raster statt
- * Wischleiste). Quer ab 800 px Inhaltsbreite stehen links Kopf und
- * Haeuser (rollen), rechts die Tuer und darunter die Leiste (stehen).
- * Ob quer zwei Spalten passen, entscheidet die Breite neben der
- * Seitenleiste (Containerabfrage) - nicht die des Fensters.
+ * Aufbau der Tuer (TourClient): Kopf, Liste (Haeuser der Strasse bzw.
+ * Klingeln im Haus), Ergebnisleiste. Handy: eine Spalte, die Leiste schwebt
+ * fest ueber der Reiterleiste. iPad und Rechner: dieselbe Spalte, breiter;
+ * die Leiste klebt unten an der Liste - immer an derselben Stelle, wie viele
+ * Termine oder Hinweise auch darueber stehen. Quer (ab 800 px Inhaltsbreite,
+ * Containerabfrage) steht sie einzeilig, damit mehr Zeilen ins Bild passen.
  */
 .tour-grid {
   max-width: 36rem;
   margin-inline: auto;
-}
-.tour-lists {
-  margin-top: 24px;
 }
 
 @media (min-width: 744px) {
@@ -1879,101 +1872,128 @@
     /* Kurze Strasse: die Leiste steht trotzdem unten am Rand. */
     min-height: calc(100dvh - 24px - var(--tray-dock));
   }
-  .tour-door {
-    display: flex;
-    flex-direction: column;
-  }
-  .tour-lists {
-    margin-top: 0;
-  }
 }
 
 @media (min-width: 744px) and (orientation: landscape) {
   @container tour (min-width: 800px) {
-    .tour-grid {
-      display: grid;
-      /* Ab 400 px passt "Ohne Abschluss" in Titelgroesse auf eine Zeile. */
-      grid-template-columns: minmax(0, 1fr) clamp(400px, 40cqi, 440px);
-      grid-template-rows: auto 1fr;
-      column-gap: 32px;
-      row-gap: 24px;
-      max-width: 1200px;
-    }
-    .tour-head {
-      grid-column: 1;
-      grid-row: 1;
-    }
-    .tour-lists {
-      grid-column: 1;
-      grid-row: 2;
-    }
-    /* Die Tuer steht rechts, so hoch wie Platz ueber der Leiste ist; die
-       Nummer mittig darin. Kaeme zu viel zusammen, rollt nur diese Spalte -
-       die Leiste bleibt sichtbar. Innenabstand fuer Fokusring und Kanten. */
-    .tour-door {
-      grid-column: 2;
-      grid-row: 1 / -1;
-      align-self: start;
-      position: sticky;
-      top: 18px;
-      /* 206 px: die Leiste als zwei mal zwei Tasten, bis sie vermessen ist. */
-      height: calc(100dvh - 24px - var(--tray-dock) - var(--tour-tray-height, 206px) - 16px + 12px);
-      margin: -6px;
-      padding: 6px;
-      overflow-y: auto;
-      overscroll-behavior: contain;
-      scrollbar-width: none;
-    }
-    .tour-door::-webkit-scrollbar {
-      display: none;
-    }
-    .tour-door > .door-hero {
-      --door-size: 7rem;
-      margin-block: auto;
-    }
-    .tour-grid > .tray {
-      grid-column: 2;
-      grid-row: 1 / -1;
-      align-self: end;
-    }
-    /* Schmale Spalte: zwei mal zwei, Zeichen ueber dem Wort, wie ein
-       Tastenfeld - "Ohne Abschluss" bricht so nicht um. */
+    /* Quer: vier Tasten nebeneinander, Zeichen ueber dem Wort - so bleibt
+       ueber der Leiste Platz fuer die Liste. */
     .tour-grid > .tray .tray-grid {
-      grid-template-columns: repeat(2, minmax(0, 1fr));
+      grid-template-columns: repeat(4, minmax(0, 1fr));
     }
     .tour-grid > .tray .tray-btn {
       flex-direction: column;
       gap: 6px;
-      min-height: 88px;
+      min-height: 76px;
       padding-inline: 10px;
     }
   }
 }
 
-/* Die Hausnummer: gross und rund. Lange ("12–14", "112 b") etwas kleiner,
-   damit sie ganz in die Zeile passt statt abgeschnitten zu werden. */
-.door-number {
-  font-size: var(--door-size, var(--text-hero));
-  line-height: 1;
-  letter-spacing: var(--text-hero--letter-spacing);
+/*
+ * Tueren als Tabelle - wie in den Vertriebs-Apps der Netzbetreiber: links
+ * fett die Nummer, daneben der Stand in Worten, jede zweite Zeile getoent.
+ * Ein gruener Balken links heisst "hier gab es einen Abschluss" - als Form,
+ * nicht nur als Farbe, und ohne die Tuer zu sperren.
+ */
+.door-table {
+  background: var(--surface);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--elev-card);
+  overflow: hidden;
 }
-.door-number[data-long] {
-  font-size: calc(var(--door-size, var(--text-hero)) * 0.74);
+.door-table-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 36px;
+  padding: 8px 16px;
+  border-bottom: 1px solid var(--separator);
+  font-size: var(--text-caption);
+  line-height: var(--text-caption--line-height);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.door-lead-col {
+  width: 3.5rem;
+  flex-shrink: 0;
+  text-align: center;
+}
+.door-row {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 60px;
+  padding: 8px 16px;
+  text-align: left;
+  color: inherit;
+  transition: background-color var(--dur-1) var(--ease-out);
+}
+.door-table li:nth-child(even) > .door-row {
+  background: var(--zebra);
+}
+.door-table li > .door-row:hover {
+  background: var(--hover);
+}
+.door-table li > .door-row:active {
+  background: var(--press);
+}
+.door-table li > .door-row[aria-pressed="true"] {
+  background: var(--accent-tint);
+}
+.door-row:focus-visible {
+  outline-offset: -3px;
+}
+.door-row[data-sale]::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 8px;
+  bottom: 8px;
+  width: 4px;
+  border-radius: 0 var(--radius-xs) var(--radius-xs) 0;
+  background: var(--accent);
+}
+/* Die Nummer: feste Spalte, fett - gewaehlt wird sie zur gruenen Plakette. */
+.door-lead {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  min-width: 3.5rem;
+  min-height: 40px;
+  padding-inline: 6px;
+  border-radius: var(--radius-md);
+  font-size: var(--text-title-3);
+  line-height: var(--text-title-3--line-height);
+  letter-spacing: var(--text-title-3--letter-spacing);
+  font-weight: 700;
+  white-space: nowrap;
+}
+.door-row[aria-pressed="true"] > .door-lead,
+.door-lead-on {
+  background: var(--primary);
+  color: var(--on-primary);
+  box-shadow: var(--elev-primary);
 }
 @media (min-width: 744px) {
-  .door-hero {
-    --door-size: 8rem;
+  .door-row {
+    min-height: 64px;
   }
-  .door-step {
-    width: 56px;
-    height: 56px;
-  }
-  /* Raster statt Wischleiste: auf dem iPad passen alle Haeuser auf einen Blick. */
-  .chips.house-chips {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(6.25rem, 1fr));
-    overflow: visible;
-  }
+}
+
+/* Ueber den Knoepfen: die gewaehlte Tuer, auf die sie sich beziehen. */
+.tray-target {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 48px;
+  padding: 0 4px 8px 4px;
 }
 
 /* --------------------- Ergebnisleiste an der Tuer --------------------- */

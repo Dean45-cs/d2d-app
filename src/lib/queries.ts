@@ -4,7 +4,6 @@ import { getDb } from "./db";
 import { EMPTY_PROFILE, type ProfileCounts } from "./profile";
 import { canAccessTerritory, permissionsFor } from "./permissions";
 import { bellKey, MAX_BELLS_PER_HOUSE, normalizeFloor, normalizeLabel } from "./doorbells";
-import { MAX_NOT_HOME_ATTEMPTS } from "./doors";
 import { METERS_PER_DEGREE, readShape } from "./geo/area";
 import { shapeContains, subtract, type Shape } from "./geo/shape";
 import type { DoorbellInput } from "./doorbells";
@@ -55,10 +54,13 @@ export interface TerritoryWithStats extends Territory {
   list_door_done: number;
 }
 
-/** Eine Klingel ist durch, wenn gesperrt, angetroffen oder alle Versuche verbraucht (auch in listHouseNumbers). */
+/**
+ * Eine Klingel ist bearbeitet, wenn gesperrt oder jemand angetroffen wurde -
+ * wie doorOpen() in doors.ts (auch in listHouseNumbers). "Nicht da" bleibt offen,
+ * egal wie oft.
+ */
 const BELL_DONE = `(d.blocked_at IS NOT NULL
-  OR EXISTS (SELECT 1 FROM visits v WHERE v.doorbell_id = d.id AND v.outcome <> 'NOT_HOME')
-  OR (SELECT COUNT(*) FROM visits v WHERE v.doorbell_id = d.id AND v.outcome = 'NOT_HOME') >= ${MAX_NOT_HOME_ATTEMPTS})`;
+  OR EXISTS (SELECT 1 FROM visits v WHERE v.doorbell_id = d.id AND v.outcome <> 'NOT_HOME'))`;
 
 /** Haus erfasst: gesperrt, Einzeltuer besucht oder im Mehrfamilienhaus jede Klingel durch. */
 const HOUSE_TOUCHED = `(h.blocked_at IS NOT NULL
@@ -498,7 +500,7 @@ export interface HouseNumberWithStats {
   sale_count: number;
   /** Angelegte Klingelschilder - nur im Mehrfamilienhaus ueber 0. */
   bell_count: number;
-  /** Davon abgearbeitet oder gesperrt. */
+  /** Davon angetroffen oder gesperrt. */
   bell_done_count: number;
   /** Erfolglose Versuche am Haus selbst, ohne die Klingeln. */
   not_home_count: number;
@@ -510,6 +512,11 @@ export interface HouseNumberWithStats {
   /** Wer zuletzt hier war - fuer Name und Profilbild in der Liste. */
   last_visit_user_id: number | null;
   last_outcome: VisitOutcome | null;
+  /** Grund des letzten Eintrags, falls es eine Ablehnung war. */
+  last_reason_label: string | null;
+  last_reason_icon: string | null;
+  /** Letzter Abschluss an dieser Adresse - sperrt nichts, steht aber an der Tuer. */
+  last_sale_at: string | null;
   blocked_at: string | null;
   blocked_by: number | null;
   blocked_note: string;
@@ -551,6 +558,16 @@ export function listHouseNumbers(streetIds: number[]): HouseNumberWithStats[] {
                 ORDER BY v.created_at DESC, v.id DESC LIMIT 1)            AS last_visit_user_id,
               (SELECT v.outcome FROM visits v WHERE ${HOUSE_MATCH}
                 ORDER BY v.created_at DESC, v.id DESC LIMIT 1)            AS last_outcome,
+              (SELECT r.label FROM visits v
+                 LEFT JOIN rejection_reasons r ON r.id = v.reason_id
+                WHERE ${HOUSE_MATCH}
+                ORDER BY v.created_at DESC, v.id DESC LIMIT 1)            AS last_reason_label,
+              (SELECT r.icon FROM visits v
+                 LEFT JOIN rejection_reasons r ON r.id = v.reason_id
+                WHERE ${HOUSE_MATCH}
+                ORDER BY v.created_at DESC, v.id DESC LIMIT 1)            AS last_reason_icon,
+              (SELECT MAX(v.created_at) FROM visits v
+                WHERE ${HOUSE_MATCH} AND v.outcome = 'SALE')              AS last_sale_at,
               (SELECT u.name FROM users u WHERE u.id = h.blocked_by)      AS blocked_by_name,
               (SELECT COUNT(*) FROM doorbells d
                 WHERE d.house_number_id = h.id)                           AS bell_count,
@@ -639,13 +656,16 @@ export interface DoorbellWithStats extends Doorbell {
   /** Erfasste Tueren an dieser Klingel. */
   visit_count: number;
   sale_count: number;
-  /** Erfolglose Versuche - nach MAX_NOT_HOME_ATTEMPTS ist die Klingel durch. */
+  /** Erfolglose Versuche - beliebig viele, die Klingel bleibt offen. */
   not_home_count: number;
   /** Eintraege, bei denen jemand an der Tuer war. */
   met_count: number;
   /** Ergebnis des letzten Eintrags - fuer das Symbol in der Liste. */
   last_outcome: VisitOutcome | null;
+  last_reason_label: string | null;
   last_reason_icon: string | null;
+  /** Letzter Abschluss an dieser Klingel - sperrt nichts, steht aber an der Tuer. */
+  last_sale_at: string | null;
   last_visit_at: string | null;
   last_visit_user: string | null;
   /** Wer zuletzt an dieser Klingel war - fuer Name und Profilbild. */
@@ -669,10 +689,16 @@ export function listDoorbells(houseNumberIds: number[]): DoorbellWithStats[] {
                 WHERE v.doorbell_id = d.id AND v.outcome <> 'NOT_HOME')   AS met_count,
               (SELECT v.outcome FROM visits v WHERE v.doorbell_id = d.id
                 ORDER BY v.created_at DESC, v.id DESC LIMIT 1)            AS last_outcome,
+              (SELECT r.label FROM visits v
+                 LEFT JOIN rejection_reasons r ON r.id = v.reason_id
+                WHERE v.doorbell_id = d.id
+                ORDER BY v.created_at DESC, v.id DESC LIMIT 1)            AS last_reason_label,
               (SELECT r.icon FROM visits v
                  LEFT JOIN rejection_reasons r ON r.id = v.reason_id
                 WHERE v.doorbell_id = d.id
                 ORDER BY v.created_at DESC, v.id DESC LIMIT 1)            AS last_reason_icon,
+              (SELECT MAX(v.created_at) FROM visits v
+                WHERE v.doorbell_id = d.id AND v.outcome = 'SALE')        AS last_sale_at,
               (SELECT v.created_at FROM visits v WHERE v.doorbell_id = d.id
                 ORDER BY v.created_at DESC, v.id DESC LIMIT 1)            AS last_visit_at,
               (SELECT u.name FROM visits v JOIN users u ON u.id = v.user_id

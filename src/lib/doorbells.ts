@@ -35,17 +35,6 @@ export function isNumberedLabel(label: string): boolean {
   return NUMBERED.test(bellKey(label));
 }
 
-/**
- * Haengen an diesem Brett echte Namen?
- *
- * Wo Namen stehen, darf die App die naechste Klingel nicht selbst waehlen:
- * geklingelt wird in der Reihenfolge, die der Verkaeufer vorfindet, und ein
- * Eintrag beim falschen Namen waere schlimmer als ein Tipp mehr.
- */
-export function hasNamedBells(labels: string[]): boolean {
-  return labels.some((label) => !isNumberedLabel(label));
-}
-
 /** Vergleichsform eines Schildnamens - Gross-/Kleinschreibung und Leerzeichen egal. */
 export function bellKey(label: string): string {
   return label.trim().replace(/\s+/g, " ").toLocaleLowerCase("de-DE");

@@ -10,7 +10,7 @@ import { useToast } from "@/components/Toast";
 import { useConfirm } from "@/components/useConfirm";
 import { Cell, EmptyState, ListLabel, ProgressRing, Segmented, plural } from "@/components/ui";
 import { routeUrl } from "@/lib/map";
-import { doorStatus, MAX_NOT_HOME_ATTEMPTS, whenLabel } from "@/lib/doors";
+import { doorStatus, whenLabel } from "@/lib/doors";
 
 type StreetStatus = "OPEN" | "ACTIVE" | "DONE";
 
@@ -312,7 +312,7 @@ function HouseChip({ house, canRing }: { house: HouseNumberWithStats; canRing: b
   const status = doorStatus(house);
   const blocked = status === "BLOCKED";
   const retry = !mfh && status === "RETRY";
-  const done = mfh ? house.bell_count > 0 && house.bell_done_count >= house.bell_count : status === "DONE";
+  const done = mfh ? house.bell_count > 0 && house.bell_done_count >= house.bell_count : status === "MET";
   const state: ChipState = blocked ? "blocked" : house.sale_count > 0 ? "sale" : retry ? "retry" : done ? "done" : "open";
 
   const description = [
@@ -324,7 +324,7 @@ function HouseChip({ house, canRing }: { house: HouseNumberWithStats; canRing: b
     mfh && house.bell_count > 0 ? `${house.bell_done_count} von ${house.bell_count} Klingeln` : null,
     mfh && house.bell_count === 0 ? "Klingelschilder fehlen" : null,
     house.units > 1 ? `${house.units} Wohneinheiten` : null,
-    retry ? `${house.not_home_count} von ${MAX_NOT_HOME_ATTEMPTS} Versuchen` : null,
+    retry ? `${house.not_home_count}× nicht angetroffen` : null,
     house.last_visit_user ? `zuletzt ${house.last_visit_user}, ${whenLabel(house.last_visit_at)}` : null,
   ]
     .filter(Boolean)
@@ -346,7 +346,7 @@ function HouseChip({ house, canRing }: { house: HouseNumberWithStats; canRing: b
         </span>
       ) : retry ? (
         <span className="text-caption font-medium opacity-70">
-          {house.not_home_count}/{MAX_NOT_HOME_ATTEMPTS}
+          {house.not_home_count}×
         </span>
       ) : null}
     </>

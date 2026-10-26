@@ -26,6 +26,7 @@ Bildschirm.
 | `--surface-2` | `#f2f4f3` | `#1f2522` | Fläche auf Fläche (selten) |
 | `--map-ground` | `#e3e7e5` | `#1f2522` | Kartengrund, solange Kacheln laden (hebt sich vom Seitengrund ab) |
 | `--fill` / `--fill-strong` | `#465a50` 10 % / 17 % | `#788c82` 20 % / 30 % | Felder, Segmentleisten, Ringe-Spur |
+| `--zebra` | `#465a50` 5 % | `#788c82` 8 % | Jede zweite Zeile der Klinken-Tabelle |
 | `--ink` | `#0b1510` | `#f3f6f4` | Text |
 | `--ink-2` | `#36413b` | `#d0d7d3` | Beschriftung von Kennzahlen |
 | `--muted` | `#5f6964` | `#a3aca7` | Untertitel, Zeitangaben |
@@ -150,12 +151,11 @@ lässt sie gesetzt statt voreingestellt wirken.
 
 | Klasse | Größe / Zeile | Gewicht | Verwendung |
 | --- | --- | --- | --- |
-| `text-hero` | 96 / 96 | 700 | Hausnummer beim Klinken (iPad 128, quer 112; ab fünf Zeichen ¾) |
 | `text-display` | 48 / 52 | 700 | Große Einzelzahl |
 | `text-large-title` | 34 / 41 | 700 | Seitentitel, Haupt-Kennzahl |
 | `text-title-1` | 28 / 34 | 700 | Kennzahlen im Raster |
 | `text-title-2` | 22 / 28 | 700 | Zwischentitel |
-| `text-title-3` | 20 / 25 | 600 | Abschnittstitel, Blatt-Titel |
+| `text-title-3` | 20 / 25 | 600 | Abschnittstitel, Blatt-Titel, Hausnummer in der Klinken-Liste (700) |
 | `text-headline` | 17 / 22 | 600 | Hervorgehobene Zeile |
 | `text-body` | 17 / 22 | 400 | Fließtext, Zeilentitel, Eingaben |
 | `text-callout` | 16 / 21 | 400 | – |
@@ -180,8 +180,8 @@ Eingabefelder haben immer `text-body` (17 px) – unter 16 px zoomt iOS.
   · `lg 16` · `xl 20` · `2xl 28` · `full`. Listen und Flächen `xl`, Blätter
   `2xl`, Felder `md`, Knöpfe und Plaketten `full`.
 - Tippflächen ≥ 44 pt (`.btn` 44, `.btn-sm` 36 mit unsichtbar erweiterter
-  Fläche, `.btn-lg` 56, Ergebnisknöpfe beim Klinken 60, auf dem iPad 76 bzw.
-  quer 88, Hausnummern im Raster 48).
+  Fläche, `.btn-lg` 56, Ergebnisknöpfe beim Klinken 60, auf dem iPad 76,
+  Zeilen der Klinken-Liste 60, auf dem iPad 64).
 - Sichere Bereiche: Reiterleiste, Blätter, Werkzeugleiste und Ergebnisleiste
   berücksichtigen `env(safe-area-inset-*)`.
 
@@ -237,6 +237,7 @@ Alle in `src/components/`. Stil per Klassen aus `globals.css` (`@layer component
 | `EmptyState`, `InlineError`, `Notice` | `ui.tsx` | Leer, Fehler, ruhiger Hinweis |
 | `Skeleton*` | `ui.tsx` | Ladeplatzhalter: `SkeletonHeader` (echter `PageHeader`, fester Titel steht schon da), `SkeletonText` (Balken in der Zeile seiner Schrift), `SkeletonList`, `SkeletonStats`, `SkeletonPost`, `SkeletonChips`, `SkeletonSegmented` |
 | `OutcomeGlyph` | `ui.tsx` | Ergebnis eines Besuchs als Zeichen (bei Ablehnung das Zeichen des Grundes, neutral) |
+| `DoorTable`, `DoorFilter` | `tour/DoorTable.tsx` | Klinken: Türen als Tabelle (Nummer, Stand, Zeichen; Zebra, grüner Balken = Abschluss) und die Leiste darüber („Nr. filtern“, In meiner Nähe, Nur offene) |
 | `ReasonIcon`, `ReasonTile` | `ReasonIcon.tsx` | Zeichen eines Ablehnungsgrunds; als Kachel im Symbolton (`sm` 24, `md` 32, `lg` 48) |
 | `Medal` | `levels/Medal.tsx` | Medaille eines erreichten Abzeichens im Metall der Stufe |
 | `Segmented`, `SegmentedLinks` | `ui.tsx` | Wahl aus wenigen (auch Glas-Variante über Karten) |
@@ -271,7 +272,23 @@ Alle in `src/components/`. Stil per Klassen aus `globals.css` (`@layer component
 - **Bearbeiten im Blatt** (`Sheet`), Hauptknopf im Fuß als `btn-primary btn-lg btn-block`.
 - **Löschen**: `useConfirm` mit `danger`. Alles andere: Toast mit „Rückgängig“.
 - **Leere Zustände**: ein Zeichen, ein Satz, höchstens eine Aktion.
-- **Klinken**: Termine erscheinen als kompakte Zusammenfassung; ein Tipp öffnet
+- **Klinken** (nach dem Vorbild der Glasfaser-Vertriebs-App der Telekom): die
+  Häuser der Straße als **Tabelle** (`DoorTable`, `.door-table`) – eine Zeile je
+  Hausnummer, links fett die Nummer in fester Spalte, daneben der Stand in Worten
+  („Nicht angetroffen · 2×“, der Ablehnungsgrund, „Termin vereinbart“, „Abschluss am
+  12.03.2026“), darunter wer und wann, rechts das Zeichen des Ergebnisses. Jede zweite
+  Zeile ist getönt (`--zebra`), damit die Zeile auch in der Sonne hält. Ein **grüner
+  Balken links** heißt „hier gab es einen Abschluss“ – als Form, nicht nur als Farbe,
+  und ohne die Tür zu sperren. Darüber „Nr. filtern“ (filtern statt blättern; eine
+  fehlende Nummer lässt sich dort öffnen), „In meiner Nähe“ und „Nur offene“. Ein
+  Mehrfamilienhaus öffnet sich wie ein Ordner (Chevron): drinnen stehen nur seine
+  Klingeln (`BuildingHeader` mit „‹ Straße“), keine Hausnummern. Gewählt ist, was man
+  antippt – die Nummer wird zur grünen Plakette, die Zeile getönt, und die
+  Ergebnisleiste nennt darüber dieselbe Tür (`TrayTarget`). **Nichts springt von
+  selbst**: nach dem Speichern bleibt die Tür gewählt und zeigt sofort ihren neuen
+  Stand (auch ohne Netz). Wird eine gewählte Zeile von der gewachsenen Leiste
+  verdeckt, rollt die Liste genau so weit, dass sie darüber steht.
+  Termine erscheinen als kompakte Zusammenfassung; ein Tipp öffnet
   die Liste mit Adresse, Anruf und Sprung zur Tür. Die Aktionsleiste bietet zuerst
   die fehlende Haus- oder Klingelauswahl, danach „Nicht da“, „Ohne Abschluss“,
   „Termin“ und „Auftrag starten“. Inhalt und Toasts halten Abstand zur gemessenen
@@ -281,17 +298,16 @@ Alle in `src/components/`. Stil per Klassen aus `globals.css` (`@layer component
   (nicht bei jedem Schritt die Straße hinauf), keine Entfernung, wenn man davorsteht,
   „ca.“ statt falscher Genauigkeit. Listen, die nach Nähe geordnet sind, springen
   nicht, solange das Blatt offen ist – nur die Zahlen laufen mit.
-- **Klinken auf dem iPad** (Aufbau in `globals.css`, Abschnitt „Klinken“): Die
-  Ergebnisleiste klebt unten an der Spalte der Tür (`position: sticky`) – immer an
-  derselben Stelle, egal wie viele Termine oder Hinweise darüber stehen, und in
-  derselben Anordnung wie am Handy (zwei mal zwei, „Auftrag starten“ unten rechts).
-  Hochkant eine Spalte: Kopf, Tür, Häuser als Raster, unten die Leiste. Quer (ab
-  800 px Inhaltsbreite, Containerabfrage auf `.tour`) links Kopf und Häuser zum
-  Rollen, rechts die Tür mit der Leiste darunter als Tastenfeld (Zeichen über dem
-  Wort); beide stehen. Der Toast „Rückgängig“ steht mittig über der Leiste. In
-  niedrigen Fenstern (≤ 600 px hoch) wird die Leiste einzeilig. Im Auto-Modus
-  bleibt die Seitenleiste beim Klinken bis 1279 px schmal. Wer im Raster ein Haus
-  weit unten wählt, bekommt die Nummer zurück ins Bild.
+- **Klinken auf dem iPad** (Aufbau in `globals.css`, Abschnitt „Klinken“): eine
+  Spalte (bis 760 px breit) – Kopf, Liste, unten die Ergebnisleiste. Sie klebt unten
+  an der Liste (`position: sticky`) – immer an derselben Stelle, egal wie viele
+  Termine oder Hinweise darüber stehen, und hochkant in derselben Anordnung wie am
+  Handy (zwei mal zwei, „Auftrag starten“ unten rechts). Quer (ab 800 px
+  Inhaltsbreite, Containerabfrage auf `.tour`) stehen die vier Knöpfe nebeneinander,
+  Zeichen über dem Wort – so bleibt über der Leiste Platz für die Liste. Der Toast
+  „Rückgängig“ steht mittig über der Leiste. In niedrigen Fenstern (≤ 600 px hoch)
+  wird die Leiste ebenfalls einzeilig. Im Auto-Modus bleibt die Seitenleiste beim
+  Klinken bis 1279 px schmal.
 - **Rechner/iPad**: zweispaltig (`lg:grid-cols-[minmax(0,1fr)_minmax(0,380px)]`),
   Tabellen (`table.table`) erlaubt, wo Spalten vergleichen. Containerabfragen nur
   ab `md` und nie auf Vorfahren fest positionierter Elemente – ältere Browser

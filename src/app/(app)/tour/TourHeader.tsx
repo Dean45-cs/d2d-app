@@ -56,12 +56,7 @@ export function TourHeader({
           </span>
         </button>
         <span className="flex-1" />
-        {(!online || pendingCount > 0) && (
-          <button type="button" onClick={onDay} className="badge min-h-8 px-3" aria-label="Warteschlange öffnen">
-            {online ? <IconCloudUp className="h-4 w-4" /> : <IconOffline className="h-4 w-4" />}
-            {online ? `${pendingCount} warten` : pendingCount > 0 ? `Offline · ${pendingCount}` : "Offline"}
-          </button>
-        )}
+        <QueueBadge online={online} pendingCount={pendingCount} onClick={onDay} />
         {onCard && (
           <button type="button" onClick={onCard} className="icon-btn" aria-label="Visitenkarte zeigen">
             <IconQr className="h-6 w-6" />
@@ -94,5 +89,24 @@ export function TourHeader({
       {/* An der Tuer das wichtigste Argument: wer liefert, zu welchem Preis. */}
       {territory && <ProviderLine info={territory.provider} className="mt-1 md:max-w-md" />}
     </header>
+  );
+}
+
+/** Ohne Netz oder mit wartenden Eintraegen: wie viele, ein Tipp zeigt sie. */
+export function QueueBadge({
+  online,
+  pendingCount,
+  onClick,
+}: {
+  online: boolean;
+  pendingCount: number;
+  onClick: () => void;
+}) {
+  if (online && pendingCount === 0) return null;
+  return (
+    <button type="button" onClick={onClick} className="badge min-h-8 px-3" aria-label="Warteschlange öffnen">
+      {online ? <IconCloudUp className="h-4 w-4" /> : <IconOffline className="h-4 w-4" />}
+      {online ? `${pendingCount} warten` : pendingCount > 0 ? `Offline · ${pendingCount}` : "Offline"}
+    </button>
   );
 }
