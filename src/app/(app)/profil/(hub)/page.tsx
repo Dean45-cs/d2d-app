@@ -12,6 +12,7 @@ import { NAV_ICONS } from "@/components/nav-icons";
 import { InstallCell } from "@/components/InstallHint";
 import { PushRows } from "@/components/community/PushToggle";
 import { PowerSaveCell } from "@/components/PowerSave";
+import { XpHintsCell } from "@/components/XpHintsCell";
 import { IconCalendar, IconChart, IconContacts, IconQr, IconSparkles, IconTarget } from "@/components/icons";
 import { LogoutCell } from "./LogoutCell";
 import { PasswordCell } from "./PasswordCell";
@@ -93,6 +94,7 @@ export default async function ProfileHubPage() {
       <ul className="list list-icons">
         <PushRows />
         <PowerSaveCell />
+        <XpHintsCell />
         <InstallCell />
       </ul>
 

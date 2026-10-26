@@ -49,7 +49,7 @@ import {
   type Distance,
 } from "@/lib/geo/nearby";
 import type { LevelProgress } from "@/lib/levels";
-import { levelFeedbackText, type LevelFeedback } from "@/lib/level-feedback";
+import { levelFeedbackText, xpHintsOn, type LevelFeedback } from "@/lib/level-feedback";
 import { BuildingHeader } from "./BuildingHeader";
 import { DoorFilter, DoorTable, DoorTableAction, type DoorRow } from "./DoorTable";
 import { OutcomeTray, TRAY_ICON, type TrayAction, type TrayTarget } from "./OutcomeTray";
@@ -977,7 +977,7 @@ export function TourClient({
       setLastSaved(null);
       receiveProgress(data.progression, true);
       const xp = Number(data.progression?.awardedXp ?? 0);
-      toast(xp < 0 ? `Zurückgenommen · ${xp.toLocaleString("de-DE").replace("-", "−")} XP` : "Zurückgenommen");
+      toast(xp < 0 && xpHintsOn() ? `Zurückgenommen · ${xp.toLocaleString("de-DE").replace("-", "−")} XP` : "Zurückgenommen");
       // Der Eintrag ist weg - die sofortige Zaehlung an der Tuer auch.
       const house = doneKey(door.streetId, door.number);
       book.uncountVisit(door.label ? bellSlot(house, door.label) : house, door.notHome);
