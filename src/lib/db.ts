@@ -480,6 +480,8 @@ function migrateCommunity(db: Database.Database) {
   addColumn(db, "visits", "received_at", "TEXT");
   // Zaehlt hoch, wenn alle Anmeldungen einer Person enden sollen (neues Passwort, Deaktivieren).
   addColumn(db, "users", "session_version", "INTEGER NOT NULL DEFAULT 0");
+  // Push-Arten, die jemand abbestellt hat (Komma-Liste, src/lib/push.ts) - gilt fuer alle Geraete der Person.
+  addColumn(db, "users", "push_off", "TEXT NOT NULL DEFAULT ''");
 
   db.exec(`
     CREATE TABLE IF NOT EXISTS posts (

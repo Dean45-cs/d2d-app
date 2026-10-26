@@ -4,7 +4,8 @@ import { requireUser } from "@/lib/auth";
 import { getLevelDashboard } from "@/lib/level-queries";
 import { sqlDateTime } from "@/lib/format";
 import { Achievements } from "@/components/levels/Achievements";
-import { ActivityRings, LevelBadge, LevelSummary } from "@/components/levels/LevelCard";
+import { LevelBadge, LevelSummary } from "@/components/levels/LevelCard";
+import { DailyGoals } from "@/components/levels/DailyGoals";
 import { Avatar, Cell, EmptyState, ListLabel, PageHeader, SegmentedLinks } from "@/components/ui";
 import { ShowMore } from "@/components/ShowMore";
 import { IconBolt } from "@/components/icons";
@@ -27,7 +28,6 @@ export default async function AchievementsPage() {
   const me = leaderboard.find((entry) => entry.userId === user.id);
   const top = leaderboard.slice(0, 10);
   const ownOutsideTop = me && !top.some((entry) => entry.userId === user.id) ? me : null;
-  const done = goals.filter((goal) => goal.completed).length;
 
   return (
     <div className="page">
@@ -49,10 +49,8 @@ export default async function AchievementsPage() {
                 </h2>
                 <span className="kpi text-subhead font-semibold text-accent-ink">+{number(dashboard.todayXp)} XP</span>
               </div>
-              <ActivityRings goals={goals} />
-              <p className="mt-4 text-footnote text-muted">
-                {done === goals.length ? "Alle Tagesziele geschafft" : `${done} von ${goals.length} Zielen`}
-              </p>
+              {/* Ziele aus Einstellungen -> Ziele & Erfolge. */}
+              <DailyGoals goals={goals} />
             </section>
             <LevelSummary progress={progress} label="Dein Level" />
           </div>

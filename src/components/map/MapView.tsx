@@ -6,7 +6,9 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { circleToArea } from "@/lib/geo/area";
 import { IconFit, IconLayers, IconMinus, IconNavigate, IconPlus } from "@/components/icons";
 import { usePowerSaving } from "@/components/PowerSave";
+import { usePrefs } from "@/components/PrefsSync";
 import { powerSaving, whileActive } from "@/lib/power";
+import { pref } from "@/lib/preferences";
 import { useMapConfig } from "./MapConfig";
 import { createLeafletEngine, loadLeaflet } from "./leaflet-engine";
 import {
@@ -71,6 +73,8 @@ function storeMapType(type: MapType) {
 }
 
 function isDark(): boolean {
+  // Einstellungen -> Karte -> "Dunkle Karte" aus: die Karte bleibt hell, auch wenn die App dunkel ist.
+  if (!pref("mapDark")) return false;
   const theme = document.documentElement.dataset.theme;
   if (theme === "dark") return true;
   if (theme === "light") return false;
@@ -96,6 +100,7 @@ export function MapView({
 }: Props) {
   const config = useMapConfig();
   const saving = usePowerSaving();
+  const { mapDark, mapAutoLocate } = usePrefs();
   const containerRef = useRef<HTMLDivElement | null>(null);
   const engineRef = useRef<MapEngine | null>(null);
   const onEngineRef = useRef(onEngine);
@@ -203,10 +208,11 @@ export function MapView({
   onLocationRef.current = onLocation;
   const meLayer = useRef<MapLayer | null>(null);
 
-  // powerSaving() statt saving: das ist beim ersten Durchlauf noch "aus".
+  // powerSaving()/pref() statt saving: das ist beim ersten Durchlauf noch "aus".
+  // Mitverfolgen laesst sich unter Einstellungen -> Karte abschalten.
   useEffect(() => {
-    if (autoLocate && !powerSaving()) setWatching(true);
-  }, [autoLocate, saving]);
+    if (autoLocate && !powerSaving() && pref("mapAutoLocate")) setWatching(true);
+  }, [autoLocate, saving, mapAutoLocate]);
 
   /*
    * Verfolgt wird nur, solange die Karte zu sehen ist und bedient wird
@@ -313,10 +319,11 @@ export function MapView({
     };
   }, [engine]);
 
-  // Hell/Dunkel wie die App.
+  // Hell/Dunkel wie die App (oder immer hell, siehe isDark).
   useEffect(() => {
     if (!engine) return;
     const update = () => engine.setDark(isDark());
+    update();
     const media = window.matchMedia("(prefers-color-scheme: dark)");
     media.addEventListener("change", update);
     const observer = new MutationObserver(update);
@@ -325,7 +332,7 @@ export function MapView({
       media.removeEventListener("change", update);
       observer.disconnect();
     };
-  }, [engine]);
+  }, [engine, mapDark]);
 
   function toggleType() {
     if (!engine) return;

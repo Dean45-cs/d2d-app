@@ -2,6 +2,9 @@ import crypto from "node:crypto";
 import { getDb, getSetting, setSetting } from "./db";
 import { followerIds, getPost, postForVisit } from "./community";
 import { isMilestone } from "./ranking";
+import { PUSH_KINDS, isPushKind, type PushKind } from "./push-kinds";
+
+export { PUSH_KINDS, isPushKind, type PushKind };
 
 /*
  * Push-Nachrichten aufs Handy (Web Push, RFC 8030/8291/8292).
@@ -214,8 +217,34 @@ async function sendTo(subscription: Subscription, message: PushMessage): Promise
   }
 }
 
-/** An alle Geraete dieser Personen senden. Fehler bleiben im Protokoll, nie beim Absender. */
-export async function pushToUsers(userIds: number[], message: PushMessage): Promise<number> {
+/* ============================ Push-Arten =================================== */
+
+/**
+ * Worueber jemand Push bekommen will - je Person, fuer alle ihre Geraete
+ * (Einstellungen -> Mitteilungen). Gespeichert wird, was abbestellt ist
+ * (users.push_off als Komma-Liste): eine neue Art ist fuer alle erst einmal an.
+ */
+/** SQL-Bedingung: diese Person hat die Art nicht abbestellt (Parameter: die Art). */
+export const PUSH_KIND_ALLOWED = "instr(',' || u.push_off || ',', ',' || ? || ',') = 0";
+
+export function pushKinds(userId: number): Record<PushKind, boolean> {
+  const row = getDb().prepare("SELECT push_off FROM users WHERE id = ?").get(userId) as { push_off: string } | undefined;
+  const off = new Set((row?.push_off ?? "").split(",").filter(Boolean));
+  return Object.fromEntries(PUSH_KINDS.map((kind) => [kind, !off.has(kind)])) as Record<PushKind, boolean>;
+}
+
+export function setPushKinds(userId: number, patch: Partial<Record<PushKind, boolean>>): Record<PushKind, boolean> {
+  const next = { ...pushKinds(userId), ...patch };
+  const off = PUSH_KINDS.filter((kind) => next[kind] === false).join(",");
+  getDb().prepare("UPDATE users SET push_off = ? WHERE id = ?").run(off, userId);
+  return pushKinds(userId);
+}
+
+/**
+ * An alle Geraete dieser Personen senden - mit `kind` nur an die, die diese
+ * Art nicht abbestellt haben. Fehler bleiben im Protokoll, nie beim Absender.
+ */
+export async function pushToUsers(userIds: number[], message: PushMessage, kind?: PushKind): Promise<number> {
   if (userIds.length === 0) return 0;
   const db = getDb();
   const subscriptions = db
@@ -223,9 +252,9 @@ export async function pushToUsers(userIds: number[], message: PushMessage): Prom
       // Nur aktive Personen: ein deaktiviertes Konto bekommt auf dem alten Handy nichts mehr.
       `SELECT s.id, s.endpoint, s.p256dh, s.auth FROM push_subscriptions s
          JOIN users u ON u.id = s.user_id AND u.active = 1
-        WHERE s.user_id IN (${userIds.map(() => "?").join(",")})`,
+        WHERE s.user_id IN (${userIds.map(() => "?").join(",")})${kind ? ` AND ${PUSH_KIND_ALLOWED}` : ""}`,
     )
-    .all(...userIds) as Subscription[];
+    .all(...userIds, ...(kind ? [kind] : [])) as Subscription[];
 
   const results = await Promise.all(subscriptions.map((s) => sendTo(s, message)));
   let delivered = 0;
@@ -287,7 +316,7 @@ export async function notifySale(visitId: number): Promise<void> {
     body: `${where || "Neuer Abschluss"}${milestone} – jetzt gratulieren!`,
     url: `/team/beitrag/${postId}`,
     tag: `post-${postId}`,
-  });
+  }, "sale");
 }
 
 /** Neuer Kommentar: wer den Beitrag geschrieben hat, erfaehrt es. */
@@ -308,7 +337,7 @@ export async function notifyComment(
     body: text.length > 140 ? `${text.slice(0, 139)}…` : text,
     url: `/team/beitrag/${postId}`,
     tag: `comment-${postId}`,
-  });
+  }, "comment");
 }
 
 /** Neues Abo: die abonnierte Person erfaehrt, wer ihr jetzt folgt. */
@@ -318,5 +347,5 @@ export async function notifyFollow(followeeId: number, follower: { id: number; n
     body: "Bei deinem nächsten Vertrag bekommt das ganze Abo Bescheid.",
     url: `/profil/${follower.id}`,
     tag: `follow-${follower.id}`,
-  });
+  }, "follow");
 }

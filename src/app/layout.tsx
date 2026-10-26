@@ -3,6 +3,8 @@ import "./globals.css";
 import { ServiceWorker } from "@/components/ServiceWorker";
 import { PowerMode } from "@/components/PowerSave";
 import { POWER_SCRIPT } from "@/lib/power";
+import { PREFS_SCRIPT } from "@/lib/preferences";
+import { PrefsSync } from "@/components/PrefsSync";
 
 export const metadata: Metadata = {
   title: { default: "Carlsson Sales", template: "%s · Carlsson Sales" },
@@ -46,13 +48,15 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
-    // Der Energiesparmodus setzt data-power/data-theme schon vor React (POWER_SCRIPT).
+    // Energiesparmodus und Einstellungen (Farbe, Hell/Dunkel, Textgroesse ...)
+    // setzen ihre Merkmale schon vor React (POWER_SCRIPT, PREFS_SCRIPT).
     <html lang="de" suppressHydrationWarning>
       <body>
-        <script dangerouslySetInnerHTML={{ __html: POWER_SCRIPT }} />
+        <script dangerouslySetInnerHTML={{ __html: POWER_SCRIPT + PREFS_SCRIPT }} />
         {children}
         <ServiceWorker />
         <PowerMode />
+        <PrefsSync />
       </body>
     </html>
   );

@@ -13,7 +13,8 @@
     "db:seed": "tsx scripts/seed.ts",
     "energy:refresh": "tsx scripts/refresh-energy.ts",
     "energy:check": "tsx scripts/check-energy-feed.ts",
-    "icons": "node scripts/build-icons.mjs"
+    "icons": "node scripts/build-icons.mjs",
+    "themes": "tsx scripts/build-themes.ts"
   },
   "dependencies": {
     "@mapbox/vector-tile": "^2.0.5",

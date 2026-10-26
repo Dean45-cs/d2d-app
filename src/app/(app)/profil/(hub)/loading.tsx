@@ -22,7 +22,8 @@ export default function LoadingProfileHub() {
       {/* Termine und Erfolge, dazu "Meine Zahlen" (Vertrieb) bzw. "Kunden" (Teamleitung). */}
       <SkeletonList rows={3} icon="glyph" subtitle={false} />
       <ListLabel>Dieses Gerät</ListLabel>
-      <SkeletonList rows={4} icon="glyph" subtitle={false} />
+      {/* Einstellungen, Energiesparmodus, dazu "Als App installieren" im Browser. */}
+      <SkeletonList rows={3} icon="glyph" subtitle />
     </div>
   );
 }

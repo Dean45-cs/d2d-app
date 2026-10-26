@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { PendingSales } from "@/components/PendingSales";
 import { CardQrSheet, ConfirmSheet, useCardUrl, type Sender } from "@/components/BusinessCard";
 import { useToast } from "@/components/Toast";
+import { usePrefs } from "@/components/PrefsSync";
 import { EmptyState, OutcomeGlyph } from "@/components/ui";
 import { IconBan, IconBell, IconBuilding, IconHome, IconMap, IconPlus, IconSparkles } from "@/components/icons";
 import { beginSaleDraft } from "@/lib/sale-drafts-client";
@@ -50,6 +51,7 @@ import {
 } from "@/lib/geo/nearby";
 import type { LevelProgress } from "@/lib/levels";
 import { levelFeedbackText, xpHintsOn, type LevelFeedback } from "@/lib/level-feedback";
+import { buzz, pref } from "@/lib/preferences";
 import { BuildingHeader } from "./BuildingHeader";
 import { DoorFilter, DoorTable, DoorTableAction, type DoorRow } from "./DoorTable";
 import { OutcomeTray, TRAY_ICON, type TrayAction, type TrayTarget } from "./OutcomeTray";
@@ -182,6 +184,8 @@ export function TourClient({
 }: Props) {
   const router = useRouter();
   const toast = useToast();
+  /** Was sich jeder unter Einstellungen -> Klinken selbst einrichtet. */
+  const prefs = usePrefs();
 
   /* ------------------------------ Level --------------------------------- */
 
@@ -192,7 +196,7 @@ export function TourClient({
       if (!feedback) return;
       setLevel(feedback.progress);
       // Nach dem Speichern meldet der Ergebnis-Toast den Aufstieg mit.
-      if (feedback.levelUp && !quiet) {
+      if (feedback.levelUp && !quiet && pref("levelUp")) {
         toast(`Level ${feedback.progress.level} · ${feedback.progress.title}`, {
           icon: <IconSparkles className="h-5 w-5 text-accent-ink" />,
           duration: 4000,
@@ -248,6 +252,8 @@ export function TourClient({
     const storedProduct = recall("d2d_product");
     if (storedProduct === "STROM" || storedProduct === "GAS" || storedProduct === "BEIDES") setProduct(storedProduct);
     if (recall("d2d_street_order") === "list") setStreetOrder("list");
+    // Aus den Einstellungen: gleich nur die offenen Tueren.
+    if (pref("tourOnlyOpen")) setOnlyOpen(true);
   }, []);
 
   /*
@@ -949,13 +955,15 @@ export function TourClient({
         ? [
             text,
             levelFeedbackText(result.progression),
-            result.progression?.levelUp ? result.progression.progress.title : null,
+            result.progression?.levelUp && pref("levelUp") ? result.progression.progress.title : null,
           ]
             .filter(Boolean)
             .join(" · ")
         : result.loggedOut
           ? `${text} · ${LOGGED_OUT}`
           : `${text} · offline gemerkt`;
+    // Kurzes Summen als Bestaetigung - nur wenn eingeschaltet (Einstellungen -> Mitteilungen).
+    buzz();
     // Rueckgaengig bleibt auch nach dem Toast erreichbar (Tagesblatt).
     setLastSaved(result.status === "saved" ? { id: result.id, door: result.door, text } : null);
     toast(
@@ -1020,7 +1028,7 @@ export function TourClient({
     setSheet(null);
     report(result, `Termin ${slotLabel(values.slot)}`);
     // Mit Rufnummer gleich die Bestaetigung anbieten - auch offline, WhatsApp und SMS senden nach.
-    if (values.phone) {
+    if (values.phone && pref("tourConfirm")) {
       setConfirm({
         place,
         phone: values.phone,
@@ -1327,7 +1335,7 @@ export function TourClient({
 
   /* Wie weit die gewaehlte Tuer weg ist - steht man davor (oder ist der Standort zu grob dafuer), nichts. */
   const doorDistance =
-    currentDistance && currentDistance.meters >= Math.max(2 * AT_DOOR, accuracy)
+    prefs.tourDistance && currentDistance && currentDistance.meters >= Math.max(2 * AT_DOOR, accuracy)
       ? `${distanceText(currentDistance, accuracy)} entfernt`
       : null;
 
@@ -1468,9 +1476,11 @@ export function TourClient({
         />
 
         <div className="tour-lists space-y-4">
-          {!inBuilding && <TourAppointments appointments={dueAppointments} now={now} onPick={goToAppointment} />}
+          {!inBuilding && prefs.tourAppointments && (
+            <TourAppointments appointments={dueAppointments} now={now} onPick={goToAppointment} />
+          )}
 
-          {!inBuilding && nearbyHint && (
+          {!inBuilding && nearbyHint && prefs.tourNearbyHint && (
             <TourNearby
               place={nearbyHint.place}
               distance={nearbyHint.distance}

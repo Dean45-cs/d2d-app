@@ -1,4 +1,5 @@
 import type { PermissionSet } from "./permission-definitions";
+import type { AreaId } from "./preferences";
 import type { Role } from "./types";
 
 /*
@@ -39,11 +40,15 @@ export interface NavItem {
   icon: IconName;
   /** Weitere Pfade, die zu diesem Punkt gehoeren (Reiter-Markierung). */
   match?: string[];
+  /** Bereich, der sich in den Einstellungen ausblenden laesst (data-area). */
+  area?: AreaId;
 }
 
 export interface NavSection {
   title?: string;
   items: NavItem[];
+  /** Der ganze Abschnitt laesst sich ausblenden (Einstellungen -> Bereiche). */
+  area?: AreaId;
 }
 
 export interface Navigation {
@@ -67,6 +72,8 @@ export function navigation(role: Role, rights: PermissionSet, userId?: number): 
     label: reports ? "Übersicht" : "Meine Zahlen",
     icon: "chart",
     match: reports ? ["/termine"] : [],
+    // Ohne Teamrecht ist es "Meine Zahlen" im Profil - kein eigener Bereich.
+    area: reports ? "start" : undefined,
   };
   const tour: NavItem = { href: "/tour", label: "Klinken", icon: "door", match: reports ? [] : ["/termine"] };
   const termine: NavItem = {
@@ -107,8 +114,8 @@ export function navigation(role: Role, rights: PermissionSet, userId?: number): 
   const tabs: NavItem[] = [
     ...(reports ? [start] : []),
     tour,
-    { href: "/gebiete", label: "Karte", icon: "map", match: ["/karte"] },
-    { href: "/team", label: "Team", icon: "team", match: ["/profil/"] },
+    { href: "/gebiete", label: "Karte", icon: "map", match: ["/karte"], area: "map" },
+    { href: "/team", label: "Team", icon: "team", match: ["/profil/"], area: "team" },
     // Ohne Teamrecht fuehrt "Meine Zahlen" aus dem Profil - dann bleibt dieser Reiter markiert.
     {
       href: "/profil",
@@ -120,8 +127,8 @@ export function navigation(role: Role, rights: PermissionSet, userId?: number): 
 
   const sidebar: NavSection[] = [
     { items: [start, tour, termine, ...kunden] },
-    { title: "Karte", items: [gebiete, preise] },
-    { title: "Team", items: [feed, rangliste, erfolge] },
+    { title: "Karte", items: [gebiete, preise], area: "map" },
+    { title: "Team", items: [feed, rangliste, erfolge], area: "team" },
     ...(admin.length > 0 ? [{ title: "Verwaltung", items: admin }] : []),
   ];
 

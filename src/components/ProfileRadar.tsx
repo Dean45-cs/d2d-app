@@ -43,12 +43,15 @@ export function ProfileRadar({
   currentLabel,
   previousLabel,
   className = "",
+  section,
 }: {
   subjects: ProfileSubject[];
   currentLabel: string;
   /** null: kein Vergleich moeglich ("Gesamt"). */
   previousLabel: string | null;
   className?: string;
+  /** Abschnitt der Uebersicht, der sich ausblenden laesst (data-start). */
+  section?: string;
 }) {
   const [subjectId, setSubjectId] = useState(subjects[0]?.id ?? 0);
   const [selected, setSelected] = useState<ProfileAxisKey | null>(null);
@@ -81,7 +84,7 @@ export function ProfileRadar({
     ) : undefined;
 
   return (
-    <section className={className}>
+    <section className={className} data-start={section}>
       <SectionHeader title="Profil" action={picker} />
       <figure className="surface m-0 flex flex-1 flex-col p-4">
         <svg

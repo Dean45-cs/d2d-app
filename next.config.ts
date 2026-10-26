@@ -57,7 +57,6 @@ const nextConfig: NextConfig = {
       { source: "/auswertung", destination: "/start", permanent: false },
       { source: "/einladungen", destination: "/einstellungen/einladungen", permanent: false },
       { source: "/berechtigungen", destination: "/einstellungen/rechte", permanent: false },
-      { source: "/einstellungen", destination: "/profil", permanent: false },
     ];
   },
 };

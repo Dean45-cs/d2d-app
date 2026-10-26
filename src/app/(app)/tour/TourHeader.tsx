@@ -4,11 +4,9 @@ import Link from "next/link";
 import { IconCalendar, IconChevronDown, IconCloudUp, IconOffline, IconQr } from "@/components/icons";
 import { ProgressRing } from "@/components/ui";
 import { ProviderLine } from "@/components/ProviderRating";
+import { usePrefs } from "@/components/PrefsSync";
 import type { StreetWithStats } from "@/lib/queries";
 import type { TerritoryLite } from "./model";
-
-/** Tagesziel fuer den Ring oben links - dasselbe wie unter "Erfolge". */
-const DAILY_DOORS = 20;
 
 /**
  * Kopf der Tuer-Erfassung: wo bin ich (Strasse, Gebiet), wie weit bin ich
@@ -37,6 +35,8 @@ export function TourHeader({
   /** Visitenkarte zum Vorzeigen - nur, wenn sie eingeschaltet ist. */
   onCard?: () => void;
 }) {
+  // Tagesziel fuer den Ring oben links - dasselbe wie unter "Erfolge" (Einstellungen -> Ziele).
+  const { goalDoors } = usePrefs();
   const place = territory
     ? [territory.name, [territory.postal_code, territory.city].filter(Boolean).join(" ")].filter(Boolean).join(" · ")
     : "Gebiet wählen";
@@ -50,7 +50,10 @@ export function TourHeader({
           className="-ml-2 flex min-h-11 items-center gap-2 rounded-full pl-2 pr-3 transition-colors hover:bg-hover"
           aria-label={`Heute ${todayDoors} Türen – Tagesübersicht öffnen`}
         >
-          <ProgressRing value={todayDoors} max={DAILY_DOORS} size={28} stroke={4} />
+          {/* Ring, Visitenkarte und Versorger lassen sich in den Einstellungen ausblenden (data-tour). */}
+          <span className="contents" data-tour="ring">
+            <ProgressRing value={todayDoors} max={goalDoors} size={28} stroke={4} />
+          </span>
           <span className="text-subhead font-semibold">
             {todayDoors} <span className="font-normal text-ink-2">{todayDoors === 1 ? "Tür" : "Türen"} heute</span>
           </span>
@@ -58,7 +61,7 @@ export function TourHeader({
         <span className="flex-1" />
         <QueueBadge online={online} pendingCount={pendingCount} onClick={onDay} />
         {onCard && (
-          <button type="button" onClick={onCard} className="icon-btn" aria-label="Visitenkarte zeigen">
+          <button type="button" onClick={onCard} className="icon-btn" aria-label="Visitenkarte zeigen" data-tour="card">
             <IconQr className="h-6 w-6" />
           </button>
         )}
@@ -87,7 +90,11 @@ export function TourHeader({
       </button>
       <p className="mt-1 truncate text-subhead text-ink-2">{place}</p>
       {/* An der Tuer das wichtigste Argument: wer liefert, zu welchem Preis. */}
-      {territory && <ProviderLine info={territory.provider} className="mt-1 md:max-w-md" />}
+      {territory && (
+        <div data-tour="provider">
+          <ProviderLine info={territory.provider} className="mt-1 md:max-w-md" />
+        </div>
+      )}
     </header>
   );
 }

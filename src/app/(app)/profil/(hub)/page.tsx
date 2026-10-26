@@ -10,10 +10,18 @@ import { berlinToday } from "@/lib/contracts";
 import { Avatar, Cell, ListLabel, PageHeader, ToneTile, type SymbolTone } from "@/components/ui";
 import { NAV_ICONS } from "@/components/nav-icons";
 import { InstallCell } from "@/components/InstallHint";
-import { PushRows } from "@/components/community/PushToggle";
 import { PowerSaveCell } from "@/components/PowerSave";
-import { XpHintsCell } from "@/components/XpHintsCell";
-import { IconCalendar, IconChart, IconContacts, IconQr, IconSparkles, IconTarget } from "@/components/icons";
+import {
+  IconCalendar,
+  IconChart,
+  IconCog,
+  IconComment,
+  IconContacts,
+  IconMap,
+  IconQr,
+  IconSparkles,
+  IconTarget,
+} from "@/components/icons";
 import { LogoutCell } from "./LogoutCell";
 import { PasswordCell } from "./PasswordCell";
 
@@ -88,13 +96,31 @@ export default async function ProfileHubPage() {
         <li>
           <Cell href="/team/erfolge" icon={<ToneTile tone="brown"><IconSparkles className="h-4 w-4" /></ToneTile>} title="Erfolge" />
         </li>
+        {/* In den Einstellungen ausgeblendete Bereiche bleiben hier erreichbar (globals.css, data-area-link). */}
+        {rights["reports.team"] && (
+          <li data-area-link="start">
+            <Cell href="/start" icon={<ToneTile tone="teal"><IconChart className="h-4 w-4" /></ToneTile>} title="Übersicht" />
+          </li>
+        )}
+        <li data-area-link="map">
+          <Cell href="/gebiete" icon={<ToneTile tone="blue"><IconMap className="h-4 w-4" /></ToneTile>} title="Karte" />
+        </li>
+        <li data-area-link="team">
+          <Cell href="/team" icon={<ToneTile tone="purple"><IconComment className="h-4 w-4" /></ToneTile>} title="Team" />
+        </li>
       </ul>
 
       <ListLabel>Dieses Gerät</ListLabel>
       <ul className="list list-icons">
-        <PushRows />
+        <li>
+          <Cell
+            href="/einstellungen"
+            icon={<ToneTile tone="slate"><IconCog className="h-4 w-4" /></ToneTile>}
+            title="Einstellungen"
+            subtitle="Farbe, Klinken, Karte, Mitteilungen …"
+          />
+        </li>
         <PowerSaveCell />
-        <XpHintsCell />
         <InstallCell />
       </ul>
 

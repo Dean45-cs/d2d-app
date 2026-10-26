@@ -13,6 +13,9 @@ import {
   type PushState,
 } from "@/lib/push-client";
 
+/** Merker fuer den weggetippten Push-Hinweis im Feed (Einstellungen -> Mitteilungen holt ihn zurueck). */
+export const PUSH_BANNER_KEY = "d2d-push-banner";
+
 function usePush() {
   const [state, setState] = useState<PushState | null>(null);
   const [busy, setBusy] = useState(false);
@@ -111,7 +114,7 @@ export function PushBanner() {
 
   useEffect(() => {
     try {
-      setDismissed(localStorage.getItem("d2d-push-banner") === "hidden");
+      setDismissed(localStorage.getItem(PUSH_BANNER_KEY) === "hidden");
     } catch {
       setDismissed(false);
     }
@@ -120,7 +123,7 @@ export function PushBanner() {
   function dismiss() {
     setDismissed(true);
     try {
-      localStorage.setItem("d2d-push-banner", "hidden");
+      localStorage.setItem(PUSH_BANNER_KEY, "hidden");
     } catch {
       // Ohne Speicher erscheint der Hinweis eben wieder.
     }

@@ -11,6 +11,7 @@ import {
   type ReactNode,
 } from "react";
 import { IconCheck } from "./icons";
+import { toastDuration } from "@/lib/preferences";
 
 export interface ToastOptions {
   /** Ein Knopf im Toast - etwa "Rückgängig". */
@@ -45,7 +46,8 @@ export function ToastProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (!toast) return;
-    const duration = toast.duration ?? (toast.action ? 5200 : 2800);
+    // Kurz, normal oder lang - Einstellungen -> Mitteilungen.
+    const duration = toastDuration(toast.duration ?? (toast.action ? 5200 : 2800));
     const timer = window.setTimeout(() => setToast(null), duration);
     return () => window.clearTimeout(timer);
   }, [toast]);
