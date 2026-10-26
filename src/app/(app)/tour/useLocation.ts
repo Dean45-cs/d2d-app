@@ -3,7 +3,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { LatLng } from "@/lib/geo/area";
 import { SAVE_FIX_MS, powerSaving, whileActive } from "@/lib/power";
+import { pref } from "@/lib/preferences";
 import { usePowerSaving } from "@/components/PowerSave";
+import { usePrefs } from "@/components/PrefsSync";
 
 export interface Fix {
   point: LatLng;
@@ -13,13 +15,17 @@ export interface Fix {
   at: number;
 }
 
-/** "off": Super-Energiesparmodus - geortet wird nur auf Antippen. */
-export type LocationStatus = "searching" | "ok" | "off" | "denied" | "unavailable" | "unsupported";
+/**
+ * "off": Super-Energiesparmodus, "manual": Einstellungen -> Klinken -> "Nur
+ * auf Antippen" - in beiden Faellen ortet nur "In meiner Nähe".
+ */
+export type LocationStatus = "searching" | "ok" | "off" | "manual" | "denied" | "unavailable" | "unsupported";
 
 /** Was "In meiner Nähe" dazu sagt, wenn es keinen Standort gibt. */
 export const LOCATION_NOTE: Record<Exclude<LocationStatus, "ok">, string> = {
   searching: "Standort wird gesucht …",
   off: "Energiesparmodus – Standort auf Antippen",
+  manual: "Standort nur auf Antippen – „In meiner Nähe“ ortet",
   denied: "Standort nicht freigegeben – in den Einstellungen des Browsers erlauben",
   unavailable: "Standort gerade nicht verfügbar",
   unsupported: "Dieses Gerät gibt den Standort nicht frei",
@@ -42,12 +48,14 @@ const ONCE_LIMIT = 12_000;
  * oder eine Zeitueberschreitung loescht den letzten Stand nicht: der ist
  * meist nur Sekunden alt und besser als keiner.
  *
- * Im Super-Energiesparmodus ortet nur `locate` ("In meiner Nähe"), und der
- * Stand verfaellt nach SAVE_FIX_MS - danach stimmen Entfernungen und die
+ * Im Super-Energiesparmodus (und mit "Nur auf Antippen" aus den
+ * Einstellungen) ortet nur `locate` ("In meiner Nähe"), und der Stand
+ * verfaellt nach SAVE_FIX_MS - danach stimmen Entfernungen und die
  * mitgespeicherte Position nicht mehr.
  */
 export function useLocation() {
   const saving = usePowerSaving();
+  const manual = usePrefs().tourLocation === "tap";
   const [fix, setFix] = useState<Fix | null>(null);
   const [status, setStatus] = useState<LocationStatus>("searching");
   const last = useRef<Fix | null>(null);
@@ -78,12 +86,13 @@ export function useLocation() {
       setStatus("unsupported");
       return;
     }
-    // powerSaving() statt saving: das ist beim ersten Durchlauf noch "aus".
-    if (powerSaving()) {
-      setStatus((current) => (current === "denied" ? current : last.current ? "ok" : "off"));
+    // powerSaving()/pref() statt saving/manual: die melden beim ersten Durchlauf noch den Standard.
+    const resting: LocationStatus | null = powerSaving() ? "off" : pref("tourLocation") === "tap" ? "manual" : null;
+    if (resting) {
+      setStatus((current) => (current === "denied" ? current : last.current ? "ok" : resting));
       return;
     }
-    if (!last.current) setStatus((current) => (current === "off" ? "searching" : current));
+    if (!last.current) setStatus((current) => (current === "off" || current === "manual" ? "searching" : current));
     let watch: number | null = null;
     // Zurueck in der App (auch nach dem Freigeben in den Einstellungen) oder
     // wieder bedient: wieder orten.
@@ -96,21 +105,21 @@ export function useLocation() {
         watch = null;
       },
     );
-  }, [receive, fail, saving]);
+  }, [receive, fail, saving, manual]);
 
-  // Energiesparmodus: ein alter Stand gilt nicht mehr.
+  // Nur auf Antippen: ein alter Stand gilt nicht mehr.
   useEffect(() => {
-    if (!saving || !fix) return;
+    if ((!saving && !manual) || !fix) return;
     const timer = window.setTimeout(
       () => {
         last.current = null;
         setFix(null);
-        setStatus((current) => (current === "ok" ? "off" : current));
+        setStatus((current) => (current === "ok" ? (saving ? "off" : "manual") : current));
       },
       Math.max(0, fix.at + SAVE_FIX_MS - Date.now()),
     );
     return () => window.clearTimeout(timer);
-  }, [saving, fix]);
+  }, [saving, manual, fix]);
 
   /** Jetzt einmal frisch orten - fuer den Knopf "In meiner Nähe". */
   const locate = useCallback(

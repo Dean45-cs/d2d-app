@@ -1,6 +1,6 @@
 import { getDb } from "./db";
 import { appointmentUtc } from "./appointment-time";
-import { pushToUsers, type PushMessage } from "./push";
+import { PUSH_KIND_ALLOWED, pushToUsers, type PushMessage } from "./push";
 
 interface Reminder {
   id: number;
@@ -22,8 +22,9 @@ export async function sendAppointmentReminders(now = new Date(), send = pushToUs
     WHERE v.outcome = 'APPOINTMENT' AND v.follow_up_done_at IS NULL
       AND v.follow_up_at BETWEEN ? AND ?
       AND u.active = 1 AND u.team_id = v.team_id
-      AND EXISTS (SELECT 1 FROM push_subscriptions p WHERE p.user_id = u.id)`)
-    .all(slot(-86_400_000), slot(86_400_000)) as Reminder[];
+      AND EXISTS (SELECT 1 FROM push_subscriptions p WHERE p.user_id = u.id)
+      AND ${PUSH_KIND_ALLOWED}`)
+    .all(slot(-86_400_000), slot(86_400_000), "reminder") as Reminder[];
   let delivered = 0;
   for (const row of rows) {
     let start: number;

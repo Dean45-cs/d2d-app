@@ -12,6 +12,7 @@ import { forgetPushDevice } from "@/lib/push-client";
 import { fetchWithTimeout, flush } from "@/lib/offline-queue";
 import { clearOfflinePages } from "@/lib/offline-pages";
 import { useToast } from "./Toast";
+import { usePrefs } from "./PrefsSync";
 
 export interface NavUser {
   id: number;
@@ -60,11 +61,14 @@ export function TabBar({ tabs, user }: { tabs: NavItem[]; user: NavUser }) {
   const active = activeHref(tabs, pathname);
   const [collapsed, setCollapsed] = useState(false);
   const last = useRef(0);
+  const { tabbarShrink } = usePrefs();
 
   // Nach unten rollen: die Leiste schrumpft auf den aktiven Reiter.
   // Nach oben rollen oder oben angekommen: sie ist wieder ganz da.
+  // In den Einstellungen abschaltbar - dann bleibt sie immer ganz.
   useEffect(() => {
     setCollapsed(false);
+    if (!tabbarShrink) return;
     last.current = window.scrollY;
     let frame = 0;
     const onScroll = () => {
@@ -83,7 +87,7 @@ export function TabBar({ tabs, user }: { tabs: NavItem[]; user: NavUser }) {
       window.removeEventListener("scroll", onScroll);
       cancelAnimationFrame(frame);
     };
-  }, [pathname]);
+  }, [pathname, tabbarShrink]);
 
   return (
     <nav
@@ -102,6 +106,7 @@ export function TabBar({ tabs, user }: { tabs: NavItem[]; user: NavUser }) {
             href={item.href}
             aria-current={isActive ? "page" : undefined}
             className="tabbar-item"
+            data-area={item.area}
             onClick={(event) => {
               if (collapsed) {
                 event.preventDefault();
@@ -141,7 +146,8 @@ export function Sidebar({ sections, user }: { sections: NavSection[]; user: NavU
     href: "/profil",
     label: "Profil",
     icon: "profile",
-    match: [`/profil/${user.id}`, "/profil/visitenkarte"],
+    // Die eigenen Einstellungen gehoeren zum Profil - die Verwaltung darunter hat eigene Punkte.
+    match: [`/profil/${user.id}`, "/profil/visitenkarte", "/einstellungen"],
   };
   const active = activeHref([...sections.flatMap((s) => s.items), account], pathname);
 
@@ -170,7 +176,7 @@ export function Sidebar({ sections, user }: { sections: NavSection[]; user: NavU
 
       <nav className="flex-1 space-y-4 overflow-y-auto overflow-x-hidden px-3 pb-4" aria-label="Hauptnavigation">
         {sections.map((section, index) => (
-          <div key={section.title ?? index}>
+          <div key={section.title ?? index} data-area={section.area}>
             {section.title && (
               <p className="sidebar-text sidebar-heading">{section.title}</p>
             )}
@@ -180,7 +186,7 @@ export function Sidebar({ sections, user }: { sections: NavSection[]; user: NavU
                 const icons = NAV_ICONS[item.icon];
                 const Icon = isActive ? icons.fill : icons.line;
                 return (
-                  <li key={item.href}>
+                  <li key={item.href} data-area={section.area ? undefined : item.area}>
                     <Link
                       href={item.href}
                       aria-current={isActive ? "page" : undefined}

@@ -146,7 +146,9 @@ export default async function StartPage({ searchParams }: { searchParams: Promis
 
       <PendingSales userId={user.id} />
 
+      {/* Abschnitte lassen sich in den Einstellungen ausblenden (data-start, globals.css). */}
       <HeroStats
+        section="hero"
         lead={{ label: "Abschlüsse", value: sales, hint: `${percent(sales, met)} Quote` }}
         stats={[
           { label: "Türen", value: doors, hint: `${sum.not_home ?? 0} nicht da` },
@@ -158,7 +160,7 @@ export default async function StartPage({ searchParams }: { searchParams: Promis
       <div className="mt-8 grid grid-cols-1 gap-8 lg:grid-cols-3">
         {/* Verlauf und Profil nebeneinander, sobald beide genug Breite haben. */}
         <div className="grid grid-cols-1 gap-8 lg:col-span-2 xl:grid-cols-2">
-          <section className="flex flex-col">
+          <section className="flex flex-col" data-start="history">
             <SectionHeader title="Verlauf" />
             {/* Neben dem hoeheren Profil mittig statt oben mit Loch darunter. */}
             <div className="surface flex-1 p-4 xl:flex xl:flex-col xl:justify-center">
@@ -170,11 +172,12 @@ export default async function StartPage({ searchParams }: { searchParams: Promis
             currentLabel={RANGE_TITLE[key]}
             previousLabel={PREVIOUS_TITLE[key]}
             className="flex flex-col"
+            section="radar"
           />
         </div>
 
         <div className="space-y-8">
-          <section>
+          <section data-start="appointments">
             <SectionHeader title="Termine" count={openAppointments} href="/termine" />
             {appointments.length === 0 ? (
               <div className="surface">
@@ -198,7 +201,7 @@ export default async function StartPage({ searchParams }: { searchParams: Promis
           </section>
 
           {recalls.length > 0 && (
-            <section>
+            <section data-start="recalls">
               <SectionHeader title="Umberatung fällig" count={dueCustomers} href="/kunden?ansicht=faellig" />
               <ul className="list list-icons">
                 {recalls.map((item) => (
@@ -220,7 +223,7 @@ export default async function StartPage({ searchParams }: { searchParams: Promis
         </div>
 
         {team && (
-          <section className="lg:col-span-2">
+          <section className="lg:col-span-2" data-start="team">
             <SectionHeader title="Team" href="/team/rangliste" linkLabel="Rangliste" />
             {members.length === 0 ? (
               <div className="surface">
@@ -283,13 +286,13 @@ export default async function StartPage({ searchParams }: { searchParams: Promis
           </section>
         )}
 
-        <section className={team ? "" : "lg:col-span-1"}>
+        <section className={team ? "" : "lg:col-span-1"} data-start="reasons">
           <SectionHeader title="Ablehnungsgründe" />
           <ReasonBars data={reasons} limit={6} />
         </section>
 
         {team && (
-          <section className="lg:col-span-2">
+          <section className="lg:col-span-2" data-start="territories">
             <SectionHeader
               title="Gebiete"
               count={activeTerritories.length}
@@ -344,7 +347,7 @@ export default async function StartPage({ searchParams }: { searchParams: Promis
         )}
 
         {team && topPriced && (
-          <section>
+          <section data-start="provider">
             <SectionHeader title="Teuerster Grundversorger" />
             <p className="mb-2 px-1 text-footnote text-muted">{topPriced.name}</p>
             <ProviderSummary
@@ -354,7 +357,7 @@ export default async function StartPage({ searchParams }: { searchParams: Promis
           </section>
         )}
 
-        <section className={team ? "" : "lg:col-span-2"}>
+        <section className={team ? "" : "lg:col-span-2"} data-start="contacts">
           {/* Gezaehlt werden alle Tueren im Zeitraum - die Liste zeigt nur die letzten. */}
           <SectionHeader title="Kontakte" count={doors || undefined} />
           {recent.length === 0 ? (

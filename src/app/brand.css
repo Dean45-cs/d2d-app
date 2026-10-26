@@ -4,7 +4,14 @@
    (Energie-Gruen), die zwei Signale (Rot, Bernstein) und die Datenfarben
    fuer Diagramme und Karten. Alles Neutrale (Flaechen, Schrift, Linien)
    steht in globals.css. Werte und Kontraste sind in docs/DESIGN.md belegt.
+
+   Akzentfarben (Einstellungen -> Darstellung): jedes Token liest zuerst
+   sein --t-Gegenstueck, das ein Thema in themes.css setzt - hell als
+   --t-name, dunkel als --t-name-d. Ohne Thema gilt der Wert dahinter: das
+   Gruen, wie es gestaltet ist. Erzeugt aus src/lib/theme-palette.ts.
    ========================================================================== */
+@import "./themes.css";
+
 :root {
   /* Energie-Gruen. Rollen, nie vermischen:
      --accent       Fuellung und Bedienelemente (Ring, Fortschritt, Schalter)
@@ -13,30 +20,43 @@
      --accent-vivid nur zum Toenen (color-mix), nie als Schrift
      --primary-*    die Hauptaktion: tiefgruener Verlauf mit weisser Schrift,
                     schon am hellen Ende >= 4.5:1 */
-  --accent: #15904a;
-  --accent-ink: #0c6a34;
-  --accent-vivid: #2fd161;
-  --primary-top: #16884a;
-  --primary-bottom: #0d6634;
+  --accent: var(--t-accent, #15904a);
+  --accent-ink: var(--t-accent-ink, #0c6a34);
+  --accent-vivid: var(--t-accent-vivid, #2fd161);
+  --primary-top: var(--t-primary-top, #16884a);
+  --primary-bottom: var(--t-primary-bottom, #0d6634);
   --primary: linear-gradient(180deg, var(--primary-top), var(--primary-bottom));
   --on-primary: #ffffff;
   --elev-primary: inset 0 1px 0 rgb(255 255 255 / 0.22), inset 0 0 0 1px rgb(0 0 0 / 0.08),
-    0 1px 2px rgb(8 60 30 / 0.22), 0 8px 18px -8px rgb(14 108 53 / 0.55);
+    0 1px 2px rgb(var(--t-deep-shadow, 8 60 30) / 0.22), 0 8px 18px -8px rgb(var(--t-glow-shadow, 14 108 53) / 0.55);
   /* Leise Auswahl (aktiver Reiter, Seitenleiste) */
   --accent-soft: color-mix(in srgb, var(--accent) 12%, transparent);
   /* Markenflaeche (Kopfkarte der Uebersicht, Anmeldung): tiefes Gruen,
      weisse Schrift >= 9:1 */
-  --brand-deep: #0f4d2a;
-  --brand-deeper: #0a361e;
-  --brand-glow: rgb(70 214 128 / 0.35);
+  --brand-deep: var(--t-brand-deep, #0f4d2a);
+  --brand-deeper: var(--t-brand-deeper, #0a361e);
+  --brand-glow: rgb(var(--t-brand-glow, 70 214 128) / 0.35);
   /* Licht hinter der Anmeldung */
-  --backdrop-glow: rgb(46 190 105 / 0.2);
-  --backdrop-glow-2: rgb(46 190 105 / 0.08);
+  --backdrop-glow: rgb(var(--t-backdrop, 46 190 105) / 0.2);
+  --backdrop-glow-2: rgb(var(--t-backdrop, 46 190 105) / 0.08);
+  /* Schatten in der Farbe der Marke (Kopfkarte, Bildmarke, gewaehlter Chip)
+     lesen --t-deep-shadow und --t-glow-shadow direkt in globals.css - jeder
+     mit seinem eigenen gruenen Wert dahinter. */
   /* Zeichen auf voller Akzentflaeche (Haekchen eines Abschlusses) */
   --on-accent: #ffffff;
   --accent-tint: color-mix(in srgb, var(--accent-vivid) 16%, transparent);
   --accent-tint-strong: color-mix(in srgb, var(--accent-vivid) 26%, transparent);
   --accent-edge: color-mix(in srgb, var(--accent) 34%, transparent);
+
+  /* Bildmarke (Logo.tsx): Verlauf des Symbols, helle Marke, Leuchten, Schatten */
+  --logo-1: var(--t-logo-1, #46e38e);
+  --logo-2: var(--t-logo-2, #17a852);
+  --logo-3: var(--t-logo-3, #06612f);
+  --logo-ring: var(--t-logo-ring, #cff7de);
+  --logo-dot: var(--t-logo-dot, #d4f9e1);
+  --logo-halo: var(--t-logo-halo, #f0fff5);
+  --logo-halo-2: var(--t-logo-halo-2, #bdffd6);
+  --logo-shadow: var(--t-logo-shadow, #00361a);
 
   /* Signale - nur klein und nie allein (immer mit Zeichen oder Wort) */
   --danger: #c9182a;
@@ -45,12 +65,12 @@
   --warn-tint: color-mix(in srgb, #ff9f0a 16%, transparent);
 
   /* Diagramme: Tueren neutral, Abschluesse im Akzent (>= 3:1 auf Weiss) */
-  --chart-doors: #8a978f;
-  --chart-met: #36413b;
+  --chart-doors: var(--t-chart-doors, #8a978f);
+  --chart-met: var(--t-chart-met, #36413b);
   --chart-sales: var(--accent);
   /* Verlauf: die Tuer-Saeule ist nur die Spur, in der die Abschluesse
      stehen - jeder Tag steht zusaetzlich als Text daneben (sr-only, title). */
-  --chart-doors-soft: #c9d2cd;
+  --chart-doors-soft: var(--t-chart-doors-soft, #c9d2cd);
 
   /* Teilgebiete auf der Karte. Vier Farben, als Satz gegen Rot-Gruen-
      Schwaeche geprueft; die Zahl im Kreis bleibt die eigentliche
@@ -63,11 +83,11 @@
   /* Preisstufen der Energiekarte - sequenziell von grau (wenig Argument)
      zu tiefgruen (starkes Wechselargument). Die Helligkeit steigt stetig,
      so bleiben die Stufen auch ohne Farbsehen unterscheidbar. */
-  --price-0: #c7ccc9;
-  --price-1: #9dbfa8;
-  --price-2: #5fb37c;
-  --price-3: #22a052;
-  --price-4: #0b7a35;
+  --price-0: var(--t-price-0, #c7ccc9);
+  --price-1: var(--t-price-1, #9dbfa8);
+  --price-2: var(--t-price-2, #5fb37c);
+  --price-3: var(--t-price-3, #22a052);
+  --price-4: var(--t-price-4, #0b7a35);
   --price-none: #aeaeb2;
 
   /* Symboltoene - nur fuer die Kacheln der Ablehnungsgruende (ReasonTile),
@@ -94,19 +114,19 @@
 /* Dunkel: eigene, gegen #000 / #1c1c1e gepruefte Stufen */
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --accent: #30d158;
-    --accent-ink: #34d66b;
-    --accent-vivid: #30d158;
-    --primary-top: #16884a;
-    --primary-bottom: #0e6b37;
+    --accent: var(--t-accent-d, #30d158);
+    --accent-ink: var(--t-accent-ink-d, #34d66b);
+    --accent-vivid: var(--t-accent-d, #30d158);
+    --primary-top: var(--t-primary-top-d, #16884a);
+    --primary-bottom: var(--t-primary-bottom-d, #0e6b37);
     --elev-primary: inset 0 1px 0 rgb(255 255 255 / 0.18), inset 0 0 0 1px rgb(255 255 255 / 0.04),
-      0 1px 2px rgb(0 0 0 / 0.5), 0 8px 20px -8px rgb(23 144 76 / 0.45);
+      0 1px 2px rgb(0 0 0 / 0.5), 0 8px 20px -8px rgb(var(--t-glow-shadow-d, 23 144 76) / 0.45);
     --accent-soft: color-mix(in srgb, var(--accent) 18%, transparent);
-    --brand-deep: #0e4426;
-    --brand-deeper: #062414;
-    --backdrop-glow: rgb(48 209 88 / 0.16);
-    --backdrop-glow-2: rgb(48 209 88 / 0.06);
-    --on-accent: #062611;
+    --brand-deep: var(--t-brand-deep-d, #0e4426);
+    --brand-deeper: var(--t-brand-deeper-d, #062414);
+    --backdrop-glow: rgb(var(--t-backdrop-d, 48 209 88) / 0.16);
+    --backdrop-glow-2: rgb(var(--t-backdrop-d, 48 209 88) / 0.06);
+    --on-accent: var(--t-on-accent-d, #062611);
     --accent-tint: color-mix(in srgb, var(--accent-vivid) 20%, transparent);
     --accent-tint-strong: color-mix(in srgb, var(--accent-vivid) 30%, transparent);
     --accent-edge: color-mix(in srgb, var(--accent) 40%, transparent);
@@ -114,36 +134,36 @@
     --danger-tint: color-mix(in srgb, #ff453a 18%, transparent);
     --warn: #ffb547;
     --warn-tint: color-mix(in srgb, #ff9f0a 20%, transparent);
-    --chart-doors: #8e9a94;
-    --chart-met: #d0d7d3;
-    --chart-doors-soft: #36403b;
+    --chart-doors: var(--t-chart-doors-d, #8e9a94);
+    --chart-met: var(--t-chart-met-d, #d0d7d3);
+    --chart-doors-soft: var(--t-chart-doors-soft-d, #36403b);
     --plot-1: #3987e5;
     --plot-2: #c98500;
     --plot-3: #d55181;
     --plot-4: #008300;
-    --price-0: #4a4f4c;
-    --price-1: #3f6b4e;
-    --price-2: #2e8f52;
-    --price-3: #2bb45e;
-    --price-4: #3be077;
+    --price-0: var(--t-price-0-d, #4a4f4c);
+    --price-1: var(--t-price-1-d, #3f6b4e);
+    --price-2: var(--t-price-2-d, #2e8f52);
+    --price-3: var(--t-price-3-d, #2bb45e);
+    --price-4: var(--t-price-4-d, #3be077);
     --price-none: #636366;
   }
 }
 
 :root[data-theme="dark"] {
-  --accent: #30d158;
-  --accent-ink: #34d66b;
-  --accent-vivid: #30d158;
-  --primary-top: #16884a;
-  --primary-bottom: #0e6b37;
+  --accent: var(--t-accent-d, #30d158);
+  --accent-ink: var(--t-accent-ink-d, #34d66b);
+  --accent-vivid: var(--t-accent-d, #30d158);
+  --primary-top: var(--t-primary-top-d, #16884a);
+  --primary-bottom: var(--t-primary-bottom-d, #0e6b37);
   --elev-primary: inset 0 1px 0 rgb(255 255 255 / 0.18), inset 0 0 0 1px rgb(255 255 255 / 0.04),
-    0 1px 2px rgb(0 0 0 / 0.5), 0 8px 20px -8px rgb(23 144 76 / 0.45);
+    0 1px 2px rgb(0 0 0 / 0.5), 0 8px 20px -8px rgb(var(--t-glow-shadow-d, 23 144 76) / 0.45);
   --accent-soft: color-mix(in srgb, var(--accent) 18%, transparent);
-  --brand-deep: #0e4426;
-  --brand-deeper: #062414;
-  --backdrop-glow: rgb(48 209 88 / 0.16);
-  --backdrop-glow-2: rgb(48 209 88 / 0.06);
-  --on-accent: #062611;
+  --brand-deep: var(--t-brand-deep-d, #0e4426);
+  --brand-deeper: var(--t-brand-deeper-d, #062414);
+  --backdrop-glow: rgb(var(--t-backdrop-d, 48 209 88) / 0.16);
+  --backdrop-glow-2: rgb(var(--t-backdrop-d, 48 209 88) / 0.06);
+  --on-accent: var(--t-on-accent-d, #062611);
   --accent-tint: color-mix(in srgb, var(--accent-vivid) 20%, transparent);
   --accent-tint-strong: color-mix(in srgb, var(--accent-vivid) 30%, transparent);
   --accent-edge: color-mix(in srgb, var(--accent) 40%, transparent);
@@ -151,17 +171,17 @@
   --danger-tint: color-mix(in srgb, #ff453a 18%, transparent);
   --warn: #ffb547;
   --warn-tint: color-mix(in srgb, #ff9f0a 20%, transparent);
-  --chart-doors: #8e9a94;
-  --chart-met: #d0d7d3;
-  --chart-doors-soft: #36403b;
+  --chart-doors: var(--t-chart-doors-d, #8e9a94);
+  --chart-met: var(--t-chart-met-d, #d0d7d3);
+  --chart-doors-soft: var(--t-chart-doors-soft-d, #36403b);
   --plot-1: #3987e5;
   --plot-2: #c98500;
   --plot-3: #d55181;
   --plot-4: #008300;
-  --price-0: #4a4f4c;
-  --price-1: #3f6b4e;
-  --price-2: #2e8f52;
-  --price-3: #2bb45e;
-  --price-4: #3be077;
+  --price-0: var(--t-price-0-d, #4a4f4c);
+  --price-1: var(--t-price-1-d, #3f6b4e);
+  --price-2: var(--t-price-2-d, #2e8f52);
+  --price-3: var(--t-price-3-d, #2bb45e);
+  --price-4: var(--t-price-4-d, #3be077);
   --price-none: #636366;
 }

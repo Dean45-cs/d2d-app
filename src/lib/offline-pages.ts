@@ -7,6 +7,7 @@
  */
 
 import { powerSaving } from "./power";
+import { pref } from "./preferences";
 
 /** Wie der Service Worker seine Seitenablage benennt (d2d-pages-<Version>). */
 const PAGE_CACHE_PREFIX = "d2d-pages-";
@@ -60,14 +61,16 @@ export function forgetOfflineCopy(): void {
 }
 
 /**
- * Lohnt das Auffrischen gerade? Nur auf Handy und Tablet (dort faellt das
- * Netz weg), nicht im Datensparmodus und hoechstens alle WARM_INTERVAL_MS
+ * Lohnt das Auffrischen gerade? Nur wenn eingeschaltet, nur auf Handy und
+ * Tablet (dort faellt das Netz weg), nicht im Datensparmodus und hoechstens alle WARM_INTERVAL_MS
  * (im Super-Energiesparmodus alle SAVE_WARM_INTERVAL_MS).
  */
 export function shouldWarm(
   now = Date.now(),
   interval = powerSaving() ? SAVE_WARM_INTERVAL_MS : WARM_INTERVAL_MS,
 ): boolean {
+  // Abschaltbar unter Einstellungen -> Dieses Gerät; der Start ohne Netz zeigt dann den Stand des letzten Besuchs.
+  if (!pref("offlineWarm")) return false;
   if (!navigator.onLine || !navigator.serviceWorker?.controller) return false;
   const connection = (navigator as Navigator & { connection?: { saveData?: boolean } }).connection;
   if (connection?.saveData) return false;

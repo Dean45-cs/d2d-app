@@ -1,4 +1,5 @@
 import type { LevelProgress } from "./levels";
+import { pref } from "./preferences";
 
 /** Only a confirmed server response may change the displayed XP balance. */
 export interface LevelFeedback {
@@ -51,7 +52,8 @@ export function onXpHintsChange(listener: () => void): () => void {
 
 export function levelFeedbackText(feedback?: LevelFeedback): string {
   if (!feedback || feedback.awardedXp <= 0) return "";
-  const levelUp = feedback.levelUp ? `Level ${feedback.progress.level} erreicht!` : "";
+  // Den Aufstieg nennen, solange er unter Einstellungen -> Ziele nicht abgeschaltet ist.
+  const levelUp = feedback.levelUp && pref("levelUp") ? `Level ${feedback.progress.level} erreicht!` : "";
   if (!xpHintsOn()) return levelUp;
   return `+${feedback.awardedXp.toLocaleString("de-DE")} XP${levelUp ? ` · ${levelUp}` : ""}`;
 }

@@ -119,6 +119,47 @@ je Tag als Text (`title`, für Bildschirmleser `sr-only`). Bei
 `prefers-contrast: more` wird Glas fest, Flächen bekommen eine volle Kante,
 Haarlinien und `--muted` werden dunkler.
 
+### Akzentfarben (themes.css)
+
+Unter Einstellungen › Darstellung wählt jeder eine von zehn Akzentfarben – Grün
+(Standard), Petrol, Blau, Indigo, Violett, Pink, Rot, Orange, Gold, Graphit. Jede soll
+aussehen, als wäre die App in ihr erschienen, darum wechseln **alle Rollen** mit:
+Akzent, Akzentschrift, Hauptaktion, Markenfläche samt Licht, Hintergrund der Anmeldung,
+markenfarbene Schatten, Logo (`--logo-*`), Diagramme, Preisstufen und der Hauch Farbe
+in den Neutralen (Grund, Linien, Glas, Schatten).
+
+- **Ein Token, zwei Quellen:** jedes themenfähige Token liest zuerst sein
+  `--t-`Gegenstück – hell `--t-name`, dunkel `--t-name-d` –, dahinter steht der grüne
+  Wert: `--accent: var(--t-accent, #15904a)`. Ein Thema setzt nur `--t-`Werte in
+  **einer** Regel (`:root[data-accent="rot"]`) und konkurriert so nie mit Hell/Dunkel,
+  Energiesparmodus oder Kontrast. Werte mit eigener Deckkraft stehen als Tripel da
+  (`rgb(var(--t-tint, 70 90 80) / 0.1)`).
+- **Abgeleitet, nicht gemalt:** `src/lib/theme-palette.ts` nimmt jedes grüne Token in
+  OKLCH, behält die Helligkeit, setzt Ton und Buntheit der neuen Farbe (tiefe Stufen mit
+  eigenem Ton: Gold wird zur Bronze, Blau zum Marineblau) und begrenzt auf den
+  Bildschirmumfang. Danach wird jede Rolle auf die Regeln oben nachgezogen.
+  `npm run themes` schreibt `src/app/themes.css`.
+- **Gleiche Regeln wie das Grün** (Test `scripts/tests/themes.test.ts`, je Farbe hell
+  und dunkel): Akzent ≥ 3 : 1 auf Weiß und Grund, Akzentschrift ≥ 4,5 : 1 auch auf der
+  Tönung, weiße Schrift auf der Hauptaktion ≥ 4,5 : 1, auf der Markenfläche ≥ 9 : 1,
+  Zeichen auf dem Akzent (dunkel) ≥ 4,5 : 1, Preisstufen stetig dunkler.
+- **Flächen tönen aus** (`data-tint="off"`): Neutrale in reinem Grau, die Marke bleibt.
+- Signale (`--danger`, `--warn`), Teilgebiete (`--plot-*`), Symboltöne und Medaillen
+  wechseln **nicht** – sie bedeuten etwas, unabhängig von der Marke. Bei Rot, Orange und
+  Gold gilt umso mehr: Signale nie allein, immer mit Wort oder Zeichen.
+- Das App-Symbol auf dem Home-Bildschirm (`public/icon*.png`) bleibt grün.
+
+### Einstellungen am `<html>`
+
+Was man sieht, setzt `PREFS_SCRIPT` (`src/lib/preferences.ts`) vor dem ersten Bild als
+Merkmal: `data-accent`, `data-tint="off"`, `data-theme` (Hell/Dunkel erzwungen, samt
+eigener Farbe der Statusleiste), `data-text="l|xl"` (Schriftgröße 106 % bzw. 112 % –
+alles in rem wächst mit), `data-glass="off"`, `data-motion="off"`, `data-contrast="more"`
+(wie `prefers-contrast: more`), `data-map-dark="off"` und `data-hide` mit je einem Wort
+pro ausgeblendetem Bereich (`area-team`, `start-radar`, `tour-provider` …). Die Seite
+markiert, was sich ausblenden lässt (`data-area`, `data-start`, `data-tour`); die Regeln
+dazu stehen gesammelt in `globals.css` – der Server rendert alles, nichts blitzt auf.
+
 ---
 
 ## 2. Material „Liquid Glass“
@@ -132,8 +173,9 @@ Haarlinien und `--muted` werden dunkler.
   Schatten `--elev-glass` / `--elev-float`.
 - Unschärfe `--glass-blur: blur(22px) saturate(180%)`.
 - **Rückfälle:** ohne `backdrop-filter`, bei `prefers-reduced-transparency`, bei
-  `prefers-contrast: more` und im Super-Energiesparmodus (`data-power="save"`) wird
-  Glas zur festen Fläche `--glass-solid`.
+  `prefers-contrast: more`, im Super-Energiesparmodus (`data-power="save"`) und mit
+  „Glas“ bzw. „Kontrast erhöhen“ aus den Einstellungen (`data-glass="off"`,
+  `data-contrast="more"`) wird Glas zur festen Fläche `--glass-solid`.
 - Glas nur für Dinge, die **über** Inhalt schweben. Inhalt selbst liegt auf
   `--surface` mit `--elev-card` (feine Kante, weicher Schatten) – immer über die
   Klasse `.surface` (bzw. `.list`, `.tile-grid`), nie `rounded-xl bg-surface`
@@ -202,7 +244,8 @@ Eingabefelder haben immer `text-body` (17 px) – unter 16 px zoomt iOS.
 - Blätter lassen sich am Griff nach unten wegziehen; die Reiterleiste wird beim
   Scrollen kleiner; Rückmeldungen sind Toasts (kurz, nicht blockierend, mit
   „Rückgängig“ statt Rückfragen).
-- `prefers-reduced-motion` und Super-Energiesparmodus: alle Animationen ≈ 0 ms.
+- `prefers-reduced-motion`, Super-Energiesparmodus und „Animationen“ aus den
+  Einstellungen (`data-motion="off"`): alle Animationen ≈ 0 ms.
 - **Laden:** Jede Seite hat ihr `loading.tsx` – nur dann lädt Next.js sie vorab, und
   das Skelett steht beim Tippen sofort da. Was feststeht (Titel, Zurück,
   Segmentleiste, Abschnittstitel), steht echt da; grau ist nur, was vom Server kommt.
@@ -242,6 +285,7 @@ Alle in `src/components/`. Stil per Klassen aus `globals.css` (`@layer component
 | `Medal` | `levels/Medal.tsx` | Medaille eines erreichten Abzeichens im Metall der Stufe |
 | `Segmented`, `SegmentedLinks` | `ui.tsx` | Wahl aus wenigen (auch Glas-Variante über Karten) |
 | `Switch` | `ui.tsx` | Kippschalter |
+| `PrefSwitch`, `PrefChoice`, `ChoiceRows`, `GoalStepper` | `settings/controls.tsx` | Zeilen der Einstellungen: Schalter, Auswahl mit Haken (eine Zeile je Möglichkeit), Regler für Tagesziele – je an eine Einstellung gebunden, ohne Toast (die Wirkung ist zu sehen) |
 | `Sheet` | `Sheet.tsx` | Blatt von unten (Handy, ziehbar) / mittiger Dialog (iPad, Rechner); rückt bei offener Bildschirmtastatur in den sichtbaren Teil darüber (`visualViewport`), damit der Hauptknopf zu sehen bleibt |
 | `Menu`, `MenuItem` | `Menu.tsx` | Glas-Menü hinter „…“ |
 | `ToastProvider`, `useToast` | `Toast.tsx` | Eine Rückmeldung zur Zeit, optional mit Aktion („Rückgängig“) |

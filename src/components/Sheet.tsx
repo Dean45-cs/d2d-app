@@ -49,7 +49,10 @@ export function Sheet({ title, subtitle, onClose, children, footer, action, widt
   const requestClose = useCallback(() => {
     setClosing((already) => {
       if (already) return already;
-      const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches || powerSaving();
+      const reduce =
+        window.matchMedia("(prefers-reduced-motion: reduce)").matches ||
+        powerSaving() ||
+        document.documentElement.dataset.motion === "off";
       window.setTimeout(() => closeRef.current(), reduce ? 0 : CLOSE_MS);
       return true;
     });

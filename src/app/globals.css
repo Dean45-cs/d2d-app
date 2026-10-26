@@ -125,40 +125,43 @@
 
 :root {
   /* Neutrale mit einem Hauch Gruen: gehoeren zur Marke statt zum
-     Lavendelgrau der Systemvorgabe. */
-  --bg: #f2f4f3;
+     Lavendelgrau der Systemvorgabe. Jedes Token liest zuerst sein
+     --t-Gegenstueck (hell --t-name, dunkel --t-name-d): so bekommen Grund,
+     Linien und Glas den Hauch der gewaehlten Akzentfarbe (themes.css). Mit
+     Deckkraft stehen sie als Tripel da: rgb(var(--t-tint, 70 90 80) / 0.1). */
+  --bg: var(--t-bg, #f2f4f3);
   --surface: #ffffff;
-  --surface-2: #f2f4f3;
+  --surface-2: var(--t-bg, #f2f4f3);
   /* Grund einer Karte, solange die Kacheln laden - hebt sich hell vom
      Seitengrund ab (--surface-2 waere dort unsichtbar). */
-  --map-ground: #e3e7e5;
-  --fill: rgb(70 90 80 / 0.1);
-  --fill-strong: rgb(70 90 80 / 0.17);
-  --ink: #0b1510;
-  --ink-2: #36413b;
-  --muted: #5f6964;
-  --separator: rgb(40 60 50 / 0.13);
-  --scrim: rgb(4 14 9 / 0.32);
+  --map-ground: var(--t-map-ground, #e3e7e5);
+  --fill: rgb(var(--t-tint, 70 90 80) / 0.1);
+  --fill-strong: rgb(var(--t-tint, 70 90 80) / 0.17);
+  --ink: var(--t-ink, #0b1510);
+  --ink-2: var(--t-ink-2, #36413b);
+  --muted: var(--t-muted, #5f6964);
+  --separator: rgb(var(--t-line, 40 60 50) / 0.13);
+  --scrim: rgb(var(--t-scrim, 4 14 9) / 0.32);
   --seg-thumb: #ffffff;
-  --hover: rgb(70 90 80 / 0.07);
-  --press: rgb(70 90 80 / 0.14);
+  --hover: rgb(var(--t-tint, 70 90 80) / 0.07);
+  --press: rgb(var(--t-tint, 70 90 80) / 0.14);
   /* Jede zweite Zeile einer Tabelle (Klinken) - haelt die Zeile auch in der Sonne. */
-  --zebra: rgb(70 90 80 / 0.05);
+  --zebra: rgb(var(--t-tint, 70 90 80) / 0.05);
 
   /* Material "Liquid Glass" */
-  --glass-bg: rgb(250 252 251 / 0.74);
-  --glass-strong: rgb(250 252 251 / 0.86);
-  --glass-solid: #f8faf9;
+  --glass-bg: rgb(var(--t-glass, 250 252 251) / 0.74);
+  --glass-strong: rgb(var(--t-glass, 250 252 251) / 0.86);
+  --glass-solid: var(--t-glass-solid, #f8faf9);
   --glass-sheen: linear-gradient(180deg, rgb(255 255 255 / 0.55), rgb(255 255 255 / 0) 55%);
-  --glass-edge: inset 0 0.5px 0 0 rgb(255 255 255 / 0.9), inset 0 0 0 0.5px rgb(10 30 20 / 0.07);
+  --glass-edge: inset 0 0.5px 0 0 rgb(255 255 255 / 0.9), inset 0 0 0 0.5px rgb(var(--t-shade, 10 30 20) / 0.07);
   --glass-blur: blur(22px) saturate(180%);
 
   /* Inhaltsflaechen liegen auf dem Grund: feine Kante, weicher Schatten. */
-  --elev-card: 0 0 0 1px rgb(16 40 28 / 0.045), 0 1px 2px rgb(16 40 28 / 0.04),
-    0 10px 28px -14px rgb(16 40 28 / 0.16);
-  --elev-glass: 0 1px 2px rgb(10 30 20 / 0.06), 0 10px 30px -10px rgb(10 30 20 / 0.24);
-  --elev-float: 0 2px 6px rgb(10 30 20 / 0.07), 0 28px 60px -18px rgb(10 30 20 / 0.34);
-  --elev-thumb: 0 1px 2px rgb(10 30 20 / 0.08), 0 3px 8px rgb(10 30 20 / 0.1);
+  --elev-card: 0 0 0 1px rgb(var(--t-shade, 16 40 28) / 0.045), 0 1px 2px rgb(var(--t-shade, 16 40 28) / 0.04),
+    0 10px 28px -14px rgb(var(--t-shade, 16 40 28) / 0.16);
+  --elev-glass: 0 1px 2px rgb(var(--t-shade, 10 30 20) / 0.06), 0 10px 30px -10px rgb(var(--t-shade, 10 30 20) / 0.24);
+  --elev-float: 0 2px 6px rgb(var(--t-shade, 10 30 20) / 0.07), 0 28px 60px -18px rgb(var(--t-shade, 10 30 20) / 0.34);
+  --elev-thumb: 0 1px 2px rgb(var(--t-shade, 10 30 20) / 0.08), 0 3px 8px rgb(var(--t-shade, 10 30 20) / 0.1);
 
   /* Bewegung: kurz und federnd, nie im Weg */
   --dur-1: 150ms;
@@ -181,23 +184,23 @@
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
     --bg: #000000;
-    --surface: #141917;
-    --surface-2: #1f2522;
-    --map-ground: #1f2522;
-    --fill: rgb(120 140 130 / 0.2);
-    --fill-strong: rgb(120 140 130 / 0.3);
-    --ink: #f3f6f4;
-    --ink-2: #d0d7d3;
-    --muted: #a3aca7;
-    --separator: rgb(84 100 92 / 0.5);
+    --surface: var(--t-surface-d, #141917);
+    --surface-2: var(--t-surface-2-d, #1f2522);
+    --map-ground: var(--t-map-ground-d, #1f2522);
+    --fill: rgb(var(--t-tint-d, 120 140 130) / 0.2);
+    --fill-strong: rgb(var(--t-tint-d, 120 140 130) / 0.3);
+    --ink: var(--t-ink-d, #f3f6f4);
+    --ink-2: var(--t-ink-2-d, #d0d7d3);
+    --muted: var(--t-muted-d, #a3aca7);
+    --separator: rgb(var(--t-line-d, 84 100 92) / 0.5);
     --scrim: rgb(0 0 0 / 0.55);
-    --seg-thumb: #59625d;
-    --hover: rgb(120 140 130 / 0.12);
-    --press: rgb(120 140 130 / 0.22);
-    --zebra: rgb(120 140 130 / 0.08);
-    --glass-bg: rgb(26 32 29 / 0.72);
-    --glass-strong: rgb(26 32 29 / 0.86);
-    --glass-solid: #1a201d;
+    --seg-thumb: var(--t-seg-thumb-d, #59625d);
+    --hover: rgb(var(--t-tint-d, 120 140 130) / 0.12);
+    --press: rgb(var(--t-tint-d, 120 140 130) / 0.22);
+    --zebra: rgb(var(--t-tint-d, 120 140 130) / 0.08);
+    --glass-bg: rgb(var(--t-glass-d, 26 32 29) / 0.72);
+    --glass-strong: rgb(var(--t-glass-d, 26 32 29) / 0.86);
+    --glass-solid: var(--t-glass-solid-d, #1a201d);
     --glass-sheen: linear-gradient(180deg, rgb(255 255 255 / 0.07), rgb(255 255 255 / 0) 55%);
     --glass-edge: inset 0 0.5px 0 0 rgb(255 255 255 / 0.2), inset 0 0 0 0.5px rgb(255 255 255 / 0.09);
     --elev-card: inset 0 0.5px 0 rgb(255 255 255 / 0.06), 0 0 0 1px rgb(255 255 255 / 0.045);
@@ -209,23 +212,23 @@
 
 :root[data-theme="dark"] {
   --bg: #000000;
-  --surface: #141917;
-  --surface-2: #1f2522;
-  --map-ground: #1f2522;
-  --fill: rgb(120 140 130 / 0.2);
-  --fill-strong: rgb(120 140 130 / 0.3);
-  --ink: #f3f6f4;
-  --ink-2: #d0d7d3;
-  --muted: #a3aca7;
-  --separator: rgb(84 100 92 / 0.5);
+  --surface: var(--t-surface-d, #141917);
+  --surface-2: var(--t-surface-2-d, #1f2522);
+  --map-ground: var(--t-map-ground-d, #1f2522);
+  --fill: rgb(var(--t-tint-d, 120 140 130) / 0.2);
+  --fill-strong: rgb(var(--t-tint-d, 120 140 130) / 0.3);
+  --ink: var(--t-ink-d, #f3f6f4);
+  --ink-2: var(--t-ink-2-d, #d0d7d3);
+  --muted: var(--t-muted-d, #a3aca7);
+  --separator: rgb(var(--t-line-d, 84 100 92) / 0.5);
   --scrim: rgb(0 0 0 / 0.55);
-  --seg-thumb: #59625d;
-  --hover: rgb(120 140 130 / 0.12);
-  --press: rgb(120 140 130 / 0.22);
-  --zebra: rgb(120 140 130 / 0.08);
-  --glass-bg: rgb(26 32 29 / 0.72);
-  --glass-strong: rgb(26 32 29 / 0.86);
-  --glass-solid: #1a201d;
+  --seg-thumb: var(--t-seg-thumb-d, #59625d);
+  --hover: rgb(var(--t-tint-d, 120 140 130) / 0.12);
+  --press: rgb(var(--t-tint-d, 120 140 130) / 0.22);
+  --zebra: rgb(var(--t-tint-d, 120 140 130) / 0.08);
+  --glass-bg: rgb(var(--t-glass-d, 26 32 29) / 0.72);
+  --glass-strong: rgb(var(--t-glass-d, 26 32 29) / 0.86);
+  --glass-solid: var(--t-glass-solid-d, #1a201d);
   --glass-sheen: linear-gradient(180deg, rgb(255 255 255 / 0.07), rgb(255 255 255 / 0) 55%);
   --glass-edge: inset 0 0.5px 0 0 rgb(255 255 255 / 0.2), inset 0 0 0 0.5px rgb(255 255 255 / 0.09);
   --elev-card: inset 0 0.5px 0 rgb(255 255 255 / 0.06), 0 0 0 1px rgb(255 255 255 / 0.045);
@@ -453,6 +456,84 @@
   animation-iteration-count: 1 !important;
   transition-duration: 0.01ms !important;
   scroll-behavior: auto !important;
+}
+
+/* ==========================================================================
+   Einstellungen (src/lib/preferences.ts, Merkmale am <html> vor dem ersten
+   Bild). Nach den Hell/Dunkel-Bloecken, damit sie bei gleicher Spezifitaet
+   gewinnen. Die Akzentfarbe selbst steht in themes.css.
+   ========================================================================== */
+
+/* Textgroesse: alles in rem waechst mit - Schrift, Abstaende, Felder. */
+:root[data-text="l"] {
+  font-size: 106.25%;
+}
+:root[data-text="xl"] {
+  font-size: 112.5%;
+}
+
+/* Glas aus: feste Flaechen statt Unschaerfe (wie "Transparenz reduzieren"). */
+:root[data-glass="off"] {
+  --glass-bg: var(--glass-solid);
+  --glass-strong: var(--glass-solid);
+  --glass-sheen: none;
+  --glass-blur: none;
+}
+
+/* Kontrast erhoehen: wie prefers-contrast: more. */
+:root[data-contrast="more"] {
+  --glass-bg: var(--glass-solid);
+  --glass-strong: var(--glass-solid);
+  --glass-blur: none;
+  --glass-edge: inset 0 0 0 1px var(--ink);
+  --elev-card: 0 0 0 1px var(--muted);
+  --separator: var(--muted);
+  --muted: var(--ink-2);
+}
+
+/* Bewegung aus: wie prefers-reduced-motion. */
+:root[data-motion="off"] *,
+:root[data-motion="off"] *::before,
+:root[data-motion="off"] *::after {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
+  scroll-behavior: auto !important;
+}
+
+/* Ausgeblendete Bereiche (data-hide, je Wort ein Bereich). Der Server
+   rendert alles; was aus ist, verschwindet hier - ohne Aufblitzen. */
+:root[data-hide~="area-start"] [data-area="start"],
+:root[data-hide~="area-map"] [data-area="map"],
+:root[data-hide~="area-team"] [data-area="team"],
+:root[data-hide~="start-hero"] [data-start="hero"],
+:root[data-hide~="start-history"] [data-start="history"],
+:root[data-hide~="start-radar"] [data-start="radar"],
+:root[data-hide~="start-appointments"] [data-start="appointments"],
+:root[data-hide~="start-recalls"] [data-start="recalls"],
+:root[data-hide~="start-team"] [data-start="team"],
+:root[data-hide~="start-reasons"] [data-start="reasons"],
+:root[data-hide~="start-territories"] [data-start="territories"],
+:root[data-hide~="start-provider"] [data-start="provider"],
+:root[data-hide~="start-contacts"] [data-start="contacts"],
+:root[data-hide~="tour-provider"] [data-tour="provider"],
+:root[data-hide~="tour-card"] [data-tour="card"],
+:root[data-hide~="tour-ring"] [data-tour="ring"] {
+  display: none !important;
+}
+/* Verlauf und Profil teilen sich eine Reihe - fehlt einer, nimmt der andere sie ganz. */
+:root[data-hide~="start-radar"] [data-start="history"],
+:root[data-hide~="start-history"] [data-start="radar"] {
+  grid-column: 1 / -1;
+}
+/* Ein ausgeblendeter Bereich bleibt im Profil erreichbar (Zeile "data-area-link"). */
+[data-area-link] {
+  display: none;
+}
+:root[data-hide~="area-start"] [data-area-link="start"],
+:root[data-hide~="area-map"] [data-area-link="map"],
+:root[data-hide~="area-team"] [data-area-link="team"] {
+  display: block;
 }
 
 /* ==========================================================================
@@ -903,7 +984,7 @@
   .chip[aria-current="page"] {
     background: var(--primary);
     color: var(--on-primary);
-    box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.2), 0 1px 2px rgb(8 60 30 / 0.25);
+    box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.2), 0 1px 2px rgb(var(--t-deep-shadow, 8 60 30) / 0.25);
   }
   /* Auf dem gruenen Chip: Abschluss-Haken weiss statt gruen auf gruen. */
   .chip[aria-pressed="true"] .glyph-result,
@@ -1366,8 +1447,8 @@
     color: #ffffff;
     box-shadow:
       inset 0 1px 0 rgb(255 255 255 / 0.12),
-      0 1px 2px rgb(6 40 20 / 0.2),
-      0 18px 40px -20px rgb(8 70 36 / 0.55);
+      0 1px 2px rgb(var(--t-deep-shadow, 6 40 20) / 0.2),
+      0 18px 40px -20px rgb(var(--t-deep-shadow, 8 70 36) / 0.55);
   }
   .hero-mark {
     position: absolute;
@@ -1454,7 +1535,8 @@
       var(--bg);
   }
   .brand-mark {
-    filter: drop-shadow(0 2px 3px rgb(6 60 30 / 0.18)) drop-shadow(0 14px 22px rgb(14 120 60 / 0.3));
+    filter: drop-shadow(0 2px 3px rgb(var(--t-deep-shadow, 6 60 30) / 0.18))
+      drop-shadow(0 14px 22px rgb(var(--t-glow-shadow, 14 120 60) / 0.3));
   }
 
   /* ------------------------------ Platzhalter ---------------------------- */
@@ -2435,6 +2517,10 @@
 }
 :root[data-theme="dark"] .leaflet-tile-pane {
   filter: grayscale(0.7) invert(0.92) hue-rotate(180deg) brightness(0.9) contrast(0.92);
+}
+/* Einstellungen -> Karte -> "Dunkle Karte" aus: die Kacheln bleiben hell. */
+:root[data-map-dark="off"] .leaflet-tile-pane {
+  filter: grayscale(0.55) contrast(0.95) brightness(1.03);
 }
 .map-view .leaflet-tooltip {
   background: var(--glass-strong);

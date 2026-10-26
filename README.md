@@ -31,6 +31,9 @@ Eine Web-App für Door-to-Door-Teams im Energievertrieb:
   im Team, Serie, Bestwert und Meilensteine
 - **Installierbar auf iPhone und iPad** – eigenes Symbol, Vollbild ohne Browserleiste,
   Erfassung funktioniert auch ohne Empfang
+- **Einstellungen für jeden selbst** – zehn Akzentfarben (jede wie eine eigene Ausgabe der
+  App), Hell/Dunkel, Textgröße, Effekte, und fast jede Funktion beim Klinken, auf der
+  Karte, in der Übersicht und bei den Mitteilungen ein- und ausschaltbar
 
 Die Oberfläche ist mobil-first (der Außendienst klinkt mit Handy oder iPad – Klinken ist
 für beide eigens ausgelegt, siehe [Auf dem iPad](#auf-dem-ipad)), das Leitungs-Dashboard
@@ -438,9 +441,11 @@ Erfolgsfortschritt. Tagesbestwerte und Aktivitätstage folgen Europe/Berlin.
 Die Schwierigkeit ist eine redaktionelle Zielstaffel, kein Branchenbenchmark.
 Quellenvergleich und Grenzen: [Recherche zu Vertriebserfolgen](docs/VERTRIEBSERFOLGE.md).
 
-Tagesziele (20 Türen, 5 Gespräche, 1 Abschluss) beginnen um Mitternacht in
+Tagesziele (Standard: 20 Türen, 5 Gespräche, 1 Abschluss – jeder stellt sie unter
+**Einstellungen › Ziele & Erfolge** selbst ein) beginnen um Mitternacht in
 **Europe/Berlin** neu, einschließlich Sommerzeitwechsel. Abzeichen und Tagesziele
-vergeben keine zusätzlichen XP.
+vergeben keine zusätzlichen XP. XP-Hinweise und die Meldung zum Levelaufstieg lassen
+sich dort ebenfalls abschalten.
 
 XP werden serverseitig aus den bestehenden Besuchen ermittelt: Altbestand zählt
 automatisch, gelöschte Besuche ziehen XP und Abzeichenfortschritt wieder ab.
@@ -499,7 +504,9 @@ zum Gratulieren. Außerdem gibt es eine Nachricht, wenn jemand den eigenen Beitr
 kommentiert oder einen abonniert.
 
 - Beim ersten Abonnieren fragt das Gerät nach der Erlaubnis. Ein- und ausschalten lässt
-  sich Push im **eigenen Profil**; dort gibt es auch eine Probe-Nachricht.
+  sich Push unter **Einstellungen › Mitteilungen**; dort gibt es auch eine Probe-Nachricht
+  und je Anlass einen eigenen Schalter (Abschlüsse, Kommentare, neue Abonnenten,
+  Terminerinnerungen – gilt für alle Geräte der Person, `users.push_off`).
 - **iPhone/iPad:** nur in der installierten App (ab iOS 16.4), nicht im Safari-Tab.
 - Einrichten muss man nichts: Die Schlüssel (VAPID) erzeugt die App beim ersten Bedarf
   selbst und speichert sie in der Datenbank. Eigene Schlüssel gehen über
@@ -524,6 +531,45 @@ sich, „Dabei seit“, Abonnenten und Abonnierte, darunter die Reiter **Beiträ
 
 Über „Profil bearbeiten“ ändert jeder sein Bild und den Text über sich selbst; Name,
 Rolle und Zugang bleiben bei der Teamleitung.
+
+---
+
+## Einstellungen
+
+Unter **Profil › Einstellungen** (`/einstellungen`) richtet sich jeder die App selbst ein –
+gruppiert wie die iOS-Einstellungen, je Bereich eine Seite. Alles wirkt sofort und gilt
+für **dieses Gerät** (localStorage `d2d.prefs`, nur was vom Standard abweicht); nur die
+Push-Anlässe hängen am Konto. „Alle Einstellungen zurücksetzen“ stellt den ersten Start
+wieder her.
+
+| Seite | Was sich einstellen lässt |
+| --- | --- |
+| **Darstellung** | Automatisch / Hell / Dunkel, **zehn Akzentfarben** (Grün, Petrol, Blau, Indigo, Violett, Pink, Rot, Orange, Gold, Graphit), Flächen tönen, Textgröße (Standard, Groß, Sehr groß), Glas, Animationen, Kontrast erhöhen, Reiterleiste verkleinern |
+| **Klinken** | Nur offene Türen beim Öffnen, Straßen nach Nähe oder wie im Gebiet, Tagesziel-Ring, Versorger und Preis, Visitenkarte im Kopf, fällige Termine, „Nächste offene Tür“, Entfernung zur Tür, Terminbestätigung anbieten, Standort automatisch oder nur auf Antippen, vorgewähltes Produkt |
+| **Karte** | Karte oder Satellit beim Öffnen, dunkle Karte im Dunkelmodus, Standort im Gebiet mitverfolgen |
+| **Bereiche** | Übersicht, Karte und Team in Reiter- und Seitenleiste, womit die App startet, jeder Abschnitt der Übersicht bzw. von „Meine Zahlen“ |
+| **Ziele & Erfolge** | Tagesziele für Türen, Gespräche und Abschlüsse, XP-Hinweise, Level-Aufstieg melden |
+| **Mitteilungen** | Push auf diesem Gerät, Push je Anlass (Konto), Push-Hinweis im Feed, Vibration (Android), wie lange Meldungen stehen |
+| **Dieses Gerät** | Super-Energiesparmodus, Klinken und Termine für den Start ohne Netz speichern, als App installieren |
+
+**Akzentfarben – als wäre die App in dieser Farbe erschienen.** Eine Farbe ist mehr als
+ein Knopf: Hauptaktion, Schrift im Akzent, Kopfkarte, Licht hinter der Anmeldung, Logo,
+Diagramme, Preisstufen der Karte und der Hauch Farbe in Grund, Linien und Glas wechseln
+mit. Abgeleitet wird alles aus dem gestalteten Grün (gleiche Helligkeit in OKLCH, Ton und
+Buntheit der neuen Farbe), danach wird jede Rolle auf ihren Kontrast nachgezogen –
+dieselben Regeln wie fürs Grün (Schrift ≥ 4,5 : 1, Bedienelemente ≥ 3 : 1, weiße Schrift
+auf der Hauptaktion ≥ 4,5 : 1, auf der Kopfkarte ≥ 9 : 1), hell und dunkel. Das Symbol auf
+dem Home-Bildschirm bleibt grün.
+
+Was man sieht, steht als Merkmal am `<html>` (`data-accent`, `data-theme`, `data-text`,
+`data-hide` …) und wird **vor dem ersten Bild** gesetzt (`PREFS_SCRIPT`) – nichts blitzt
+grün oder hell auf, auch nicht in gespeicherten Seiten ohne Netz. Ausgeblendete Bereiche
+bleiben im Profil unter „Meine Arbeit“ erreichbar; gezählt wird weiter alles.
+
+Umsetzung: `src/lib/preferences.ts` (Speicher, Merkmale, Skript), `src/lib/theme-palette.ts`
+(Farben) → `npm run themes` schreibt `src/app/themes.css`; Seiten unter
+`src/app/(app)/einstellungen/`. Tests: `scripts/tests/preferences.test.ts`,
+`themes.test.ts`, `push-kinds.test.ts`.
 
 ---
 
@@ -875,6 +921,11 @@ Kontraste (hell und dunkel), Glas-Material, Schrift, Radien, Bewegung, Bausteine
   `favicon-32.png` und das einfarbige Benachrichtigungs-Symbol `badge-96.png` neu. Danach
   in `public/sw.js` die `VERSION` erhöhen.
 
+- **Akzentfarben** zum Auswählen (Einstellungen › Darstellung) entstehen aus dem Grün in
+  `src/lib/theme-palette.ts`. Nach einer Änderung dort oder an den grünen Werten
+  `npm run themes` – das schreibt `src/app/themes.css`; ein Test prüft, dass die Datei
+  zum Code passt, und hält jede Farbe auf denselben Kontrasten wie das Grün.
+
 Die Diagrammfarben und die Farben der Teilgebiete (`--plot-1` bis `--plot-4`) sind auf
 Farbfehlsichtigkeit geprüft – jedes Paar gegen jedes, hell und dunkel. Wer sie
 austauscht, sollte den Abstand der Farben zueinander prüfen; sonst sind auf der Karte
@@ -936,6 +987,7 @@ dass jemand etwas einstellt:
   sie ins Bild kommen.
 
 Wem das nicht reicht, schaltet unter **Profil → Dieses Gerät → Super-Energiesparmodus**
+(oder **Einstellungen › Dieses Gerät**)
 alles ab, was Akku kostet und an der Tür nicht gebraucht wird (gilt nur für dieses
 Gerät, wirkt sofort):
 
@@ -1013,10 +1065,12 @@ src/
       profil/         Profil-Übersicht, Profil mit Zahlen, Abonnenten, eigene Visitenkarte
       gebiete/        Gebiete und Straßen
       karte/          Energiepreise auf der Karte
-      einstellungen/  Mitglieder, Einladungen, Rechte, Ablehnungsgründe, Energie & Tarif
+      einstellungen/  Persönliche Einstellungen (Darstellung, Klinken, Karte, Bereiche, Ziele,
+                      Mitteilungen); Verwaltung: Mitglieder, Einladungen, Rechte, Gründe, Energie
     api/              REST-Endpunkte
     k/[token]/        Öffentliche Visitenkarte, Kontakt (vCard) und Bild
     brand.css         Markenfarben (Akzent, Signale, Datenfarben)
+    themes.css        Akzentfarben zum Auswählen (erzeugt: npm run themes)
     globals.css       Gestaltungssystem: Tokens, Glas, Schrift, Bausteine
   lib/
     db.ts             Schema und Verbindung
@@ -1026,6 +1080,8 @@ src/
     ranking.ts        Rangliste, Abstand zum Nächsten, Serie, Abzeichen
     push.ts           Push-Nachrichten senden (Server)
     push-client.ts    Push ein- und ausschalten (Browser)
+    preferences.ts    Einstellungen je Gerät: Speicher, Merkmale am <html>, Skript vor dem ersten Bild
+    theme-palette.ts  Akzentfarben aus dem Grün ableiten (OKLCH, Kontraste); color.ts rechnet
     appointments.ts   Terminzeiten, Vorschläge, Beschriftung
     customers.ts      Kundenliste: Abfragen, Speichern, Wiedervorlage
     contracts.ts      Vertragsende, Fälligkeit, Datumsformate
@@ -1058,6 +1114,7 @@ npm run typecheck       # TypeScript prüfen
 npm run lint            # ESLint (Next.js- und React-Hooks-Regeln)
 npm test                # Tests
 npm run db:seed         # Datenbank einrichten
+npm run themes          # Akzentfarben neu erzeugen (src/app/themes.css)
 npm run energy:refresh  # Tagesquelle abrufen (falls eingerichtet)
 npm run energy:check    # Preistabelle der Tagesquelle prüfen
 ```

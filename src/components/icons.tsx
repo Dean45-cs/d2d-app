@@ -661,3 +661,57 @@ export function IconSparkles(props: IconProps) {
     </Line>
   );
 }
+
+/* ---------------------------- Einstellungen ---------------------------- */
+
+export function IconPalette(props: IconProps) {
+  return (
+    <Line {...props}>
+      <path d="M12 3.25a8.75 8.75 0 0 0 0 17.5c1.2 0 1.9-.8 1.9-1.75 0-.55-.25-.95-.55-1.3-.3-.35-.55-.75-.55-1.3 0-1 .8-1.65 1.75-1.65h2.1a4.1 4.1 0 0 0 4.1-4.1c0-4.05-3.9-7.4-8.75-7.4Z" />
+      <circle cx="7.75" cy="11.5" r="1.15" fill="currentColor" stroke="none" />
+      <circle cx="10" cy="7.5" r="1.15" fill="currentColor" stroke="none" />
+      <circle cx="14.5" cy="7.5" r="1.15" fill="currentColor" stroke="none" />
+    </Line>
+  );
+}
+export function IconTextSize(props: IconProps) {
+  return (
+    <Line {...props}>
+      <path d="m3 18.5 4.25-11.5L11.5 18.5" />
+      <path d="M4.6 14.5h5.3" />
+      <path d="m13 18.5 3.5-8.5 3.5 8.5" />
+      <path d="M14.2 15.75h4.6" />
+    </Line>
+  );
+}
+export function IconSun(props: IconProps) {
+  return (
+    <Line {...props}>
+      <circle cx="12" cy="12" r="3.75" />
+      <path d="M12 2.75v1.75M12 19.5v1.75M2.75 12H4.5M19.5 12h1.75M5.45 5.45l1.25 1.25M17.3 17.3l1.25 1.25M5.45 18.55l1.25-1.25M17.3 6.7l1.25-1.25" />
+    </Line>
+  );
+}
+export function IconMoon(props: IconProps) {
+  return (
+    <Line {...props}>
+      <path d="M19.5 14.6A7.75 7.75 0 0 1 9.4 4.5a7.75 7.75 0 1 0 10.1 10.1Z" />
+    </Line>
+  );
+}
+export function IconContrast(props: IconProps) {
+  return (
+    <Line {...props}>
+      <circle cx="12" cy="12" r="8.25" />
+      <path d="M12 3.75a8.25 8.25 0 0 1 0 16.5Z" fill="currentColor" stroke="none" />
+    </Line>
+  );
+}
+export function IconVibrate(props: IconProps) {
+  return (
+    <Line {...props}>
+      <rect x="7.5" y="3.5" width="9" height="17" rx="2.25" />
+      <path d="M4.25 8.5v7M19.75 8.5v7M1.75 10.5v3M22.25 10.5v3" />
+    </Line>
+  );
+}

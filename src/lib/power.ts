@@ -17,6 +17,8 @@
  * Laeuft ausschliesslich im Browser.
  */
 
+import { DARK_STATUS, STATUS_META_ID, applyTheme } from "./preferences";
+
 /** Wo das Geraet sich den Modus merkt (localStorage). */
 export const POWER_KEY = "d2d.power";
 const POWER_EVENT = "d2d-power";
@@ -24,15 +26,9 @@ const POWER_EVENT = "d2d-power";
 export const IDLE_MS = 2 * 60 * 1000;
 /** Im Energiesparmodus gilt ein Standort so lange - danach koennte man schon woanders stehen. */
 export const SAVE_FIX_MS = 2 * 60 * 1000;
-/**
- * Statusleiste im Energiesparmodus: so schwarz wie die Oberflaeche. Ein
- * eigenes meta-Tag ganz vorn im <head> (das erste passende gilt) - die von
- * Next.js gehoeren React und werden nicht angefasst. Bewusst "#000" statt
- * "#000000": React ordnet meta-Tags beim Laden nach ihrem Inhalt zu und
- * hielte unseres sonst fuer das dunkle aus layout.tsx.
- */
-const SAVE_THEME_COLOR = "#000";
-const COLOR_META_ID = "d2d-power-color";
+/** Statusleiste im Energiesparmodus: so schwarz wie die Oberflaeche (preferences.ts teilt das Tag). */
+const SAVE_THEME_COLOR = DARK_STATUS;
+const COLOR_META_ID = STATUS_META_ID;
 
 /**
  * Setzt den Modus vor dem ersten Bild (im <body> des Wurzel-Layouts) - sonst
@@ -60,28 +56,15 @@ export function powerSaving(): boolean {
   return document.documentElement.dataset.power === "save";
 }
 
-/** Oberflaeche umstellen: Merkmal fuer die Styles, dunkles Thema, Farbe der Statusleiste. */
+/**
+ * Oberflaeche umstellen: Merkmal fuer die Styles, dunkles Thema, Farbe der
+ * Statusleiste. Aus heisst: wieder Hell/Dunkel wie eingestellt (Einstellungen).
+ */
 export function applyPowerSaving(on: boolean): void {
   const root = document.documentElement;
-  if (on) {
-    root.dataset.power = "save";
-    root.dataset.theme = "dark";
-  } else {
-    delete root.dataset.power;
-    delete root.dataset.theme;
-  }
-  let meta = document.getElementById(COLOR_META_ID) as HTMLMetaElement | null;
-  if (!on) {
-    meta?.remove();
-    return;
-  }
-  if (!meta) {
-    meta = document.createElement("meta");
-    meta.id = COLOR_META_ID;
-    meta.name = "theme-color";
-    meta.content = SAVE_THEME_COLOR;
-  }
-  if (document.head.firstChild !== meta) document.head.prepend(meta);
+  if (on) root.dataset.power = "save";
+  else delete root.dataset.power;
+  applyTheme();
 }
 
 /** Modus ein- oder ausschalten - wirkt sofort auf alles, was zuhoert. */

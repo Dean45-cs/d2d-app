@@ -19,7 +19,8 @@ export const MARK_DOT = { cx: 71.2, cy: 28.8, r: 6.75 };
 /**
  * Bildmarke im App-Symbol-Format: gerundetes Quadrat in Energie-Gruen mit
  * Licht von oben links, feiner Lichtkante und einer hellen Marke, die einen
- * weichen Schatten wirft. Der Punkt leuchtet leicht.
+ * weichen Schatten wirft. Der Punkt leuchtet leicht. Die Farben kommen aus
+ * den --logo-Tokens (brand.css) - in jeder Akzentfarbe ihr eigenes Symbol.
  */
 export function LogoMark({ size = 32, className = "" }: { size?: number; className?: string }) {
   const id = useId().replace(/:/g, "");
@@ -35,9 +36,9 @@ export function LogoMark({ size = 32, className = "" }: { size?: number; classNa
     >
       <defs>
         <linearGradient id={`${id}-bg`} x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0" stopColor="#46e38e" />
-          <stop offset=".52" stopColor="#17a852" />
-          <stop offset="1" stopColor="#06612f" />
+          <stop offset="0" style={{ stopColor: "var(--logo-1, #46e38e)" }} />
+          <stop offset=".52" style={{ stopColor: "var(--logo-2, #17a852)" }} />
+          <stop offset="1" style={{ stopColor: "var(--logo-3, #06612f)" }} />
         </linearGradient>
         <radialGradient id={`${id}-light`} cx=".2" cy=".08" r=".9">
           <stop offset="0" stopColor="#fff" stopOpacity=".3" />
@@ -51,16 +52,16 @@ export function LogoMark({ size = 32, className = "" }: { size?: number; classNa
         </linearGradient>
         <linearGradient id={`${id}-ring`} x1=".1" y1=".1" x2=".9" y2=".9">
           <stop offset="0" stopColor="#fff" />
-          <stop offset="1" stopColor="#cff7de" />
+          <stop offset="1" style={{ stopColor: "var(--logo-ring, #cff7de)" }} />
         </linearGradient>
         <radialGradient id={`${id}-dot`} cx=".36" cy=".3" r=".8">
           <stop offset="0" stopColor="#fff" />
-          <stop offset="1" stopColor="#d4f9e1" />
+          <stop offset="1" style={{ stopColor: "var(--logo-dot, #d4f9e1)" }} />
         </radialGradient>
         <radialGradient id={`${id}-halo`}>
-          <stop offset="0" stopColor="#f0fff5" stopOpacity=".8" />
-          <stop offset=".42" stopColor="#bdffd6" stopOpacity=".3" />
-          <stop offset="1" stopColor="#bdffd6" stopOpacity="0" />
+          <stop offset="0" stopOpacity=".8" style={{ stopColor: "var(--logo-halo, #f0fff5)" }} />
+          <stop offset=".42" stopOpacity=".3" style={{ stopColor: "var(--logo-halo-2, #bdffd6)" }} />
+          <stop offset="1" stopOpacity="0" style={{ stopColor: "var(--logo-halo-2, #bdffd6)" }} />
         </radialGradient>
         <filter id={`${id}-shadow`} x="-20%" y="-20%" width="140%" height="140%">
           <feGaussianBlur stdDeviation="1.6" />
@@ -69,7 +70,7 @@ export function LogoMark({ size = 32, className = "" }: { size?: number; classNa
       <rect width="100" height="100" rx="22.4" fill={ref("bg")} />
       <rect width="100" height="100" rx="22.4" fill={ref("light")} />
       <rect x=".5" y=".5" width="99" height="99" rx="21.9" fill="none" stroke={ref("rim")} />
-      <g fill="#00361a" opacity=".3" filter={ref("shadow")} transform="translate(0 2.2)">
+      <g style={{ fill: "var(--logo-shadow, #00361a)" }} opacity=".3" filter={ref("shadow")} transform="translate(0 2.2)">
         <path d={MARK_RING} />
         <circle {...MARK_DOT} />
       </g>

@@ -14,9 +14,18 @@ export interface HeroStat {
  * Termine. Die einzige tiefgruene Flaeche der Seite; der Ring der Marke
  * liegt leise im Hintergrund.
  */
-export function HeroStats({ lead, stats }: { lead: HeroStat; stats: HeroStat[] }) {
+export function HeroStats({
+  lead,
+  stats,
+  section,
+}: {
+  lead: HeroStat;
+  stats: HeroStat[];
+  /** Abschnitt der Uebersicht, der sich ausblenden laesst (data-start). */
+  section?: string;
+}) {
   return (
-    <section className="hero" aria-label="Kennzahlen im Zeitraum">
+    <section className="hero" aria-label="Kennzahlen im Zeitraum" data-start={section}>
       <LogoGlyph size={196} className="hero-mark" />
       <div className="hero-body">
         <div className="min-w-0">
