@@ -1,9 +1,9 @@
 import { SkeletonText } from "@/components/ui";
 
 /**
- * Platzhalter der Tuer: Kopf, grosse Nummer, Ergebnisleiste, Haeuser -
- * aufgebaut wie die Seite (dieselben Klassen wie TourClient), damit auf
- * Handy und iPad, hochkant wie quer, beim Laden nichts springt.
+ * Platzhalter der Tuer: Kopf, Ergebnisleiste, Liste der Haeuser - aufgebaut
+ * wie die Seite (dieselben Klassen wie TourClient), damit auf Handy und iPad,
+ * hochkant wie quer, beim Laden nichts springt.
  */
 export default function LoadingTour() {
   return (
@@ -25,41 +25,44 @@ export default function LoadingTour() {
           </p>
         </header>
 
-        <div className="tour-door">
-          <section className="door-hero flex flex-col items-center py-2 text-center">
-            <div className="grid w-full grid-cols-[44px_minmax(0,1fr)_44px] items-center gap-2 md:grid-cols-[56px_minmax(0,1fr)_56px]">
-              <span className="skeleton h-11 w-11 rounded-full md:h-14 md:w-14" />
-              <span className="door-number block">
-                <SkeletonText width="min(48%, 9rem)" className="rounded-2xl" />
-              </span>
-              <span className="skeleton h-11 w-11 rounded-full md:h-14 md:w-14" />
-            </div>
-            <p className="mt-2 w-full text-subhead">
-              <SkeletonText width="min(52%, 12rem)" />
-            </p>
-            <div className="mt-2 flex h-11 items-center justify-center gap-4">
-              <span className="skeleton h-4 w-32 rounded-full" />
-            </div>
-          </section>
-        </div>
-
         <div className="tray glass-strong">
-          <div className="tray-grid">
-            {[0, 1, 2, 3].map((i) => (
-              <span key={i} className="tray-btn skeleton bg-fill" />
-            ))}
-          </div>
+          <p className="px-2 py-2 text-center text-subhead md:text-headline">
+            <SkeletonText width="min(50%, 12rem)" className="mx-auto" />
+          </p>
         </div>
 
-        <div className="tour-lists">
-          <div className="mb-2 flex min-h-11 items-center px-1 text-footnote">
-            <SkeletonText width="min(30%, 7rem)" />
+        <div className="tour-lists space-y-4">
+          <div className="flex items-center gap-2">
+            <span className="skeleton h-11 flex-1 rounded-md" />
+            <span className="skeleton h-11 w-11 shrink-0 rounded-full" />
+            <span className="skeleton h-11 w-28 shrink-0 rounded-full" />
           </div>
-          <div className="chips house-chips -mx-4 px-4 pb-1 md:mx-0 md:px-0 md:pb-0">
-            {Array.from({ length: 12 }, (_, i) => (
-              <span key={i} className="skeleton h-9 w-16 shrink-0 rounded-full md:h-12 md:w-auto" />
-            ))}
+          <div className="door-table">
+            <div className="door-table-head">
+              <span className="door-lead-col">Nr.</span>
+              <span className="flex-1">Stand</span>
+            </div>
+            <ul>
+              {Array.from({ length: 8 }, (_, i) => (
+                <li key={i}>
+                  <div className="door-row">
+                    <span className="door-lead">
+                      <span className="skeleton h-5 w-8 rounded-md" />
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block text-body">
+                        <SkeletonText width={`${48 + ((i * 17) % 30)}%`} />
+                      </span>
+                      <span className="block text-footnote">
+                        <SkeletonText width={`${30 + ((i * 11) % 20)}%`} />
+                      </span>
+                    </span>
+                  </div>
+                </li>
+              ))}
+            </ul>
           </div>
+          <div className="tray-space" />
         </div>
       </div>
     </div>

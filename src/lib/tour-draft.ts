@@ -15,7 +15,7 @@
  */
 
 import type { DoorbellInput } from "./doorbells";
-import type { BuildingType } from "./types";
+import type { BuildingType, VisitOutcome } from "./types";
 
 // v2: seit die Oberflaeche Versuche zaehlt statt "erledigt ja/nein".
 const STORAGE_KEY = "d2d_tour_draft_v2";
@@ -36,6 +36,21 @@ export interface LocalVisits {
    */
   baseNotHome?: number;
   baseMet?: number;
+  /**
+   * Der zuletzt hier erfasste Eintrag - die Zeile zeigt ihn sofort, auch ohne
+   * Netz, bis der Server ihn selbst kennt.
+   */
+  last?: LocalLast;
+}
+
+/** Ein an der Tuer erfasstes Ergebnis, so wie die Zeile es anzeigt. */
+export interface LocalLast {
+  outcome: VisitOutcome;
+  reasonLabel: string | null;
+  reasonIcon: string | null;
+  /** Zeitpunkt wie beim Server: "2026-09-27 17:52:10" (UTC). */
+  at: string;
+  userId: number;
 }
 
 export interface TourDraft {

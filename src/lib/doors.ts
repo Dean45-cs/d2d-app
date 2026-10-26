@@ -5,22 +5,19 @@
  * Mehrfamilienhaus. Bewusst ohne Datenbankbezug, damit Oberflaeche und
  * Abfragen dieselbe Regel benutzen.
  *
- * Der Kern: "nicht angetroffen" ist kein Ergebnis, sondern ein Versuch. An
- * zwei von drei Tueren macht beim ersten Mal niemand auf - wer die Tuer
- * danach abhakt, verschenkt den Grossteil seiner Kontaktchancen. Deshalb
- * zaehlt die App die Versuche, statt die Tuer zuzumachen.
+ * Kein Ergebnis macht eine Tuer zu: "nicht angetroffen" ist nur ein Versuch,
+ * und auch wer schon angetroffen wurde - selbst mit Abschluss -, kann wieder
+ * angetroffen werden. Leute ziehen um, Vertraege laufen aus. Zu ist nur, was
+ * jemand ausdruecklich sperrt.
  */
-
-/** Nach so vielen erfolglosen Versuchen gilt eine Tuer als abgearbeitet. */
-export const MAX_NOT_HOME_ATTEMPTS = 3;
 
 export type DoorStatus =
   /** Noch nie jemand dran gewesen. */
   | "OPEN"
-  /** Nicht angetroffen, es sind noch Versuche offen. */
+  /** Bisher nur nicht angetroffen - beliebig oft. */
   | "RETRY"
-  /** Angetroffen, oder alle Versuche verbraucht. */
-  | "DONE"
+  /** Jemand angetroffen (Gespraech, Termin oder Abschluss). */
+  | "MET"
   /** Ausdruecklich gesperrt - nicht mehr anlaufen. */
   | "BLOCKED";
 
@@ -35,19 +32,22 @@ export interface DoorFacts {
 
 export function doorStatus(facts: DoorFacts): DoorStatus {
   if (facts.blocked_at) return "BLOCKED";
-  if (facts.met_count > 0) return "DONE";
-  if (facts.not_home_count >= MAX_NOT_HOME_ATTEMPTS) return "DONE";
+  if (facts.met_count > 0) return "MET";
   if (facts.not_home_count > 0) return "RETRY";
   return "OPEN";
 }
 
-/** Erledigt heisst: hier muss niemand mehr hin. */
-export function doorFinished(facts: DoorFacts): boolean {
+/**
+ * Offen heisst: hier wurde noch niemand angetroffen. Dorthin fuehrt "In
+ * meiner Nähe", und das zaehlt "offen". Erfassen laesst sich jede Tuer, die
+ * nicht gesperrt ist - offen oder nicht.
+ */
+export function doorOpen(facts: DoorFacts): boolean {
   const status = doorStatus(facts);
-  return status === "DONE" || status === "BLOCKED";
+  return status === "OPEN" || status === "RETRY";
 }
 
-/** "vor 5 Min.", "gestern 18:40", "Di, 16.09. 09:12" - kurz genug fuer die Plakette. */
+/** "vor 5 Min.", "gestern 18:40", "Di, 16.09. 09:12", "14.05.2024" - kurz genug fuer die Plakette. */
 export function whenLabel(value: string | null): string {
   if (!value) return "";
   const date = new Date(`${value.replace(" ", "T")}Z`);
@@ -65,5 +65,30 @@ export function whenLabel(value: string | null): string {
   if (days === 0) return `heute ${time}`;
   if (days === 1) return `gestern ${time}`;
   if (days < 7) return `${date.toLocaleDateString("de-DE", { weekday: "short" })} ${time}`;
+  // Aus einem anderen Jahr: das Jahr statt der Uhrzeit - "14.05." saehe aus wie von diesem Mai.
+  if (date.getFullYear() !== today.getFullYear()) {
+    return date.toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric" });
+  }
   return `${date.toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit" })} ${time}`;
+}
+
+/**
+ * Tag eines Eintrags fuer "Abschluss am …": heute und gestern mit Uhrzeit,
+ * sonst das volle Datum - ein Abschluss kann Jahre her sein, und genau das
+ * soll man an der Tuer sehen (vielleicht wohnt dort inzwischen jemand anders).
+ */
+export function dayLabel(value: string | null, now = new Date()): string {
+  if (!value) return "";
+  const date = new Date(`${value.replace(" ", "T")}Z`);
+  if (Number.isNaN(date.getTime())) return "";
+
+  const time = date.toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" });
+  const day = new Date(date);
+  day.setHours(0, 0, 0, 0);
+  const today = new Date(now);
+  today.setHours(0, 0, 0, 0);
+  const days = Math.round((today.getTime() - day.getTime()) / 86_400_000);
+  if (days === 0) return `heute ${time}`;
+  if (days === 1) return `gestern ${time}`;
+  return date.toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric" });
 }

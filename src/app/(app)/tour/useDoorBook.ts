@@ -4,8 +4,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { DoorbellWithStats, HouseNumberWithStats } from "@/lib/queries";
 import type { BuildingType } from "@/lib/types";
 import { bellKey, type DoorbellInput } from "@/lib/doorbells";
-import { doorFinished, type DoorFacts } from "@/lib/doors";
-import { readDraft, writeDraft, type LocalVisits } from "@/lib/tour-draft";
+import { doorOpen, type DoorFacts } from "@/lib/doors";
+import { readDraft, writeDraft, type LocalLast, type LocalVisits } from "@/lib/tour-draft";
 import { onDropped, type QueuedWrite } from "@/lib/offline-queue";
 import { NEW_BELL, bellSlot, doneKey, type Bell } from "./model";
 
@@ -21,7 +21,8 @@ import { NEW_BELL, bellSlot, doneKey, type Bell } from "./model";
  *    umbenannte oder geloeschte Schilder nicht als Geister wieder auf)
  *  - was nie beim Server ankommt (verworfen, abgelehnt), wird zurueckgenommen
  *
- * Daraus ergibt sich fuer jede Tuer: offen, nochmal, erledigt, gesperrt.
+ * Daraus ergibt sich fuer jede Tuer: neu, nicht da, angetroffen, gesperrt -
+ * und was dort zuletzt war. Zu macht davon nur die Sperre.
  */
 export function useDoorBook(
   houseNumbers: HouseNumberWithStats[],
@@ -142,7 +143,9 @@ export function useDoorBook(
         not_home_count: bell.not_home_count,
         met_count: bell.met_count,
         last_outcome: bell.last_outcome,
+        last_reason_label: bell.last_reason_label,
         last_reason_icon: bell.last_reason_icon,
+        last_sale_at: bell.last_sale_at,
         last_visit_at: bell.last_visit_at,
         last_visit_user: bell.last_visit_user,
         last_visit_user_id: bell.last_visit_user_id,
@@ -207,35 +210,40 @@ export function useDoorBook(
     [factsOf],
   );
 
-  const isBellDone = useCallback(
-    (key: string, bell: Bell) => doorFinished(bellFacts(key, bell)),
+  const isBellOpen = useCallback(
+    (key: string, bell: Bell) => doorOpen(bellFacts(key, bell)),
     [bellFacts],
   );
 
   /**
-   * Ein Mehrfamilienhaus ist erst fertig, wenn jede Klingel dran war - oder
-   * die ganze Adresse gesperrt ist (wie beim Server, HOUSE_TOUCHED): sonst
-   * fuehrte "weiter" und "in meiner Naehe" an eine Tuer, an der niemand klingeln darf.
+   * Ein Mehrfamilienhaus ist offen, solange an einer Klingel noch niemand
+   * angetroffen wurde (oder noch keine Schilder angelegt sind). Eine gesperrte
+   * Adresse ist nie offen (wie beim Server, HOUSE_TOUCHED): sonst fuehrte
+   * "in meiner Naehe" an eine Tuer, an der niemand klingeln darf.
    */
-  const isDone = useCallback(
+  const isOpen = useCallback(
     (house: HouseNumberWithStats) => {
       const key = doneKey(house.street_id, house.number);
-      if (factsOf(key, house).blocked_at) return true;
+      if (factsOf(key, house).blocked_at) return false;
       if (typeOf(house) === "MFH") {
         const bells = bellsOf(key, house.id);
-        return bells.length > 0 && bells.every((bell) => isBellDone(key, bell));
+        return bells.length === 0 || bells.some((bell) => isBellOpen(key, bell));
       }
-      return doorFinished(factsOf(key, house));
+      return doorOpen(factsOf(key, house));
     },
-    [typeOf, bellsOf, isBellDone, factsOf],
+    [typeOf, bellsOf, isBellOpen, factsOf],
   );
+
+  /** Was zuletzt an dieser Tuer erfasst wurde, solange der Server es noch nicht kennt. */
+  const lastOf = useCallback((key: string): LocalLast | null => localVisits.get(key)?.last ?? null, [localVisits]);
 
   /**
    * Eine erfasste Tuer sofort zaehlen. `base` ist der Serverstand der Tuer
    * in diesem Moment - so verschwindet der Zuschlag genau dann, wenn der
-   * Server den Eintrag selbst zaehlt.
+   * Server den Eintrag selbst zaehlt. `last` steht so lange in der Zeile.
    */
-  const countVisit = useCallback((key: string, base: DoorFacts, notHome: boolean) => {
+  const countVisit = useCallback((key: string, base: DoorFacts, last: LocalLast) => {
+    const notHome = last.outcome === "NOT_HOME";
     setLocalVisits((prev) => {
       const next = new Map(prev);
       const seen = next.get(key);
@@ -252,6 +260,7 @@ export function useDoorBook(
         ...entry,
         notHome: entry.notHome + (notHome ? 1 : 0),
         met: entry.met + (notHome ? 0 : 1),
+        last,
       });
       return next;
     });
@@ -263,10 +272,12 @@ export function useDoorBook(
       const seen = prev.get(key);
       if (!seen) return prev;
       const next = new Map(prev);
+      // Was davor war, weiss wieder der Server - der zurueckgenommene Eintrag steht nicht mehr da.
       const left = {
         ...seen,
         notHome: Math.max(0, seen.notHome - (notHome ? 1 : 0)),
         met: Math.max(0, seen.met - (notHome ? 0 : 1)),
+        last: undefined,
       };
       if (left.notHome === 0 && left.met === 0) next.delete(key);
       else next.set(key, left);
@@ -373,8 +384,9 @@ export function useDoorBook(
     bellsOf,
     factsOf,
     bellFacts,
-    isBellDone,
-    isDone,
+    isBellOpen,
+    isOpen,
+    lastOf,
     countVisit,
     uncountVisit,
     setType,
