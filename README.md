@@ -34,6 +34,9 @@ Eine Web-App für Door-to-Door-Teams im Energievertrieb:
 - **Einstellungen für jeden selbst** – zehn Akzentfarben (jede wie eine eigene Ausgabe der
   App), Hell/Dunkel, Textgröße, Effekte, und fast jede Funktion beim Klinken, auf der
   Karte, in der Übersicht und bei den Mitteilungen ein- und ausschaltbar
+- **Einführung als Video** – alle Funktionen in zweieinhalb Minuten unter Profil ›
+  Einführung, mit Kapitelmarken zum Springen; gebaut aus Code in
+  [video/einfuehrung](video/einfuehrung/README.md)
 
 Die Oberfläche ist mobil-first (der Außendienst klinkt mit Handy oder iPad – Klinken ist
 für beide eigens ausgelegt, siehe [Auf dem iPad](#auf-dem-ipad)), das Leitungs-Dashboard

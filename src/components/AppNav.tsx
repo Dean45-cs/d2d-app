@@ -147,7 +147,7 @@ export function Sidebar({ sections, user }: { sections: NavSection[]; user: NavU
     label: "Profil",
     icon: "profile",
     // Die eigenen Einstellungen gehoeren zum Profil - die Verwaltung darunter hat eigene Punkte.
-    match: [`/profil/${user.id}`, "/profil/visitenkarte", "/einstellungen"],
+    match: [`/profil/${user.id}`, "/profil/visitenkarte", "/profil/einfuehrung", "/einstellungen"],
   };
   const active = activeHref([...sections.flatMap((s) => s.items), account], pathname);
 

@@ -18,6 +18,7 @@ import {
   IconComment,
   IconContacts,
   IconMap,
+  IconPlay,
   IconQr,
   IconSparkles,
   IconTarget,
@@ -150,6 +151,14 @@ export default async function ProfileHubPage() {
 
       <ListLabel>Werkzeuge</ListLabel>
       <ul className="list list-icons">
+        <li>
+          <Cell
+            href="/profil/einfuehrung"
+            icon={<ToneTile tone="magenta"><IconPlay className="h-4 w-4" /></ToneTile>}
+            title="Einführung"
+            subtitle="Alle Funktionen als Video"
+          />
+        </li>
         <li>
           <Cell
             href={TARIFRECHNER}
