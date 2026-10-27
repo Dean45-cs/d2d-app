@@ -64,8 +64,9 @@ export interface Navigation {
 
 export function navigation(role: Role, rights: PermissionSet, userId?: number): Navigation {
   const reports = rights["reports.team"];
-  // Eigenes Profil und eigene Visitenkarte gehoeren zum Reiter "Profil" - fremde Profile zum Team.
-  const me = userId ? [`/profil/${userId}`, "/profil/visitenkarte"] : ["/profil/visitenkarte"];
+  // Eigenes Profil, eigene Visitenkarte und die Einfuehrung gehoeren zum Reiter "Profil" - fremde Profile zum Team.
+  const own = ["/profil/visitenkarte", "/profil/einfuehrung"];
+  const me = userId ? [`/profil/${userId}`, ...own] : own;
 
   const start: NavItem = {
     href: "/start",

@@ -1,0 +1,963 @@
+{
+ "duration": 161,
+ "cues": [
+  {
+   "t": 0.5,
+   "kind": "hit",
+   "word": "Tür."
+  },
+  {
+   "t": 1.5,
+   "kind": "hit",
+   "word": "Gespräch."
+  },
+  {
+   "t": 2.5,
+   "kind": "hit",
+   "word": "Termin."
+  },
+  {
+   "t": 3.5,
+   "kind": "hit-big",
+   "word": "Abschluss."
+  },
+  {
+   "t": 4,
+   "kind": "whoosh-in"
+  },
+  {
+   "t": 4.65,
+   "kind": "dot"
+  },
+  {
+   "t": 5,
+   "kind": "sweep"
+  },
+  {
+   "t": 6,
+   "kind": "impact"
+  },
+  {
+   "t": 6.9,
+   "kind": "shimmer"
+  },
+  {
+   "t": 10.1,
+   "kind": "riser-short"
+  },
+  {
+   "t": 11,
+   "kind": "whoosh-light"
+  },
+  {
+   "t": 12.5,
+   "kind": "pop",
+   "n": 0
+  },
+  {
+   "t": 13,
+   "kind": "pop",
+   "n": 1
+  },
+  {
+   "t": 13.5,
+   "kind": "pop",
+   "n": 2
+  },
+  {
+   "t": 14,
+   "kind": "pop",
+   "n": 3
+  },
+  {
+   "t": 14.5,
+   "kind": "pop",
+   "n": 4
+  },
+  {
+   "t": 16.3,
+   "kind": "whoosh"
+  },
+  {
+   "t": 17,
+   "kind": "cut"
+  },
+  {
+   "t": 19.2,
+   "kind": "tap"
+  },
+  {
+   "t": 19.7,
+   "kind": "tap"
+  },
+  {
+   "t": 20.2,
+   "kind": "tap"
+  },
+  {
+   "t": 20.7,
+   "kind": "tap"
+  },
+  {
+   "t": 21.2,
+   "kind": "tap"
+  },
+  {
+   "t": 21.45,
+   "kind": "close"
+  },
+  {
+   "t": 22.3,
+   "kind": "tap"
+  },
+  {
+   "t": 22.5,
+   "kind": "scan"
+  },
+  {
+   "t": 26,
+   "kind": "tap"
+  },
+  {
+   "t": 26.4,
+   "kind": "split"
+  },
+  {
+   "t": 26.8,
+   "kind": "pop",
+   "n": 0
+  },
+  {
+   "t": 26.95,
+   "kind": "pop",
+   "n": 1
+  },
+  {
+   "t": 27.1,
+   "kind": "pop",
+   "n": 2
+  },
+  {
+   "t": 29,
+   "kind": "route"
+  },
+  {
+   "t": 32.2,
+   "kind": "whoosh"
+  },
+  {
+   "t": 33,
+   "kind": "cut"
+  },
+  {
+   "t": 33,
+   "kind": "whoosh-in"
+  },
+  {
+   "t": 34.8,
+   "kind": "tap"
+  },
+  {
+   "t": 36.5,
+   "kind": "pop",
+   "n": 0
+  },
+  {
+   "t": 36.9,
+   "kind": "pop",
+   "n": 1
+  },
+  {
+   "t": 37.3,
+   "kind": "pop",
+   "n": 2
+  },
+  {
+   "t": 37.7,
+   "kind": "pop",
+   "n": 3
+  },
+  {
+   "t": 40.5,
+   "kind": "swoosh-back"
+  },
+  {
+   "t": 41.8,
+   "kind": "tap"
+  },
+  {
+   "t": 41.88,
+   "kind": "xp"
+  },
+  {
+   "t": 42.8,
+   "kind": "tap"
+  },
+  {
+   "t": 43.3,
+   "kind": "tap"
+  },
+  {
+   "t": 43.38,
+   "kind": "xp"
+  },
+  {
+   "t": 45.6,
+   "kind": "tap"
+  },
+  {
+   "t": 46.2,
+   "kind": "tap"
+  },
+  {
+   "t": 46.4,
+   "kind": "sheet"
+  },
+  {
+   "t": 47.2,
+   "kind": "tick"
+  },
+  {
+   "t": 47.38,
+   "kind": "tick"
+  },
+  {
+   "t": 47.56,
+   "kind": "tick"
+  },
+  {
+   "t": 47.74,
+   "kind": "tick"
+  },
+  {
+   "t": 47.92,
+   "kind": "tick"
+  },
+  {
+   "t": 49.4,
+   "kind": "tap"
+  },
+  {
+   "t": 50.4,
+   "kind": "xp"
+  },
+  {
+   "t": 52.4,
+   "kind": "tap"
+  },
+  {
+   "t": 52.55,
+   "kind": "folder"
+  },
+  {
+   "t": 54.4,
+   "kind": "tap"
+  },
+  {
+   "t": 55,
+   "kind": "tap"
+  },
+  {
+   "t": 55.08,
+   "kind": "xp"
+  },
+  {
+   "t": 57,
+   "kind": "tap"
+  },
+  {
+   "t": 58.6,
+   "kind": "tap"
+  },
+  {
+   "t": 58.8,
+   "kind": "locate"
+  },
+  {
+   "t": 65.5,
+   "kind": "whoosh"
+  },
+  {
+   "t": 66,
+   "kind": "cut"
+  },
+  {
+   "t": 66,
+   "kind": "whoosh-in"
+  },
+  {
+   "t": 67.5,
+   "kind": "tap"
+  },
+  {
+   "t": 68,
+   "kind": "tap"
+  },
+  {
+   "t": 68.12,
+   "kind": "key"
+  },
+  {
+   "t": 68.185,
+   "kind": "key"
+  },
+  {
+   "t": 68.25,
+   "kind": "key"
+  },
+  {
+   "t": 68.315,
+   "kind": "key"
+  },
+  {
+   "t": 68.38,
+   "kind": "key"
+  },
+  {
+   "t": 68.445,
+   "kind": "key"
+  },
+  {
+   "t": 68.51,
+   "kind": "key"
+  },
+  {
+   "t": 68.575,
+   "kind": "key"
+  },
+  {
+   "t": 68.64,
+   "kind": "key"
+  },
+  {
+   "t": 68.705,
+   "kind": "key"
+  },
+  {
+   "t": 68.77,
+   "kind": "key"
+  },
+  {
+   "t": 69,
+   "kind": "tap"
+  },
+  {
+   "t": 69.12,
+   "kind": "key"
+  },
+  {
+   "t": 69.18,
+   "kind": "key"
+  },
+  {
+   "t": 69.24,
+   "kind": "key"
+  },
+  {
+   "t": 69.3,
+   "kind": "key"
+  },
+  {
+   "t": 69.36,
+   "kind": "key"
+  },
+  {
+   "t": 69.42,
+   "kind": "key"
+  },
+  {
+   "t": 69.48,
+   "kind": "key"
+  },
+  {
+   "t": 69.54,
+   "kind": "key"
+  },
+  {
+   "t": 69.6,
+   "kind": "key"
+  },
+  {
+   "t": 69.66,
+   "kind": "key"
+  },
+  {
+   "t": 69.72,
+   "kind": "key"
+  },
+  {
+   "t": 69.78,
+   "kind": "key"
+  },
+  {
+   "t": 70.3,
+   "kind": "tap"
+  },
+  {
+   "t": 70.4,
+   "kind": "xp"
+  },
+  {
+   "t": 71.6,
+   "kind": "tap"
+  },
+  {
+   "t": 71.85,
+   "kind": "whoosh"
+  },
+  {
+   "t": 74.2,
+   "kind": "sent"
+  },
+  {
+   "t": 75.3,
+   "kind": "push"
+  },
+  {
+   "t": 78.5,
+   "kind": "whoosh"
+  },
+  {
+   "t": 79,
+   "kind": "cut"
+  },
+  {
+   "t": 79,
+   "kind": "whoosh-in"
+  },
+  {
+   "t": 80.4,
+   "kind": "tap"
+  },
+  {
+   "t": 80.6,
+   "kind": "sheet"
+  },
+  {
+   "t": 81.6,
+   "kind": "tap"
+  },
+  {
+   "t": 81.8,
+   "kind": "whoosh"
+  },
+  {
+   "t": 82.3,
+   "kind": "key"
+  },
+  {
+   "t": 82.65,
+   "kind": "key"
+  },
+  {
+   "t": 83,
+   "kind": "key"
+  },
+  {
+   "t": 83.35,
+   "kind": "key"
+  },
+  {
+   "t": 83.9,
+   "kind": "sign"
+  },
+  {
+   "t": 85.25,
+   "kind": "tap"
+  },
+  {
+   "t": 85.8,
+   "kind": "whoosh"
+  },
+  {
+   "t": 86,
+   "kind": "riser"
+  },
+  {
+   "t": 87.6,
+   "kind": "tap"
+  },
+  {
+   "t": 88,
+   "kind": "drop"
+  },
+  {
+   "t": 88.05,
+   "kind": "confetti"
+  },
+  {
+   "t": 91,
+   "kind": "levelup"
+  },
+  {
+   "t": 91.6,
+   "kind": "whoosh"
+  },
+  {
+   "t": 92.2,
+   "kind": "push"
+  },
+  {
+   "t": 93.2,
+   "kind": "like"
+  },
+  {
+   "t": 93.42,
+   "kind": "like"
+  },
+  {
+   "t": 93.64,
+   "kind": "like"
+  },
+  {
+   "t": 93.86,
+   "kind": "like"
+  },
+  {
+   "t": 94.08,
+   "kind": "like"
+  },
+  {
+   "t": 94.3,
+   "kind": "like"
+  },
+  {
+   "t": 96.6,
+   "kind": "whoosh"
+  },
+  {
+   "t": 97,
+   "kind": "cut"
+  },
+  {
+   "t": 97,
+   "kind": "whoosh-in"
+  },
+  {
+   "t": 97.7,
+   "kind": "build"
+  },
+  {
+   "t": 98.9,
+   "kind": "scan"
+  },
+  {
+   "t": 99.7,
+   "kind": "pop"
+  },
+  {
+   "t": 100,
+   "kind": "tap"
+  },
+  {
+   "t": 100.2,
+   "kind": "chime"
+  },
+  {
+   "t": 104.4,
+   "kind": "whoosh"
+  },
+  {
+   "t": 105,
+   "kind": "cut"
+  },
+  {
+   "t": 105,
+   "kind": "whoosh-in"
+  },
+  {
+   "t": 105.9,
+   "kind": "tick"
+  },
+  {
+   "t": 106.11,
+   "kind": "tick"
+  },
+  {
+   "t": 106.32,
+   "kind": "tick"
+  },
+  {
+   "t": 106.53,
+   "kind": "tick"
+  },
+  {
+   "t": 106.74,
+   "kind": "tick"
+  },
+  {
+   "t": 106.95,
+   "kind": "tick"
+  },
+  {
+   "t": 109.6,
+   "kind": "tap"
+  },
+  {
+   "t": 109.7,
+   "kind": "switch"
+  },
+  {
+   "t": 111,
+   "kind": "key"
+  },
+  {
+   "t": 111.6,
+   "kind": "pop"
+  },
+  {
+   "t": 113.4,
+   "kind": "whoosh"
+  },
+  {
+   "t": 114,
+   "kind": "cut"
+  },
+  {
+   "t": 114,
+   "kind": "whoosh-in"
+  },
+  {
+   "t": 114.6,
+   "kind": "count"
+  },
+  {
+   "t": 115.4,
+   "kind": "build"
+  },
+  {
+   "t": 117.1,
+   "kind": "rise"
+  },
+  {
+   "t": 119,
+   "kind": "tap"
+  },
+  {
+   "t": 122.4,
+   "kind": "whoosh"
+  },
+  {
+   "t": 123,
+   "kind": "cut"
+  },
+  {
+   "t": 123,
+   "kind": "whoosh-in"
+  },
+  {
+   "t": 123.5,
+   "kind": "rise",
+   "n": 0
+  },
+  {
+   "t": 123.95,
+   "kind": "rise",
+   "n": 1
+  },
+  {
+   "t": 124.4,
+   "kind": "rise",
+   "n": 2
+  },
+  {
+   "t": 126.6,
+   "kind": "pop"
+  },
+  {
+   "t": 128.7,
+   "kind": "whoosh"
+  },
+  {
+   "t": 129.6,
+   "kind": "ring"
+  },
+  {
+   "t": 130,
+   "kind": "ring"
+  },
+  {
+   "t": 130.4,
+   "kind": "ring"
+  },
+  {
+   "t": 130.9,
+   "kind": "levelup"
+  },
+  {
+   "t": 131.2,
+   "kind": "medal",
+   "n": 0
+  },
+  {
+   "t": 131.5,
+   "kind": "medal",
+   "n": 1
+  },
+  {
+   "t": 131.8,
+   "kind": "medal",
+   "n": 2
+  },
+  {
+   "t": 132.1,
+   "kind": "medal",
+   "n": 3
+  },
+  {
+   "t": 132.4,
+   "kind": "medal",
+   "n": 4
+  },
+  {
+   "t": 134.4,
+   "kind": "whoosh"
+  },
+  {
+   "t": 135,
+   "kind": "cut"
+  },
+  {
+   "t": 135,
+   "kind": "whoosh-in"
+  },
+  {
+   "t": 136.2,
+   "kind": "rise"
+  },
+  {
+   "t": 139.2,
+   "kind": "tap"
+  },
+  {
+   "t": 139.3,
+   "kind": "xp"
+  },
+  {
+   "t": 141.4,
+   "kind": "whoosh"
+  },
+  {
+   "t": 142,
+   "kind": "cut"
+  },
+  {
+   "t": 142,
+   "kind": "whoosh-in"
+  },
+  {
+   "t": 143.5,
+   "kind": "color",
+   "n": 1
+  },
+  {
+   "t": 144,
+   "kind": "color",
+   "n": 2
+  },
+  {
+   "t": 144.5,
+   "kind": "color",
+   "n": 3
+  },
+  {
+   "t": 145,
+   "kind": "color",
+   "n": 4
+  },
+  {
+   "t": 145.5,
+   "kind": "color",
+   "n": 5
+  },
+  {
+   "t": 146,
+   "kind": "color",
+   "n": 6
+  },
+  {
+   "t": 146.5,
+   "kind": "color",
+   "n": 7
+  },
+  {
+   "t": 147,
+   "kind": "color",
+   "n": 8
+  },
+  {
+   "t": 147.5,
+   "kind": "color",
+   "n": 9
+  },
+  {
+   "t": 148,
+   "kind": "color",
+   "n": 0
+  },
+  {
+   "t": 148.3,
+   "kind": "switch"
+  },
+  {
+   "t": 148.4,
+   "kind": "whoosh"
+  },
+  {
+   "t": 149.6,
+   "kind": "whoosh"
+  },
+  {
+   "t": 151.5,
+   "kind": "riser-short"
+  },
+  {
+   "t": 152,
+   "kind": "cut"
+  },
+  {
+   "t": 152,
+   "kind": "whoosh-in"
+  },
+  {
+   "t": 152.3,
+   "kind": "tick"
+  },
+  {
+   "t": 152.42,
+   "kind": "tick"
+  },
+  {
+   "t": 152.54,
+   "kind": "tick"
+  },
+  {
+   "t": 152.66,
+   "kind": "tick"
+  },
+  {
+   "t": 152.78,
+   "kind": "tick"
+  },
+  {
+   "t": 152.9,
+   "kind": "tick"
+  },
+  {
+   "t": 153.02,
+   "kind": "tick"
+  },
+  {
+   "t": 153.14,
+   "kind": "tick"
+  },
+  {
+   "t": 153.26,
+   "kind": "tick"
+  },
+  {
+   "t": 153.38,
+   "kind": "tick"
+  },
+  {
+   "t": 153.5,
+   "kind": "tick"
+  },
+  {
+   "t": 153.62,
+   "kind": "tick"
+  },
+  {
+   "t": 154.6,
+   "kind": "riser-short"
+  },
+  {
+   "t": 155.3,
+   "kind": "impact"
+  },
+  {
+   "t": 155.9,
+   "kind": "shimmer"
+  },
+  {
+   "t": 158,
+   "kind": "pop"
+  },
+  {
+   "t": 160.1,
+   "kind": "outro"
+  }
+ ],
+ "scenes": [
+  {
+   "id": "open",
+   "start": 0,
+   "dur": 4.8
+  },
+  {
+   "id": "logo",
+   "start": 4.5,
+   "dur": 6.5
+  },
+  {
+   "id": "tabs",
+   "start": 11,
+   "dur": 6
+  },
+  {
+   "id": "gebiete",
+   "start": 17,
+   "dur": 16
+  },
+  {
+   "id": "klinken",
+   "start": 33,
+   "dur": 33
+  },
+  {
+   "id": "termine",
+   "start": 66,
+   "dur": 13
+  },
+  {
+   "id": "abschluss",
+   "start": 79,
+   "dur": 18
+  },
+  {
+   "id": "visitenkarte",
+   "start": 97,
+   "dur": 8
+  },
+  {
+   "id": "preise",
+   "start": 105,
+   "dur": 9
+  },
+  {
+   "id": "zahlen",
+   "start": 114,
+   "dur": 9
+  },
+  {
+   "id": "team",
+   "start": 123,
+   "dur": 12
+  },
+  {
+   "id": "kunden",
+   "start": 135,
+   "dur": 7
+  },
+  {
+   "id": "farben",
+   "start": 142,
+   "dur": 10
+  },
+  {
+   "id": "outro",
+   "start": 152,
+   "dur": 9
+  }
+ ]
+}

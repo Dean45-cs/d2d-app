@@ -190,6 +190,15 @@ export function IconHistory(props: IconProps) {
     </Line>
   );
 }
+/** Abspielen: Dreieck im Kreis - die Einfuehrung als Video. */
+export function IconPlay(props: IconProps) {
+  return (
+    <Line {...props}>
+      <circle cx="12" cy="12" r="8.75" />
+      <path d="M10.25 8.9v6.2a.6.6 0 0 0 .9.52l5.1-3.1a.6.6 0 0 0 0-1.04l-5.1-3.1a.6.6 0 0 0-.9.52Z" />
+    </Line>
+  );
+}
 export function IconPlus(props: IconProps) {
   return (
     <Line {...props}>
