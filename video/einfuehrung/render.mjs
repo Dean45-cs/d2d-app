@@ -11,6 +11,8 @@
  *
  * Optionen: --fps 60 --workers 4 --scale 1 --crf 20 --out datei.mp4
  *           --blur 2 (Bewegungsunschaerfe: n Zwischenbilder je Bild)
+ *           --cut action (Action-Schnitt aus action.html: eigene Ton-Hinweise
+ *           audio/cues-action.json, Ton audio/soundtrack-action.wav)
  *
  * Braucht ffmpeg und Playwright mit Chromium (npx playwright install chromium).
  */
@@ -31,7 +33,6 @@ try {
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const OUT = join(HERE, "out");
-const PAGE = pathToFileURL(join(HERE, "index.html")).href;
 
 const args = process.argv.slice(2);
 const opt = (name, fallback) => {
@@ -46,10 +47,17 @@ const WORKERS = Number(opt("workers", 4));
 const SCALE = Number(opt("scale", 1));
 const CRF = Number(opt("crf", 20));
 const BLUR = Number(opt("blur", 1));
-const OUTFILE = opt("out", join(OUT, "einfuehrung.mp4"));
+const CUT = opt("cut", "");
+const suffix = CUT ? `-${CUT}` : "";
+const PAGE = pathToFileURL(join(HERE, CUT ? `${CUT}.html` : "index.html")).href;
+const CUES = join(HERE, "audio", `cues${suffix}.json`);
+const AUDIO = join(HERE, "audio", `soundtrack${suffix}.wav`);
+const OUTFILE = opt("out", join(OUT, `einfuehrung${suffix}.mp4`));
 const [mode = "video", ...rest] = args;
 
 mkdirSync(OUT, { recursive: true });
+
+const launch = () => chromium.launch({ args: ["--disable-lcd-text", "--force-color-profile=srgb"] });
 
 async function openPage(browser) {
   const page = await browser.newPage({
@@ -92,6 +100,7 @@ async function duration(browser) {
   const page = await openPage(browser);
   const info = await page.evaluate(() => ({
     duration: window.V.duration,
+    bpm: window.V.cut ? window.V.cut.bpm : window.V.BPM,
     cues: window.V.cues,
     scenes: window.V.sceneList(),
   }));
@@ -99,7 +108,7 @@ async function duration(browser) {
   return info;
 }
 
-async function renderVideo(browser, from, to) {
+async function renderVideo(from, to) {
   const subs = BLUR;
   const total = Math.round((to - from) * FPS);
   const per = Math.ceil(total / WORKERS);
@@ -114,6 +123,8 @@ async function renderVideo(browser, from, to) {
     const b = Math.min(total, a + per);
     if (a >= b) return null;
     return (async () => {
+      // eigener Browser je Prozess: sonst teilen sich alle einen Grafikprozess
+      const browser = await launch();
       const page = await openPage(browser);
       const file = join(segDir, `seg-${String(w).padStart(2, "0")}.mp4`);
       const filters = [];
@@ -139,7 +150,7 @@ async function renderVideo(browser, from, to) {
       }
       enc.proc.stdin.end();
       await enc.done;
-      await page.close();
+      await browser.close();
       return file;
     })();
   }).filter(Boolean);
@@ -148,12 +159,11 @@ async function renderVideo(browser, from, to) {
   process.stdout.write("\n");
   const list = join(segDir, "list.txt");
   writeFileSync(list, files.map((f) => `file '${f}'`).join("\n"));
-  const audio = join(HERE, "audio", "soundtrack.wav");
-  const withAudio = existsSync(audio);
+  const withAudio = existsSync(AUDIO);
   const final = ffmpeg(
     [
       "-y", "-f", "concat", "-safe", "0", "-i", list,
-      ...(withAudio ? ["-ss", String(from), "-t", String(to - from), "-i", audio] : []),
+      ...(withAudio ? ["-ss", String(from), "-t", String(to - from), "-i", AUDIO] : []),
       "-c:v", "libx264", "-preset", "slow", "-crf", String(CRF), "-pix_fmt", "yuv420p",
       "-profile:v", "high", "-tune", "animation", "-g", String(FPS * 2),
       ...(withAudio ? ["-c:a", "aac", "-b:a", "192k", "-shortest"] : []),
@@ -166,12 +176,12 @@ async function renderVideo(browser, from, to) {
 }
 
 async function main() {
-  const browser = await chromium.launch({ args: ["--disable-lcd-text", "--force-color-profile=srgb"] });
+  const browser = await launch();
   try {
     if (mode === "cues") {
       const info = await duration(browser);
-      writeFileSync(join(HERE, "audio", "cues.json"), JSON.stringify(info, null, 1));
-      console.log(`${info.cues.length} Hinweise, ${info.duration} s -> audio/cues.json`);
+      writeFileSync(CUES, JSON.stringify(info, null, 1));
+      console.log(`${info.cues.length} Hinweise, ${info.duration.toFixed(2)} s -> ${CUES}`);
     } else if (mode === "stills") {
       const page = await openPage(browser);
       const dir = join(OUT, "stills");
@@ -209,7 +219,7 @@ async function main() {
       const from = rest[0] !== undefined ? Number(rest[0]) : 0;
       const to = rest[1] !== undefined ? Number(rest[1]) : info.duration;
       console.log(`Rendere ${from}–${to} s, ${FPS} fps, ${WORKERS} Prozesse${BLUR > 1 ? `, ${BLUR}x Unschärfe` : ""}`);
-      await renderVideo(browser, from, to);
+      await renderVideo(from, to);
     }
   } finally {
     await browser.close();

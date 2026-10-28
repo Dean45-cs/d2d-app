@@ -55,3 +55,24 @@ ffmpeg -ss 8.8 -i out/einfuehrung.mp4 -frames:v 1 -vf scale=1280:-1 -q:v 4 ../..
 
 Ändert sich der Zeitplan in `js/timeline.js`, die Kapitelmarken in
 `src/app/(app)/profil/einfuehrung/IntroVideo.tsx` mitziehen.
+
+## Action-Schnitt
+
+Eine zweite, schnellere Fassung (rund 1:57) aus denselben Szenen – nicht in der
+App eingebunden. `action.html` lädt zusätzlich `js/action.js`:
+
+- **Tempo:** alles läuft 1,25-mal so schnell, die Musik mit 150 statt 120 BPM.
+  Ruhige Stellen laufen zusätzlich gerafft durch. Jede Raffung spart ganze
+  Schläge, darum bleiben Schnitte und Effekte im Takt (`RAMPS` in `js/action.js`).
+- **Kamera:** Alle Szenen hängen in einer Kamera-Ebene. Sie punscht auf jeden
+  Takt und jeden Treffer, ruckt bei Einschlägen (Logo, Abschluss, Level) und
+  reißt an jedem Kapitelschnitt durch. Der Hintergrund bewegt sich nur halb so
+  stark mit.
+- **Musik:** derselbe Song mit durchgehend vollem Beat und einem Fill vor jedem
+  Kapitel.
+
+```bash
+node render.mjs cues --cut action        # -> audio/cues-action.json
+python3 audio/soundtrack.py action       # -> audio/soundtrack-action.wav
+node render.mjs video --cut action       # -> out/einfuehrung-action.mp4
+```

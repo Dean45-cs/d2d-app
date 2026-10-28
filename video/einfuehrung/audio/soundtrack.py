@@ -10,23 +10,32 @@ jeder Fingertipp, jede XP-Plakette, jeder Schnitt hat seinen Klang.
 
     pip install numpy scipy
     python3 audio/soundtrack.py          -> audio/soundtrack.wav
+    python3 audio/soundtrack.py action   -> audio/soundtrack-action.wav
+
+Der Action-Schnitt (`node render.mjs cues --cut action`) bringt sein eigenes
+Tempo mit (150 BPM) und spielt durchgehend mit vollem Beat und Fills vor
+jedem Kapitel.
 """
 import json
 import os
+import sys
 import wave
 
 import numpy as np
 from scipy import ndimage, signal
 
 HERE = os.path.dirname(os.path.abspath(__file__))
+CUT = sys.argv[1] if len(sys.argv) > 1 else ""
+SUFFIX = f"-{CUT}" if CUT else ""
+ACTION = CUT == "action"
 SR = 48000
-BPM = 120
-BEAT = 60 / BPM
-BAR = BEAT * 4
 rng = np.random.default_rng(2026)
 
-with open(os.path.join(HERE, "cues.json"), encoding="utf-8") as f:
+with open(os.path.join(HERE, f"cues{SUFFIX}.json"), encoding="utf-8") as f:
     INFO = json.load(f)
+BPM = INFO.get("bpm", 120)
+BEAT = 60 / BPM
+BAR = BEAT * 4
 DUR = INFO["duration"] + 0.6
 N = int(DUR * SR)
 SCENES = {s["id"]: s["start"] for s in INFO["scenes"]}
@@ -174,11 +183,11 @@ def part(t):
     if t < S["gebiete"]:
         return "lift"
     if t < S["klinken"]:
-        return "verse"
+        return "full" if ACTION else "verse"
     if t < S["termine"]:
         return "full"
     if t < S["abschluss"]:
-        return "verse"
+        return "full" if ACTION else "verse"
     if t < DROP:
         return "build"
     if t < S["visitenkarte"]:
@@ -186,7 +195,7 @@ def part(t):
     if t < S["kunden"]:
         return "full"
     if t < S["farben"]:
-        return "verse"
+        return "full" if ACTION else "verse"
     if t < OUTRO:
         return "full"
     if t < OUTRO_HIT - 0.1:
@@ -200,15 +209,15 @@ LEVEL = {"intro": 0.7, "logo": 0.85, "lift": 0.92, "verse": 0.85, "full": 1.0, "
 def section(t):
     """Welche Instrumente an Sekunde t spielen."""
     p_ = part(t)
-    pre_drop = DROP - 2.0 <= t < DROP
-    gap = DROP - 0.5 <= t < DROP
+    pre_drop = DROP - BAR <= t < DROP
+    gap = DROP - BEAT <= t < DROP
     return {
         "part": p_,
         "level": LEVEL[p_],
         "arp": p_ not in ("intro", "logo", "end"),
         "kick": p_ in ("lift", "verse", "full", "build", "drop") and not gap,
         "hats": p_ in ("lift", "verse", "full", "build", "drop") and not gap,
-        "hats16": p_ in ("full", "drop"),
+        "hats16": p_ in (("full", "drop", "build") if ACTION else ("full", "drop")),
         "clap": p_ in ("full", "drop", "verse") and not pre_drop,
         "bass": p_ in ("verse", "full", "build", "drop") and not gap,
         "lead": p_ == "drop",
@@ -347,13 +356,20 @@ def make_drums():
         if any(abs(t0 - st) < 1e-6 for st in CHAPTER_STARTS):
             add(out, CRASH, t0, 0.22)
     # Wirbel vor dem Drop
-    roll_start = DROP - 2.0
+    roll_start = DROP - BAR
     for k in range(32):
-        tk = roll_start + k * (2.0 / 32)
+        tk = roll_start + k * (BAR / 32)
         n = int(0.08 * SR)
         tt = t_axis(n)
         x = (bp(noise(n), 1200, 6000) * 0.8 + 0.4 * sine(190, n)) * np.exp(-tt * 40)
         add(out, x, tk, 0.06 + 0.25 * (k / 31) ** 2, pan=0.2 * np.sin(k))
+    if ACTION:
+        # Fill auf dem letzten Schlag vor jedem Kapitel: Sechzehntel, lauter werdend
+        for st in CHAPTER_STARTS:
+            if abs(st - DROP) < 1e-6 or st < SCENES["gebiete"] - 1e-6:
+                continue
+            for k in range(4):
+                add(out, C, st - BEAT + k * BEAT / 4, 0.16 + 0.1 * k, pan=-0.3 + 0.2 * k)
     return reverb(out, IR_SHORT, 0.12)
 
 
@@ -553,7 +569,8 @@ def render_cue(c):
     elif k == "shimmer":
         add(sfx, reverb(fx_sparkles(1.4, 24, 3), IR, 0.5), t, 0.5)
     elif k in ("riser-short", "riser"):
-        length = 1.0 if k == "riser-short" else 2.0
+        # Riser enden auf dem Treffer: Laenge folgt dem Tempo
+        length = (1.0 if k == "riser-short" else 2.0) * 120 / BPM
         add(sfx, fx_riser(length), t, 0.3 if k == "riser-short" else 0.45)
     elif k == "pop":
         add(sfx, fx_pop(500 + n_idx * 90), t, 0.3, pan=-0.3 + 0.15 * n_idx)
@@ -622,7 +639,7 @@ def render_cue(c):
         add(sfx, x, t, 0.06)
     elif k == "cut":
         add(sfx, fx_whoosh(0.9, True, 250, 9000), t - 0.5, 0.42)
-        add(sfx, fx_boom(0.7, 85), t, 0.16)
+        add(sfx, fx_boom(0.7, 85), t, 0.28 if ACTION else 0.16)
     elif k == "outro":
         pass
 
@@ -699,7 +716,7 @@ def main():
     rms = np.sqrt(np.mean(out ** 2))
     print(f"Spitze -1 dBFS, RMS {20 * np.log10(rms):.1f} dBFS, {DUR:.1f} s")
     pcm = (np.clip(out, -1, 1) * 32767).astype(np.int16)
-    path = os.path.join(HERE, "soundtrack.wav")
+    path = os.path.join(HERE, f"soundtrack{SUFFIX}.wav")
     with wave.open(path, "wb") as w:
         w.setnchannels(2)
         w.setsampwidth(2)
