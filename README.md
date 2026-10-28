@@ -601,7 +601,7 @@ begrenzt; ein Tagesgebiet sind meist ein bis zwei Quadratkilometer.
 
 Überschneiden sich Gebiete aus älteren Daten, zeigt die Übersichtskarte trotzdem jeden
 Fleck nur einmal: das kleinere Gebiet liegt obenauf, das größere bekommt dort ein Loch.
-Die Kürzel stehen immer mitten in der eigenen Fläche; decken sie sich beim aktuellen
+Die Profilbilder stehen immer mitten in der eigenen Fläche; decken sie sich beim aktuellen
 Zoom, tritt das kleinere zurück und erscheint beim Hineinzoomen wieder.
 
 ### Was mit den Hausnummern passiert
@@ -618,45 +618,79 @@ Die geladenen Hausnummern bleiben erhalten und werden an drei Stellen benutzt:
   verrät sie.
 
 Fehlen die Hausnummern in OpenStreetMap, bleibt alles wie vorher – die Straße wird
-ohne Liste angelegt und die Nummer an der Tür von Hand eingetippt. **„Straßen
-nachladen“** trägt fehlende Hausnummern bei bestehenden Gebieten nach, ohne etwas zu
-überschreiben.
+ohne Liste angelegt und die Nummer an der Tür von Hand eingetippt.
+
+### Häuser und Fläche abgleichen
+
+Die Fläche ist die Wahrheit: Ein Haus gehört zu dem Gebiet, in dessen Fläche es liegt.
+**„Häuser abgleichen“** (Menü oben rechts) und **„Fläche ändern“** zeigen vor dem
+Speichern, was sich ändert – gespeichert wird genau das:
+
+- **Neue Häuser** aus OpenStreetMap, die in der Fläche liegen und noch niemandem gehören,
+  kommen dazu.
+- **Häuser außerhalb**, an denen noch niemand war, fallen weg. Liegen sie in einem
+  anderen Gebiet, wandern sie dorthin – so repariert sich auch ein Gebiet, das früher
+  falsch aufgeteilt wurde.
+- **Häuser aus anderen Gebieten**, die in dieser Fläche liegen, deren eigene Fläche sie
+  aber gar nicht enthält, kommen hierher (nur unbearbeitete).
+- **Besuchte Häuser** außerhalb – mit Besuchen, Klingeln oder einer Sperre – bleiben im
+  Gebiet. Ihre Geschichte gehört dorthin, und eine Sperre verschwindet nie still.
+
+Ist OpenStreetMap nicht erreichbar, geht der Abgleich ohne neue Häuser weiter;
+aufgeräumt wird trotzdem.
 
 ### Ein Gebiet auf mehrere Leute aufteilen
 
-Unter **„Aufteilen auf“** wird aus einer Zeichnung mit einem Tipp ein Gebiet je
-Mitarbeiter – **bis zu vier**:
+Unter **„In wie viele Teile aufteilen?“** wird aus einer Zeichnung mit einem Tipp ein
+Gebiet je Mitarbeiter – **bis zu sechs**:
 
-- Die App gruppiert die Straßen **räumlich** (niemand läuft quer durchs Viertel) und
-  gleicht sie danach **nach Türen** aus. Wohneinheiten aus OpenStreetMap zählen, sonst
-  jede Adresse als eine Tür.
-- Jedes Paket bekommt Farbe und Nummer auf der Karte, eine eigene Fläche und ein
-  eigenes Zuteilungsfeld. Die Flächen teilen die Zeichnung **lückenlos und ohne
-  Überschneidung** mit geraden Grenzen; jede Grenze liegt dort, wo sie die Häuser der
-  beiden Nachbarpakete am saubersten trennt. Eine Straße, die über eine Grenze läuft,
-  bleibt ganz bei ihrem Paket – ihre letzten Häuser können also knapp jenseits liegen.
+- Verteilt werden **Häuser, nicht ganze Straßen**: Jedes Haus gehört zu genau der
+  Teilfläche, in der es liegt – in der Vorschau, beim Speichern und danach an der Tür.
+  Läuft eine Straße über eine Grenze, wird sie dort geteilt (`Hauptstraße 1-39` in
+  Teil 1, `41-80` in Teil 2); die Straßenliste zeigt, welche Nummern wohin gehen.
+- Die Teilflächen teilen die Zeichnung **lückenlos und ohne Überschneidung** mit geraden
+  Grenzen. Gerechnet wird ein Potenzdiagramm mit Kapazitätsausgleich: Die Grenzen werden
+  so verschoben, bis jedes Teilgebiet seinen Anteil an **Türen** hat (Wohneinheiten aus
+  OpenStreetMap zählen, sonst jede Adresse als eine Tür), und liegen dabei möglichst
+  so, dass sie wenige Straßen zerschneiden.
+- **Größe je Teilgebiet:** „Normal“, ½×, ¾×, 1¼×, 1½× oder 2× – z. B. 1½× für den
+  Erfahrenen und Normal für den Neuen ergibt 60/40. Jede Zeile zeigt Türen und Anteil.
+- **„Teilflächen auf der Karte zeigen“** führt zurück zur Karte: Grenzen, Nummern und
+  jedes Haus in der Farbe seines Teilgebiets. Ein Tipp auf eine Straße springt dorthin.
 - Gespeichert wird in einem Zug: `Innenstadt-Nord – KW 38 (1/3)` bis `(3/3)`.
-  Entweder entstehen alle Teilgebiete oder keines.
+  Entweder entstehen alle Teilgebiete oder keines. Der Server ordnet dabei jedes Haus
+  noch einmal selbst der Fläche zu, in der es liegt – auch wenn eine ältere App-Version
+  noch ganze Straßen schickt.
 
-Ganz gleich groß werden die Pakete nicht immer – eine Straße mit 50 Wohneinheiten
-lässt sich nicht halbieren. Angestrebt sind höchstens 12 % Unterschied.
+Ganz exakt treffen die Anteile nicht immer – ein Haus mit 50 Wohneinheiten lässt sich
+nicht halbieren. Angestrebt sind höchstens 5 % Abweichung je Teilgebiet.
 
-> **Warum höchstens vier?** Mehr Farben nebeneinander lassen sich auf einer Karte nicht
-> mehr sicher unterscheiden, vor allem bei Rot-Grün-Schwäche. Die vier Farben in
-> `brand.css` (`--plot-1` bis `--plot-4`) sind dafür geprüft – hell und dunkel, jedes
-> Paar gegen jedes. Die Zahl im Kreis ist die eigentliche Kennzeichnung, die Farbe nur
-> die Unterstützung.
+**Teilgebiete bleiben eine Gruppe.** In der Gebietsliste stehen sie eingerückt unter
+dem Namen des Ganzen („Teil 1 von 3“) mit gemeinsamem Fortschritt und den Profilbildern
+aller Zuständigen. Auf der Gebietsseite zeigt „Teilgebiete von …“ die Geschwister,
+wer wo dran ist und wie weit das Ganze ist. **„Teilgebiete zusammenlegen“** holt andere
+Teile zurück – etwa wenn jemand krank ist: Straßen, Häuser, Klingeln, Sperren und
+Besuche ziehen um, die Flächen werden vereinigt. Sind alle Teile wieder beisammen,
+ist es wieder ein normales Gebiet mit dem Namen des Ganzen.
+
+> **Warum höchstens sechs?** Mehr Farben nebeneinander lassen sich auf einer Karte nicht
+> mehr sicher unterscheiden, vor allem bei Rot-Grün-Schwäche. Die sechs Farben in
+> `brand.css` (`--plot-1` bis `--plot-6`) sind dafür geprüft – simuliert für Rot-, Grün-
+> und Blauschwäche, hell und dunkel, jedes Paar gegen jedes. Die Zahl im Kreis ist die
+> eigentliche Kennzeichnung, die Farbe nur die Unterstützung.
 
 ### Den Überblick behalten
 
 - Die **Gebietsliste** zeigt oben alle Flächen auf einer Karte: grün = in Arbeit,
-  dunkel = fertig, grau = offen, gestrichelt = pausiert; das Kürzel im Kreis = wer dran ist.
+  dunkel = fertig, grau = offen, gestrichelt = pausiert; das **Profilbild** auf der Fläche
+  zeigt, wer dran ist – bei Gebieten ohne Zuteilung, wer dort am meisten geklingelt hat
+  („bearbeitet von …“). Ohne Bild stehen die Anfangsbuchstaben im Ton der Person da.
   Über das Auswahlfeld lässt sich die Karte auf eine Person oder auf „nicht zugeteilt“
   filtern; ein Tipp auf eine Fläche öffnet das Gebiet.
 - Die **Gebietsseite** zeigt die Fläche und jede Straße als Punkt, eingefärbt nach
   Bearbeitungsstand (offen / in Arbeit / fertig). Die Fläche lässt sich neu ziehen
-  („Fläche ändern“), die Straßenliste nachladen („Straßen nachladen“) – vorhandene
-  Straßen bleiben unberührt.
+  („Fläche ändern“), die Häuser lassen sich mit der Fläche abgleichen („Häuser
+  abgleichen“) – beides mit Vorschau vor dem Speichern.
 - Der Pfeil **➤** neben einer Straße öffnet die Navigation in **Apple Karten** – in der
   Gebietsliste und an der Tür in der Türerfassung (am Rechner die Web-Version).
 - Auf jeder Karte schaltet der Ebenen-Knopf zwischen Karte und **Satellit** um (nur mit
@@ -912,7 +946,7 @@ Kontraste (hell und dunkel), Glas-Material, Schrift, Radien, Bewegung, Bausteine
 
 - **Markenfarben** stehen in `src/app/brand.css`: genau ein Akzent (Energie-Grün,
   `--accent` für Flächen, `--accent-ink` für Schrift), zwei Signale (`--danger`,
-  `--warn`), die Datenfarben für Diagramme (`--chart-*`), Teilgebiete (`--plot-1…4`)
+  `--warn`), die Datenfarben für Diagramme (`--chart-*`), Teilgebiete (`--plot-1…6`)
   und Preisstufen (`--price-0…4`).
 - **Neutrales und Material** (Flächen, Schrift, Glas, Radien, Schriftstufen) steht in
   `src/app/globals.css`. Tailwinds eigene Farben und Schriftgrößen sind dort bewusst
@@ -929,7 +963,7 @@ Kontraste (hell und dunkel), Glas-Material, Schrift, Radien, Bewegung, Bausteine
   `npm run themes` – das schreibt `src/app/themes.css`; ein Test prüft, dass die Datei
   zum Code passt, und hält jede Farbe auf denselben Kontrasten wie das Grün.
 
-Die Diagrammfarben und die Farben der Teilgebiete (`--plot-1` bis `--plot-4`) sind auf
+Die Diagrammfarben und die Farben der Teilgebiete (`--plot-1` bis `--plot-6`) sind auf
 Farbfehlsichtigkeit geprüft – jedes Paar gegen jedes, hell und dunkel. Wer sie
 austauscht, sollte den Abstand der Farben zueinander prüfen; sonst sind auf der Karte
 zwei Teilgebiete nicht mehr auseinanderzuhalten.
@@ -1049,7 +1083,7 @@ entstehen zwei getrennte Datenbestände.
 | Hausnummern | eigene Tabelle je Straße, aus OpenStreetMap übernommen |
 | Karte | OpenFreeMap über MapLibre GL; Apple Karten (MapKit JS), wenn eingerichtet; Rückfall Leaflet |
 | Gebietszuschnitt | Overpass (Straßen in der Fläche), Rückweg OpenFreeMap-Vektorkacheln, Nominatim (Ortssuche) |
-| Aufteilung | k-Means auf den Straßenmitten, danach Ausgleich nach Türen |
+| Aufteilung | hausgenau: Potenzdiagramm mit Kapazitätsausgleich nach Türen (`src/lib/geo/split.ts`) |
 | Login | Signiertes Session-Cookie (HMAC), Passwörter als scrypt-Hash |
 | App auf dem Handy | PWA mit Manifest, Service Worker und lokaler Erfassungs-Warteschlange |
 | Push-Nachrichten | Web Push (VAPID, aes128gcm) direkt mit `node:crypto`, Schlüssel selbst erzeugt |

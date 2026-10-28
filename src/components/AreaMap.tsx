@@ -5,7 +5,7 @@ import type { LatLng } from "@/lib/geo/area";
 import { labelPoint, resolveOverlaps, shapePoints, type Shape } from "@/lib/geo/shape";
 import { MapView } from "./map/MapView";
 import { declutter, type Placeable } from "./map/declutter";
-import { badgeMarker } from "./map/markers";
+import { avatarMarker, badgeMarker } from "./map/markers";
 import type { MapEngine } from "./map/types";
 import { cssColor } from "./map-colors";
 
@@ -18,8 +18,10 @@ export interface MapArea {
   area: Shape;
   tone?: AreaTone;
   hint?: string;
-  /** Kuerzel, das dauerhaft auf der Flaeche steht (wer dran ist). */
+  /** Kuerzel, das dauerhaft auf der Flaeche steht - wenn keine Person dazu gehoert. */
   badge?: string;
+  /** Wer das Gebiet bearbeitet: Profilbild (sonst Kuerzel im Ton der Person) auf der Flaeche. */
+  person?: { name: string; avatar: string; tone: string } | null;
 }
 
 export interface LegendEntry {
@@ -53,6 +55,8 @@ export const TONE_LEGEND: Record<AreaTone, string> = {
 };
 
 const BADGE_SIZE = 28;
+/** Profilbilder etwas groesser als Kuerzel - ein Gesicht braucht Platz, um erkannt zu werden. */
+const AVATAR_SIZE = 34;
 
 /**
  * Gezeichnete Gebiete auf einer Karte. Ueberschneiden sich Gebiete (aeltere
@@ -98,16 +102,17 @@ export function AreaMap({ areas, legend, className, onSelect, children }: Props)
           onClick: open,
         });
       }
-      const label = item.badge ? labelPoint(visible) : null;
-      if (item.badge && label) {
+      const label = item.person || item.badge ? labelPoint(visible) : null;
+      if (label) {
+        const size = item.person ? AVATAR_SIZE : BADGE_SIZE;
         const handle = layer.marker(label.point, {
-          ...badgeMarker(color, item.badge, BADGE_SIZE),
+          ...(item.person ? avatarMarker(color, item.person, size) : badgeMarker(color, item.badge ?? "", size)),
           title: item.name,
           subtitle: item.hint,
           onClick: open,
           priority: 2,
         });
-        badges.push({ point: label.point, size: [BADGE_SIZE, BADGE_SIZE], rank: label.room, handle });
+        badges.push({ point: label.point, size: [size, size], rank: label.room, handle });
       }
     });
 

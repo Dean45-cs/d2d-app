@@ -72,13 +72,17 @@
      stehen - jeder Tag steht zusaetzlich als Text daneben (sr-only, title). */
   --chart-doors-soft: var(--t-chart-doors-soft, #c9d2cd);
 
-  /* Teilgebiete auf der Karte. Vier Farben, als Satz gegen Rot-Gruen-
-     Schwaeche geprueft; die Zahl im Kreis bleibt die eigentliche
-     Kennzeichnung. Mehr als vier waeren nicht mehr unterscheidbar. */
+  /* Teilgebiete auf der Karte. Sechs Farben, als Satz gegen Rot-, Gruen- und
+     Blauschwaeche geprueft (simuliert, jedes Paar gegen jedes, hell und dunkel):
+     Violett und Schiefer liegen zu jeder anderen Farbe weiter weg als das
+     knappste Paar der ersten vier. Die Zahl im Kreis bleibt die eigentliche
+     Kennzeichnung - mehr als sechs waeren nicht mehr unterscheidbar. */
   --plot-1: #2a78d6;
   --plot-2: #eda100;
   --plot-3: #e87ba4;
   --plot-4: #008300;
+  --plot-5: #8800ff;
+  --plot-6: #4f6273;
 
   /* Preisstufen der Energiekarte - sequenziell von grau (wenig Argument)
      zu tiefgruen (starkes Wechselargument). Die Helligkeit steigt stetig,
@@ -141,6 +145,8 @@
     --plot-2: #c98500;
     --plot-3: #d55181;
     --plot-4: #008300;
+    --plot-5: #7711ff;
+    --plot-6: #aaaadd;
     --price-0: var(--t-price-0-d, #4a4f4c);
     --price-1: var(--t-price-1-d, #3f6b4e);
     --price-2: var(--t-price-2-d, #2e8f52);
@@ -178,6 +184,8 @@
   --plot-2: #c98500;
   --plot-3: #d55181;
   --plot-4: #008300;
+  --plot-5: #7711ff;
+  --plot-6: #aaaadd;
   --price-0: var(--t-price-0-d, #4a4f4c);
   --price-1: var(--t-price-1-d, #3f6b4e);
   --price-2: var(--t-price-2-d, #2e8f52);

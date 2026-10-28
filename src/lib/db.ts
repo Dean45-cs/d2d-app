@@ -422,6 +422,23 @@ function migrate(db: Database.Database) {
   addColumn(db, "users", "card_phone", "INTEGER NOT NULL DEFAULT 0");
   addColumn(db, "users", "badge_number", "TEXT NOT NULL DEFAULT ''");
   db.exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_users_card ON users (card_token) WHERE card_token IS NOT NULL");
+
+  /*
+   * Teilgebiete eines aufgeteilten Gebiets bleiben eine Gruppe: gemeinsamer
+   * Fortschritt, wieder zusammenlegbar. Die Gruppe traegt nur den Namen des
+   * Ganzen - loescht man sie, bleiben die Gebiete einfach einzeln stehen.
+   */
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS territory_groups (
+      id         INTEGER PRIMARY KEY AUTOINCREMENT,
+      team_id    INTEGER NOT NULL REFERENCES teams(id) ON DELETE CASCADE,
+      name       TEXT NOT NULL,
+      created_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+  `);
+  addColumn(db, "territories", "group_id", "INTEGER REFERENCES territory_groups(id) ON DELETE SET NULL");
+  db.exec("CREATE INDEX IF NOT EXISTS idx_territories_group ON territories (group_id) WHERE group_id IS NOT NULL");
 }
 
 function migrateInvitations(db: Database.Database) {

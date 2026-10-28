@@ -161,6 +161,17 @@ export function normalize(shape: Shape): Shape {
   }
 }
 
+/** Mehrere Formen zu einer - etwa beim Zusammenlegen von Teilgebieten. Null, wenn es nicht aufgeht. */
+export function unite(shapes: Shape[]): Shape | null {
+  const parts = shapes.filter((shape) => shape.length > 0);
+  if (parts.length === 0) return [];
+  try {
+    return fromPc(polygonClipping.union(toPc(parts[0]), ...parts.slice(1).map(toPc)));
+  } catch {
+    return null;
+  }
+}
+
 /** Form ohne die angegebenen Flaechen. Nur Nachbarn, die sie beruehren, kosten Rechenzeit. */
 export function subtract(shape: Shape, others: Shape[]): Shape {
   if (shape.length === 0) return shape;

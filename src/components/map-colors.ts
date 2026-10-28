@@ -11,7 +11,7 @@ export function cssColor(variable: string, fallback: string): string {
 
 import { MAX_PLOTS } from "@/lib/geo/split";
 
-const PLOT_FALLBACK = ["#2a78d6", "#eda100", "#e87ba4", "#008300"];
+const PLOT_FALLBACK = ["#2a78d6", "#eda100", "#e87ba4", "#008300", "#8800ff", "#4f6273"];
 
 /** Farbe des n-ten Teilgebiets (0-basiert). */
 export function plotColor(index: number): string {

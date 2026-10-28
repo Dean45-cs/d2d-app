@@ -42,6 +42,8 @@ export interface Territory {
   due_date: string | null;
   /** Auf der Karte gezeichnete Flaeche als JSON ([[lat, lng], ...]), sonst "". */
   area_json: string;
+  /** Teilgebiet eines aufgeteilten Gebiets: die Gruppe (territory_groups), sonst null. */
+  group_id: number | null;
   created_at: string;
 }
 

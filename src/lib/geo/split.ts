@@ -1,100 +1,412 @@
 /**
  * Ein grosses Gebiet auf mehrere Leute aufteilen.
  *
- * Zwei Anforderungen, die sich widersprechen:
- *  - jeder soll ungefaehr gleich viele Tueren bekommen
- *  - niemand soll quer durchs Viertel laufen
+ * Drei Anforderungen:
+ *  - jedes Haus gehoert zu genau dem Teilgebiet, in dessen Flaeche es liegt
+ *  - jeder bekommt ungefaehr seinen Anteil an Tueren (gleich viel oder z. B. 60/40)
+ *  - niemand soll quer durchs Viertel laufen, Strassen bleiben moeglichst ganz
  *
- * Deshalb erst raeumlich gruppieren (k-Means auf den Strassenmitten), danach
- * so lange die guenstigste Strasse vom vollsten zum leersten Paket schieben,
- * bis die Pakete ungefaehr gleich schwer sind. Bewusst ohne Zufall: gleiche
- * Eingabe, gleiches Ergebnis - sonst sieht die Vorschau anders aus als das,
- * was gespeichert wird.
+ * Frueher wurden ganze Strassen verteilt und die Flaechen danach um die
+ * Haeuser gelegt. Eine lange Strasse quer durchs Viertel landete so komplett
+ * in einem Teilgebiet, obwohl dessen Flaeche nur ihre halbe Laenge abdeckte -
+ * ab drei Teilen passten die nachtraeglich gerechneten Grenzen oft gar nicht
+ * mehr. Jetzt werden Haeuser verteilt, und Flaeche und Haeuser kommen aus
+ * derselben Rechnung:
+ *
+ * Kapazitaetsbeschraenktes Potenzdiagramm. Jedes Teilgebiet hat eine Mitte c
+ * und ein Gewicht psi; ein Punkt x gehoert zu dem Teilgebiet mit dem kleinsten
+ * |x - c|² - psi. Die Zellen sind Vielecke mit geraden Grenzen, luecken- und
+ * ueberschneidungsfrei - und ein Haus liegt genau dann in einer Zelle, wenn es
+ * zu ihr gehoert. Die Gewichte werden so eingestellt, dass jede Zelle ihren
+ * Anteil an Tueren enthaelt; innerhalb der Toleranz waehlt jede Grenze die
+ * Lage, die die wenigsten Strassen zerschneidet. Laeuft eine Strasse doch
+ * ueber eine Grenze, wird sie dort geteilt ("Hauptstr. 1-39" / "41-80").
+ *
+ * Bewusst ohne Zufall: gleiche Eingabe, gleiches Ergebnis - sonst sieht die
+ * Vorschau anders aus als das, was gespeichert wird.
  */
 
-import { METERS_PER_DEGREE, type LatLng } from "./area";
-import { intersect, type Shape } from "./shape";
+import { METERS_PER_DEGREE } from "./area";
+import { intersect, shapeContains, type Shape } from "./shape";
 
-export interface SplitStreet {
-  name: string;
+/**
+ * Hoechstzahl der Teilgebiete. Die Grenze kommt von der Karte: mehr Flaechen
+ * nebeneinander sind farblich nicht mehr sicher zu unterscheiden - die Zahl
+ * im Kreis bleibt ohnehin die eigentliche Kennzeichnung.
+ */
+export const MAX_PLOTS = 6;
+
+/** Wie gross ein Teilgebiet im Vergleich zu den anderen wird (1 = normal). */
+export const PLOT_SIZES = [0.5, 0.75, 1, 1.25, 1.5, 2] as const;
+
+/** Bis zu 5 % Abweichung vom Soll je Teilgebiet sind in Ordnung. */
+const TOLERANCE = 0.05;
+const KMEANS_ROUNDS = 12;
+/** Mitten nachziehen, solange sie sich noch bewegen - in der Praxis selten mehr als vier Runden. */
+const LLOYD_ROUNDS = 6;
+const BALANCE_ROUNDS = 40;
+const COHESION_ROUNDS = 8;
+
+export interface SplitHouse {
+  number: string;
+  units: number;
   lat: number | null;
   lng: number | null;
-  /** Arbeitsaufwand der Strasse: Wohneinheiten, sonst Adressen. */
-  weight: number;
+}
+
+/** Was eine Strasse zum Aufteilen mitbringen muss - FoundStreet und StreetInput passen beide. */
+export interface SplitStreet {
+  name: string;
+  houseNumbers: string;
+  units: number;
+  lat: number | null;
+  lng: number | null;
+  numbers?: SplitHouse[];
+}
+
+export interface PlotSplit<S> {
+  /** Strassen dieses Teilgebiets - geteilte Strassen nur mit ihren Haeusern hier. */
+  streets: S[];
+  /** Flaeche, in der genau diese Haeuser liegen. */
+  area: Shape;
+  /** Arbeitsaufwand: Wohneinheiten, sonst Haeuser. */
+  doors: number;
+}
+
+/** Aufwand einer Strasse: Wohneinheiten, sonst Zahl der Haeuser, mindestens eins. */
+export function streetDoors(street: SplitStreet): number {
+  if (street.units > 0) return street.units;
+  return Math.max(1, street.numbers?.length ?? 0);
+}
+
+function houseDoors(house: SplitHouse): number {
+  return Math.max(1, house.units);
+}
+
+/** Anteile wie [1, 1.5] auf eine Summe von 1 bringen; Unsinn zaehlt als 1. */
+export function normalizeShares(sizes: number[]): number[] {
+  const clean = sizes.map((size) => (Number.isFinite(size) && size > 0 ? Math.min(size, 10) : 1));
+  const total = clean.reduce((sum, size) => sum + size, 0);
+  return clean.map((size) => size / total);
 }
 
 /**
- * Hoechstzahl der Pakete. Die Grenze kommt von der Karte: mehr als vier
- * Flaechen nebeneinander sind farblich nicht mehr sicher zu unterscheiden
- * (geprueft auf Rot-Gruen-Schwaeche, hell und dunkel).
+ * Teilt Flaeche und Strassen auf `sizes.length` Teilgebiete auf.
+ * `sizes` sind die relativen Groessen (z. B. [1, 1, 1] oder [1.5, 1]).
+ * Das Ergebnis hat immer genau so viele Eintraege (notfalls leere).
  */
-export const MAX_PLOTS = 4;
-
-const KMEANS_ROUNDS = 12;
-const BALANCE_ROUNDS = 400;
-/** Bis zu 12 % Unterschied zwischen groesstem und kleinstem Paket sind in Ordnung. */
-const TOLERANCE = 0.12;
-
-/**
- * Verteilt die Strassen auf `count` Pakete.
- * Das Ergebnis hat immer genau `count` Eintraege (notfalls leere).
- */
-export function splitStreets<T extends SplitStreet>(streets: T[], count: number): T[][] {
-  const groups: T[][] = Array.from({ length: Math.max(1, count) }, () => []);
-  if (count <= 1 || streets.length === 0) {
-    groups[0] = [...streets];
-    return groups;
+export function splitIntoPlots<S extends SplitStreet>(area: Shape, streets: S[], sizes: number[]): PlotSplit<S>[] {
+  const count = Math.max(1, Math.min(MAX_PLOTS, sizes.length));
+  if (count === 1 || streets.length === 0) {
+    const all: PlotSplit<S>[] = Array.from({ length: count }, () => ({ streets: [], area: [], doors: 0 }));
+    all[0] = { streets: [...streets], area, doors: streets.reduce((sum, s) => sum + streetDoors(s), 0) };
+    return all;
   }
 
-  const located = streets.filter((s) => s.lat !== null && s.lng !== null);
-  const unlocated = streets.filter((s) => s.lat === null || s.lng === null);
+  const projection = projectionFor(area, streets);
+  const sites = sitesOf(streets, projection);
+  const shares = normalizeShares(sizes.slice(0, count));
+  const { assign, centers, psi } = partition(sites, shares);
 
-  if (located.length <= count) {
-    // Zu wenig Koordinaten fuer eine sinnvolle Aufteilung: schlicht reihum.
-    [...located, ...unlocated].forEach((street, index) => groups[index % count].push(street));
-    return groups;
-  }
+  // Weniger Mitten als Teilgebiete (kaum Haeuser): die uebrigen bleiben ohne Flaeche.
+  const cells = area.length > 0 && centers.length > 0 ? powerCells(area, sites, centers, psi, projection) : [];
+  const areas: Shape[] = Array.from({ length: count }, (_, index) => cells[index] ?? []);
 
-  const scale = Math.cos((located[0].lat! * Math.PI) / 180);
-  const xy = located.map((s) => [s.lng! * scale, s.lat!] as [number, number]);
-  const weights = located.map((s) => Math.max(1, s.weight));
-
-  let centers = seed(xy, count);
-  let assignment = xy.map((point) => nearest(point, centers));
-
-  for (let round = 0; round < KMEANS_ROUNDS; round += 1) {
-    centers = centroids(xy, assignment, count, centers);
-    const next = xy.map((point) => nearest(point, centers));
-    if (next.every((value, index) => value === assignment[index])) break;
-    assignment = next;
-  }
-
-  balance(xy, weights, assignment, centers, count);
-
-  located.forEach((street, index) => groups[assignment[index]].push(street));
-  // Strassen ohne Koordinate wandern in das jeweils leichteste Paket.
-  for (const street of unlocated) {
-    let lightest = 0;
+  // Wohin Strassen ganz ohne Lage gehen: zum Teilgebiet, das am weitesten unter seinem Soll liegt.
+  const total = sites.reduce((sum, site) => sum + site.w, 0) + unplacedDoors(streets);
+  const loads = new Array(count).fill(0) as number[];
+  sites.forEach((site, index) => (loads[assign[index]] += site.w));
+  const lightest = (doors: number) => {
+    let best = 0;
     for (let i = 1; i < count; i += 1) {
-      if (weightOf(groups[i]) < weightOf(groups[lightest])) lightest = i;
+      if (shares[i] * total - loads[i] > shares[best] * total - loads[best]) best = i;
     }
-    groups[lightest].push(street);
+    loads[best] += doors;
+    return best;
+  };
+
+  const siteIndex = new Map<string, number>();
+  sites.forEach((site, index) => {
+    for (const key of site.keys) siteIndex.set(key, index);
+  });
+  const groups = distribute(areas, streets, (streetIndex, houseIndex) => {
+    const site = siteIndex.get(`${streetIndex}:${houseIndex}`);
+    if (site !== undefined) return assign[site];
+    return lightest(streetDoors(streets[streetIndex]));
+  });
+
+  return groups.map((group, index) => ({
+    streets: group.sort((a, b) => a.name.localeCompare(b.name, "de-DE") || compareRange(a, b)),
+    area: areas[index] ?? [],
+    doors: group.reduce((sum, s) => sum + streetDoors(s), 0),
+  }));
+}
+
+/**
+ * Verteilt Strassen hausgenau auf Flaechen: Jedes Haus mit Lage kommt in die
+ * Flaeche, in der es liegt. Das gilt fuer die Vorschau wie fuer den Server -
+ * egal, wie die Strassen vorher verteilt waren.
+ *
+ *  - Haus ohne Lage: dorthin, wo die meisten Haeuser seiner Strasse liegen
+ *  - Strasse ganz ohne Hauslage: nach ihrer Mitte, sonst `fallback`
+ *  - Haus in keiner Flaeche (genau auf einer Grenze, ausserhalb): `fallback`
+ *
+ * `fallback(strasse, haus)` bekommt die Indizes (haus = -1 fuer die ganze
+ * Strasse) und liefert die Nummer des Teilgebiets.
+ */
+export function distribute<S extends SplitStreet>(
+  areas: Shape[],
+  streets: S[],
+  fallback: (streetIndex: number, houseIndex: number) => number,
+): S[][] {
+  const count = Math.max(1, areas.length);
+  const clamp = (plot: number) => (Number.isInteger(plot) && plot >= 0 && plot < count ? plot : 0);
+  const containing = (lat: number, lng: number) => areas.findIndex((shape) => shape.length > 0 && shapeContains(shape, [lat, lng]));
+  const groups: S[][] = Array.from({ length: count }, () => []);
+
+  streets.forEach((street, streetIndex) => {
+    const numbers = street.numbers ?? [];
+    const target = numbers.map((house, houseIndex) => {
+      if (house.lat === null || house.lng === null) return -1;
+      const inside = containing(house.lat, house.lng);
+      return inside >= 0 ? inside : clamp(fallback(streetIndex, houseIndex));
+    });
+
+    let whole: number;
+    if (target.some((plot) => plot >= 0)) {
+      // Haeuser ohne Lage gehen mit der Mehrheit ihrer Strasse.
+      const weight = new Array(count).fill(0) as number[];
+      target.forEach((plot, houseIndex) => {
+        if (plot >= 0) weight[plot] += houseDoors(numbers[houseIndex]);
+      });
+      whole = weight.indexOf(Math.max(...weight));
+    } else if (street.lat !== null && street.lng !== null && containing(street.lat, street.lng) >= 0) {
+      whole = containing(street.lat, street.lng);
+    } else {
+      whole = clamp(fallback(streetIndex, -1));
+    }
+    const final = target.map((plot) => (plot >= 0 ? plot : whole));
+
+    if (numbers.length === 0 || final.every((plot) => plot === final[0])) {
+      groups[numbers.length === 0 ? whole : final[0]].push(street);
+      return;
+    }
+    for (let plot = 0; plot < count; plot += 1) {
+      const part = numbers.filter((_, houseIndex) => final[houseIndex] === plot);
+      if (part.length > 0) groups[plot].push(fragment(street, part));
+    }
+  });
+  return groups;
+}
+
+/**
+ * Fuer den Server: Teilgebiete, wie die App sie schickt, noch einmal nach
+ * ihren Flaechen ordnen. Alle Strassen kommen auf einen Haufen (geteilte
+ * Strassen wieder zusammen), dann geht jedes Haus in die Flaeche, in der es
+ * liegt. So stimmt das Ergebnis auch, wenn eine alte App-Version (aus dem
+ * Zwischenspeicher) noch ganze Strassen verteilt. Was in keiner Flaeche
+ * liegt, bleibt, wo die App es hingelegt hat.
+ */
+export function regroupByArea<S extends SplitStreet>(groups: Array<{ area: Shape | null; streets: S[] }>): S[][] {
+  interface Pooled {
+    street: S;
+    groups: Set<number>;
+    /** Hausnummer (Schreibweise egal) -> Haus und Teilgebiet laut App. */
+    houses: Map<string, { house: SplitHouse; group: number }>;
+  }
+  const pool = new Map<string, Pooled>();
+  groups.forEach((group, index) => {
+    for (const street of group.streets) {
+      const key = street.name.trim().toLocaleLowerCase("de-DE");
+      let entry = pool.get(key);
+      if (!entry) {
+        entry = { street, groups: new Set(), houses: new Map() };
+        pool.set(key, entry);
+      }
+      entry.groups.add(index);
+      for (const house of street.numbers ?? []) {
+        const number = house.number.replace(/\s+/g, "").toLowerCase();
+        if (!entry.houses.has(number)) entry.houses.set(number, { house, group: index });
+      }
+    }
+  });
+
+  const pooled = [...pool.values()];
+  const streets = pooled.map((entry) => {
+    // Aus einem Teilgebiet: unveraendert. Aus mehreren: wieder eine Strasse mit allen Haeusern.
+    if (entry.groups.size <= 1) return entry.street;
+    const numbers = [...entry.houses.values()].map((item) => item.house).sort(byHouseNumber);
+    return fragment(entry.street, numbers);
+  });
+  const houseGroup = pooled.map((entry, streetIndex) => {
+    const byNumber = new Map([...entry.houses.values()].map((item) => [item.house, item.group]));
+    return (streets[streetIndex].numbers ?? []).map((house) => byNumber.get(house) ?? [...entry.groups][0]);
+  });
+
+  return distribute(
+    groups.map((group) => group.area ?? []),
+    streets,
+    (streetIndex, houseIndex) =>
+      houseIndex >= 0 ? houseGroup[streetIndex][houseIndex] : [...pooled[streetIndex].groups][0],
+  );
+}
+
+/** Sortiert wie im Briefkasten: 2 vor 10, 12 vor 12a. */
+function byHouseNumber(a: SplitHouse, b: SplitHouse): number {
+  const parse = (value: string) => {
+    const match = value.match(/^(\d+)\s*(.*)$/);
+    return match ? { value: Number(match[1]), suffix: match[2] } : { value: 0, suffix: value };
+  };
+  const left = parse(a.number);
+  const right = parse(b.number);
+  return left.value - right.value || left.suffix.localeCompare(right.suffix, "de-DE");
+}
+
+/** Der Teil einer Strasse mit nur diesen Haeusern - Spanne, Einheiten und Mitte neu gerechnet. */
+export function fragment<S extends SplitStreet>(street: S, numbers: SplitHouse[]): S {
+  const located = numbers.filter((house) => house.lat !== null && house.lng !== null);
+  const part: S = {
+    ...street,
+    numbers,
+    houseNumbers: rangeOf(numbers),
+    units: numbers.reduce((sum, house) => sum + houseDoors(house), 0),
+    lat: located.length > 0 ? round6(located.reduce((sum, h) => sum + h.lat!, 0) / located.length) : street.lat,
+    lng: located.length > 0 ? round6(located.reduce((sum, h) => sum + h.lng!, 0) / located.length) : street.lng,
+  };
+  // FoundStreet zaehlt zusaetzlich die Adressen.
+  if ("addresses" in street) (part as S & { addresses: number }).addresses = numbers.length;
+  return part;
+}
+
+/** "1-39" aus den Hausnummern in ihrer Reihenfolge. */
+function rangeOf(numbers: SplitHouse[]): string {
+  if (numbers.length === 0) return "";
+  const first = numbers[0].number;
+  const last = numbers[numbers.length - 1].number;
+  return first === last ? first : `${first}-${last}`;
+}
+
+function compareRange(a: SplitStreet, b: SplitStreet): number {
+  return (Number.parseInt(a.houseNumbers, 10) || 0) - (Number.parseInt(b.houseNumbers, 10) || 0);
+}
+
+function unplacedDoors(streets: SplitStreet[]): number {
+  return streets.reduce((sum, street) => {
+    const located = (street.numbers ?? []).some((h) => h.lat !== null && h.lng !== null);
+    return located || (street.lat !== null && street.lng !== null) ? sum : sum + streetDoors(street);
+  }, 0);
+}
+
+/* ------------------------------ Geometrie -------------------------------- */
+
+type XY = [number, number];
+
+interface Projection {
+  toXY: (lat: number, lng: number) => XY;
+  toLatLng: (point: XY) => [number, number];
+}
+
+/** Ebene Naeherung in Metern rund um die Flaeche - Gebiete sind nur wenige Kilometer gross. */
+function projectionFor(area: Shape, streets: SplitStreet[]): Projection {
+  let origin: [number, number] | null = area[0]?.[0]?.[0] ?? null;
+  for (const street of streets) {
+    if (origin) break;
+    const house = street.numbers?.find((h) => h.lat !== null && h.lng !== null);
+    if (house) origin = [house.lat!, house.lng!];
+    else if (street.lat !== null && street.lng !== null) origin = [street.lat, street.lng];
+  }
+  const [lat0, lng0] = origin ?? [0, 0];
+  const mx = METERS_PER_DEGREE * Math.cos((lat0 * Math.PI) / 180);
+  const my = METERS_PER_DEGREE;
+  return {
+    toXY: (lat, lng) => [(lng - lng0) * mx, (lat - lat0) * my],
+    toLatLng: ([x, y]) => [round6(lat0 + y / my), round6(lng0 + x / mx)],
+  };
+}
+
+/** Ein Punkt der Rechnung: ein Haus (mehrere Nummern am selben Fleck zusammengefasst) oder eine Strassenmitte. */
+interface Site {
+  x: number;
+  y: number;
+  w: number;
+  street: number;
+  /** "strasse:haus" aller Eingaben an diesem Punkt (haus = -1: die Strasse selbst). */
+  keys: string[];
+}
+
+function sitesOf(streets: SplitStreet[], projection: Projection): Site[] {
+  const sites: Site[] = [];
+  const byPlace = new Map<string, Site>();
+  const add = (streetIndex: number, houseIndex: number, lat: number, lng: number, w: number) => {
+    // "12-16" an einem Gebaeude ergibt drei Nummern am selben Fleck - die bleiben beisammen.
+    const place = `${streetIndex}|${lat}|${lng}`;
+    const known = byPlace.get(place);
+    if (known) {
+      known.w += w;
+      known.keys.push(`${streetIndex}:${houseIndex}`);
+      return;
+    }
+    const [x, y] = projection.toXY(lat, lng);
+    const site: Site = { x, y, w, street: streetIndex, keys: [`${streetIndex}:${houseIndex}`] };
+    byPlace.set(place, site);
+    sites.push(site);
+  };
+
+  streets.forEach((street, streetIndex) => {
+    const numbers = street.numbers ?? [];
+    let located = 0;
+    numbers.forEach((house, houseIndex) => {
+      if (house.lat === null || house.lng === null) return;
+      located += 1;
+      add(streetIndex, houseIndex, house.lat, house.lng, houseDoors(house));
+    });
+    if (located === 0 && street.lat !== null && street.lng !== null) {
+      add(streetIndex, -1, street.lat, street.lng, streetDoors(street));
+    }
+  });
+  return sites;
+}
+
+/**
+ * Die eigentliche Aufteilung: Mitten nach k-Means, dann abwechselnd Gewichte
+ * auf die Anteile einstellen und Mitten in den Schwerpunkt ihrer Zelle ziehen.
+ * Zum Schluss legt jede Grenze sich - innerhalb der Toleranz - dorthin, wo sie
+ * die wenigsten Strassen zerschneidet.
+ */
+function partition(sites: Site[], shares: number[]): { assign: number[]; centers: XY[]; psi: number[] } {
+  const count = shares.length;
+  if (sites.length <= count) {
+    // Hoechstens ein Punkt je Teilgebiet - jeder bekommt seinen eigenen, der Rest bleibt leer.
+    const centers = sites.map((site) => [site.x, site.y] as XY);
+    return { assign: sites.map((_, index) => index), centers, psi: new Array(centers.length).fill(0) };
   }
 
-  return groups.map((group) => group.sort((a, b) => a.name.localeCompare(b.name, "de-DE")));
+  const total = sites.reduce((sum, site) => sum + site.w, 0);
+  const targets = shares.map((share) => share * total);
+  let centers = initialCenters(sites, count);
+  let psi = new Array(count).fill(0) as number[];
+
+  for (let round = 0; round < LLOYD_ROUNDS; round += 1) {
+    psi = balance(sites, centers, psi, targets, false);
+    const assign = assignAll(sites, centers, psi);
+    const next = weightedCentroids(sites, assign, centers);
+    const moved = Math.max(...next.map((c, i) => Math.hypot(c[0] - centers[i][0], c[1] - centers[i][1])));
+    centers = next;
+    if (moved < 1) break;
+  }
+  psi = balance(sites, centers, psi, targets, false);
+  psi = balance(sites, centers, psi, targets, true);
+  return { assign: assignAll(sites, centers, psi), centers, psi };
 }
 
-function weightOf(group: SplitStreet[]): number {
-  return group.reduce((sum, s) => sum + Math.max(1, s.weight), 0);
-}
-
-/** Startpunkte moeglichst weit auseinander - das vermeidet zerfledderte Pakete. */
-function seed(xy: Array<[number, number]>, count: number): Array<[number, number]> {
-  const centers: Array<[number, number]> = [xy[0]];
+/** Startmitten: moeglichst weit auseinander, dann ein paar Runden k-Means - in Lesereihenfolge nummeriert. */
+function initialCenters(sites: Site[], count: number): XY[] {
+  const points = sites.map((site) => [site.x, site.y] as XY);
+  const centers: XY[] = [points[0]];
   while (centers.length < count) {
-    let best = xy[0];
+    let best = points[0];
     let bestDistance = -1;
-    for (const point of xy) {
+    for (const point of points) {
       const distance = Math.min(...centers.map((c) => squared(point, c)));
       if (distance > bestDistance) {
         bestDistance = distance;
@@ -103,30 +415,31 @@ function seed(xy: Array<[number, number]>, count: number): Array<[number, number
     }
     centers.push(best);
   }
-  return centers;
+
+  let current = centers;
+  let assign = sites.map((site) => nearest([site.x, site.y], current));
+  for (let round = 0; round < KMEANS_ROUNDS; round += 1) {
+    current = weightedCentroids(sites, assign, current);
+    const next = sites.map((site) => nearest([site.x, site.y], current));
+    if (next.every((value, index) => value === assign[index])) break;
+    assign = next;
+  }
+  // Nummer 1 oben links: von Nord nach Sued, bei gleicher Hoehe von West nach Ost.
+  return [...current].sort((a, b) => b[1] - a[1] || a[0] - b[0]);
 }
 
-function centroids(
-  xy: Array<[number, number]>,
-  assignment: number[],
-  count: number,
-  previous: Array<[number, number]>,
-): Array<[number, number]> {
-  const sums = Array.from({ length: count }, () => [0, 0, 0]);
-  xy.forEach((point, index) => {
-    const group = sums[assignment[index]];
-    group[0] += point[0];
-    group[1] += point[1];
-    group[2] += 1;
+function weightedCentroids(sites: Site[], assign: number[], previous: XY[]): XY[] {
+  const sums = previous.map(() => [0, 0, 0]);
+  sites.forEach((site, index) => {
+    const group = sums[assign[index]];
+    group[0] += site.x * site.w;
+    group[1] += site.y * site.w;
+    group[2] += site.w;
   });
-  return sums.map((group, index) =>
-    group[2] === 0
-      ? previous[index]
-      : ([group[0] / group[2], group[1] / group[2]] as [number, number]),
-  );
+  return sums.map((group, index) => (group[2] === 0 ? previous[index] : ([group[0] / group[2], group[1] / group[2]] as XY)));
 }
 
-function nearest(point: [number, number], centers: Array<[number, number]>): number {
+function nearest(point: XY, centers: XY[]): number {
   let best = 0;
   let bestDistance = Infinity;
   centers.forEach((center, index) => {
@@ -139,213 +452,165 @@ function nearest(point: [number, number], centers: Array<[number, number]>): num
   return best;
 }
 
-function squared(a: [number, number], b: [number, number]): number {
-  return (a[0] - b[0]) ** 2 + (a[1] - b[1]) ** 2;
+/** Zugehoerigkeit im Potenzdiagramm: kleinstes |x - c|² - psi, bei Gleichstand die kleinere Nummer. */
+function owner(site: Site, centers: XY[], psi: number[], skip = -1): number {
+  let best = -1;
+  let bestValue = Infinity;
+  for (let i = 0; i < centers.length; i += 1) {
+    if (i === skip) continue;
+    const value = (site.x - centers[i][0]) ** 2 + (site.y - centers[i][1]) ** 2 - psi[i];
+    if (value < bestValue) {
+      bestValue = value;
+      best = i;
+    }
+  }
+  return best;
+}
+
+function assignAll(sites: Site[], centers: XY[], psi: number[]): number[] {
+  return sites.map((site) => owner(site, centers, psi));
 }
 
 /**
- * Gleicht die Paketgroessen an: immer die Strasse verschieben, die dem
- * leichteren Paket am naechsten liegt.
+ * Stellt die Gewichte so ein, dass jede Zelle ihren Anteil enthaelt - Zelle
+ * fuer Zelle, jeweils mit allen anderen fest. Fuer eine Zelle ist das exakt
+ * loesbar: Jeder Punkt wechselt ab einem bestimmten Gewicht zu ihr, also
+ * genuegt es, die Punkte nach dieser Schwelle zu sortieren.
  *
- * Verschoben wird nur, wenn die Strasse leichter ist als der Abstand zwischen
- * vollstem und leerstem Paket. Dann wird der Unterschied garantiert kleiner -
- * die Pakete koennen sich also nicht gegenseitig hin und her schaukeln, und
- * das Verfahren kommt von selbst zum Stehen.
+ * `cohesion`: unter allen Lagen innerhalb der Toleranz die, die am wenigsten
+ * Strassen zerschneidet.
  */
-function balance(
-  xy: Array<[number, number]>,
-  weights: number[],
-  assignment: number[],
-  centers: Array<[number, number]>,
-  count: number,
-): void {
-  const total = weights.reduce((sum, w) => sum + w, 0);
-  const allowed = Math.max(1, (total / count) * TOLERANCE);
+function balance(sites: Site[], centers: XY[], start: number[], targets: number[], cohesion: boolean): number[] {
+  const psi = [...start];
+  const count = centers.length;
+  const rounds = cohesion ? COHESION_ROUNDS : BALANCE_ROUNDS;
+  const streetCount = sites.reduce((max, site) => Math.max(max, site.street + 1), 0);
 
-  for (let round = 0; round < BALANCE_ROUNDS; round += 1) {
-    const loads = new Array(count).fill(0) as number[];
-    assignment.forEach((group, index) => (loads[group] += weights[index]));
-
-    let heavy = 0;
-    let light = 0;
-    loads.forEach((load, index) => {
-      if (load > loads[heavy]) heavy = index;
-      if (load < loads[light]) light = index;
-    });
-    const gap = loads[heavy] - loads[light];
-    if (gap <= allowed) return;
-
-    let candidate = -1;
-    let bestCost = Infinity;
-    assignment.forEach((group, index) => {
-      if (group !== heavy || weights[index] >= gap) return;
-      const cost = squared(xy[index], centers[light]) - squared(xy[index], centers[heavy]);
-      if (cost < bestCost) {
-        bestCost = cost;
-        candidate = index;
+  for (let round = 0; round < rounds; round += 1) {
+    if (!cohesion) {
+      const loads = new Array(count).fill(0) as number[];
+      for (const site of sites) loads[owner(site, centers, psi)] += site.w;
+      if (loads.every((load, i) => Math.abs(load - targets[i]) <= allowed(targets[i]))) break;
+    }
+    let changed = false;
+    for (let i = 0; i < count; i += 1) {
+      const next = bestWeight(i, sites, centers, psi, targets[i], cohesion ? streetCount : 0);
+      if (next !== psi[i]) {
+        psi[i] = next;
+        changed = true;
       }
-    });
-
-    // Nichts mehr zu holen: die Pakete sind so gleich, wie es die einzelnen
-    // Strassen zulassen (eine Strasse mit 50 Wohneinheiten laesst sich nicht teilen).
-    if (candidate === -1) return;
-    assignment[candidate] = light;
-  }
-}
-
-/* ------------------------- Flaechen der Pakete -------------------------- */
-
-type XY = [number, number];
-
-/**
- * Teilt die Flaeche lueckenlos und ohne Ueberschneidung auf die Pakete auf.
- *
- * Jedes Paket bekommt eine Zelle eines gewichteten Voronoi-Diagramms
- * (Potenzdiagramm) um die Mitte seiner Haeuser: gerade Grenzen, keine Luecken,
- * keine Ueberlappung. Die Gewichte schieben jede Grenze dorthin, wo sie die
- * Haeuser der beiden Nachbarpakete am besten trennt - bei ungleich grossen
- * Paketen liegt sie also nicht stumpf in der Mitte.
- *
- * `groups[i]` sind die Haeuser von Paket i; das Ergebnis hat dieselbe Laenge.
- */
-export function plotAreas(area: Shape, groups: LatLng[][]): Shape[] {
-  const used = groups
-    .map((points, index) => ({ index, points }))
-    .filter((group) => group.points.length > 0);
-  const result: Shape[] = groups.map(() => []);
-  if (area.length === 0 || used.length === 0) return result;
-  if (used.length === 1) {
-    result[used[0].index] = area;
-    return result;
-  }
-
-  // Ebene Naeherung in Metern rund um die Flaeche.
-  const [lat0, lng0] = area[0][0][0];
-  const mx = METERS_PER_DEGREE * Math.cos((lat0 * Math.PI) / 180);
-  const my = METERS_PER_DEGREE;
-  const toXY = ([lat, lng]: LatLng): XY => [(lng - lng0) * mx, (lat - lat0) * my];
-  const toLatLng = ([x, y]: XY): LatLng => [round6(lat0 + y / my), round6(lng0 + x / mx)];
-
-  const sets = used.map((group) => group.points.map(toXY));
-  const centers = sets.map(mean);
-  const weights = powerWeights(sets, centers);
-
-  // Grosszuegiger Rahmen um die Flaeche - die Zellen werden danach auf sie zugeschnitten.
-  const frame = frameOf(area.flatMap((polygon) => polygon[0] ?? []).map(toXY), 200);
-
-  used.forEach((group, i) => {
-    let cell = frame;
-    for (let j = 0; j < used.length && cell.length >= 3; j += 1) {
-      if (j === i) continue;
-      const [ci, cj] = [centers[i], centers[j]];
-      // Punkt x gehoert zu i, solange |x-ci|² - wi <= |x-cj|² - wj.
-      cell = clipHalfPlane(
-        cell,
-        2 * (cj[0] - ci[0]),
-        2 * (cj[1] - ci[1]),
-        norm2(cj) - norm2(ci) + weights[i] - weights[j],
-      );
     }
-    if (cell.length < 3) return;
-    result[group.index] = intersect(area, [[cell.map(toLatLng)]]);
-  });
-  return result;
+    if (!changed) break;
+  }
+
+  // Hat die Rucksichtnahme auf Strassen die Anteile zu sehr verschoben, gilt wieder nur die Groesse.
+  if (cohesion) {
+    const loads = new Array(count).fill(0) as number[];
+    for (const site of sites) loads[owner(site, centers, psi)] += site.w;
+    if (loads.some((load, i) => Math.abs(load - targets[i]) > allowed(targets[i]) * 1.5)) {
+      return balance(sites, centers, psi, targets, false);
+    }
+  }
+  return psi;
 }
 
-/**
- * Gewichte des Potenzdiagramms. Fuer jedes Paar Nachbarpakete gibt es eine
- * beste Trennlinie; die Gewichte werden so gewaehlt, dass alle Grenzen diesen
- * Linien moeglichst nahe kommen (kleinste Quadrate, erstes Gewicht = 0).
- */
-function powerWeights(sets: XY[][], centers: XY[]): number[] {
+function allowed(target: number): number {
+  return Math.max(1, target * TOLERANCE);
+}
+
+/** Bestes Gewicht fuer Zelle i bei festen anderen Gewichten. */
+function bestWeight(i: number, sites: Site[], centers: XY[], psi: number[], target: number, streetCount: number): number {
+  const n = sites.length;
+  const theta = new Float64Array(n);
+  const other = new Int32Array(n);
+  for (let j = 0; j < n; j += 1) {
+    const site = sites[j];
+    const rival = owner(site, centers, psi, i);
+    other[j] = rival;
+    const own = (site.x - centers[i][0]) ** 2 + (site.y - centers[i][1]) ** 2;
+    const best = (site.x - centers[rival][0]) ** 2 + (site.y - centers[rival][1]) ** 2 - psi[rival];
+    // Punkt j gehoert zu i, sobald psi_i >= theta_j.
+    theta[j] = own - best;
+  }
+  const order = Array.from({ length: n }, (_, j) => j).sort((a, b) => theta[a] - theta[b]);
+
+  // Strassen je Zelle zaehlen: zerschnitten ist eine Strasse mit Haeusern in mehr als einer Zelle.
   const k = centers.length;
-  const matrix = Array.from({ length: k }, () => new Array(k).fill(0) as number[]);
-  const rhs = new Array(k).fill(0) as number[];
-
-  // Wie stark ein Paar zaehlt: Haeuser, fuer die genau diese beiden Pakete die
-  // naechsten sind. Pakete, die sich nicht beruehren, bestimmen so nichts.
-  const pairWeight = Array.from({ length: k }, () => new Array(k).fill(0.01) as number[]);
-  for (const point of sets.flat()) {
-    const [first, second] = centers
-      .map((center, index) => ({ index, distance: norm2([point[0] - center[0], point[1] - center[1]]) }))
-      .sort((a, b) => a.distance - b.distance);
-    pairWeight[first.index][second.index] += 1;
-    pairWeight[second.index][first.index] += 1;
-  }
-
-  for (let i = 0; i < k; i += 1) {
-    for (let j = i + 1; j < k; j += 1) {
-      const d: XY = [centers[j][0] - centers[i][0], centers[j][1] - centers[i][1]];
-      const length = Math.hypot(d[0], d[1]);
-      if (length < 1e-6) continue;
-      const u: XY = [d[0] / length, d[1] / length];
-      const t = bestThreshold(
-        sets[i].map((p) => p[0] * u[0] + p[1] * u[1]),
-        sets[j].map((p) => p[0] * u[0] + p[1] * u[1]),
-      );
-      // Grenze bei x·u = t  <=>  wi - wj = 2·|d|·t - (|cj|² - |ci|²)
-      const b = 2 * length * t - (norm2(centers[j]) - norm2(centers[i]));
-      const w = pairWeight[i][j];
-      matrix[i][i] += w;
-      matrix[j][j] += w;
-      matrix[i][j] -= w;
-      matrix[j][i] -= w;
-      rhs[i] += w * b;
-      rhs[j] -= w * b;
+  const perCell = streetCount > 0 ? new Int32Array(streetCount * k) : null;
+  const cells = streetCount > 0 ? new Int32Array(streetCount) : null;
+  let cut = 0;
+  if (perCell && cells) {
+    for (let j = 0; j < n; j += 1) {
+      const slot = sites[j].street * k + other[j];
+      if (perCell[slot]++ === 0 && ++cells[sites[j].street] === 2) cut += 1;
     }
   }
 
-  // Erstes Gewicht festhalten, den Rest loesen.
-  const size = k - 1;
-  const a = matrix.slice(1).map((row) => row.slice(1));
-  const r = rhs.slice(1);
-  const solved = solve(a, r) ?? new Array(size).fill(0);
-  return [0, ...solved];
+  const slack = allowed(target);
+  let bestAt = 0;
+  let bestError = Math.abs(target);
+  let bestCut = cut;
+  let bestGap = 0;
+  let load = 0;
+  const gapAt = (p: number) => (p === 0 || p === n ? 0 : theta[order[p]] - theta[order[p - 1]]);
+  const better = (error: number, cuts: number, gap: number) => {
+    if (!perCell) return error < bestError;
+    const fits = error <= slack;
+    const bestFits = bestError <= slack;
+    if (fits !== bestFits) return fits;
+    if (!fits) return error < bestError;
+    return cuts < bestCut || (cuts === bestCut && (gap > bestGap * 1.5 || (gap >= bestGap / 1.5 && error < bestError)));
+  };
+
+  for (let p = 1; p <= n; p += 1) {
+    const j = order[p - 1];
+    load += sites[j].w;
+    if (perCell && cells) {
+      const street = sites[j].street;
+      const from = street * k + other[j];
+      const to = street * k + i;
+      if (--perCell[from] === 0 && --cells[street] === 1) cut -= 1;
+      if (perCell[to]++ === 0 && ++cells[street] === 2) cut += 1;
+    }
+    // Geschnitten wird nur zwischen zwei verschiedenen Schwellen - nie mitten durch einen Fleck.
+    if (p < n && theta[order[p]] - theta[j] < 1e-6) continue;
+    const error = Math.abs(load - target);
+    const gap = gapAt(p);
+    if (better(error, cut, gap)) {
+      bestAt = p;
+      bestError = error;
+      bestCut = cut;
+      bestGap = gap;
+    }
+  }
+
+  if (bestAt === 0) return theta[order[0]] - 1;
+  if (bestAt === n) return theta[order[n - 1]] + 1;
+  // Grenze mittig in die Luecke - so liegt kein Haus knapp darauf.
+  return (theta[order[bestAt - 1]] + theta[order[bestAt]]) / 2;
 }
 
 /**
- * Schwelle auf einer Achse, die Paket a (links) und b (rechts) am saubersten
- * trennt: moeglichst wenige Haeuser auf der falschen Seite, bei Gleichstand
- * mitten in der breitesten Luecke.
+ * Die Zellen als Flaechen: Rahmen um alles, je Nachbar eine Halbebene
+ * abschneiden, auf die gezeichnete Flaeche zuschneiden.
  */
-function bestThreshold(a: number[], b: number[]): number {
-  const values = [
-    ...a.map((value) => ({ value, side: 0 })),
-    ...b.map((value) => ({ value, side: 1 })),
-  ].sort((x, y) => x.value - y.value);
-
-  // Schwelle vor allen Werten: alle aus a liegen falsch.
-  let wrong = a.length;
-  let best = { wrong, gap: 0, at: values[0].value };
-  for (let index = 0; index < values.length; index += 1) {
-    wrong += values[index].side === 0 ? -1 : 1;
-    const next = values[index + 1];
-    if (next && next.value === values[index].value) continue;
-    const gap = next ? next.value - values[index].value : 0;
-    const at = next ? (values[index].value + next.value) / 2 : values[index].value;
-    if (wrong < best.wrong || (wrong === best.wrong && gap > best.gap)) best = { wrong, gap, at };
-  }
-  return best.at;
-}
-
-/** Gauss-Elimination fuer die paar Gewichte (hoechstens drei Unbekannte). */
-function solve(a: number[][], r: number[]): number[] | null {
-  const n = r.length;
-  const m = a.map((row, i) => [...row, r[i]]);
-  for (let col = 0; col < n; col += 1) {
-    let pivot = col;
-    for (let row = col + 1; row < n; row += 1) {
-      if (Math.abs(m[row][col]) > Math.abs(m[pivot][col])) pivot = row;
+function powerCells(area: Shape, sites: Site[], centers: XY[], psi: number[], projection: Projection): Shape[] {
+  const points: XY[] = [
+    ...area.flatMap((polygon) => polygon[0] ?? []).map(([lat, lng]) => projection.toXY(lat, lng)),
+    ...sites.map((site) => [site.x, site.y] as XY),
+  ];
+  const frame = frameOf(points, 200);
+  return centers.map((ci, i) => {
+    let cell = frame;
+    for (let j = 0; j < centers.length && cell.length >= 3; j += 1) {
+      if (j === i) continue;
+      const cj = centers[j];
+      // x gehoert zu i, solange |x-ci|² - psi_i <= |x-cj|² - psi_j.
+      cell = clipHalfPlane(cell, 2 * (cj[0] - ci[0]), 2 * (cj[1] - ci[1]), norm2(cj) - norm2(ci) + psi[i] - psi[j]);
     }
-    if (Math.abs(m[pivot][col]) < 1e-12) return null;
-    [m[col], m[pivot]] = [m[pivot], m[col]];
-    for (let row = 0; row < n; row += 1) {
-      if (row === col) continue;
-      const factor = m[row][col] / m[col][col];
-      for (let k = col; k <= n; k += 1) m[row][k] -= factor * m[col][k];
-    }
-  }
-  return m.map((row, i) => row[n] / row[i]);
+    if (cell.length < 3) return [];
+    return intersect(area, [[cell.map(projection.toLatLng)]]);
+  });
 }
 
 /** Schneidet ein konvexes Vieleck auf die Halbebene ax·x + ay·y <= c zu. */
@@ -378,10 +643,8 @@ function frameOf(points: XY[], margin: number): XY[] {
   ];
 }
 
-function mean(points: XY[]): XY {
-  const x = points.reduce((sum, p) => sum + p[0], 0) / points.length;
-  const y = points.reduce((sum, p) => sum + p[1], 0) / points.length;
-  return [x, y];
+function squared(a: XY, b: XY): number {
+  return (a[0] - b[0]) ** 2 + (a[1] - b[1]) ** 2;
 }
 
 function norm2(p: XY): number {

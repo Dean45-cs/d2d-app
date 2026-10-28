@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 import { AreaMap, type AreaTone, type MapArea } from "@/components/AreaMap";
 import { IconChevronDown } from "@/components/icons";
-import { plural } from "@/components/ui";
+import { personTone, plural } from "@/components/ui";
 import type { Shape } from "@/lib/geo/shape";
 
 export interface OverviewTerritory {
@@ -13,6 +13,10 @@ export interface OverviewTerritory {
   area: Shape;
   status: string;
   assignee: string | null;
+  /** Profilbild der zustaendigen Person, "" ohne Bild. */
+  assigneeAvatar: string;
+  /** Ohne Zuteilung: wer dort am meisten geklingelt hat - man sieht immer, wer es bearbeitet hat. */
+  worker: { name: string; avatar: string } | null;
   streets: number;
   /** "12 von 30 Häusern" */
   progress: string;
@@ -23,7 +27,8 @@ const STATUS_LABEL: Record<string, string> = { ACTIVE: "In Arbeit", DONE: "Ferti
 
 /**
  * Alle gezeichneten Gebiete auf einen Blick: gruen ist in Arbeit, das
- * Kuerzel sagt, wer dran ist. Ein Tipp oeffnet das Gebiet.
+ * Profilbild sagt, wer dran ist - oder wer es bearbeitet hat. Ein Tipp
+ * oeffnet das Gebiet.
  */
 export function TerritoryOverviewMap({
   territories,
@@ -56,19 +61,25 @@ export function TerritoryOverviewMap({
   // Stabil halten: die Karte loest bei neuen Daten Ueberschneidungen neu auf.
   const areas: MapArea[] = useMemo(
     () =>
-      shown.map((t) => ({
-        id: t.id,
-        name: t.name,
-        area: t.area,
-        tone: TONES[t.status] ?? "open",
-        badge: initials(t.assignee),
-        hint: [
-          STATUS_LABEL[t.status] ?? t.status,
-          plural(t.streets, "Straße", "Straßen"),
-          t.progress,
-          t.assignee ?? "nicht zugeteilt",
-        ].join(" · "),
-      })),
+      shown.map((t) => {
+        const person = t.assignee
+          ? { name: t.assignee, avatar: t.assigneeAvatar }
+          : t.worker;
+        return {
+          id: t.id,
+          name: t.name,
+          area: t.area,
+          tone: TONES[t.status] ?? "open",
+          person: person ? { ...person, tone: personTone(person.name) } : null,
+          badge: "–",
+          hint: [
+            STATUS_LABEL[t.status] ?? t.status,
+            plural(t.streets, "Straße", "Straßen"),
+            t.progress,
+            t.assignee ?? (t.worker ? `bearbeitet von ${t.worker.name}` : "nicht zugeteilt"),
+          ].join(" · "),
+        };
+      }),
     [shown],
   );
 
@@ -110,9 +121,3 @@ export function TerritoryOverviewMap({
   );
 }
 
-/** „Alex Krüger“ -> „AK“, niemand -> „–“ */
-function initials(name: string | null): string {
-  if (!name) return "–";
-  const parts = name.trim().split(/\s+/).slice(0, 2);
-  return parts.map((part) => part[0]?.toLocaleUpperCase("de-DE") ?? "").join("") || "–";
-}
