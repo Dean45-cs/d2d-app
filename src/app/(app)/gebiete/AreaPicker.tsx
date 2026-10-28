@@ -267,14 +267,20 @@ export function AreaPicker({
     return () => layer.clear();
   }, [layers, overlay, plots]);
 
-  // Auf eine Strasse springen, wenn sie in der Liste angetippt wird
+  // Auf eine Strasse springen, wenn sie in der Liste angetippt wird. Nur beim
+  // Antippen - nicht bei jeder neuen Aufteilung, waehrend die Karte verborgen ist.
+  const overlayRef = useRef(overlay);
+  overlayRef.current = overlay;
   useEffect(() => {
     if (!engine || !focus) return;
-    const street = overlay.find((s) => s.name === focus);
+    const street = overlayRef.current.find((s) => s.name === focus);
     const target = street?.center ?? street?.points[0] ?? null;
     if (!target) return;
+    // Die Karte kann gerade erst wieder sichtbar geworden sein (Schritt zurueck):
+    // erst neu vermessen, sonst rechnet sie mit der Groesse 0.
+    engine.resize();
     engine.setView(target, Math.max(engine.zoom(), 16));
-  }, [engine, focus, overlay]);
+  }, [engine, focus]);
 
   // Aktuelle Auswahl samt Eckpunkten
   useEffect(() => {

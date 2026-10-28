@@ -26,6 +26,48 @@ export function badgeMarker(color: string, label: string, size = 28) {
   };
 }
 
+/**
+ * Profilbild auf einer Flaeche: wer das Gebiet bearbeitet. Der Ring traegt
+ * die Farbe des Gebietsstands. Ohne Bild (oder wenn es nicht laedt) stehen
+ * die Anfangsbuchstaben im Ton der Person da - wie ueberall in der App.
+ */
+export function avatarMarker(color: string, person: { name: string; avatar: string; tone: string }, size = 34) {
+  return {
+    size: [size, size] as [number, number],
+    element: () => {
+      const node = el("span", "map-avatar");
+      node.style.width = `${size}px`;
+      node.style.height = `${size}px`;
+      node.style.borderColor = color;
+      const showInitials = () => {
+        node.replaceChildren();
+        const letters = el("span", "map-avatar-initials avatar-initials", initialsOf(person.name));
+        letters.dataset.tone = person.tone;
+        letters.style.fontSize = `${Math.round(size * 0.36)}px`;
+        node.appendChild(letters);
+      };
+      if (person.avatar) {
+        const image = document.createElement("img");
+        image.src = person.avatar;
+        image.alt = "";
+        image.decoding = "async";
+        image.draggable = false;
+        image.addEventListener("error", showInitials, { once: true });
+        node.appendChild(image);
+      } else {
+        showInitials();
+      }
+      return node;
+    },
+  };
+}
+
+/** "Alex Krüger" -> "AK" */
+function initialsOf(name: string): string {
+  const parts = name.trim().split(/\s+/).slice(0, 2);
+  return parts.map((part) => part[0]?.toLocaleUpperCase("de-DE") ?? "").join("") || "–";
+}
+
 /** Griff zum Ziehen (Mittelpunkt des Umkreises, Ecken einer Flaeche). */
 export function handleMarker(color: string, size = 18) {
   return {

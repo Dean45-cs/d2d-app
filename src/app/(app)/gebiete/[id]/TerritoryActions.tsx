@@ -1,22 +1,23 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Menu, MenuItem, MenuSeparator } from "@/components/Menu";
 import { Sheet } from "@/components/Sheet";
 import { useToast } from "@/components/Toast";
 import { useConfirm } from "@/components/useConfirm";
-import { InlineError, plural } from "@/components/ui";
-import { IconPlus, IconPolygonArea, IconRefresh, IconTrash } from "@/components/icons";
+import { InlineError, SkeletonList, plural } from "@/components/ui";
+import { IconCheckCircle, IconInfo, IconMinus, IconPlus, IconPolygonArea, IconRefresh, IconTrash } from "@/components/icons";
 import { labelPoint, type Shape } from "@/lib/geo/shape";
 import { loadStreets, StreetsError } from "@/lib/geo/fetch-streets";
 import { AreaPicker } from "../AreaPicker";
+import type { FoundStreet } from "../StreetResult";
 
 type OtherArea = { id: number; name: string; area: Shape };
 
 /**
  * Seltene Aktionen der Teamleitung hinter den drei Punkten oben rechts:
- * Flaeche, Strassen, Loeschen. Was danach passiert, meldet ein Toast.
+ * Flaeche, Haeuser, Strassen, Loeschen. Was danach passiert, meldet ein Toast.
  */
 export function TerritoryActions({
   territoryId,
@@ -36,38 +37,7 @@ export function TerritoryActions({
   const router = useRouter();
   const toast = useToast();
   const { confirm, dialog } = useConfirm();
-  const [sheet, setSheet] = useState<"area" | "streets" | null>(null);
-  const [busy, setBusy] = useState(false);
-
-  /** Strassen aus der gespeicherten Flaeche holen und ins Gebiet uebernehmen. */
-  async function importStreets() {
-    if (!area || busy) return;
-    setBusy(true);
-    toast("Straßen werden geladen …");
-    try {
-      const data = await loadStreets(area);
-      if (data.streets.length === 0) {
-        toast("Keine Straßen in der Fläche");
-        return;
-      }
-      const response = await fetch(`/api/territories/${territoryId}/streets`, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ streetList: data.streets }),
-      });
-      const saved = await response.json();
-      if (!response.ok) {
-        toast(saved.error ?? "Straßen nicht gespeichert");
-        return;
-      }
-      toast(saved.added === 0 ? "Alle Straßen schon im Gebiet" : `${plural(saved.added, "Straße", "Straßen")} übernommen`);
-      router.refresh();
-    } catch (caught) {
-      toast(caught instanceof StreetsError ? caught.message : "OpenStreetMap nicht erreichbar");
-    } finally {
-      setBusy(false);
-    }
-  }
+  const [sheet, setSheet] = useState<"area" | "streets" | "reconcile" | null>(null);
 
   async function remove() {
     const ok = await confirm({
@@ -99,8 +69,8 @@ export function TerritoryActions({
               {area ? "Fläche ändern" : "Fläche festlegen"}
             </MenuItem>
             {area && (
-              <MenuItem icon={<IconRefresh className="h-5 w-5" />} onSelect={() => void importStreets()}>
-                Straßen nachladen
+              <MenuItem icon={<IconRefresh className="h-5 w-5" />} onSelect={() => setSheet("reconcile")}>
+                Häuser abgleichen
               </MenuItem>
             )}
             <MenuItem icon={<IconPlus className="h-5 w-5" />} onSelect={() => setSheet("streets")}>
@@ -119,6 +89,9 @@ export function TerritoryActions({
         <AreaSheet territoryId={territoryId} area={area} otherAreas={otherAreas} onClose={() => setSheet(null)} />
       )}
       {sheet === "streets" && <AddStreetsSheet territoryId={territoryId} onClose={() => setSheet(null)} />}
+      {sheet === "reconcile" && area && (
+        <ReconcileSheet territoryId={territoryId} area={area} onClose={() => setSheet(null)} />
+      )}
       {dialog}
     </>
   );
@@ -139,7 +112,8 @@ export function AreaSetupButton({ territoryId, otherAreas }: { territoryId: numb
 
 /**
  * Flaeche neu ziehen: die bisherige liegt gestrichelt darunter,
- * Nachbargebiete werden ausgespart.
+ * Nachbargebiete werden ausgespart. Vor dem Speichern zeigt die App, welche
+ * Haeuser dazukommen und welche wegfallen - gespeichert wird genau das.
  */
 function AreaSheet({
   territoryId,
@@ -152,59 +126,266 @@ function AreaSheet({
   otherAreas: OtherArea[];
   onClose: () => void;
 }) {
+  const [draft, setDraft] = useState<Shape | null>(null);
+  const [reviewing, setReviewing] = useState(false);
+  const center = area ? (labelPoint(area)?.point ?? null) : null;
+  const review = useReconcile(territoryId, reviewing ? draft : null, true, onClose);
+
+  return (
+    <Sheet
+      title={reviewing ? "Häuser prüfen" : area ? "Fläche ändern" : "Fläche festlegen"}
+      subtitle={`Schritt ${reviewing ? 2 : 1} von 2`}
+      width="lg"
+      onClose={onClose}
+      footer={
+        reviewing ? (
+          <ReconcileFooter review={review} label="Fläche speichern" onBack={() => setReviewing(false)} />
+        ) : (
+          <button
+            type="button"
+            className="btn btn-primary btn-lg btn-block"
+            onClick={() => setReviewing(true)}
+            disabled={!draft}
+          >
+            Weiter – Häuser prüfen
+          </button>
+        )
+      }
+    >
+      {/* Die Karte bleibt beim Pruefen stehen - "Zurueck" findet die Zeichnung wieder. */}
+      <div className={reviewing ? "hidden" : undefined}>
+        <AreaPicker
+          onAreaChange={setDraft}
+          existing={otherAreas}
+          previous={area}
+          start={center ? { lat: center[0], lng: center[1], zoom: 15 } : undefined}
+        />
+      </div>
+      {reviewing && <ReconcileView review={review} />}
+    </Sheet>
+  );
+}
+
+/** Haeuser der bisherigen Flaeche abgleichen - ohne neu zu zeichnen. */
+function ReconcileSheet({ territoryId, area, onClose }: { territoryId: number; area: Shape; onClose: () => void }) {
+  const review = useReconcile(territoryId, area, false, onClose);
+  const nothing = review.result && review.result.added + review.result.pulled + review.result.removed === 0;
+  return (
+    <Sheet
+      title="Häuser abgleichen"
+      subtitle="Häuser und Fläche in Einklang bringen"
+      onClose={onClose}
+      footer={<ReconcileFooter review={review} label={nothing ? "Fertig" : "Übernehmen"} />}
+    >
+      <ReconcileView review={review} />
+    </Sheet>
+  );
+}
+
+interface ReconcileResult {
+  added: number;
+  addedStreets: number;
+  removed: number;
+  moved: number;
+  pulled: number;
+  keptWorked: number;
+  areaChanged: boolean;
+}
+
+/**
+ * Vorschau und Speichern des Abgleichs. Die Strassen der Flaeche kommen aus
+ * OpenStreetMap; ist das nicht erreichbar, geht es ohne neue Haeuser weiter -
+ * aufraeumen klappt trotzdem. Gespeichert wird mit derselben Liste, die die
+ * Vorschau gesehen hat.
+ */
+function useReconcile(territoryId: number, area: Shape | null, newArea: boolean, onDone: () => void) {
   const router = useRouter();
   const toast = useToast();
-  const [draft, setDraft] = useState<Shape | null>(null);
+  const [streets, setStreets] = useState<FoundStreet[] | null>(null);
+  const [mapProblem, setMapProblem] = useState<string | null>(null);
+  const [result, setResult] = useState<ReconcileResult | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const center = area ? (labelPoint(area)?.point ?? null) : null;
+
+  const send = useCallback(
+    async (list: FoundStreet[], dryRun: boolean) => {
+      const response = await fetch(`/api/territories/${territoryId}/reconcile`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ area: newArea ? area : undefined, streetList: list, dryRun }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.error ?? "Der Abgleich hat nicht geklappt.");
+      return data as ReconcileResult;
+    },
+    [territoryId, area, newArea],
+  );
+
+  useEffect(() => {
+    setStreets(null);
+    setResult(null);
+    setError(null);
+    setMapProblem(null);
+    if (!area) return;
+    let cancelled = false;
+    void (async () => {
+      let list: FoundStreet[] = [];
+      try {
+        list = (await loadStreets(area)).streets;
+      } catch (caught) {
+        if (!cancelled) {
+          setMapProblem(
+            `${caught instanceof StreetsError ? caught.message : "OpenStreetMap ist nicht erreichbar."} Neue Häuser kommen diesmal nicht dazu.`,
+          );
+        }
+      }
+      try {
+        const preview = await send(list, true);
+        if (cancelled) return;
+        setStreets(list);
+        setResult(preview);
+      } catch (caught) {
+        if (!cancelled) setError(caught instanceof Error ? caught.message : "Keine Verbindung.");
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [area, send]);
 
   async function save() {
-    if (!draft) return;
+    if (!streets) return;
     setBusy(true);
     setError(null);
     try {
-      const response = await fetch(`/api/territories/${territoryId}`, {
-        method: "PATCH",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ area: draft }),
-      });
-      const data = await response.json();
-      if (!response.ok) {
-        setError(data.error ?? "Fläche nicht gespeichert.");
-        return;
-      }
-      toast("Fläche gespeichert");
-      onClose();
+      const done = await send(streets, false);
+      const changes = done.added + done.pulled + done.removed;
+      toast(
+        newArea
+          ? "Fläche gespeichert"
+          : changes === 0
+            ? "Alles stimmt schon"
+            : `${plural(changes, "Haus", "Häuser")} abgeglichen`,
+      );
+      onDone();
       router.refresh();
-    } catch {
-      setError("Keine Verbindung.");
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Keine Verbindung.");
     } finally {
       setBusy(false);
     }
   }
 
+  return { result, mapProblem, error, busy, save };
+}
+
+type Review = ReturnType<typeof useReconcile>;
+
+function ReconcileFooter({ review, label, onBack }: { review: Review; label: string; onBack?: () => void }) {
   return (
-    <Sheet
-      title={area ? "Fläche ändern" : "Fläche festlegen"}
-      width="lg"
-      onClose={onClose}
-      footer={
-        <div className="space-y-3">
-          {error && <InlineError>{error}</InlineError>}
-          <button type="button" className="btn btn-primary btn-lg btn-block" onClick={save} disabled={busy || !draft}>
-            {busy ? "Speichern …" : "Fläche speichern"}
+    <div className="space-y-3">
+      {review.error && <InlineError>{review.error}</InlineError>}
+      <div className="flex gap-2">
+        {onBack && (
+          <button type="button" className="btn btn-secondary btn-lg shrink-0" onClick={onBack} disabled={review.busy}>
+            Zurück
           </button>
-        </div>
-      }
-    >
-      <AreaPicker
-        onAreaChange={setDraft}
-        existing={otherAreas}
-        previous={area}
-        start={center ? { lat: center[0], lng: center[1], zoom: 15 } : undefined}
-      />
-    </Sheet>
+        )}
+        <button
+          type="button"
+          className="btn btn-primary btn-lg flex-1"
+          onClick={() => void review.save()}
+          disabled={review.busy || !review.result}
+        >
+          {review.busy ? "Speichern …" : label}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/** Was der Abgleich aendert - jede Zeile ein Satz, mit Plus, Minus oder Hinweis. */
+function ReconcileView({ review }: { review: Review }) {
+  const { result, mapProblem, error } = review;
+  if (!result) {
+    return error ? null : (
+      <div aria-busy="true" aria-label="Häuser werden geprüft">
+        <p className="mb-3 px-1 text-footnote text-muted">Häuser werden mit OpenStreetMap abgeglichen …</p>
+        <SkeletonList rows={3} />
+      </div>
+    );
+  }
+  const nothing = result.added + result.pulled + result.removed === 0;
+  return (
+    <div className="space-y-3">
+      <ul className="list list-icons">
+        {result.added > 0 && (
+          <ChangeRow sign="plus" title={plural(result.added, "neues Haus", "neue Häuser")}>
+            {result.addedStreets > 0
+              ? `aus der Karte · ${plural(result.addedStreets, "neue Straße", "neue Straßen")}`
+              : "aus der Karte"}
+          </ChangeRow>
+        )}
+        {result.pulled > 0 && (
+          <ChangeRow sign="plus" title={plural(result.pulled, "Haus kommt", "Häuser kommen")}>
+            aus anderen Gebieten – sie liegen in dieser Fläche
+          </ChangeRow>
+        )}
+        {result.removed > 0 && (
+          <ChangeRow sign="minus" title={plural(result.removed, "Haus fällt", "Häuser fallen")}>
+            {result.moved > 0
+              ? `weg, sie liegen außerhalb · ${result.moved} davon ins Gebiet, in dem sie liegen`
+              : "weg, sie liegen außerhalb der Fläche"}
+          </ChangeRow>
+        )}
+        {result.keptWorked > 0 && (
+          <ChangeRow sign="info" title={plural(result.keptWorked, "besuchtes Haus bleibt", "besuchte Häuser bleiben")}>
+            liegen außerhalb, haben aber schon Besuche, Klingeln oder eine Sperre
+          </ChangeRow>
+        )}
+        {nothing && result.keptWorked === 0 && (
+          <ChangeRow sign="ok" title="Alles stimmt">
+            Häuser und Fläche passen zusammen
+          </ChangeRow>
+        )}
+      </ul>
+      {mapProblem && <p className="px-1 text-footnote text-muted">{mapProblem}</p>}
+    </div>
+  );
+}
+
+function ChangeRow({
+  sign,
+  title,
+  children,
+}: {
+  sign: "plus" | "minus" | "info" | "ok";
+  title: string;
+  children: React.ReactNode;
+}) {
+  const icon =
+    sign === "plus" ? (
+      <IconPlus className="h-4 w-4" />
+    ) : sign === "minus" ? (
+      <IconMinus className="h-4 w-4" />
+    ) : sign === "ok" ? (
+      <IconCheckCircle className="h-4 w-4" />
+    ) : (
+      <IconInfo className="h-4 w-4" />
+    );
+  return (
+    <li className="cell">
+      <span
+        className={`glyph glyph-round shrink-0 ${sign === "plus" || sign === "ok" ? "text-accent-ink" : sign === "minus" ? "text-danger" : "text-muted"}`}
+        aria-hidden="true"
+      >
+        {icon}
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block text-body">{title}</span>
+        <span className="block text-footnote text-muted">{children}</span>
+      </span>
+    </li>
   );
 }
 

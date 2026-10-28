@@ -37,6 +37,8 @@ import {
   type WorkStreet,
 } from "./TerritoryWorkspace";
 import { StreetList } from "./StreetList";
+import { GroupParts } from "./GroupParts";
+import { combinedProgress, getGroup, groupMembers, partTitle } from "@/lib/territory-groups";
 
 export const dynamic = "force-dynamic";
 
@@ -174,6 +176,11 @@ export default async function TerritoryDetailPage({
       : [],
   );
 
+  // Teil eines aufgeteilten Gebiets: die Geschwister samt gemeinsamem Fortschritt.
+  const group = getGroup(user.team_id, territory.group_id);
+  const parts = group ? groupMembers(user, group.id) : [];
+  const together = combinedProgress(parts);
+
   const hours = hourBuckets(territory.id);
   const hourTotal = hours.reduce((sum, h) => sum + h.total, 0);
   const handover = handoverSummary(territory);
@@ -266,6 +273,24 @@ export default async function TerritoryDetailPage({
           />
 
           <TerritoryHandover summary={handover} />
+
+          {group && parts.length > 1 && (
+            <GroupParts
+              territoryId={territory.id}
+              groupName={group.name}
+              parts={parts.map((part) => ({
+                id: part.id,
+                name: partTitle(part.name, group.name),
+                assignee: part.assignee_name,
+                avatar: part.assignee_avatar ?? "",
+                progress: territoryProgress(part).label,
+                share: progressShare(territoryProgress(part)),
+                status: part.status,
+              }))}
+              combined={{ label: together.label, share: progressShare(together) }}
+              canMerge={isLeader}
+            />
+          )}
 
           <StreetList
             territoryId={territory.id}

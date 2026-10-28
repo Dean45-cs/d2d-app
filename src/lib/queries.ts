@@ -34,6 +34,8 @@ export function listMembers(teamId: number): User[] {
 
 export interface TerritoryWithStats extends Territory {
   assignee_name: string | null;
+  /** Adresse des Profilbilds der zustaendigen Person, "" ohne Bild. */
+  assignee_avatar: string | null;
   street_count: number;
   unit_count: number;
   visit_count: number;
@@ -76,9 +78,10 @@ const HOUSE_TOUCHED = `(h.blocked_at IS NOT NULL
 const LIST_STREET = "NOT EXISTS (SELECT 1 FROM house_numbers x WHERE x.street_id = s.id AND x.lat IS NOT NULL)";
 const BELLS_OF_HOUSE = "(SELECT COUNT(*) FROM doorbells d WHERE d.house_number_id = h.id)";
 
-const TERRITORY_STATS_SQL = `
+export const TERRITORY_STATS_SQL = `
   SELECT t.*,
          u.name AS assignee_name,
+         avatar_src(u.id, u.avatar) AS assignee_avatar,
          (SELECT COUNT(*) FROM streets s WHERE s.territory_id = t.id)              AS street_count,
          (SELECT COALESCE(SUM(s.units), 0) FROM streets s WHERE s.territory_id = t.id) AS unit_count,
          (SELECT COUNT(*) FROM visits v WHERE v.territory_id = t.id)               AS visit_count,
@@ -155,6 +158,31 @@ export function listAccessibleTerritories(user: User): TerritoryWithStats[] {
         )
         .all(user.team_id, user.id, user.id) as TerritoryWithStats[]);
   return territories.filter((territory) => canAccessTerritory(user, territory, rights));
+}
+
+/**
+ * Wer in einem Gebiet am meisten geklingelt hat (bei Gleichstand: zuletzt) -
+ * fuer Gebiete ohne Zuteilung, damit auf der Karte trotzdem zu sehen ist, wer
+ * es bearbeitet hat.
+ */
+export function topWorkers(teamId: number, territoryIds: number[]): Map<number, { name: string; avatar: string }> {
+  const result = new Map<number, { name: string; avatar: string }>();
+  if (territoryIds.length === 0) return result;
+  const placeholders = territoryIds.map(() => "?").join(",");
+  const rows = getDb()
+    .prepare(
+      `SELECT x.territory_id, u.name, avatar_src(u.id, u.avatar) AS avatar
+         FROM (SELECT territory_id, user_id, COUNT(*) AS visits, MAX(created_at) AS last_at
+                 FROM visits WHERE team_id = ? AND territory_id IN (${placeholders})
+                GROUP BY territory_id, user_id) x
+         JOIN users u ON u.id = x.user_id
+        ORDER BY x.territory_id, x.visits DESC, x.last_at DESC`,
+    )
+    .all(teamId, ...territoryIds) as Array<{ territory_id: number; name: string; avatar: string }>;
+  for (const row of rows) {
+    if (!result.has(row.territory_id)) result.set(row.territory_id, { name: row.name, avatar: row.avatar });
+  }
+  return result;
 }
 
 /** Gebiete ohne Kennzahlen - fuer Stellen, die nur Name, Ort, Status und Flaeche brauchen. Gleiche Reihenfolge wie listTerritories. */
@@ -286,13 +314,30 @@ export interface TerritoryDraft {
  * Legt mehrere Gebiete auf einmal an - fuer ein Gebiet, das beim Anlegen auf
  * mehrere Leute aufgeteilt wird. Entweder entstehen alle oder keines: ein
  * halb aufgeteiltes Viertel waere schlimmer als gar keines.
+ *
+ * Mit `groupName` bleiben die Teilgebiete eine Gruppe (territory_groups):
+ * gemeinsamer Fortschritt, spaeter wieder zusammenlegbar.
  */
-export function createTerritories(teamId: number, drafts: TerritoryDraft[], createdBy?: number): number[] {
+export function createTerritories(
+  teamId: number,
+  drafts: TerritoryDraft[],
+  createdBy?: number,
+  groupName?: string,
+): number[] {
   const db = getDb();
   const run = db.transaction(() => {
+    const groupId =
+      groupName && drafts.length > 1
+        ? Number(
+            db
+              .prepare("INSERT INTO territory_groups (team_id, name, created_by) VALUES (?, ?, ?)")
+              .run(teamId, groupName, createdBy ?? null).lastInsertRowid,
+          )
+        : null;
     const ids: number[] = [];
     for (const draft of drafts) {
       const id = createTerritory({ teamId, createdBy, ...draft });
+      if (groupId) db.prepare("UPDATE territories SET group_id = ? WHERE id = ?").run(groupId, id);
       addStreetEntries(id, draft.streets);
       ids.push(id);
     }
@@ -385,6 +430,15 @@ export function addStreetEntries(territoryId: number, entries: StreetInput[]): n
     .prepare("SELECT id, name, house_numbers, units FROM streets WHERE territory_id = ?")
     .all(territoryId) as Array<{ id: number; name: string; house_numbers: string; units: number }>;
   const known = new Map(existingRows.map((r) => [r.name.toLocaleLowerCase("de-DE"), r]));
+  // Nach dem Zusammenlegen von Teilgebieten kann eine Strasse zweimal dastehen (ihre
+  // beiden Haelften) - eine Hausnummer gilt dann als vorhanden, wenn eine davon sie hat.
+  const twins = new Map<number, number[]>();
+  for (const row of existingRows) {
+    const ids = existingRows
+      .filter((other) => other.name.toLocaleLowerCase("de-DE") === row.name.toLocaleLowerCase("de-DE"))
+      .map((other) => other.id);
+    twins.set(row.id, ids);
+  }
   const maxOrder = db
     .prepare("SELECT COALESCE(MAX(sort_order), 0) AS m FROM streets WHERE territory_id = ?")
     .get(territoryId) as { m: number };
@@ -416,7 +470,11 @@ export function addStreetEntries(territoryId: number, entries: StreetInput[]): n
 
   const saveNumbers = (streetId: number, numbers: HouseNumberInput[]) => {
     for (const house of numbers) {
-      const existing = sameNumber.get(streetId, house.number) as { id: number } | undefined;
+      let existing: { id: number } | undefined;
+      for (const id of twins.get(streetId) ?? [streetId]) {
+        existing = sameNumber.get(id, house.number) as { id: number } | undefined;
+        if (existing) break;
+      }
       if (existing) {
         // Schon da (z. B. an der Tuer getippt): nur ergaenzen, was fehlt.
         completeNumber.run(house.lat, house.lng, house.units, existing.id);

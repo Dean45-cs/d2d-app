@@ -9,7 +9,7 @@ import { plotColor } from "@/components/map-colors";
 import type { User } from "@/lib/types";
 import { labelPoint, type Shape } from "@/lib/geo/shape";
 import { loadStreets as fetchAreaStreets, StreetsError } from "@/lib/geo/fetch-streets";
-import { plotAreas, splitStreets } from "@/lib/geo/split";
+import { splitIntoPlots } from "@/lib/geo/split";
 import { AreaPicker, type ExistingArea, type OverlayPlot, type OverlayStreet } from "./AreaPicker";
 import {
   StreetResult,
@@ -58,6 +58,8 @@ export function NewTerritoryButton({
   const [chosen, setChosen] = useState<Set<string>>(new Set());
   const [focus, setFocus] = useState<string | null>(null);
   const [plotCount, setPlotCount] = useState(1);
+  /** Relative Groesse je Teilgebiet (1 = normal) - z. B. 1,5 und 1 fuer 60/40. */
+  const [sizes, setSizes] = useState<number[]>([]);
   const [assignees, setAssignees] = useState<string[]>([]);
 
   const [form, setForm] = useState({
@@ -81,6 +83,7 @@ export function NewTerritoryButton({
     setChosen(new Set());
     setFocus(null);
     setPlotCount(1);
+    setSizes([]);
     setAssignees([]);
     setError(null);
     setStep(1);
@@ -127,58 +130,85 @@ export function NewTerritoryButton({
     [result, chosen],
   );
 
+  /*
+   * Aufgeteilt wird hausgenau: jedes Haus gehoert zu der Teilflaeche, in der
+   * es liegt. Laeuft eine Strasse ueber eine Grenze, steht sie in beiden
+   * Teilgebieten - jeweils nur mit ihren Haeusern dort.
+   */
   const plots: Plot[] = useMemo(() => {
-    if (plotCount < 2 || selectedStreets.length === 0) return [];
-    const groups = splitStreets(
-      selectedStreets.map((s) => ({ ...s, weight: doorsOf(s) || 1 })),
-      plotCount,
-    // Liegen die Strassen so, dass ein Paket leer bliebe, entstehen lieber
-    // weniger Gebiete als eines ohne Strassen.
-    ).filter((group) => group.length > 0);
-    return groups.map((group, index) => ({
-      label: String(index + 1),
-      color: plotColor(index),
-      streets: group,
-      doors: group.reduce((sum, s) => sum + doorsOf(s), 0),
-    }));
-  }, [selectedStreets, plotCount]);
+    if (plotCount < 2 || selectedStreets.length === 0 || !area) return [];
+    const wanted = Array.from({ length: plotCount }, (_, index) => sizes[index] ?? 1);
+    const split = splitIntoPlots(area, selectedStreets, wanted);
+    const doors = split.map((part) => part.streets.reduce((sum, s) => sum + doorsOf(s), 0));
+    const total = doors.reduce((sum, value) => sum + value, 0) || 1;
+    return (
+      split
+        .map((part, index) => ({ part, index, doors: doors[index] }))
+        // Liegen die Haeuser so, dass ein Paket leer bliebe, entstehen lieber
+        // weniger Gebiete als eines ohne Haeuser.
+        .filter(({ part }) => part.streets.length > 0)
+        .map(({ part, index, doors: plotDoors }, position) => ({
+          label: String(position + 1),
+          color: plotColor(position),
+          streets: part.streets,
+          doors: plotDoors,
+          area: part.area,
+          share: Math.round((plotDoors / total) * 100),
+          size: wanted[index],
+          slot: index,
+        }))
+    );
+  }, [selectedStreets, plotCount, sizes, area]);
 
-  /** Strassenname -> Nummer des Teilgebiets. */
+  /** Strassenname -> Nummern der Teilgebiete (eine geteilte Strasse steht in mehreren). */
   const plotOf = useMemo(() => {
-    const map = new Map<string, number>();
-    plots.forEach((plot, index) => plot.streets.forEach((s) => map.set(s.name, index)));
+    const map = new Map<string, number[]>();
+    plots.forEach((plot, index) =>
+      plot.streets.forEach((s) => {
+        const list = map.get(s.name) ?? [];
+        if (!list.includes(index)) list.push(index);
+        map.set(s.name, list);
+      }),
+    );
     return map;
   }, [plots]);
 
   /* -------------------------- Karten-Vorschau ---------------------------- */
 
-  const overlay: OverlayStreet[] = useMemo(
-    () =>
-      (result?.streets ?? []).map((street) => ({
-        name: street.name,
-        points: pointsOf(street),
-        center: street.lat !== null && street.lng !== null ? [street.lat, street.lng] : null,
-        color: chosen.has(street.name) ? plotColor(plotOf.get(street.name) ?? 0) : null,
-      })),
-    [result, chosen, plotOf],
-  );
+  const overlay: OverlayStreet[] = useMemo(() => {
+    // Geteilte Strassen: jeder Teil in der Farbe seines Teilgebiets.
+    const parts = new Map<string, OverlayStreet[]>();
+    plots.forEach((plot) =>
+      plot.streets.forEach((street) => {
+        const list = parts.get(street.name) ?? [];
+        list.push({
+          name: street.name,
+          points: pointsOf(street),
+          center: street.lat !== null && street.lng !== null ? [street.lat, street.lng] : null,
+          color: plot.color,
+        });
+        parts.set(street.name, list);
+      }),
+    );
+    return (result?.streets ?? []).flatMap((street) => {
+      const split = chosen.has(street.name) ? parts.get(street.name) : undefined;
+      if (split) return split;
+      return [
+        {
+          name: street.name,
+          points: pointsOf(street),
+          center: street.lat !== null && street.lng !== null ? [street.lat, street.lng] : null,
+          color: chosen.has(street.name) ? plotColor(0) : null,
+        },
+      ];
+    });
+  }, [result, chosen, plots]);
 
   // Die Teilgebiete teilen sich die Flaeche lueckenlos und ueberschneiden sich nicht.
-  const overlayPlots: OverlayPlot[] = useMemo(() => {
-    if (!area || plots.length === 0) return [];
-    const shapes = plotAreas(
-      area,
-      plots.map((plot) =>
-        plot.streets.flatMap((street) => {
-          // Ohne Hausnummern mit Lage zaehlt die Mitte der Strasse.
-          const houses = pointsOf(street);
-          if (houses.length > 0 || street.lat === null || street.lng === null) return houses;
-          return [[street.lat, street.lng] as [number, number]];
-        }),
-      ),
-    );
-    return plots.map((plot, index) => ({ label: plot.label, color: plot.color, area: shapes[index] }));
-  }, [area, plots]);
+  const overlayPlots: OverlayPlot[] = useMemo(
+    () => plots.map((plot) => ({ label: plot.label, color: plot.color, area: plot.area })),
+    [plots],
+  );
 
   /* ------------------------------ Schritte ------------------------------- */
 
@@ -243,6 +273,7 @@ export function NewTerritoryButton({
               method: "POST",
               headers: { "content-type": "application/json" },
               body: JSON.stringify({
+                name: form.name,
                 city: form.city,
                 postalCode: form.postalCode,
                 note: form.note,
@@ -250,7 +281,7 @@ export function NewTerritoryButton({
                 groups: plots.map((plot, index) => ({
                   name: `${form.name} (${plot.label}/${plots.length})`,
                   assignedUserId: assignees[index] ? Number(assignees[index]) : null,
-                  area: overlayPlots[index]?.area.length ? overlayPlots[index].area : null,
+                  area: plot.area.length ? plot.area : null,
                   streetList: plot.streets,
                 })),
               }),
@@ -353,8 +384,10 @@ export function NewTerritoryButton({
           }
         >
           {/* ----------------------- Schritt 1: Fläche / Liste ----------------- */}
-          {step === 1 && (
-            <div className="space-y-4">
+          {/* Die Karte bleibt in allen Schritten stehen, nur verborgen: "Zurück" findet
+              Zeichnung, Straßen und Aufteilung wieder - samt Vorschau der Teilflächen. */}
+          {(step === 1 || tab === "map") && (
+            <div className={`space-y-4 ${step === 1 ? "" : "hidden"}`}>
               <Segmented
                 options={[
                   { value: "map", label: "Auf der Karte", icon: <IconMap className="h-4 w-4" /> },
@@ -376,6 +409,7 @@ export function NewTerritoryButton({
                     if (result) {
                       setResult(null);
                       setPlotCount(1);
+                      setSizes([]);
                     }
                   }}
                   existing={existingAreas}
@@ -438,9 +472,20 @@ export function NewTerritoryButton({
                 }
                 onChooseAll={(all) => setChosen(all ? new Set(result.streets.map((s) => s.name)) : new Set())}
                 focus={focus}
-                onFocus={setFocus}
+                onFocus={(name) => {
+                  // "Auf der Karte zeigen": zurück zur Karte, die zur Straße springt.
+                  setFocus(name);
+                  setStep(1);
+                }}
                 plotCount={plotCount}
                 onPlotCount={setPlotCount}
+                onPlotSize={(index, size) =>
+                  setSizes((prev) => {
+                    const next = Array.from({ length: plotCount }, (_, i) => prev[i] ?? 1);
+                    next[index] = size;
+                    return next;
+                  })
+                }
                 plots={plots}
                 plotOf={plotOf}
                 members={canAssign ? members : []}
@@ -453,14 +498,21 @@ export function NewTerritoryButton({
                   })
                 }
               />
-              <button
-                type="button"
-                className="btn btn-plain btn-sm"
-                onClick={() => void loadStreets()}
-                disabled={loadingStreets}
-              >
-                {loadingStreets ? "Wird geladen …" : "Neu laden"}
-              </button>
+              <div className="flex flex-wrap gap-2">
+                {plots.length > 1 && (
+                  <button type="button" className="btn btn-plain btn-sm" onClick={() => setStep(1)}>
+                    Teilflächen auf der Karte zeigen
+                  </button>
+                )}
+                <button
+                  type="button"
+                  className="btn btn-plain btn-sm"
+                  onClick={() => void loadStreets()}
+                  disabled={loadingStreets}
+                >
+                  {loadingStreets ? "Wird geladen …" : "Neu laden"}
+                </button>
+              </div>
             </div>
           )}
 

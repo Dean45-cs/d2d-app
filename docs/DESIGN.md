@@ -54,7 +54,7 @@ Marke gehören. Der Seitengrund im Dunkeln bleibt Schwarz (OLED).
 | `--warn` / `--warn-tint` | `#a35a00` | `#ffb547` | Warnung (veraltet, prüfen) |
 | `--chart-doors` / `--chart-met` / `--chart-sales` | grüngrau / dunkel / Akzent | grüngrau / hell / Akzent | Diagramme, Fitness-Ringe |
 | `--chart-doors-soft` | `#c9d2cd` | `#36403b` | Tür-Säule im Verlauf – nur Spur für die Abschlüsse darin, Werte je Tag zusätzlich als Text |
-| `--plot-1…4` | unverändert | dunkel angepasst | Teilgebiete (CVD-geprüfter Satz) |
+| `--plot-1…6` | unverändert | dunkel angepasst | Teilgebiete (CVD-geprüfter Satz) |
 | `--price-0…4`, `--price-none` | grau → tiefgrün | dunkel → hellgrün | Preisstufen der Energiekarte (sequenziell, Helligkeit steigt) |
 | `--tone-{blue,indigo,purple,magenta,teal,slate,brown}-{hi,lo}` | Verlauf hell → satt | gleich | Symbolkacheln (`ReasonTile`, `ToneTile`) und Kürzel-Avatare |
 
