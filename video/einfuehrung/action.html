@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="de">
+  <head>
+    <meta charset="utf-8" />
+    <title>Carlsson Sales · Einführung (Action-Schnitt)</title>
+    <link rel="stylesheet" href="css/video.css" />
+  </head>
+  <body>
+    <div id="stage"></div>
+    <script src="js/engine.js"></script>
+    <script src="js/icons.js"></script>
+    <script src="js/ui.js"></script>
+    <script src="js/stage.js"></script>
+    <script src="js/screens.js"></script>
+    <script src="js/timeline.js"></script>
+    <script src="js/scenes/01-intro.js"></script>
+    <script src="js/scenes/02-gebiete.js"></script>
+    <script src="js/scenes/03-klinken.js"></script>
+    <script src="js/scenes/04-termine.js"></script>
+    <script src="js/scenes/05-abschluss.js"></script>
+    <script src="js/scenes/06-karte.js"></script>
+    <script src="js/scenes/07-zahlen.js"></script>
+    <script src="js/scenes/08-team.js"></script>
+    <script src="js/scenes/09-farben.js"></script>
+    <script src="js/scenes/10-outro.js"></script>
+    <script src="js/transitions.js"></script>
+    <script src="js/action.js"></script>
+    <script>
+      V.build();
+      // Vorschau im Browser: ?t=12.5 zeigt ein Standbild, ?play spielt ab
+      const q = new URLSearchParams(location.search);
+      if (q.has("play")) {
+        const t0 = performance.now() - (parseFloat(q.get("play")) || 0) * 1000;
+        const loop = () => {
+          V.seek(((performance.now() - t0) / 1000) % V.duration);
+          requestAnimationFrame(loop);
+        };
+        loop();
+      } else {
+        V.seek(parseFloat(q.get("t")) || 0);
+      }
+      window.__ready = document.fonts.ready.then(() => true);
+    </script>
+  </body>
+</html>
