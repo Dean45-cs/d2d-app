@@ -16,6 +16,10 @@ Eine Web-App für Door-to-Door-Teams im Energievertrieb:
 - **Kundenliste** – die Teamleitung ordnet jedem Auftrag nachträglich den Kunden aus dem
   Buchungsportal zu, mit Rufnummer und Vertragsende; vor Ablauf steht er unter „Fällig“
   zum Anrufen, Besuchen und Umberaten
+- **Provisionen** – die Liste aus dem Portal, mit Regeln der Teamleitung: jede Person sieht,
+  welcher Tarif ihr wie viel bringt (für den Verbrauch des Kunden auf den Euro genau),
+  Führungskräfte geben ihren Leuten einen Anteil weiter, dazu Boni je Tarif, Person oder
+  für Strom + Gas – niemand sieht, was die Ebenen darüber bekommen
 - **Preise auf der Karte** – zeigt, wo der Grundversorger besonders teuer ist; Preise in Sekunden
   vom Preisblatt eingetragen oder als Tabelle aus Excel übernommen
 - **Übersicht** – Antreff- und Abschlussquoten je Mitarbeiter, Gebiet und Zeitraum; dazu ein
@@ -93,14 +97,17 @@ Geräte abgemeldet. Neu gesetzt von der Leitung wird es unter Profil › Verwalt
 | Feed: posten, kommentieren, abonnieren | ✅ | ✅ |
 | Fremde Beiträge und Kommentare löschen | ✅ | – |
 | Kundenliste: Kunden zuordnen, Wiedervorlage, Export | ✅ | – |
+| Provisionsliste mit den eigenen Beträgen | ✅ (Admin-Provision) | ✅ |
+| Provisionen verwalten: Liste importieren, Regeln, Boni | ✅ | – |
+| Eigenen Leuten einen Anteil der Provision geben | ✅ | ✅ (mit eigener Struktur) |
 | Energiekarte | ✅ | ✅ |
 
 Die Tabelle beschreibt die Rollenstandards. Unter **Profil › Verwaltung › Rechte** lassen
-sich 21 Rechte pro Person auf **Standard**, **Erlauben** oder **Entziehen** setzen:
+sich 23 Rechte pro Person auf **Standard**, **Erlauben** oder **Entziehen** setzen:
 Gebiete erstellen/sehen/bearbeiten/zuteilen/löschen, Besuchskorrekturen, Türsperren,
-Teamtermine, Kundenliste, Teamauswertung, Mitglieder- und Strukturverwaltung, Rollen,
-Berechtigungen, Einladungen, Energiepreise und Referenzwerte, Tagesquelle,
-Ablehnungsgründe und Feedmoderation. Ein ausdrücklicher Entzug hat Vorrang vor
+Teamtermine, Kundenliste, Provisionen verwalten, Provision der Struktur, Teamauswertung,
+Mitglieder- und Strukturverwaltung, Rollen, Berechtigungen, Einladungen, Energiepreise und
+Referenzwerte, Tagesquelle, Ablehnungsgründe und Feedmoderation. Ein ausdrücklicher Entzug hat Vorrang vor
 automatischen Rechten; „Standard“ folgt der aktuellen Rolle und Struktur.
 
 **Sobald mindestens eine aktive Person in der eigenen Struktur ist**, darf auch
@@ -136,8 +143,9 @@ Die Sicherheitstests laufen über `npm test`, einschließlich
 Auf dem Handy schwebt unten eine Reiterleiste aus Glas: **Klinken · Karte · Team ·
 Profil**, mit dem Recht „Teamauswertung“ vorne zusätzlich **Übersicht**. Der Vertrieb
 landet direkt beim Klinken. „Karte“ umfasst Gebiete und Preise, „Team“ Feed, Rangliste
-und Erfolge, „Profil“ die eigenen Listen (mit dem Recht „Kundenliste pflegen“ auch
-**Kunden**), das Gerät und – je nach Recht – die Verwaltung (Mitglieder, Einladungen, Rechte, Ablehnungsgründe, Energie & Tarif). Auf
+und Erfolge, „Profil“ die eigenen Listen (**Provisionen**, mit dem Recht „Kundenliste pflegen“ auch
+**Kunden**), das Gerät und – je nach Recht – die Verwaltung (Mitglieder, Einladungen, Rechte, Ablehnungsgründe, Energie & Tarif,
+Provisionsregeln). Auf
 iPad (ab 744 pt Breite, also auch iPad mini hochkant) und Rechner steht alles in einer
 einklappbaren Seitenleiste; beim Klinken bleibt sie im Auto-Modus schmal. Alte Adressen
 (`/feed`, `/vergleich`, `/level`, `/auswertung`, `/mehr`, `/einladungen`,
@@ -382,6 +390,82 @@ Teams. Kundendaten hängen am Abschluss: wird der Abschluss zurückgenommen, sin
 weg. „Kundendaten entfernen“ löscht sie, ohne den Abschluss anzutasten. Rechenregeln in
 `src/lib/contracts.ts`, Abfragen in `src/lib/customers.ts`, Tests in
 `scripts/tests/customers.test.ts`.
+
+## Provisionen
+
+Welcher Tarif bringt wie viel? Unter **Provisionen** (Seitenleiste, auf dem Handy unter
+Profil) sieht jede Person ihre eigene Liste: je Anbieter die Tarife mit ihrem Betrag in Euro.
+Mit dem **Verbrauch des Kunden** („3500 kWh“) zeigt jede Zeile genau die passende Staffel,
+Tarife, die dafür nicht gelten, fallen raus; „Höchste zuerst“ sortiert nach Provision. Dazu
+Filter für Strom/Gas, Privat/Gewerbe und „Aktion & Bonus“. Ein Tipp auf den Tarif zeigt alle
+Staffeln, davon die Aktion, später die Folgeprovision, die Boni und wann ausgezahlt wird.
+
+### Die Liste aus dem Portal
+
+Die Provisionen in der Liste des Portals sind die der **Teamleitung** (Admin-Provision).
+Unter **Profil › Verwaltung › Provisionsregeln › Liste importieren** wird der Export
+„Meine Provisionen“ als Excel-Datei hochgeladen (oder die Tabelle aus Excel eingefügt). Die
+App liest Anbieter, Tarif, Verbrauch von/bis, Grund-, Aktions- und Folgeprovision sowie
+Abschluss/Anschluss (wann ausgezahlt wird) und zeigt vor dem Speichern, was neu ist, was sich
+ändert und was entfällt. Stand und Ende der Aktion kommen aus dem Dateinamen
+(„… 05.11.2026 bis 08.11.2026“); danach zählt nur noch die Grundprovision.
+
+- **Sparte und Kundenart** stehen nicht im Export. Die App erkennt sie am Tarifnamen
+  („Strom spar24“ von Goldgas ist Strom). Steht weder Strom noch Gas im Namen, ist Strom nur
+  geraten – solche Tarife stehen unter „Sparte prüfen“, ein Tipp bestätigt oder ändert.
+- **Individuelle Provision**: Zeilen mit Platzhalter (0,001 €) zeigt die App als „individuell“.
+- **Erneut importieren** ersetzt die Beträge. Sparte, Hinweis, Ausblenden und Ausnahmen eines
+  Tarifs bleiben; was nicht mehr in der Liste steht, wird als „entfallen“ ausgeblendet.
+
+### Regeln
+
+| Regel | Wer | Wirkung |
+|---|---|---|
+| Standardsatz | Teamleitung | z. B. 60 % der Admin-Provision für alle |
+| Ausnahme | Teamleitung | je Sparte, Anbieter oder Tarif ein anderer Satz oder ein fester Betrag – die genauere gilt: Tarif vor Anbieter vor Sparte vor Standard |
+| Persönlicher Satz | Teamleitung | für Leute direkt unter ihr, z. B. 70 %: verschiebt die ganze Liste um dieselben Prozentpunkte, auch bei Ausnahmen |
+| Anteil | jede Führungskraft | ihre direkten Leute bekommen einen Anteil ihrer eigenen Provision, z. B. 80 % – die Differenz bleibt bei ihr, über beliebig viele Ebenen |
+
+Ohne eigenen Anteil gilt für jemanden in einer Struktur der Standard, höchstens so viel, wie
+die Führungskraft selbst bekommt. Wechselt jemand die Führungskraft, gilt wieder der
+Standard. Die Teamleitung kann eine **Untergrenze** setzen (z. B. mindestens 70 % der
+eigenen Provision weitergeben) und entscheiden, ob **Aktions-** und **Folgeprovision**
+anteilig weitergegeben werden. Ein fester Betrag gilt für die Abschlussprovision; die
+Folgeprovision wird immer prozentual geteilt. Beispiel bei 150 € Admin-Provision:
+
+| | |
+|---|---:|
+| Lisa (persönlich 70 %) | 105 € |
+| Tom (80 % von Lisa) | 84 € |
+| Lisa behält an Toms Vertrag | 21 € |
+| Bleibt bei der Teamleitung | 45 € |
+
+### Boni
+
+Unter Provisionsregeln › Boni: **Tarif-Bonus** (je Tarif, Anbieter, Sparte oder für alle),
+**persönlicher Bonus** (etwa in der Einarbeitung) und **Kombi-Bonus** (Strom und Gas beim
+selben Kunden) – je Vertrag, auf Wunsch befristet. Boni bezahlt die Teamleitung aus ihrer
+Marge, sie gehen an den, der verkauft, und stehen als Plakette am Tarif bzw. oben in der Liste.
+
+### Wer was sieht
+
+- **Vertrieb**: nur die eigenen Euro-Beträge – nie die Admin-Provision, keinen Prozentsatz
+  und nichts von den Ebenen darüber.
+- **Führungskräfte** (automatisch ab einer aktiven Person in der eigenen Struktur, Recht
+  „Provision der Struktur festlegen“): unter „Meine Leute“ ihre Struktur nach unten, die
+  Liste jeder Person darunter und was sie selbst an deren Verträgen behalten.
+- **Provisionen verwalten** (Teamleitung): Standardliste mit Admin-Provision und dem, was
+  bleibt, „Ansicht als …“ für jede Person, Import, Regeln und Boni.
+
+Zugeschnitten wird auf dem Server: was jemand nicht sehen darf, verlässt ihn nicht.
+Rechenkern in `src/lib/commissions/model.ts`, Excel-Leser in `xlsx.ts` (ohne zusätzliche
+Bibliothek), Tabellen-Import in `table.ts`, Abfragen und Sichtbarkeit in `store.ts`. Tests in
+`scripts/tests/commissions.test.ts` und `scripts/tests/commissions-store.test.ts`.
+
+**Als Nächstes geplant:** Tarif beim „Abschluss bestätigen“ und eine Auftragsübersicht, in
+der die Teamleitung jeden Vertrag prüft (Neu → An Distributor übermittelt → Freigegeben →
+Bereit zur Provisionierung → Ausgezahlt, jederzeit „In Klärung“ oder „Storniert/Abgelehnt“);
+danach „Mein Verdienst“ je Monat, Staffel-Boni und Stornos nach der Auszahlung.
 
 ## Digitale Visitenkarte
 
@@ -1098,12 +1182,14 @@ src/
       tour/           Türerfassung (das Herzstück)
       termine/        Vereinbarte Termine, Bestätigung per WhatsApp/SMS
       kunden/         Kundenliste: Kunde je Auftrag, Vertragsende, Wiedervorlage
+      provisionen/    Provisionsliste je Person, Struktur (Anteile, persönliche Sätze)
       team/           Feed, Beitrag, Rangliste, Erfolge
       profil/         Profil-Übersicht, Profil mit Zahlen, Abonnenten, eigene Visitenkarte
       gebiete/        Gebiete und Straßen
       karte/          Energiepreise auf der Karte
       einstellungen/  Persönliche Einstellungen (Darstellung, Klinken, Karte, Bereiche, Ziele,
-                      Mitteilungen); Verwaltung: Mitglieder, Einladungen, Rechte, Gründe, Energie
+                      Mitteilungen); Verwaltung: Mitglieder, Einladungen, Rechte, Gründe, Energie,
+                      Provisionsregeln
     api/              REST-Endpunkte
     k/[token]/        Öffentliche Visitenkarte, Kontakt (vCard) und Bild
     brand.css         Markenfarben (Akzent, Signale, Datenfarben)
@@ -1121,6 +1207,7 @@ src/
     theme-palette.ts  Akzentfarben aus dem Grün ableiten (OKLCH, Kontraste); color.ts rechnet
     appointments.ts   Terminzeiten, Vorschläge, Beschriftung
     customers.ts      Kundenliste: Abfragen, Speichern, Wiedervorlage
+    commissions/      Provisionen: Rechenkern, Excel- und Tabellen-Import, Sichtbarkeit je Rolle
     contracts.ts      Vertragsende, Fälligkeit, Datumsformate
     confirmation.ts   Terminbestätigung: Text, WhatsApp- und SMS-Links
     business-card.ts  Visitenkarte: Link, vCard; Abfragen in card-queries.ts

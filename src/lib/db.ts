@@ -439,6 +439,128 @@ function migrate(db: Database.Database) {
   `);
   addColumn(db, "territories", "group_id", "INTEGER REFERENCES territory_groups(id) ON DELETE SET NULL");
   db.exec("CREATE INDEX IF NOT EXISTS idx_territories_group ON territories (group_id) WHERE group_id IS NOT NULL");
+
+  migrateCommissions(db);
+}
+
+/**
+ * Provisionen (src/lib/commissions/): die Liste vom Portal mit den
+ * Admin-Provisionen, die Regeln der Teamleitung und was jede Person daraus
+ * bekommt. Admin-Betraege verlassen den Server nur fuer "Provisionen
+ * verwalten" - niemand sieht, was die Ebenen ueber ihm bekommen.
+ */
+function migrateCommissions(db: Database.Database) {
+  db.exec(`
+    /* Ein Import der Portal-Liste: Stand und bis wann die Aktionsprovision gilt. */
+    CREATE TABLE IF NOT EXISTS commission_imports (
+      id          INTEGER PRIMARY KEY AUTOINCREMENT,
+      team_id     INTEGER NOT NULL REFERENCES teams(id) ON DELETE CASCADE,
+      label       TEXT NOT NULL DEFAULT '',
+      valid_from  TEXT NOT NULL DEFAULT '',
+      promo_until TEXT,
+      row_count   INTEGER NOT NULL DEFAULT 0,
+      created_by  INTEGER REFERENCES users(id) ON DELETE SET NULL,
+      created_at  TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+    CREATE INDEX IF NOT EXISTS idx_commission_imports_team ON commission_imports (team_id, id);
+
+    /* Ein Tarif der Liste. Sparte und Kundenart stehen nicht im Portal-Export -
+       sie werden beim ersten Import aus dem Namen erkannt und bleiben danach,
+       wie die Teamleitung sie gesetzt hat. active = 0: in der letzten Liste nicht mehr dabei. */
+    CREATE TABLE IF NOT EXISTS commission_tariffs (
+      id                INTEGER PRIMARY KEY AUTOINCREMENT,
+      team_id           INTEGER NOT NULL REFERENCES teams(id) ON DELETE CASCADE,
+      provider          TEXT NOT NULL,
+      name              TEXT NOT NULL,
+      sparte            TEXT NOT NULL DEFAULT 'STROM' CHECK (sparte IN ('STROM','GAS','SONSTIGES')),
+      segment           TEXT NOT NULL DEFAULT 'PRIVAT' CHECK (segment IN ('PRIVAT','GEWERBE')),
+      needs_review      INTEGER NOT NULL DEFAULT 0,
+      payout_conclusion REAL NOT NULL DEFAULT 1,
+      payout_connection REAL NOT NULL DEFAULT 0,
+      active            INTEGER NOT NULL DEFAULT 1,
+      hidden            INTEGER NOT NULL DEFAULT 0,
+      note              TEXT NOT NULL DEFAULT '',
+      import_id         INTEGER REFERENCES commission_imports(id) ON DELETE SET NULL,
+      created_at        TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at        TEXT NOT NULL DEFAULT (datetime('now')),
+      UNIQUE (team_id, provider, name)
+    );
+
+    /* Staffel eines Tarifs nach Jahresverbrauch. individual = 1: die Liste nennt
+       nur einen Platzhalter (0,001 €), die Provision wird je Vertrag vereinbart. */
+    CREATE TABLE IF NOT EXISTS commission_bands (
+      id         INTEGER PRIMARY KEY AUTOINCREMENT,
+      tariff_id  INTEGER NOT NULL REFERENCES commission_tariffs(id) ON DELETE CASCADE,
+      kwh_from   INTEGER NOT NULL,
+      kwh_to     INTEGER NOT NULL,
+      base_eur   REAL NOT NULL DEFAULT 0,
+      promo_eur  REAL NOT NULL DEFAULT 0,
+      follow_eur REAL NOT NULL DEFAULT 0,
+      individual INTEGER NOT NULL DEFAULT 0,
+      UNIQUE (tariff_id, kwh_from, kwh_to)
+    );
+    CREATE INDEX IF NOT EXISTS idx_commission_bands_tariff ON commission_bands (tariff_id, kwh_from);
+
+    /* Standardsatz und Weitergabe je Team. standard_percent NULL: noch nichts freigegeben. */
+    CREATE TABLE IF NOT EXISTS commission_settings (
+      team_id          INTEGER PRIMARY KEY REFERENCES teams(id) ON DELETE CASCADE,
+      standard_percent REAL,
+      share_promo      INTEGER NOT NULL DEFAULT 1,
+      share_follow     INTEGER NOT NULL DEFAULT 1,
+      min_share        REAL,
+      updated_by       INTEGER REFERENCES users(id) ON DELETE SET NULL,
+      updated_at       TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+    /* Ausnahmen vom Standardsatz: je Sparte, Anbieter oder Tarif ein anderer Satz
+       oder ein fester Betrag. Die genauere Regel gewinnt. */
+    CREATE TABLE IF NOT EXISTS commission_rules (
+      id          INTEGER PRIMARY KEY AUTOINCREMENT,
+      team_id     INTEGER NOT NULL REFERENCES teams(id) ON DELETE CASCADE,
+      scope       TEXT NOT NULL CHECK (scope IN ('SPARTE','PROVIDER','TARIFF')),
+      scope_value TEXT NOT NULL,
+      mode        TEXT NOT NULL CHECK (mode IN ('PERCENT','FIXED')),
+      value       REAL NOT NULL,
+      updated_by  INTEGER REFERENCES users(id) ON DELETE SET NULL,
+      updated_at  TEXT NOT NULL DEFAULT (datetime('now')),
+      UNIQUE (team_id, scope, scope_value)
+    );
+
+    /* Was eine Person bekommt. RATE: persoenlicher Satz der Admin-Provision (direkt
+       unter der Teamleitung). SHARE: Anteil an der Provision der Fuehrungskraft.
+       Gilt nur, solange manager_id noch die direkte Fuehrungskraft ist. */
+    CREATE TABLE IF NOT EXISTS commission_people (
+      user_id    INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+      team_id    INTEGER NOT NULL REFERENCES teams(id) ON DELETE CASCADE,
+      kind       TEXT NOT NULL CHECK (kind IN ('RATE','SHARE')),
+      value      REAL NOT NULL,
+      manager_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+      updated_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+    /* Boni der Teamleitung - kommen aus ihrer Marge, gehen an den, der verkauft.
+       VOLUME (Staffel) folgt mit den Auftraegen. */
+    CREATE TABLE IF NOT EXISTS commission_bonuses (
+      id           INTEGER PRIMARY KEY AUTOINCREMENT,
+      team_id      INTEGER NOT NULL REFERENCES teams(id) ON DELETE CASCADE,
+      kind         TEXT NOT NULL CHECK (kind IN ('TARIFF','PERSONAL','COMBO','VOLUME')),
+      label        TEXT NOT NULL DEFAULT '',
+      amount_eur   REAL NOT NULL,
+      scope        TEXT NOT NULL DEFAULT 'ALL' CHECK (scope IN ('ALL','SPARTE','PROVIDER','TARIFF')),
+      scope_value  TEXT NOT NULL DEFAULT '',
+      user_id      INTEGER REFERENCES users(id) ON DELETE CASCADE,
+      valid_from   TEXT,
+      valid_to     TEXT,
+      threshold    INTEGER,
+      per_contract INTEGER NOT NULL DEFAULT 1,
+      active       INTEGER NOT NULL DEFAULT 1,
+      created_by   INTEGER REFERENCES users(id) ON DELETE SET NULL,
+      created_at   TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at   TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+    CREATE INDEX IF NOT EXISTS idx_commission_bonuses_team ON commission_bonuses (team_id, active);
+  `);
 }
 
 function migrateInvitations(db: Database.Database) {

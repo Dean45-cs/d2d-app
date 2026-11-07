@@ -32,7 +32,8 @@ export type IconName =
   | "invite"
   | "shield"
   | "list"
-  | "cog";
+  | "cog"
+  | "euro";
 
 export interface NavItem {
   href: string;
@@ -84,6 +85,10 @@ export function navigation(role: Role, rights: PermissionSet, userId?: number): 
   };
   // Kundenliste: wer hinter den Abschluessen steht, fuer den Anruf nach Vertragsende.
   const kunden: NavItem[] = rights["customers.manage"] ? [{ href: "/kunden", label: "Kunden", icon: "contacts" }] : [];
+  // Provisionsliste: welcher Tarif wie viel bringt - jede Person sieht ihre eigene.
+  // Die Teamleitung bekommt die Admin-Provision; eine Liste hat sie nur mit dem Verwaltungsrecht.
+  const provisionen: NavItem[] =
+    role !== "LEADER" || rights["commissions.manage"] ? [{ href: "/provisionen", label: "Provisionen", icon: "euro" }] : [];
   const gebiete: NavItem = {
     href: "/gebiete",
     label: rights["territories.view_all"] ? "Gebiete" : "Meine Gebiete",
@@ -110,6 +115,9 @@ export function navigation(role: Role, rights: PermissionSet, userId?: number): 
     ...(rights["energy.reference"] || rights["energy.manage"] || rights["energy.refresh"]
       ? [{ href: "/einstellungen/energie", label: "Energie & Tarif", icon: "cog" as const }]
       : []),
+    ...(rights["commissions.manage"]
+      ? [{ href: "/einstellungen/provisionen", label: "Provisionsregeln", icon: "euro" as const }]
+      : []),
   ];
 
   const tabs: NavItem[] = [
@@ -122,12 +130,12 @@ export function navigation(role: Role, rights: PermissionSet, userId?: number): 
       href: "/profil",
       label: "Profil",
       icon: "profile",
-      match: ["/einstellungen", "/kunden", ...me, ...(reports ? [] : ["/start"])],
+      match: ["/einstellungen", "/kunden", "/provisionen", ...me, ...(reports ? [] : ["/start"])],
     },
   ];
 
   const sidebar: NavSection[] = [
-    { items: [start, tour, termine, ...kunden] },
+    { items: [start, tour, termine, ...kunden, ...provisionen] },
     { title: "Karte", items: [gebiete, preise], area: "map" },
     { title: "Team", items: [feed, rangliste, erfolge], area: "team" },
     ...(admin.length > 0 ? [{ title: "Verwaltung", items: admin }] : []),
@@ -137,7 +145,7 @@ export function navigation(role: Role, rights: PermissionSet, userId?: number): 
     tabs,
     sidebar,
     admin,
-    items: [start, tour, termine, ...kunden, gebiete, preise, feed, rangliste, erfolge, ...admin],
+    items: [start, tour, termine, ...kunden, ...provisionen, gebiete, preise, feed, rangliste, erfolge, ...admin],
   };
 }
 

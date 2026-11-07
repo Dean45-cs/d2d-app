@@ -1,0 +1,435 @@
+import assert from "node:assert/strict";
+import { after, test } from "node:test";
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import path from "node:path";
+import { crc32, deflateRawSync } from "node:zlib";
+import { getDb } from "../../src/lib/db";
+import { AuthError } from "../../src/lib/auth";
+import { ValidationError } from "../../src/lib/api";
+import { hasPermission, permissionsFor } from "../../src/lib/permissions";
+import { navigation } from "../../src/lib/nav";
+import { readXlsx, XlsxError } from "../../src/lib/commissions/xlsx";
+import { datesFromLabel, labelFromFileName, readCommissionTable, type ImportRow } from "../../src/lib/commissions/table";
+import {
+  checkImportRows,
+  commissionCounts,
+  commissionStructure,
+  commissionView,
+  commitCommissionImport,
+  createCommissionBonus,
+  loadTariffs,
+  previewCommissionImport,
+  saveCommissionRule,
+  saveCommissionSettings,
+  setPersonCommission,
+  updateCommissionBonus,
+  updateCommissionTariff,
+} from "../../src/lib/commissions/store";
+import type { User } from "../../src/lib/types";
+
+const directory = mkdtempSync(path.join(tmpdir(), "d2d-commissions-"));
+const previous = process.env.DATABASE_PATH;
+process.env.DATABASE_PATH = path.join(directory, "test.db");
+const db = getDb();
+after(() => {
+  db.close(); global.__d2dDb = undefined;
+  if (previous === undefined) delete process.env.DATABASE_PATH;
+  else process.env.DATABASE_PATH = previous;
+  rmSync(directory, { recursive: true, force: true });
+});
+
+const DAY = "2026-11-07";
+let sequence = 0;
+const user = (id: number) => db.prepare("SELECT * FROM users WHERE id = ?").get(id) as User;
+
+/** Teamleitung -> Lisa -> Tom -> Max, Paul direkt unter der Teamleitung, dazu ein fremdes Team. */
+function fixture() {
+  const team = Number(db.prepare("INSERT INTO teams(name) VALUES ('Provisionen')").run().lastInsertRowid);
+  const other = Number(db.prepare("INSERT INTO teams(name) VALUES ('Fremd')").run().lastInsertRowid);
+  const add = (name: string, manager: number | null, role = "MEMBER", teamId = team) => {
+    const handle = `${name}-${++sequence}`;
+    return Number(db.prepare("INSERT INTO users(team_id, manager_id, name, email, password_hash, role) VALUES (?, ?, ?, ?, '', ?)")
+      .run(teamId, manager, name, `${handle}@example.test`, role).lastInsertRowid);
+  };
+  const leader = add("Teamleitung", null, "LEADER");
+  const lisa = add("Lisa", leader);
+  const tom = add("Tom", lisa);
+  const max = add("Max", tom);
+  const paul = add("Paul", leader);
+  const outsider = add("Fremde Leitung", null, "LEADER", other);
+  return { team, leader, lisa, tom, max, paul, outsider };
+}
+
+const row = (provider: string, name: string, base: number, patch: Partial<ImportRow> = {}): ImportRow => ({
+  line: 2, provider, name, kwhFrom: 1, kwhTo: 100000, base, promo: 0, follow: 0, payoutConclusion: 1, payoutConnection: 0, ...patch,
+});
+const LIST: ImportRow[] = [
+  row("Lichtwerk", "Licht Ökostrom 24", 150),
+  row("Ostwerk", "Ost Strom 24", 100, { promo: 40 }),
+  row("Gaswerk", "Gaswerk Business Gas", 150, { kwhTo: 25000 }),
+  row("Gaswerk", "Gaswerk Business Gas", 200, { kwhFrom: 25001, kwhTo: 100000 }),
+  row("Paketwerk", "Home Paket 12", 80),
+  row("Spotwerk", "Spot Gas RLM Gewerbekunden", 0.001, { kwhFrom: 0, kwhTo: 1000000, payoutConclusion: 0, payoutConnection: 1 }),
+  // Ein unverwechselbarer Admin-Betrag: taucht er in einer Partneransicht auf, ist etwas durchgesickert.
+  row("Südwerk", "Südstrom Business 24", 777.77, { follow: 333.33 }),
+];
+
+function setup() {
+  const f = fixture();
+  commitCommissionImport(user(f.leader), LIST, { label: "Meine Provisionen - 05.11.2026 bis 08.11.2026", validFrom: "2026-11-05", promoUntil: "2026-11-08" });
+  saveCommissionSettings(user(f.leader), { standardPercent: 60 });
+  return f;
+}
+const tariffId = (teamId: number, name: string) => loadTariffs(teamId).find((t) => t.name === name)!.id;
+const forbidden = (fn: () => unknown) => assert.throws(fn, (error: unknown) => error instanceof AuthError && error.status === 403);
+const invalid = (fn: () => unknown, pattern?: RegExp) =>
+  assert.throws(fn, (error: unknown) => error instanceof ValidationError && (!pattern || pattern.test(error.message)));
+
+/* ------------------------------ Excel lesen ------------------------------ */
+
+/** Eine kleine, echte .xlsx bauen - ZIP mit Deflate, wie Excel sie schreibt. */
+function xlsx(files: Record<string, string>): Buffer {
+  const locals: Buffer[] = [];
+  const centrals: Buffer[] = [];
+  let offset = 0;
+  for (const [name, content] of Object.entries(files)) {
+    const data = Buffer.from(content, "utf8");
+    const packed = deflateRawSync(data);
+    const nameBytes = Buffer.from(name, "utf8");
+    const local = Buffer.alloc(30);
+    local.writeUInt32LE(0x04034b50, 0);
+    local.writeUInt16LE(20, 4);
+    local.writeUInt16LE(8, 8);
+    local.writeUInt32LE(crc32(data), 14);
+    local.writeUInt32LE(packed.length, 18);
+    local.writeUInt32LE(data.length, 22);
+    local.writeUInt16LE(nameBytes.length, 26);
+    locals.push(local, nameBytes, packed);
+    const central = Buffer.alloc(46);
+    central.writeUInt32LE(0x02014b50, 0);
+    central.writeUInt16LE(20, 4);
+    central.writeUInt16LE(20, 6);
+    central.writeUInt16LE(8, 10);
+    central.writeUInt32LE(crc32(data), 16);
+    central.writeUInt32LE(packed.length, 20);
+    central.writeUInt32LE(data.length, 24);
+    central.writeUInt16LE(nameBytes.length, 28);
+    central.writeUInt32LE(offset, 42);
+    centrals.push(central, nameBytes);
+    offset += 30 + nameBytes.length + packed.length;
+  }
+  const directory = Buffer.concat(centrals);
+  const end = Buffer.alloc(22);
+  end.writeUInt32LE(0x06054b50, 0);
+  end.writeUInt16LE(Object.keys(files).length, 8);
+  end.writeUInt16LE(Object.keys(files).length, 10);
+  end.writeUInt32LE(directory.length, 12);
+  end.writeUInt32LE(offset, 16);
+  return Buffer.concat([...locals, directory, end]);
+}
+
+const WORKBOOK = {
+  "xl/workbook.xml": `<?xml version="1.0"?><workbook xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="Worksheet" sheetId="1" r:id="rId7"/></sheets></workbook>`,
+  "xl/_rels/workbook.xml.rels": `<?xml version="1.0"?><Relationships><Relationship Id="rId7" Type="worksheet" Target="worksheets/liste.xml"/></Relationships>`,
+  "xl/sharedStrings.xml": `<sst><si><t>Anbieter</t></si><si><t>Tarif</t></si><si><t>Grundprovision</t></si><si><r><t>Strom </t></r><r><t>&amp; Gas</t></r></si><si><t>Ökostrom 24</t></si></sst>`,
+  "xl/worksheets/liste.xml": `<worksheet><sheetData>
+    <row r="1"><c r="A1" t="s"><v>0</v></c><c r="B1" t="s"><v>1</v></c><c r="C1" t="s"><v>2</v></c><c r="D1" t="inlineStr"><is><t>Aktionsprovision</t></is></c></row>
+    <row r="3"><c r="A3" t="s"><v>3</v></c><c r="B3" t="s"><v>4</v></c><c r="C3"><v>82.499999999999986</v></c><c r="E3" s="2"/><c r="D3"><v>1E-3</v></c></row>
+  </sheetData></worksheet>`,
+};
+
+test("Excel-Dateien werden ohne Zusatzbibliothek gelesen", () => {
+  const cells = readXlsx(xlsx(WORKBOOK));
+  assert.deepEqual(cells[0], ["Anbieter", "Tarif", "Grundprovision", "Aktionsprovision"]);
+  assert.deepEqual(cells[1], []);
+  assert.deepEqual(cells[2], ["Strom & Gas", "Ökostrom 24", "82.5", "0.001", ""]);
+  // Ohne Beziehungen nimmt der Leser das erste Blatt am ueblichen Ort.
+  const plain = readXlsx(xlsx({ "xl/worksheets/sheet1.xml": `<worksheet><sheetData><row r="1"><c r="B1" t="str"><v>x &lt; y</v></c></row></sheetData></worksheet>` }));
+  assert.deepEqual(plain, [["", "x < y"]]);
+  assert.throws(() => readXlsx(Buffer.from("Anbieter;Tarif\n")), XlsxError);
+  assert.throws(() => readXlsx(xlsx({ "xl/other.xml": "<x/>" })), XlsxError);
+});
+
+test("die Tabelle wird tolerant gelesen und Fehler zeilengenau gemeldet", () => {
+  const result = readCommissionTable([
+    ["Export vom 05.11.2026"],
+    ["Anbieter", "Tarif", "Verbrauch VON", "Verbrauch BIS", "Grundprovision", "Aktionsprovision", "Folgeprovision", "Abschluss", "Anschluss"],
+    ["Gaswerk", "Gaswerk Business Gas", "1", "25.000", "120,00 €", "", "20", "100%", "0%"],
+    ["", "", "", "", "", "", "", "", ""],
+    ["Gaswerk", "Ohne Betrag", "1", "2", "", "", "", "", ""],
+    ["Gaswerk", "Verdreht", "5000", "100", "10", "", "", "", ""],
+    ["Spotwerk", "Spot Strom", "0", "1000000", "0.001", "0", "0", "0", "1"],
+    ["Gaswerk", "Gaswerk Business Gas", "1", "25000", "125", "", "", "1", "0"],
+  ]);
+  assert.equal(result.error, undefined);
+  assert.equal(result.rows.length, 2);
+  assert.deepEqual(result.rows[0], {
+    line: 8, provider: "Gaswerk", name: "Gaswerk Business Gas", kwhFrom: 1, kwhTo: 25000, base: 125, promo: 0, follow: 0,
+    payoutConclusion: 1, payoutConnection: 0,
+  });
+  assert.equal(result.rows[1].payoutConnection, 1);
+  assert.equal(result.rows[1].payoutConclusion, 0);
+  assert.deepEqual(result.skipped.map((s) => s.line), [5, 6, 3]);
+  assert.match(result.skipped[0].error, /Grundprovision fehlt/);
+  assert.match(result.skipped[2].error, /Doppelt/);
+  assert.match(readCommissionTable([["Name", "Preis"]]).error ?? "", /Kopfzeile/);
+  assert.deepEqual(datesFromLabel("Meine Provisionen - 05.11.2026 bis 08.11.2026"), { validFrom: "2026-11-05", promoUntil: "2026-11-08" });
+  assert.deepEqual(datesFromLabel("Liste"), { validFrom: "", promoUntil: "" });
+  assert.equal(labelFromFileName("Meine_Provisionen_-_05.11.2026_bis_08.11.2026.xlsx"), "Meine Provisionen - 05.11.2026 bis 08.11.2026");
+});
+
+/* --------------------------------- Import -------------------------------- */
+
+test("Import zeigt vorher, was sich aendert, und behaelt Einstellungen bekannter Tarife", () => {
+  const f = fixture();
+  const leader = user(f.leader);
+  const first = previewCommissionImport(f.team, LIST);
+  assert.equal(first.tariffs, 6);
+  assert.equal(first.bands, 7);
+  assert.equal(first.added.length, 6);
+  assert.deepEqual(first.review, ["Paketwerk · Home Paket 12"]);
+  assert.equal(first.individual, 1);
+  commitCommissionImport(leader, LIST, { label: "Liste 1", validFrom: "2026-11-05", promoUntil: "" });
+
+  const eon = tariffId(f.team, "Ost Strom 24");
+  const paket = tariffId(f.team, "Home Paket 12");
+  updateCommissionTariff(leader, paket, { sparte: "STROM", note: "Nur Neukunden", hidden: true });
+  saveCommissionRule(leader, { scope: "TARIFF", scopeValue: String(eon), mode: "FIXED", value: 70 });
+
+  const next = [...LIST.filter((r) => r.provider !== "Lichtwerk").map((r) => (r.name === "Ost Strom 24" ? { ...r, base: 110 } : r)),
+    row("Westwerk", "West Gas 24", 90, { promo: 30 })];
+  const preview = previewCommissionImport(f.team, next);
+  assert.deepEqual(preview.added, ["Westwerk · West Gas 24"]);
+  assert.deepEqual(preview.changed, ["Ostwerk · Ost Strom 24"]);
+  assert.deepEqual(preview.removed, ["Lichtwerk · Licht Ökostrom 24"]);
+  assert.equal(preview.unchanged, 4);
+  commitCommissionImport(leader, next, { label: "Liste 2", validFrom: "2026-11-12" });
+
+  const tariffs = loadTariffs(f.team);
+  const kept = tariffs.find((t) => t.id === paket)!;
+  assert.equal(kept.note, "Nur Neukunden");
+  assert.equal(kept.hidden, 1);
+  assert.equal(kept.needs_review, 0);
+  assert.equal(tariffs.find((t) => t.id === eon)!.bands[0].base_eur, 110);
+  assert.equal(tariffs.find((t) => t.name === "Licht Ökostrom 24")!.active, 0);
+  assert.equal(tariffs.find((t) => t.name.startsWith("Spot Gas"))!.bands[0].individual, 1);
+  assert.equal(tariffs.find((t) => t.name.startsWith("Spot Gas"))!.payout_connection, 1);
+  // Die Ausnahme haengt am Tarif und ueberlebt den Import.
+  assert.equal((db.prepare("SELECT COUNT(*) AS n FROM commission_rules WHERE scope_value = ?").get(String(eon)) as { n: number }).n, 1);
+  // Wieder dabei: derselbe Tarif, wieder aktiv.
+  commitCommissionImport(leader, LIST, { validFrom: "2026-11-19" });
+  assert.equal(loadTariffs(f.team).find((t) => t.name === "Licht Ökostrom 24")!.active, 1);
+  // Westwerk stand nur in der zweiten Liste - jetzt wieder entfallen.
+  assert.deepEqual(commissionCounts(f.team), { tariffs: 6, review: 0, configured: false });
+});
+
+test("Importzeilen aus dem Browser werden erneut geprueft", () => {
+  assert.equal(checkImportRows([row("Gaswerk", "Gas", 10)]).length, 1);
+  invalid(() => checkImportRows([]));
+  invalid(() => checkImportRows([{ ...row("Gaswerk", "Gas", 10), base: -1 }]), /Grundprovision/);
+  invalid(() => checkImportRows([{ ...row("Gaswerk", "Gas", 10), kwhFrom: 10, kwhTo: 5 }]), /Verbrauch/);
+  invalid(() => checkImportRows([{ ...row("", "Gas", 10) }]), /Anbieter/);
+  invalid(() => checkImportRows([{ ...row("Gaswerk", "Gas", 10), payoutConnection: 2 }]), /Anschluss/);
+});
+
+test("nur die Teamleitung importiert und stellt Regeln ein", () => {
+  const f = setup();
+  forbidden(() => commitCommissionImport(user(f.lisa), LIST, {}));
+  forbidden(() => saveCommissionSettings(user(f.paul), { standardPercent: 90 }));
+  forbidden(() => saveCommissionRule(user(f.lisa), { scope: "SPARTE", scopeValue: "GAS", mode: "PERCENT", value: 90 }));
+  forbidden(() => createCommissionBonus(user(f.tom), { kind: "TARIFF", amount: 20 }));
+  forbidden(() => updateCommissionTariff(user(f.lisa), tariffId(f.team, "Licht Ökostrom 24"), { hidden: true }));
+  forbidden(() => commissionView(user(f.paul), null, DAY));
+  // Andere Teams bleiben draussen.
+  forbidden(() => commissionView(user(f.outsider), f.paul, DAY));
+  assert.throws(() => commissionView(user(f.leader), f.outsider, DAY), AuthError);
+});
+
+/* -------------------------------- Rechte --------------------------------- */
+
+test("Rechte: Verwalten hat die Teamleitung, Struktur-Provision jede Fuehrungskraft", () => {
+  const f = fixture();
+  assert.equal(hasPermission(user(f.leader), "commissions.manage"), true);
+  assert.equal(hasPermission(user(f.lisa), "commissions.manage"), false);
+  assert.equal(hasPermission(user(f.lisa), "commissions.structure"), true);
+  assert.equal(hasPermission(user(f.max), "commissions.structure"), false);
+  assert.equal(hasPermission(user(f.paul), "commissions.structure"), false);
+  const memberNav = navigation("MEMBER", permissionsFor(user(f.paul)), f.paul);
+  assert.ok(memberNav.items.some((item) => item.href === "/provisionen"));
+  assert.ok(!memberNav.admin.some((item) => item.href === "/einstellungen/provisionen"));
+  assert.ok(navigation("LEADER", permissionsFor(user(f.leader)), f.leader).admin.some((item) => item.href === "/einstellungen/provisionen"));
+});
+
+/* ------------------------------- Ansichten ------------------------------- */
+
+/** Alle Zahlen einer Ansicht - darin darf kein Admin-Betrag stecken. */
+const numbers = (value: unknown): number[] =>
+  typeof value === "number" ? [value] : value && typeof value === "object" ? Object.values(value).flatMap(numbers) : [];
+
+test("der Vertrieb sieht nur eigene Euro-Betraege - nie Admin-Provision oder Saetze", () => {
+  const f = setup();
+  const leader = user(f.leader);
+  saveCommissionRule(leader, { scope: "PROVIDER", scopeValue: "ostwerk", mode: "PERCENT", value: 65 });
+  updateCommissionTariff(leader, tariffId(f.team, "Home Paket 12"), { hidden: true });
+  const view = commissionView(user(f.paul), f.paul, DAY);
+  assert.equal(view.admin, false);
+  assert.equal(view.manager, false);
+  assert.equal(view.configured, true);
+  assert.ok(!view.tariffs.some((t) => t.name === "Home Paket 12"), "ausgeblendete Tarife fehlen");
+  const json = JSON.stringify(view);
+  for (const key of ['"admin":{', '"chain":', '"keep":', '"rule":', "needsReview", "77.77", "333.33"]) {
+    assert.ok(!json.includes(key), `${key} steckt in der Partneransicht`);
+  }
+  // 60 % von 777,77 € sind 466,66 € - die eigenen Betraege stehen da, der Admin-Betrag nicht.
+  assert.ok(!numbers(view).includes(777.77) && !numbers(view).includes(333.33));
+  const south = view.tariffs.find((t) => t.provider === "Südwerk")!;
+  assert.deepEqual(south.bands.map((b) => [b.now, b.follow]), [[466.66, 200]]);
+  const east = view.tariffs.find((t) => t.provider === "Ostwerk")!;
+  assert.deepEqual(east.bands.map((b) => [b.now, b.promo]), [[91, 26]]);
+  // Aktion vorbei: nur noch der Anteil der Grundprovision.
+  const later = commissionView(user(f.paul), f.paul, "2026-11-09");
+  assert.equal(later.stand?.promoActive, false);
+  assert.equal(later.tariffs.find((t) => t.provider === "Ostwerk")!.bands[0].now, 65);
+  const spot = view.tariffs.find((t) => t.name.startsWith("Spot Gas"))!;
+  assert.deepEqual([spot.bands[0].now, spot.bands[0].individual, spot.timing], [null, true, "bei Lieferbeginn"]);
+});
+
+test("niemand sieht, was die Ebenen darueber bekommen", () => {
+  const f = setup();
+  const leader = user(f.leader);
+  setPersonCommission(leader, f.lisa, 70);
+  setPersonCommission(user(f.lisa), f.tom, 80);
+  // Nach oben und zur Seite: verboten.
+  forbidden(() => commissionView(user(f.tom), f.lisa, DAY));
+  forbidden(() => commissionView(user(f.max), f.tom, DAY));
+  forbidden(() => commissionView(user(f.paul), f.lisa, DAY));
+  forbidden(() => commissionView(user(f.lisa), f.paul, DAY));
+  forbidden(() => commissionView(user(f.lisa), f.leader, DAY));
+  // Toms eigene Liste nennt nur Toms Betraege.
+  const tom = commissionView(user(f.tom), f.tom, DAY);
+  const plain = tom.tariffs.find((t) => t.name === "Licht Ökostrom 24")!;
+  assert.equal(plain.bands[0].now, 84);
+  assert.ok(!numbers(tom).includes(105), "Lisas Betrag steckt in Toms Ansicht");
+  assert.ok(!JSON.stringify(tom).includes('"keep"'));
+  // Die Struktur zeigt nur nach unten - und den Standardsatz nur der Verwaltung.
+  const structure = commissionStructure(user(f.tom));
+  assert.deepEqual(structure.people.map((p) => p.id), [f.max]);
+  assert.equal(structure.standardPercent, null);
+  assert.equal(commissionStructure(user(f.max)).people.length, 0);
+});
+
+test("Fuehrungskraefte sehen ihre Leute und was sie selbst daran behalten", () => {
+  const f = setup();
+  setPersonCommission(user(f.leader), f.lisa, 70);
+  setPersonCommission(user(f.lisa), f.tom, 80);
+  setPersonCommission(user(f.tom), f.max, 75);
+  const tomFromLisa = commissionView(user(f.lisa), f.tom, DAY);
+  assert.equal(tomFromLisa.manager, true);
+  const band = tomFromLisa.tariffs.find((t) => t.name === "Licht Ökostrom 24")!.bands[0];
+  assert.deepEqual([band.now, band.keep], [84, 21]);
+  // Max ist zwei Ebenen unter Lisa: sie behaelt die Differenz zu Tom, Tom die zu Max.
+  const maxFromLisa = commissionView(user(f.lisa), f.max, DAY).tariffs.find((t) => t.name === "Licht Ökostrom 24")!.bands[0];
+  assert.deepEqual([maxFromLisa.now, maxFromLisa.keep], [63, 21]);
+  const maxFromTom = commissionView(user(f.tom), f.max, DAY).tariffs.find((t) => t.name === "Licht Ökostrom 24")!.bands[0];
+  assert.deepEqual([maxFromTom.now, maxFromTom.keep], [63, 21]);
+  assert.ok(!JSON.stringify(commissionView(user(f.lisa), f.tom, DAY)).includes('"admin":{'));
+  const structure = commissionStructure(user(f.lisa));
+  assert.deepEqual(
+    structure.people.map((p) => [p.name, p.depth, p.kind, p.value, p.editable]),
+    [["Tom", 0, "SHARE", 80, true], ["Max", 1, "SHARE", 75, false]],
+  );
+});
+
+test("die Teamleitung sieht alles: Admin-Betraege, Kosten der Struktur und Ansicht als", () => {
+  const f = setup();
+  const leader = user(f.leader);
+  setPersonCommission(leader, f.lisa, 70);
+  setPersonCommission(user(f.lisa), f.tom, 80);
+  const standard = commissionView(leader, null, DAY);
+  assert.equal(standard.subject, null);
+  const plain = standard.tariffs.find((t) => t.name === "Licht Ökostrom 24")!;
+  assert.deepEqual([plain.bands[0].now, plain.bands[0].admin?.now, plain.bands[0].chain?.now], [90, 150, 90]);
+  assert.ok(standard.tariffs.some((t) => t.name === "Home Paket 12" && t.admin?.needsReview));
+  const asTom = commissionView(leader, f.tom, DAY).tariffs.find((t) => t.name === "Licht Ökostrom 24")!.bands[0];
+  // Tom bekommt 84 €, die Kette (bis Lisa) kostet 105 €, die Teamleitung behaelt 45 €.
+  assert.deepEqual([asTom.now, asTom.chain?.now, asTom.admin?.now], [84, 105, 150]);
+  const structure = commissionStructure(leader);
+  assert.equal(structure.standardPercent, 60);
+  assert.deepEqual(structure.people.map((p) => [p.name, p.kind, p.value, p.editable]), [
+    ["Lisa", "RATE", 70, true], ["Tom", "SHARE", 80, true], ["Max", "SHARE", null, true], ["Paul", "RATE", null, true],
+  ]);
+});
+
+/* ------------------------------ Einstellen ------------------------------- */
+
+test("Fuehrungskraefte stellen nur ihre direkten Leute ein, mit Untergrenze", () => {
+  const f = setup();
+  const leader = user(f.leader);
+  setPersonCommission(user(f.lisa), f.tom, 80);
+  forbidden(() => setPersonCommission(user(f.lisa), f.max, 50));
+  forbidden(() => setPersonCommission(user(f.tom), f.lisa, 100));
+  forbidden(() => setPersonCommission(user(f.lisa), f.lisa, 100));
+  forbidden(() => setPersonCommission(user(f.lisa), f.paul, 50));
+  forbidden(() => setPersonCommission(user(f.paul), f.paul, 90));
+  invalid(() => setPersonCommission(user(f.lisa), f.tom, 120), /0 und 100/);
+  forbidden(() => setPersonCommission(leader, f.leader, 50));
+  // Eine zweite Teamleitung bekommt ebenfalls die volle Admin-Provision - da gibt es nichts einzustellen.
+  const coLeader = Number(db.prepare("INSERT INTO users(team_id, manager_id, name, email, password_hash, role) VALUES (?, ?, 'Zweite Leitung', ?, '', 'LEADER')")
+    .run(f.team, f.leader, `co-${++sequence}@example.test`).lastInsertRowid);
+  invalid(() => setPersonCommission(leader, coLeader, 50), /volle Admin-Provision/);
+  saveCommissionSettings(leader, { minShare: 70 });
+  invalid(() => setPersonCommission(user(f.lisa), f.tom, 60), /Mindestens 70/);
+  setPersonCommission(user(f.lisa), f.tom, 70);
+  // Die Verwaltung darf darunter - und jede Ebene einstellen.
+  setPersonCommission(leader, f.max, 50);
+  setPersonCommission(leader, f.lisa, 72.5);
+  // Recht entzogen: dann auch nicht mehr fuer die eigenen Leute.
+  db.prepare("INSERT INTO user_permissions(user_id, permission, allowed) VALUES (?, 'commissions.structure', 0)").run(f.lisa);
+  forbidden(() => setPersonCommission(user(f.lisa), f.tom, 90));
+  // Zurueck auf Standard geht mit null.
+  setPersonCommission(leader, f.tom, null);
+  assert.equal((db.prepare("SELECT COUNT(*) AS n FROM commission_people WHERE user_id = ?").get(f.tom) as { n: number }).n, 0);
+  // Wechselt Tom die Fuehrungskraft, gilt Lisas Einstellung nicht mehr.
+  setPersonCommission(leader, f.tom, 80);
+  db.prepare("UPDATE users SET manager_id = ? WHERE id = ?").run(f.paul, f.tom);
+  const tom = commissionStructure(leader).people.find((p) => p.id === f.tom)!;
+  assert.deepEqual([tom.managerName, tom.value], ["Paul", null]);
+});
+
+test("Ausnahmen und Boni werden geprueft und erscheinen bei den richtigen Leuten", () => {
+  const f = setup();
+  const leader = user(f.leader);
+  invalid(() => saveCommissionRule(leader, { scope: "PROVIDER", scopeValue: "Gibtsnicht", mode: "PERCENT", value: 50 }), /Anbieter/);
+  invalid(() => saveCommissionRule(leader, { scope: "SPARTE", scopeValue: "WASSER", mode: "PERCENT", value: 50 }), /Sparte/);
+  invalid(() => saveCommissionRule(leader, { scope: "SPARTE", scopeValue: "GAS", mode: "PERCENT", value: 101 }), /0 und 100/);
+  invalid(() => saveCommissionRule(leader, { scope: "SPARTE", scopeValue: "GAS", mode: "EGAL", value: 10 }));
+  const first = saveCommissionRule(leader, { scope: "SPARTE", scopeValue: "GAS", mode: "PERCENT", value: 50 });
+  const again = saveCommissionRule(leader, { scope: "SPARTE", scopeValue: "GAS", mode: "FIXED", value: 80 });
+  assert.equal(first, again, "je Bereich gibt es eine Ausnahme");
+
+  invalid(() => createCommissionBonus(leader, { kind: "VOLUME", amount: 10 }), /Staffel/);
+  invalid(() => createCommissionBonus(leader, { kind: "PERSONAL", amount: 10 }), /Für wen/);
+  invalid(() => createCommissionBonus(leader, { kind: "TARIFF", amount: 10, validFrom: "2026-11-30", validTo: "2026-11-01" }), /Ende/);
+  invalid(() => createCommissionBonus(leader, { kind: "TARIFF", amount: 0 }));
+  createCommissionBonus(leader, { kind: "TARIFF", label: "Herbst", amount: 20, scope: "PROVIDER", scopeValue: "Ostwerk", validTo: "2026-11-30" });
+  createCommissionBonus(leader, { kind: "PERSONAL", label: "Einarbeitung", amount: 10, userId: f.tom, validFrom: "2026-11-01", validTo: "2026-11-28" });
+  const combo = createCommissionBonus(leader, { kind: "COMBO", amount: 15 });
+  const eon = (view: ReturnType<typeof commissionView>) => view.tariffs.find((t) => t.provider === "Ostwerk")!.bonuses.map((b) => [b.label, b.amount]);
+  assert.deepEqual(eon(commissionView(user(f.tom), f.tom, DAY)), [["Herbst", 20], ["Einarbeitung", 10]]);
+  assert.deepEqual(eon(commissionView(user(f.paul), f.paul, DAY)), [["Herbst", 20]]);
+  assert.deepEqual(eon(commissionView(leader, null, DAY)), [["Herbst", 20]]);
+  assert.deepEqual(eon(commissionView(user(f.paul), f.paul, "2026-12-01")), []);
+  assert.deepEqual(commissionView(user(f.paul), f.paul, DAY).combo.map((b) => b.amount), [15]);
+  updateCommissionBonus(leader, combo, { active: false });
+  assert.deepEqual(commissionView(user(f.paul), f.paul, DAY).combo, []);
+});
+
+test("ohne Standardsatz sieht der Vertrieb die Tarife, aber noch keine Betraege", () => {
+  const f = fixture();
+  commitCommissionImport(user(f.leader), LIST, { validFrom: "2026-11-05" });
+  const view = commissionView(user(f.paul), f.paul, DAY);
+  assert.equal(view.configured, false);
+  assert.ok(view.tariffs.length > 0);
+  assert.ok(view.tariffs.every((t) => t.bands.every((b) => b.now === null)));
+});

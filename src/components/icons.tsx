@@ -599,6 +599,17 @@ export function IconTarget(props: IconProps) {
   );
 }
 
+/** Euro im Kreis - Provisionen. */
+export function IconEuro(props: IconProps) {
+  return (
+    <Line {...props}>
+      <circle cx="12" cy="12" r="8.75" />
+      <path d="M15.6 8.85a4.4 4.4 0 1 0 0 6.3" />
+      <path d="M7.25 10.85h5.5M7.25 13.15h5.5" />
+    </Line>
+  );
+}
+
 /* ---------------------------- Team & Feed ----------------------------- */
 
 export function IconTrophy(props: IconProps) {
