@@ -9,6 +9,8 @@ export const PERMISSIONS = [
   { key: "doors.unblock", group: "Vertrieb", label: "Türsperren aufheben", description: "Sperren in zugänglichen Gebieten aufheben." },
   { key: "appointments.team", group: "Vertrieb", label: "Teamtermine verwalten", description: "Termine aller Teammitglieder sehen, verschieben und abhaken." },
   { key: "customers.manage", group: "Vertrieb", label: "Kundenliste pflegen", description: "Den Aufträgen des Teams Kunden mit Telefonnummer und Vertragsende zuordnen, auslaufende Verträge zur Umberatung sehen und die Liste exportieren." },
+  { key: "commissions.manage", group: "Provisionen", label: "Provisionen verwalten", description: "Liste vom Portal importieren, Regeln, persönliche Sätze und Boni festlegen. Sieht die Admin-Provisionen und was jede Person bekommt." },
+  { key: "commissions.structure", group: "Provisionen", label: "Provision der Struktur festlegen", description: "Den eigenen Leuten einen Anteil an der eigenen Provision geben. Automatisch ab einer aktiven Person in der eigenen Struktur." },
   { key: "reports.team", group: "Auswertung", label: "Teamauswertung sehen", description: "Übersicht und Auswertungen des gesamten Teams einschließlich Besuchsdetails sehen." },
   { key: "team.manage", group: "Verwaltung", label: "Mitglieder verwalten", description: "Mitglieder anlegen, bearbeiten, deaktivieren und Passwörter setzen. Im Vertrieb auf die eigene Struktur begrenzt." },
   { key: "team.roles", group: "Verwaltung", label: "Rollen ändern", description: "Teamleitungen ernennen oder zurückstufen. Dieses Recht gilt ausschließlich für Teamleitungen." },

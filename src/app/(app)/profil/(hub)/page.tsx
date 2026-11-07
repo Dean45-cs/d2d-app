@@ -6,6 +6,7 @@ import { getLevelProgress } from "@/lib/level-queries";
 import { countAppointments } from "@/lib/queries";
 import { countCustomers } from "@/lib/customers";
 import { cardSettings } from "@/lib/card-queries";
+import { commissionCounts } from "@/lib/commissions/store";
 import { berlinToday } from "@/lib/contracts";
 import { Avatar, Cell, ListLabel, PageHeader, ToneTile, type SymbolTone } from "@/components/ui";
 import { NAV_ICONS } from "@/components/nav-icons";
@@ -17,6 +18,7 @@ import {
   IconCog,
   IconComment,
   IconContacts,
+  IconEuro,
   IconMap,
   IconPlay,
   IconQr,
@@ -44,6 +46,7 @@ export default async function ProfileHubPage() {
   const openAppointments = countAppointments(user.team_id, { userId: user.id }).open;
   const dueCustomers = rights["customers.manage"] ? countCustomers(user.team_id, berlinToday()).due : 0;
   const cardOn = cardSettings(user.id).token !== null;
+  const commissions = rights["commissions.manage"] ? commissionCounts(user.team_id) : null;
 
   return (
     <div className="page-narrow">
@@ -84,6 +87,16 @@ export default async function ProfileHubPage() {
             detail={cardOn ? "An" : "Aus"}
           />
         </li>
+        {(user.role !== "LEADER" || rights["commissions.manage"]) && (
+          <li>
+            <Cell
+              href="/provisionen"
+              icon={<ToneTile tone="teal"><IconEuro className="h-4 w-4" /></ToneTile>}
+              title="Provisionen"
+              detail={commissions && commissions.review > 0 ? `${commissions.review} prüfen` : undefined}
+            />
+          </li>
+        )}
         {rights["customers.manage"] && (
           <li>
             <Cell
@@ -192,4 +205,5 @@ const ADMIN_TONES: Partial<Record<string, SymbolTone>> = {
   shield: "slate",
   list: "purple",
   cog: "teal",
+  euro: "brown",
 };

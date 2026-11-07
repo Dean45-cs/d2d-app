@@ -21,6 +21,8 @@ export function permissionsFor(user: User, overrides = permissionOverrides(user.
   const defaults = Object.fromEntries(PERMISSIONS.map(({ key }) => [key, user.role === "LEADER"])) as PermissionSet;
   defaults["territories.create"] ||= hasPeople;
   defaults["permissions.manage"] ||= hasPeople;
+  // Wer eigene Leute hat, entscheidet, welchen Anteil seiner Provision sie bekommen.
+  defaults["commissions.structure"] ||= hasPeople;
   defaults["invitations.create"] = true;
   defaults["invitations.approve"] = true;
   const canCreate = overrides["territories.create"] ?? defaults["territories.create"];

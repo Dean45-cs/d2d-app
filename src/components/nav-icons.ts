@@ -9,6 +9,7 @@ import {
   IconContacts,
   IconDoor,
   IconDoorFill,
+  IconEuro,
   IconList,
   IconMap,
   IconMapFill,
@@ -42,4 +43,5 @@ export const NAV_ICONS: Record<IconName, { line: IconComponent; fill: IconCompon
   shield: { line: IconShield, fill: IconShield },
   list: { line: IconList, fill: IconList },
   cog: { line: IconCog, fill: IconCog },
+  euro: { line: IconEuro, fill: IconEuro },
 };
