@@ -25,10 +25,9 @@
   --accent-vivid: var(--t-accent-vivid, #2fd161);
   --primary-top: var(--t-primary-top, #16884a);
   --primary-bottom: var(--t-primary-bottom, #0d6634);
-  --primary: linear-gradient(180deg, var(--primary-top), var(--primary-bottom));
+  --primary: var(--primary-bottom);
   --on-primary: #ffffff;
-  --elev-primary: inset 0 1px 0 rgb(255 255 255 / 0.22), inset 0 0 0 1px rgb(0 0 0 / 0.08),
-    0 1px 2px rgb(var(--t-deep-shadow, 8 60 30) / 0.22), 0 8px 18px -8px rgb(var(--t-glow-shadow, 14 108 53) / 0.55);
+  --elev-primary: none;
   /* Leise Auswahl (aktiver Reiter, Seitenleiste) */
   --accent-soft: color-mix(in srgb, var(--accent) 12%, transparent);
   /* Markenflaeche (Kopfkarte der Uebersicht, Anmeldung): tiefes Gruen,
@@ -123,8 +122,7 @@
     --accent-vivid: var(--t-accent-d, #30d158);
     --primary-top: var(--t-primary-top-d, #16884a);
     --primary-bottom: var(--t-primary-bottom-d, #0e6b37);
-    --elev-primary: inset 0 1px 0 rgb(255 255 255 / 0.18), inset 0 0 0 1px rgb(255 255 255 / 0.04),
-      0 1px 2px rgb(0 0 0 / 0.5), 0 8px 20px -8px rgb(var(--t-glow-shadow-d, 23 144 76) / 0.45);
+    --elev-primary: none;
     --accent-soft: color-mix(in srgb, var(--accent) 18%, transparent);
     --brand-deep: var(--t-brand-deep-d, #0e4426);
     --brand-deeper: var(--t-brand-deeper-d, #062414);
@@ -162,8 +160,7 @@
   --accent-vivid: var(--t-accent-d, #30d158);
   --primary-top: var(--t-primary-top-d, #16884a);
   --primary-bottom: var(--t-primary-bottom-d, #0e6b37);
-  --elev-primary: inset 0 1px 0 rgb(255 255 255 / 0.18), inset 0 0 0 1px rgb(255 255 255 / 0.04),
-    0 1px 2px rgb(0 0 0 / 0.5), 0 8px 20px -8px rgb(var(--t-glow-shadow-d, 23 144 76) / 0.45);
+  --elev-primary: none;
   --accent-soft: color-mix(in srgb, var(--accent) 18%, transparent);
   --brand-deep: var(--t-brand-deep-d, #0e4426);
   --brand-deeper: var(--t-brand-deeper-d, #062414);
