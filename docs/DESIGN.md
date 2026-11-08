@@ -60,8 +60,8 @@ Marke gehören. Der Seitengrund im Dunkeln bleibt Schwarz (OLED).
 
 **Regeln**
 
-- Die **Hauptaktion ist kräftig**: tiefgrüner Verlauf `--primary` mit weißer
-  Schrift und Lichtkante (`.btn-primary`, `.tray-btn-primary`), eine je
+- Die **Hauptaktion ist kräftig**: flaches Tiefgrün `--primary` mit weißer
+  Schrift, ohne Glanz und Schatten (`.btn-primary`, `.tray-btn-primary`), eine je
   Bildschirm. Gewählte Chips tragen denselben Verlauf, flacher. Zweitaktionen
   sind grau (`.btn-secondary`) oder getönt (`icon-btn-accent`).
 - Der **grüne Kreis mit Haken** (`.glyph-result`) bedeutet ausschließlich
@@ -193,20 +193,20 @@ lässt sie gesetzt statt voreingestellt wirken.
 
 | Klasse | Größe / Zeile | Gewicht | Verwendung |
 | --- | --- | --- | --- |
-| `text-display` | 48 / 52 | 700 | Große Einzelzahl |
-| `text-large-title` | 34 / 41 | 700 | Seitentitel, Haupt-Kennzahl |
-| `text-title-1` | 28 / 34 | 700 | Kennzahlen im Raster |
-| `text-title-2` | 22 / 28 | 700 | Zwischentitel |
-| `text-title-3` | 20 / 25 | 600 | Abschnittstitel, Blatt-Titel, Hausnummer in der Klinken-Liste (700) |
-| `text-headline` | 17 / 22 | 600 | Hervorgehobene Zeile |
-| `text-body` | 17 / 22 | 400 | Fließtext, Zeilentitel, Eingaben |
-| `text-callout` | 16 / 21 | 400 | – |
-| `text-subhead` | 15 / 20 | 400 | Knöpfe, Werte rechts |
-| `text-footnote` | 13 / 18 | 400 | Untertitel, Beschriftungen |
-| `text-caption` | 12 / 16 | 400 | Zeitangaben |
-| `text-caption-2` | 11 / 13 | 600 | Reiterbeschriftung, Legende |
+| `text-display` | 40 / 44 | 700 | Große Einzelzahl |
+| `text-large-title` | 28 / 34 | 700 | Seitentitel, Haupt-Kennzahl |
+| `text-title-1` | 24 / 30 | 700 | Kennzahlen im Raster |
+| `text-title-2` | 19 / 24 | 700 | Zwischentitel |
+| `text-title-3` | 17 / 22 | 600 | Abschnittstitel, Blatt-Titel, Hausnummer in der Klinken-Liste (700) |
+| `text-headline` | 15 / 20 | 600 | Hervorgehobene Zeile |
+| `text-body` | 15 / 20 | 400 | Fließtext, Zeilentitel, Eingaben |
+| `text-callout` | 14 / 19 | 400 | – |
+| `text-subhead` | 13 / 18 | 400 | Knöpfe, Werte rechts |
+| `text-footnote` | 12 / 16 | 400 | Untertitel, Beschriftungen |
+| `text-caption` | 11 / 14 | 400 | Zeitangaben |
+| `text-caption-2` | 10 / 12 | 600 | Reiterbeschriftung, Legende |
 
-Eingabefelder haben immer `text-body` (17 px) – unter 16 px zoomt iOS.
+Eingabefelder haben immer mindestens 16 px – unter 16 px zoomt iOS.
 
 ---
 
@@ -218,11 +218,11 @@ Eingabefelder haben immer `text-body` (17 px) – unter 16 px zoomt iOS.
   `@theme` (`--breakpoint-md`), in den Medienabfragen und in `Sheet.tsx`.
 - Seitenrand `--gutter`: 16 / 24 / 32 px (Handy / Tablet / Rechner).
 - Seitenbreiten: `.page` 1200 px, `.page-medium` 960 px, `.page-narrow` 680 px.
-- **Radien konzentrisch** (innen = außen − Abstand): `xs 4` · `sm 8` · `md 12`
-  · `lg 16` · `xl 20` · `2xl 28` · `full`. Listen und Flächen `xl`, Blätter
+- **Radien konzentrisch** (innen = außen − Abstand): `xs 4` · `sm 6` · `md 10`
+  · `lg 12` · `xl 14` · `2xl 20` · `full`. Listen und Flächen `xl`, Blätter
   `2xl`, Felder `md`, Knöpfe und Plaketten `full`.
-- Tippflächen ≥ 44 pt (`.btn` 44, `.btn-sm` 36 mit unsichtbar erweiterter
-  Fläche, `.btn-lg` 56, Ergebnisknöpfe beim Klinken 60, auf dem iPad 76,
+- Tippflächen ≥ 44 pt (`.btn` 40, `.btn-sm` 32 mit unsichtbar erweiterter
+  Fläche, `.btn-lg` 48, Ergebnisknöpfe beim Klinken 60, auf dem iPad 76,
   Zeilen der Klinken-Liste 60, auf dem iPad 64).
 - Sichere Bereiche: Reiterleiste, Blätter, Werkzeugleiste und Ergebnisleiste
   berücksichtigen `env(safe-area-inset-*)`.

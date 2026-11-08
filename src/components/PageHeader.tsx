@@ -54,7 +54,7 @@ export function PageHeader({
   return (
     <>
       <div className="toolbar" data-stuck={stuck}>
-        <div className="grid h-11 grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-2">
+        <div className="grid h-10 grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-2">
           <div className="flex min-w-0 items-center">
             {back && (
               <Link
@@ -77,12 +77,12 @@ export function PageHeader({
       {hideLargeTitle ? (
         <h1 className="sr-only">{title}</h1>
       ) : (
-        <header className="pb-4 pt-1">
+        <header className="pb-3">
           <h1 ref={titleRef} className="text-large-title">
             {title}
           </h1>
           {subtitle && <p className="mt-1 text-subhead text-muted">{subtitle}</p>}
-          {children && <div className="mt-4">{children}</div>}
+          {children && <div className="mt-3">{children}</div>}
         </header>
       )}
     </>
