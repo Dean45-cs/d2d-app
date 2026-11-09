@@ -13,7 +13,7 @@ import { IconCheckCircle, IconExternal } from "@/components/icons";
 import { Cell } from "@/components/ui";
 import { powerSaving } from "@/lib/power";
 
-const TARIFRECHNER = process.env.NEXT_PUBLIC_TARIFRECHNER_URL ?? "https://portal-ep24.de/menues/tarifrechner/";
+const TARIFRECHNER = process.env.NEXT_PUBLIC_TARIFRECHNER_URL ?? "https://stromundgasportal.de/eingabe/";
 /** So oft fragt die offene App nach Vorgaengen von anderen Geraeten. */
 const POLL_MS = 60_000;
 

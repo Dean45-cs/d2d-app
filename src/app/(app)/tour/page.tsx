@@ -199,7 +199,7 @@ export default async function TourPage({
       appointments={appointments}
       tarifrechnerUrl={
         process.env.NEXT_PUBLIC_TARIFRECHNER_URL ??
-        "https://portal-ep24.de/menues/tarifrechner/"
+        "https://stromundgasportal.de/eingabe/"
       }
       sender={{ name: user.name, teamName: card.teamName, cardToken: card.token }}
     />

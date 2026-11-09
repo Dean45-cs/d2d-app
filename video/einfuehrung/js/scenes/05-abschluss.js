@@ -55,7 +55,7 @@
         ph.app,
         `<div style="position:absolute;inset:0;background:#f7f8fa;color:#14181f">
           <div style="padding:58px 14px 10px;background:#f7f8fa;border-bottom:1px solid #e3e6ea">
-            <div style="height:38px;border-radius:12px;background:#e9ecef;display:flex;align-items:center;justify-content:center;gap:6px;font-size:15px;color:#3a4048">${V.ic("shield", 14)}portal-ep24.de</div>
+            <div style="height:38px;border-radius:12px;background:#e9ecef;display:flex;align-items:center;justify-content:center;gap:6px;font-size:15px;color:#3a4048">${V.ic("shield", 14)}stromundgasportal.de</div>
           </div>
           <div style="padding:16px">
             <div style="font:800 24px Inter;letter-spacing:-.02em">Tarifrechner</div>
