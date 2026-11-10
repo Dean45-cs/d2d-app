@@ -8,7 +8,7 @@ import type { User } from "./types";
  * Kundenliste - wer hinter jedem Abschluss steht.
  *
  * An der Tuer nimmt die App bewusst keine Kundendaten auf (die gehoeren in
- * den Tarifrechner des Partners). Die Teamleitung traegt sie nachtraeglich
+ * den Tarifrechner des Partners). Die Geschaeftsfuehrung traegt sie nachtraeglich
  * aus dem Buchungsportal ein: Name, Rufnummer und Vertragslaufzeit. Kurz vor
  * Vertragsende steht der Kunde dann unter "Fällig" - zum Anrufen, Besuchen
  * und Umberaten.

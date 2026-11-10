@@ -21,8 +21,6 @@ export function permissionsFor(user: User, overrides = permissionOverrides(user.
   const defaults = Object.fromEntries(PERMISSIONS.map(({ key }) => [key, user.role === "LEADER"])) as PermissionSet;
   defaults["territories.create"] ||= hasPeople;
   defaults["permissions.manage"] ||= hasPeople;
-  // Wer eigene Leute hat, entscheidet, welchen Anteil seiner Provision sie bekommen.
-  defaults["commissions.structure"] ||= hasPeople;
   defaults["invitations.create"] = true;
   defaults["invitations.approve"] = true;
   const canCreate = overrides["territories.create"] ?? defaults["territories.create"];
@@ -98,14 +96,14 @@ export function assertMemberScope(user: User, target: User): void {
 /**
  * Ein Konto uebernehmen (Passwort setzen) darf nur, wer selbst mindestens die
  * Rechte dieser Person hat - sonst liesse sich so jedes Recht beschaffen, das
- * man nicht vergeben darf. Die Teamleitung hat ohnehin alle.
+ * man nicht vergeben darf. Die Geschaeftsfuehrung hat ohnehin alle.
  */
 export function assertNoExtraRights(actor: User, target: User): void {
   if (actor.role === "LEADER") return;
   const mine = permissionsFor(actor);
   const theirs = permissionsFor({ ...target, active: 1 });
   if (PERMISSIONS.some(({ key }) => theirs[key] && !mine[key])) {
-    throw new AuthError("Diese Person hat Rechte, die du selbst nicht hast. Das Passwort kann nur die Teamleitung neu setzen.", 403);
+    throw new AuthError("Diese Person hat Rechte, die du selbst nicht hast. Das Passwort kann nur die Geschäftsführung neu setzen.", 403);
   }
 }
 

@@ -263,7 +263,7 @@ function migrate(db: Database.Database) {
   }
 
   /* Profilbild des Mitarbeiters als Data-URL (kleines JPEG, von der
-     Teamleitung beim Anlegen gesetzt). An der Tuer steht damit ein Gesicht
+     Geschaeftsfuehrung beim Anlegen gesetzt). An der Tuer steht damit ein Gesicht
      neben "zuletzt hier war ..." - ein Name allein sagt im Treppenhaus
      weniger als das Bild des Kollegen. Als Text in der Datenbank, weil die
      App sonst keinen Ort fuer Dateien haette. */
@@ -384,7 +384,7 @@ function migrate(db: Database.Database) {
     CREATE INDEX IF NOT EXISTS idx_visit_requests_visit ON visit_requests(visit_id);
   `);
   /*
-   * Kundenliste: wer hinter einem Abschluss steht, traegt die Teamleitung
+   * Kundenliste: wer hinter einem Abschluss steht, traegt die Geschaeftsfuehrung
    * nachtraeglich aus dem Buchungsportal ein - samt Rufnummer und
    * Vertragsende, damit das Team nach Ablauf wieder anrufen und neu beraten
    * kann. Haengt am Besuch: wird der Abschluss zurueckgenommen, verschwinden
@@ -416,7 +416,7 @@ function migrate(db: Database.Database) {
    * Digitale Visitenkarte (src/lib/business-card.ts): die Adresse ist ein
    * Zufallswert, NULL heisst ausgeschaltet. Die Rufnummer am Konto steht nur
    * auf der Karte, wenn die Person das will; die Ausweisnummer traegt die
-   * Teamleitung ein. Eindeutig ueber einen Index - ALTER TABLE kann kein UNIQUE.
+   * Geschaeftsfuehrung ein. Eindeutig ueber einen Index - ALTER TABLE kann kein UNIQUE.
    */
   addColumn(db, "users", "card_token", "TEXT");
   addColumn(db, "users", "card_phone", "INTEGER NOT NULL DEFAULT 0");
@@ -441,11 +441,30 @@ function migrate(db: Database.Database) {
   db.exec("CREATE INDEX IF NOT EXISTS idx_territories_group ON territories (group_id) WHERE group_id IS NOT NULL");
 
   migrateCommissions(db);
+  migrateTiers(db);
+}
+
+/**
+ * Stufen im Vertrieb (src/lib/tiers.ts): Berater, Senior Berater, Teamleiter.
+ * Nur die Geschaeftsfuehrung und Teamleiter haben Leute unter sich. Wer beim
+ * Update schon ein Team hat, wird deshalb einmalig Teamleiter - niemand
+ * verliert seine Leute. Die Saetze der Stufen stehen bei den Provisionen.
+ */
+function migrateTiers(db: Database.Database) {
+  const fresh = !hasColumn(db, "users", "tier");
+  addColumn(db, "users", "tier", "TEXT NOT NULL DEFAULT 'BERATER' CHECK (tier IN ('BERATER','SENIOR','TEAMLEITER'))");
+  if (fresh) {
+    db.exec(`UPDATE users SET tier = 'TEAMLEITER'
+      WHERE role = 'MEMBER' AND EXISTS (SELECT 1 FROM users report WHERE report.manager_id = users.id)`);
+  }
+  // NULL: die Stufe bekommt so viel wie die Stufe darunter.
+  addColumn(db, "commission_settings", "senior_percent", "REAL");
+  addColumn(db, "commission_settings", "lead_percent", "REAL");
 }
 
 /**
  * Provisionen (src/lib/commissions/): die Liste vom Portal mit den
- * Admin-Provisionen, die Regeln der Teamleitung und was jede Person daraus
+ * Admin-Provisionen, die Regeln der Geschaeftsfuehrung und was jede Person daraus
  * bekommt. Admin-Betraege verlassen den Server nur fuer "Provisionen
  * verwalten" - niemand sieht, was die Ebenen ueber ihm bekommen.
  */
@@ -466,7 +485,7 @@ function migrateCommissions(db: Database.Database) {
 
     /* Ein Tarif der Liste. Sparte und Kundenart stehen nicht im Portal-Export -
        sie werden beim ersten Import aus dem Namen erkannt und bleiben danach,
-       wie die Teamleitung sie gesetzt hat. active = 0: in der letzten Liste nicht mehr dabei. */
+       wie die Geschaeftsfuehrung sie gesetzt hat. active = 0: in der letzten Liste nicht mehr dabei. */
     CREATE TABLE IF NOT EXISTS commission_tariffs (
       id                INTEGER PRIMARY KEY AUTOINCREMENT,
       team_id           INTEGER NOT NULL REFERENCES teams(id) ON DELETE CASCADE,
@@ -501,7 +520,9 @@ function migrateCommissions(db: Database.Database) {
     );
     CREATE INDEX IF NOT EXISTS idx_commission_bands_tariff ON commission_bands (tariff_id, kwh_from);
 
-    /* Standardsatz und Weitergabe je Team. standard_percent NULL: noch nichts freigegeben. */
+    /* Standardsatz und Weitergabe je Team. standard_percent NULL: noch nichts freigegeben.
+       min_share stammt aus der Zeit vor den Stufen und wird nicht mehr gelesen; die Saetze
+       fuer Senior Berater und Teamleiter ergaenzt migrateTiers. */
     CREATE TABLE IF NOT EXISTS commission_settings (
       team_id          INTEGER PRIMARY KEY REFERENCES teams(id) ON DELETE CASCADE,
       standard_percent REAL,
@@ -526,9 +547,10 @@ function migrateCommissions(db: Database.Database) {
       UNIQUE (team_id, scope, scope_value)
     );
 
-    /* Was eine Person bekommt. RATE: persoenlicher Satz der Admin-Provision (direkt
-       unter der Teamleitung). SHARE: Anteil an der Provision der Fuehrungskraft.
-       Gilt nur, solange manager_id noch die direkte Fuehrungskraft ist. */
+    /* Individueller Satz einer Person (RATE: Prozent der Admin-Provision) - er ersetzt
+       ihre Stufe (users.tier). Gilt nur, solange manager_id noch die direkte
+       Fuehrungskraft ist. SHARE (Anteil an der Provision der Fuehrungskraft) stammt aus
+       der Zeit vor den Stufen und wird nicht mehr gerechnet. */
     CREATE TABLE IF NOT EXISTS commission_people (
       user_id    INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
       team_id    INTEGER NOT NULL REFERENCES teams(id) ON DELETE CASCADE,
@@ -539,7 +561,7 @@ function migrateCommissions(db: Database.Database) {
       updated_at TEXT NOT NULL DEFAULT (datetime('now'))
     );
 
-    /* Boni der Teamleitung - kommen aus ihrer Marge, gehen an den, der verkauft.
+    /* Boni der Geschaeftsfuehrung - kommen aus ihrer Marge, gehen an den, der verkauft.
        VOLUME (Staffel) folgt mit den Auftraegen. */
     CREATE TABLE IF NOT EXISTS commission_bonuses (
       id           INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -566,8 +588,8 @@ function migrateCommissions(db: Database.Database) {
 function migrateInvitations(db: Database.Database) {
   const needsStructure = !hasColumn(db, "users", "manager_id");
   addColumn(db, "users", "manager_id", "INTEGER REFERENCES users(id) ON DELETE RESTRICT");
-  // Nur eindeutige bestehende Teams automatisch zuordnen. Bei mehreren
-  // Teamleitungen wird die tatsächliche Struktur in der Teamverwaltung gesetzt.
+  // Nur eindeutige bestehende Teams automatisch zuordnen. Bei mehreren Personen in
+  // der Geschäftsführung wird die tatsächliche Struktur in der Teamverwaltung gesetzt.
   if (needsStructure) {
     db.exec(`UPDATE users SET manager_id = (
       SELECT id FROM users leader WHERE leader.team_id = users.team_id AND leader.role = 'LEADER'

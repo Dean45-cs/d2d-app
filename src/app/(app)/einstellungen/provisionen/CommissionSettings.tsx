@@ -7,7 +7,8 @@ import { useToast } from "@/components/Toast";
 import { useConfirm } from "@/components/useConfirm";
 import { Cell, InlineError, ListLabel, PageHeader, Pill, Segmented, Switch, ToneTile, plural } from "@/components/ui";
 import { IconCloudUp, IconEuro, IconList, IconPlus, IconSparkles, IconUsers } from "@/components/icons";
-import { money, percentLabel, SPARTE_LABEL, SPARTEN, type BonusScope, type RuleMode, type RuleScope, type Sparte } from "@/lib/commissions/model";
+import { money, percentLabel, SPARTE_LABEL, SPARTEN, tierPercents, type BonusScope, type RuleMode, type RuleScope, type Sparte } from "@/lib/commissions/model";
+import { TIER_LABEL } from "@/lib/tiers";
 import type { AdminBonus, AdminRule, CommissionAdmin } from "@/lib/commissions/store";
 import { parseInput, send, shortDay } from "../../provisionen/client";
 import { ImportSheet } from "./ImportSheet";
@@ -15,7 +16,7 @@ import { ImportSheet } from "./ImportSheet";
 type Open =
   | { kind: "import" }
   | { kind: "standard" }
-  | { kind: "floor" }
+  | { kind: "tier"; tier: "SENIOR" | "TEAMLEITER" }
   | { kind: "rule"; rule: AdminRule | null }
   | { kind: "bonus"; bonus: AdminBonus | null };
 
@@ -34,15 +35,22 @@ function period(from: string | null, to: string | null): string | null {
 }
 
 /**
- * Provisionsregeln: die Liste vom Portal, der Standardsatz fuer alle,
- * Ausnahmen je Sparte, Anbieter oder Tarif und die Boni. Persoenliche
- * Saetze stehen unter Provisionen › Personen.
+ * Provisionsregeln: die Liste vom Portal, der Standardsatz (Stufe Berater)
+ * und die Saetze der hoeheren Stufen, Ausnahmen je Sparte, Anbieter oder
+ * Tarif und die Boni. Wer welche Stufe hat, steht unter Provisionen › Personen.
  */
 export function CommissionSettings({ data, today, openImport }: { data: CommissionAdmin; today: string; openImport: boolean }) {
   const router = useRouter();
   const toast = useToast();
   const [open, setOpen] = useState<Open | null>(openImport ? { kind: "import" } : null);
   const { settings, latest, counts } = data;
+  const tiers = tierPercents(settings);
+  // Was eine Stufe mehr bringt als die darunter - "wie Berater", solange nichts festgelegt ist.
+  const tierDetail = (tier: "SENIOR" | "TEAMLEITER") => {
+    const stored = tier === "SENIOR" ? settings.senior_percent : settings.lead_percent;
+    if (stored === null || tiers === null) return tier === "SENIOR" ? "wie Berater" : "wie Senior Berater";
+    return percentLabel(tiers[tier]);
+  };
 
   async function patchSettings(body: Record<string, unknown>, done: string) {
     const result = await send("/api/commissions/settings", "PATCH", body);
@@ -118,7 +126,7 @@ export function CommissionSettings({ data, today, openImport }: { data: Commissi
               <Cell
                 onClick={() => setOpen({ kind: "standard" })}
                 title="Standardsatz"
-                subtitle="Anteil der Admin-Provision für den Vertrieb"
+                subtitle="Stufe Berater – Anteil der Admin-Provision"
                 detail={settings.standard_percent === null ? "nicht festgelegt" : percentLabel(settings.standard_percent)}
                 tone={settings.standard_percent === null ? "accent" : undefined}
                 chevron
@@ -150,17 +158,37 @@ export function CommissionSettings({ data, today, openImport }: { data: Commissi
                 }
               />
             </li>
+          </ul>
+          <p className="list-footer">Der Vertrieb sieht nur Euro-Beträge – nie Sätze, deine Admin-Provision oder was die Ebenen darüber bekommen.</p>
+        </section>
+
+        <section>
+          <ListLabel>Stufen</ListLabel>
+          <ul className="list">
             <li>
               <Cell
-                onClick={() => setOpen({ kind: "floor" })}
-                title="Untergrenze für Führungskräfte"
-                subtitle="So viel ihrer Provision geben sie mindestens weiter"
-                detail={settings.min_share === null ? "keine" : percentLabel(settings.min_share)}
+                onClick={() => setOpen({ kind: "tier", tier: "SENIOR" })}
+                title={TIER_LABEL.SENIOR}
+                subtitle="Satz nach dem ersten Aufstieg"
+                detail={tierDetail("SENIOR")}
+                chevron
+              />
+            </li>
+            <li>
+              <Cell
+                onClick={() => setOpen({ kind: "tier", tier: "TEAMLEITER" })}
+                title={TIER_LABEL.TEAMLEITER}
+                subtitle="Darf ein eigenes Team aufbauen"
+                detail={tierDetail("TEAMLEITER")}
                 chevron
               />
             </li>
           </ul>
-          <p className="list-footer">Der Vertrieb sieht nur Euro-Beträge – nie Sätze, deine Admin-Provision oder was die Ebenen darüber bekommen.</p>
+          <p className="list-footer">
+            Eine höhere Stufe bringt auf jeden Tarif dieselben Prozentpunkte mehr, auch bei Ausnahmen. Ein Teamleiter bekommt außerdem
+            von jedem Vertrag seiner direkten Leute die Differenz zu deren Betrag – die zahlst du aus deiner Marge, den Leuten wird
+            nichts abgezogen. Weitere Ebenen gibt es nicht.
+          </p>
         </section>
 
         <section>
@@ -243,8 +271,8 @@ export function CommissionSettings({ data, today, openImport }: { data: Commissi
               <Cell
                 href="/provisionen/struktur"
                 icon={<ToneTile tone="indigo"><IconUsers className="h-4 w-4" /></ToneTile>}
-                title="Persönliche Sätze und Anteile"
-                subtitle="Wer direkt unter dir mehr oder weniger bekommt"
+                title="Stufen und individuelle Sätze"
+                subtitle="Wer welche Stufe hat und was sie bekommt"
               />
             </li>
           </ul>
@@ -255,20 +283,32 @@ export function CommissionSettings({ data, today, openImport }: { data: Commissi
       {open?.kind === "standard" && (
         <PercentSheet
           title="Standardsatz"
-          hint="So viel Prozent der Admin-Provision bekommt jede Person, für die nichts anderes gilt."
+          hint="So viel Prozent der Admin-Provision bekommt ein Berater – die Stufe, mit der alle starten."
           value={settings.standard_percent}
           onClose={() => setOpen(null)}
           onSave={(value) => patchSettings({ standardPercent: value }, `Standardsatz ${value === null ? "" : percentLabel(value)}`)}
         />
       )}
-      {open?.kind === "floor" && (
+      {open?.kind === "tier" && (
         <PercentSheet
-          title="Untergrenze"
-          hint="Führungskräfte geben ihren Leuten mindestens so viel Prozent ihrer eigenen Provision weiter. Leer: keine Untergrenze."
-          value={settings.min_share}
+          // Neu gemountet je Stufe: das Feld startet mit deren Wert.
+          key={open.tier}
+          title={TIER_LABEL[open.tier]}
+          hint={
+            open.tier === "SENIOR"
+              ? "So viel Prozent der Admin-Provision bekommt ein Senior Berater. Leer: wie ein Berater."
+              : "So viel Prozent der Admin-Provision bekommt ein Teamleiter – und von den Verträgen seiner direkten Leute die Differenz zu deren Betrag. Leer: wie ein Senior Berater."
+          }
+          value={open.tier === "SENIOR" ? settings.senior_percent : settings.lead_percent}
           optional
+          placeholder={open.tier === "SENIOR" ? "wie Berater" : "wie Senior Berater"}
           onClose={() => setOpen(null)}
-          onSave={(value) => patchSettings({ minShare: value }, value === null ? "Keine Untergrenze" : `Untergrenze ${percentLabel(value)}`)}
+          onSave={(value) =>
+            patchSettings(
+              open.tier === "SENIOR" ? { seniorPercent: value } : { leadPercent: value },
+              value === null ? `${TIER_LABEL[open.tier]}: kein eigener Satz` : `${TIER_LABEL[open.tier]} ${percentLabel(value)}`,
+            )
+          }
         />
       )}
       {open?.kind === "rule" && <RuleSheet key={open.rule?.id ?? "neu"} rule={open.rule} data={data} onClose={() => setOpen(null)} />}
@@ -277,12 +317,13 @@ export function CommissionSettings({ data, today, openImport }: { data: Commissi
   );
 }
 
-/** Ein Prozentwert - Standardsatz oder Untergrenze. */
+/** Ein Prozentwert - Standardsatz oder der Satz einer Stufe. */
 function PercentSheet({
   title,
   hint,
   value,
   optional = false,
+  placeholder,
   onClose,
   onSave,
 }: {
@@ -290,6 +331,7 @@ function PercentSheet({
   hint: string;
   value: number | null;
   optional?: boolean;
+  placeholder?: string;
   onClose: () => void;
   onSave: (value: number | null) => Promise<boolean>;
 }) {
@@ -327,7 +369,7 @@ function PercentSheet({
             className="field pr-12 tabular-nums"
             inputMode="decimal"
             autoComplete="off"
-            placeholder={optional ? "keine" : "z. B. 60"}
+            placeholder={placeholder ?? "z. B. 65"}
             value={text}
             onChange={(e) => setText(e.target.value)}
           />
@@ -534,7 +576,7 @@ function RuleSheet({ rule, data, onClose }: { rule: AdminRule | null; data: Comm
           </div>
           <p className="list-footer">
             {mode === "PERCENT"
-              ? "Statt des Standardsatzes. Persönliche Sätze verschieben sich mit."
+              ? "Statt des Standardsatzes. Höhere Stufen und individuelle Sätze verschieben sich mit."
               : "Für die Abschlussprovision – egal wie hoch die Admin-Provision ist. Die Folgeprovision wird weiter prozentual geteilt."}
           </p>
         </section>

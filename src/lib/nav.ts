@@ -9,7 +9,7 @@ import type { Role } from "./types";
  *   Uebersicht (Zahlen, Termine, Team)  - nur mit "reports.team"
  *   Klinken    (die Tuer; Termine fuer den Vertrieb)
  *   Karte      (Gebiete und Energiepreise als zwei Ansichten)
- *   Team       (Feed, Rangliste, Erfolge, Profile der Kollegen)
+ *   Team       (Feed, Rangliste, Erfolge, Stufen, Profile der Kollegen)
  *   Profil     (Konto, Benachrichtigungen, Verwaltung)
  *
  * Bewusst ohne "use client": die Navigation entsteht auf dem Server und
@@ -28,6 +28,7 @@ export type IconName =
   | "comment"
   | "trophy"
   | "sparkles"
+  | "pyramid"
   | "users"
   | "invite"
   | "shield"
@@ -86,7 +87,7 @@ export function navigation(role: Role, rights: PermissionSet, userId?: number): 
   // Kundenliste: wer hinter den Abschluessen steht, fuer den Anruf nach Vertragsende.
   const kunden: NavItem[] = rights["customers.manage"] ? [{ href: "/kunden", label: "Kunden", icon: "contacts" }] : [];
   // Provisionsliste: welcher Tarif wie viel bringt - jede Person sieht ihre eigene.
-  // Die Teamleitung bekommt die Admin-Provision; eine Liste hat sie nur mit dem Verwaltungsrecht.
+  // Die Geschaeftsfuehrung bekommt die Admin-Provision; eine Liste hat sie nur mit dem Verwaltungsrecht.
   const provisionen: NavItem[] =
     role !== "LEADER" || rights["commissions.manage"] ? [{ href: "/provisionen", label: "Provisionen", icon: "euro" }] : [];
   const gebiete: NavItem = {
@@ -98,6 +99,8 @@ export function navigation(role: Role, rights: PermissionSet, userId?: number): 
   const feed: NavItem = { href: "/team", label: "Feed", icon: "comment", match: ["/profil/"] };
   const rangliste: NavItem = { href: "/team/rangliste", label: "Rangliste", icon: "trophy" };
   const erfolge: NavItem = { href: "/team/erfolge", label: "Erfolge", icon: "sparkles" };
+  // Wer auf welcher Stufe steht - als Pyramide mit Profilbildern.
+  const stufen: NavItem = { href: "/team/stufen", label: "Stufen", icon: "pyramid" };
 
   const admin: NavItem[] = [
     ...(rights["team.manage"] || rights["structure.manage"] || rights["team.roles"]
@@ -137,7 +140,7 @@ export function navigation(role: Role, rights: PermissionSet, userId?: number): 
   const sidebar: NavSection[] = [
     { items: [start, tour, termine, ...kunden, ...provisionen] },
     { title: "Karte", items: [gebiete, preise], area: "map" },
-    { title: "Team", items: [feed, rangliste, erfolge], area: "team" },
+    { title: "Team", items: [feed, rangliste, erfolge, stufen], area: "team" },
     ...(admin.length > 0 ? [{ title: "Verwaltung", items: admin }] : []),
   ];
 
@@ -145,7 +148,7 @@ export function navigation(role: Role, rights: PermissionSet, userId?: number): 
     tabs,
     sidebar,
     admin,
-    items: [start, tour, termine, ...kunden, ...provisionen, gebiete, preise, feed, rangliste, erfolge, ...admin],
+    items: [start, tour, termine, ...kunden, ...provisionen, gebiete, preise, feed, rangliste, erfolge, stufen, ...admin],
   };
 }
 

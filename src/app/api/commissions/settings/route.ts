@@ -4,7 +4,7 @@ import { saveCommissionSettings } from "@/lib/commissions/store";
 
 export const dynamic = "force-dynamic";
 
-/** Standardsatz, Weitergabe von Aktions- und Folgeprovision, Untergrenze - nur Geschicktes aendert sich. */
+/** Standardsatz, Saetze der Stufen, Weitergabe von Aktions- und Folgeprovision - nur Geschicktes aendert sich. */
 export async function PATCH(request: Request) {
   return handle(async () => {
     const user = await requireUser();

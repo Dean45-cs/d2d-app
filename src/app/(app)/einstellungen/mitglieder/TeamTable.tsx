@@ -11,7 +11,8 @@ import { CreateMemberSheet } from "./CreateMemberSheet";
 import { MemberSheet, PasswordSheet } from "./MemberSheet";
 import { syncPush } from "@/lib/push-client";
 import { TeamStructure } from "./TeamStructure";
-import { ROLE_LABEL, type MemberRow, type PatchMember } from "./types";
+import { positionLabel } from "@/lib/tiers";
+import type { MemberRow, PatchMember } from "./types";
 
 type SheetState = { kind: "member" | "password"; id: number } | { kind: "create" } | null;
 
@@ -92,7 +93,7 @@ export function TeamTable({
         title="Mitglieder"
         subtitle={[
           `${active.length} aktiv`,
-          leaders > 0 && plural(leaders, "Teamleitung", "Teamleitungen"),
+          leaders > 0 && `${leaders} in der Geschäftsführung`,
           inactive.length > 0 && `${inactive.length} deaktiviert`,
         ]
           .filter(Boolean)
@@ -184,7 +185,7 @@ export function TeamTable({
                     </td>
                     <td>
                       <span className="flex flex-wrap items-center gap-2">
-                        {ROLE_LABEL[m.role]}
+                        {positionLabel(m)}
                         {!m.active && <Pill>Deaktiviert</Pill>}
                       </span>
                     </td>
@@ -298,7 +299,7 @@ function MemberList({
               title={m.name}
               subtitle={[
                 m.id === currentUserId && "Du",
-                ROLE_LABEL[m.role],
+                positionLabel(m),
                 m.territories.length > 0 && plural(m.territories.length, "Gebiet", "Gebiete"),
                 reports && plural(m.doors, "Tür", "Türen"),
               ]

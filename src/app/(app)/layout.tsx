@@ -5,6 +5,7 @@ import { getCurrentUser } from "@/lib/auth";
 import { Sidebar, TabBar, type NavUser } from "@/components/AppNav";
 import { ToastProvider } from "@/components/Toast";
 import { navigation } from "@/lib/nav";
+import { positionLabel } from "@/lib/tiers";
 import { mapConfig } from "@/lib/map";
 import { MapConfigProvider } from "@/components/map/MapConfig";
 import { PushSync } from "@/components/PushSync";
@@ -21,7 +22,7 @@ export default async function AppLayout({ children }: Readonly<{ children: React
     id: user.id,
     name: user.name,
     email: user.email,
-    roleLabel: user.role === "LEADER" ? "Teamleitung" : "Vertrieb",
+    roleLabel: positionLabel(user),
     avatar: user.avatar || null,
   };
 

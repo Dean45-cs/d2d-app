@@ -64,7 +64,7 @@ export interface RankEntry extends PersonTotals {
 }
 
 /**
- * Wer in die Wertung kommt: der Vertrieb immer, die Teamleitung nur, wenn
+ * Wer in die Wertung kommt: der Vertrieb immer, die Geschaeftsfuehrung nur, wenn
  * sie im Zeitraum selbst an Tueren war - sonst stuende sie mit lauter Nullen
  * am Ende und druckte nur die Plaetze der anderen.
  */

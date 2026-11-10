@@ -4,7 +4,7 @@
  *
  * Eine kostenlose Schnittstelle mit echten Grundversorgungstarifen gibt es
  * nicht. Jeder Grundversorger muss seine Preise aber gut auffindbar im
- * Internet veroeffentlichen (§ 36 EnWG) - die Teamleitung tippt sie vom
+ * Internet veroeffentlichen (§ 36 EnWG) - die Geschaeftsfuehrung tippt sie vom
  * Preisblatt ab, direkt auf der Energiekarte oder als Tabelle. Diese Werte
  * gehen einer (optionalen) Tagesquelle vor.
  */
@@ -93,7 +93,7 @@ export function deleteManualPrice(teamId: number, id: number): boolean {
  * Bundesdurchschnitt der Grundversorgung als Massstab fuer gepflegte Preise.
  * Voreinstellung: Stand September 2026 laut Check24/Verivox - Strom rund
  * 37,3 ct/kWh plus 13,76 EUR Grundpreis im Monat, Gas rund 13,6 ct/kWh.
- * Die Teamleitung kann die Werte in den Einstellungen anpassen.
+ * Die Geschaeftsfuehrung kann die Werte in den Einstellungen anpassen.
  */
 export const DEFAULT_REFERENCE = {
   stromCt: 37.3,

@@ -1,5 +1,8 @@
 export type Role = "LEADER" | "MEMBER";
 
+/** Stufe im Vertrieb - bestimmt den Provisionssatz; ab Teamleiter darf man ein eigenes Team aufbauen. */
+export type Tier = "BERATER" | "SENIOR" | "TEAMLEITER";
+
 export type VisitOutcome = "NOT_HOME" | "MET_NO_SALE" | "APPOINTMENT" | "SALE";
 
 export type TerritoryStatus = "OPEN" | "ACTIVE" | "DONE" | "PAUSED";
@@ -11,6 +14,8 @@ export interface User {
   name: string;
   email: string;
   role: Role;
+  /** Stufe im Vertrieb; fuer die Geschaeftsfuehrung ohne Bedeutung. */
+  tier: Tier;
   phone: string | null;
   active: number;
   /** Profilbild als Data-URL, "" wenn keines hinterlegt ist. */

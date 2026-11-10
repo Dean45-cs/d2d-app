@@ -8,6 +8,7 @@ import { getDb } from "../../src/lib/db";
 import { AuthError } from "../../src/lib/auth";
 import { ValidationError } from "../../src/lib/api";
 import { hasPermission, permissionsFor } from "../../src/lib/permissions";
+import { isPermission } from "../../src/lib/permission-definitions";
 import { navigation } from "../../src/lib/nav";
 import { readXlsx, XlsxError } from "../../src/lib/commissions/xlsx";
 import { datesFromLabel, labelFromFileName, readCommissionTable, type ImportRow } from "../../src/lib/commissions/table";
@@ -43,22 +44,27 @@ const DAY = "2026-11-07";
 let sequence = 0;
 const user = (id: number) => db.prepare("SELECT * FROM users WHERE id = ?").get(id) as User;
 
-/** Teamleitung -> Lisa -> Tom -> Max, Paul direkt unter der Teamleitung, dazu ein fremdes Team. */
+/**
+ * Geschaeftsfuehrung -> Lisa (Teamleiterin) -> Tom (Berater), Max (Senior Berater) und Mia (Teamleiterin) -> Ole.
+ * Paul direkt unter der Geschaeftsfuehrung, dazu ein fremdes Team.
+ */
 function fixture() {
   const team = Number(db.prepare("INSERT INTO teams(name) VALUES ('Provisionen')").run().lastInsertRowid);
   const other = Number(db.prepare("INSERT INTO teams(name) VALUES ('Fremd')").run().lastInsertRowid);
-  const add = (name: string, manager: number | null, role = "MEMBER", teamId = team) => {
+  const add = (name: string, manager: number | null, tier = "BERATER", role = "MEMBER", teamId = team) => {
     const handle = `${name}-${++sequence}`;
-    return Number(db.prepare("INSERT INTO users(team_id, manager_id, name, email, password_hash, role) VALUES (?, ?, ?, ?, '', ?)")
-      .run(teamId, manager, name, `${handle}@example.test`, role).lastInsertRowid);
+    return Number(db.prepare("INSERT INTO users(team_id, manager_id, name, email, password_hash, role, tier) VALUES (?, ?, ?, ?, '', ?, ?)")
+      .run(teamId, manager, name, `${handle}@example.test`, role, tier).lastInsertRowid);
   };
-  const leader = add("Teamleitung", null, "LEADER");
-  const lisa = add("Lisa", leader);
+  const leader = add("Geschäftsführung", null, "BERATER", "LEADER");
+  const lisa = add("Lisa", leader, "TEAMLEITER");
   const tom = add("Tom", lisa);
-  const max = add("Max", tom);
+  const max = add("Max", lisa, "SENIOR");
+  const mia = add("Mia", lisa, "TEAMLEITER");
+  const ole = add("Ole", mia);
   const paul = add("Paul", leader);
-  const outsider = add("Fremde Leitung", null, "LEADER", other);
-  return { team, leader, lisa, tom, max, paul, outsider };
+  const outsider = add("Fremde Leitung", null, "BERATER", "LEADER", other);
+  return { team, leader, lisa, tom, max, mia, ole, paul, outsider };
 }
 
 const row = (provider: string, name: string, base: number, patch: Partial<ImportRow> = {}): ImportRow => ({
@@ -78,7 +84,8 @@ const LIST: ImportRow[] = [
 function setup() {
   const f = fixture();
   commitCommissionImport(user(f.leader), LIST, { label: "Meine Provisionen - 05.11.2026 bis 08.11.2026", validFrom: "2026-11-05", promoUntil: "2026-11-08" });
-  saveCommissionSettings(user(f.leader), { standardPercent: 60 });
+  // Berater 60 %, Senior Berater 65 %, Teamleiter 70 % - von 150 € also 90 €, 97,50 € und 105 €.
+  saveCommissionSettings(user(f.leader), { standardPercent: 60, seniorPercent: 65, leadPercent: 70 });
   return f;
 }
 const tariffId = (teamId: number, name: string) => loadTariffs(teamId).find((t) => t.name === name)!.id;
@@ -233,7 +240,7 @@ test("Importzeilen aus dem Browser werden erneut geprueft", () => {
   invalid(() => checkImportRows([{ ...row("Gaswerk", "Gas", 10), payoutConnection: 2 }]), /Anschluss/);
 });
 
-test("nur die Teamleitung importiert und stellt Regeln ein", () => {
+test("nur die Geschaeftsfuehrung importiert und stellt Regeln ein", () => {
   const f = setup();
   forbidden(() => commitCommissionImport(user(f.lisa), LIST, {}));
   forbidden(() => saveCommissionSettings(user(f.paul), { standardPercent: 90 }));
@@ -248,13 +255,14 @@ test("nur die Teamleitung importiert und stellt Regeln ein", () => {
 
 /* -------------------------------- Rechte --------------------------------- */
 
-test("Rechte: Verwalten hat die Teamleitung, Struktur-Provision jede Fuehrungskraft", () => {
+test("Rechte: Provisionen verwaltet die Geschaeftsfuehrung - Teamleiter stellen nichts ein", () => {
   const f = fixture();
   assert.equal(hasPermission(user(f.leader), "commissions.manage"), true);
   assert.equal(hasPermission(user(f.lisa), "commissions.manage"), false);
-  assert.equal(hasPermission(user(f.lisa), "commissions.structure"), true);
-  assert.equal(hasPermission(user(f.max), "commissions.structure"), false);
-  assert.equal(hasPermission(user(f.paul), "commissions.structure"), false);
+  // Das fruehere Recht "Provision der Struktur festlegen" gibt es nicht mehr - auch ein gespeicherter Eintrag gilt nicht.
+  assert.equal(isPermission("commissions.structure"), false);
+  db.prepare("INSERT INTO user_permissions(user_id, permission, allowed) VALUES (?, 'commissions.structure', 1)").run(f.lisa);
+  assert.ok(!("commissions.structure" in permissionsFor(user(f.lisa))));
   const memberNav = navigation("MEMBER", permissionsFor(user(f.paul)), f.paul);
   assert.ok(memberNav.items.some((item) => item.href === "/provisionen"));
   assert.ok(!memberNav.admin.some((item) => item.href === "/einstellungen/provisionen"));
@@ -278,7 +286,7 @@ test("der Vertrieb sieht nur eigene Euro-Betraege - nie Admin-Provision oder Sae
   assert.equal(view.configured, true);
   assert.ok(!view.tariffs.some((t) => t.name === "Home Paket 12"), "ausgeblendete Tarife fehlen");
   const json = JSON.stringify(view);
-  for (const key of ['"admin":{', '"chain":', '"keep":', '"rule":', "needsReview", "77.77", "333.33"]) {
+  for (const key of ['"admin":{', '"cost":', '"keep":', '"rule":', "needsReview", "77.77", "333.33"]) {
     assert.ok(!json.includes(key), `${key} steckt in der Partneransicht`);
   }
   // 60 % von 777,77 € sind 466,66 € - die eigenen Betraege stehen da, der Admin-Betrag nicht.
@@ -295,106 +303,147 @@ test("der Vertrieb sieht nur eigene Euro-Betraege - nie Admin-Provision oder Sae
   assert.deepEqual([spot.bands[0].now, spot.bands[0].individual, spot.timing], [null, true, "bei Lieferbeginn"]);
 });
 
-test("niemand sieht, was die Ebenen darueber bekommen", () => {
+test("niemand sieht, was die Ebenen darueber bekommen - und kein Teamleiter ueber seine direkten Leute hinaus", () => {
   const f = setup();
-  const leader = user(f.leader);
-  setPersonCommission(leader, f.lisa, 70);
-  setPersonCommission(user(f.lisa), f.tom, 80);
   // Nach oben und zur Seite: verboten.
   forbidden(() => commissionView(user(f.tom), f.lisa, DAY));
   forbidden(() => commissionView(user(f.max), f.tom, DAY));
   forbidden(() => commissionView(user(f.paul), f.lisa, DAY));
   forbidden(() => commissionView(user(f.lisa), f.paul, DAY));
   forbidden(() => commissionView(user(f.lisa), f.leader, DAY));
+  // Keine weiteren Ebenen: Ole gehoert zu Mias Team, und Mia baut als Teamleiterin ihr eigenes auf.
+  forbidden(() => commissionView(user(f.lisa), f.ole, DAY));
+  forbidden(() => commissionView(user(f.lisa), f.mia, DAY));
+  forbidden(() => commissionView(user(f.mia), f.tom, DAY));
   // Toms eigene Liste nennt nur Toms Betraege.
   const tom = commissionView(user(f.tom), f.tom, DAY);
   const plain = tom.tariffs.find((t) => t.name === "Licht Ökostrom 24")!;
-  assert.equal(plain.bands[0].now, 84);
+  assert.equal(plain.bands[0].now, 90);
   assert.ok(!numbers(tom).includes(105), "Lisas Betrag steckt in Toms Ansicht");
   assert.ok(!JSON.stringify(tom).includes('"keep"'));
-  // Die Struktur zeigt nur nach unten - und den Standardsatz nur der Verwaltung.
-  const structure = commissionStructure(user(f.tom));
-  assert.deepEqual(structure.people.map((p) => p.id), [f.max]);
-  assert.equal(structure.standardPercent, null);
-  assert.equal(commissionStructure(user(f.max)).people.length, 0);
-});
-
-test("Fuehrungskraefte sehen ihre Leute und was sie selbst daran behalten", () => {
-  const f = setup();
-  setPersonCommission(user(f.leader), f.lisa, 70);
-  setPersonCommission(user(f.lisa), f.tom, 80);
-  setPersonCommission(user(f.tom), f.max, 75);
-  const tomFromLisa = commissionView(user(f.lisa), f.tom, DAY);
-  assert.equal(tomFromLisa.manager, true);
-  const band = tomFromLisa.tariffs.find((t) => t.name === "Licht Ökostrom 24")!.bands[0];
-  assert.deepEqual([band.now, band.keep], [84, 21]);
-  // Max ist zwei Ebenen unter Lisa: sie behaelt die Differenz zu Tom, Tom die zu Max.
-  const maxFromLisa = commissionView(user(f.lisa), f.max, DAY).tariffs.find((t) => t.name === "Licht Ökostrom 24")!.bands[0];
-  assert.deepEqual([maxFromLisa.now, maxFromLisa.keep], [63, 21]);
-  const maxFromTom = commissionView(user(f.tom), f.max, DAY).tariffs.find((t) => t.name === "Licht Ökostrom 24")!.bands[0];
-  assert.deepEqual([maxFromTom.now, maxFromTom.keep], [63, 21]);
-  assert.ok(!JSON.stringify(commissionView(user(f.lisa), f.tom, DAY)).includes('"admin":{'));
+  // "Meine Leute" zeigt nur die direkten - ohne Saetze.
   const structure = commissionStructure(user(f.lisa));
-  assert.deepEqual(
-    structure.people.map((p) => [p.name, p.depth, p.kind, p.value, p.editable]),
-    [["Tom", 0, "SHARE", 80, true], ["Max", 1, "SHARE", 75, false]],
-  );
+  assert.deepEqual(structure.people.map((p) => p.id), [f.max, f.tom]);
+  assert.equal(structure.tiers, null);
+  assert.ok(structure.people.every((p) => p.percent === null && p.value === null && !p.editable));
+  assert.deepEqual(commissionStructure(user(f.mia)).people.map((p) => p.id), [f.ole]);
+  assert.equal(commissionStructure(user(f.tom)).people.length, 0);
+  // Ein Berater bekommt nie ein Team zu sehen - auch wenn in der Datenbank jemand unter ihm steht.
+  db.prepare("UPDATE users SET manager_id = ? WHERE id = ?").run(f.tom, f.ole);
+  assert.equal(commissionStructure(user(f.tom)).people.length, 0);
+  forbidden(() => commissionView(user(f.tom), f.ole, DAY));
 });
 
-test("die Teamleitung sieht alles: Admin-Betraege, Kosten der Struktur und Ansicht als", () => {
+test("Teamleiter sehen ihre direkten Leute und die Differenz, die sie daran bekommen", () => {
   const f = setup();
   const leader = user(f.leader);
-  setPersonCommission(leader, f.lisa, 70);
-  setPersonCommission(user(f.lisa), f.tom, 80);
+  const plainBand = (viewer: number, subject: number) =>
+    commissionView(user(viewer), subject, DAY).tariffs.find((t) => t.name === "Licht Ökostrom 24")!.bands[0];
+  const tomFromLisa = commissionView(user(f.lisa), f.tom, DAY);
+  assert.equal(tomFromLisa.manager, true);
+  // Tom behaelt seine 90 € - Lisa bekommt 15 € obendrauf, beim Senior Berater 7,50 €.
+  assert.deepEqual([plainBand(f.lisa, f.tom).now, plainBand(f.lisa, f.tom).keep], [90, 15]);
+  assert.deepEqual([plainBand(f.lisa, f.max).now, plainBand(f.lisa, f.max).keep], [97.5, 7.5]);
+  assert.deepEqual([plainBand(f.mia, f.ole).now, plainBand(f.mia, f.ole).keep], [90, 15]);
+  assert.ok(!JSON.stringify(tomFromLisa).includes('"admin":{'));
+  assert.ok(!JSON.stringify(tomFromLisa).includes('"cost":'));
+  assert.deepEqual(
+    commissionStructure(user(f.lisa)).people.map((p) => [p.name, p.tier, p.managerId === f.lisa]),
+    [["Max", "SENIOR", true], ["Tom", "BERATER", true]],
+  );
+  // Ein individueller Satz aendert die Differenz - mehr als der Teamleiter selbst ergibt null, nie ein Minus.
+  setPersonCommission(leader, f.tom, 68);
+  assert.deepEqual([plainBand(f.lisa, f.tom).now, plainBand(f.lisa, f.tom).keep], [102, 3]);
+  setPersonCommission(leader, f.tom, 80);
+  assert.deepEqual([plainBand(f.lisa, f.tom).now, plainBand(f.lisa, f.tom).keep], [120, 0]);
+  // Wird Tom selbst Teamleiter, faellt die Differenz weg - Lisa sieht seine Liste nicht mehr.
+  setPersonCommission(leader, f.tom, null);
+  db.prepare("UPDATE users SET tier = 'TEAMLEITER' WHERE id = ?").run(f.tom);
+  forbidden(() => commissionView(user(f.lisa), f.tom, DAY));
+  assert.equal(plainBand(f.tom, f.tom).now, 105);
+});
+
+test("die Geschaeftsfuehrung sieht alles: Admin-Betraege, Kosten je Vertrag und Ansicht als", () => {
+  const f = setup();
+  const leader = user(f.leader);
   const standard = commissionView(leader, null, DAY);
   assert.equal(standard.subject, null);
   const plain = standard.tariffs.find((t) => t.name === "Licht Ökostrom 24")!;
-  assert.deepEqual([plain.bands[0].now, plain.bands[0].admin?.now, plain.bands[0].chain?.now], [90, 150, 90]);
+  assert.deepEqual([plain.bands[0].now, plain.bands[0].admin?.now, plain.bands[0].cost?.now], [90, 150, 90]);
   assert.ok(standard.tariffs.some((t) => t.name === "Home Paket 12" && t.admin?.needsReview));
-  const asTom = commissionView(leader, f.tom, DAY).tariffs.find((t) => t.name === "Licht Ökostrom 24")!.bands[0];
-  // Tom bekommt 84 €, die Kette (bis Lisa) kostet 105 €, die Teamleitung behaelt 45 €.
-  assert.deepEqual([asTom.now, asTom.chain?.now, asTom.admin?.now], [84, 105, 150]);
+  const as = (id: number) => {
+    const band = commissionView(leader, id, DAY).tariffs.find((t) => t.name === "Licht Ökostrom 24")!.bands[0];
+    return [band.now, band.cost?.now, band.admin?.now];
+  };
+  // Tom bekommt 90 €, mit Lisas Differenz kostet der Vertrag 105 €, der Geschaeftsfuehrung bleiben 45 €.
+  assert.deepEqual(as(f.tom), [90, 105, 150]);
+  // Auch zwei Ebenen tief nie mehr als der Satz eines Teamleiters: nur Mia bekommt etwas, Lisa nicht.
+  assert.deepEqual(as(f.ole), [90, 105, 150]);
+  assert.deepEqual(as(f.mia), [105, 105, 150]);
+  assert.deepEqual(as(f.paul), [90, 90, 150]);
   const structure = commissionStructure(leader);
-  assert.equal(structure.standardPercent, 60);
-  assert.deepEqual(structure.people.map((p) => [p.name, p.kind, p.value, p.editable]), [
-    ["Lisa", "RATE", 70, true], ["Tom", "SHARE", 80, true], ["Max", "SHARE", null, true], ["Paul", "RATE", null, true],
+  assert.deepEqual(structure.tiers, { BERATER: 60, SENIOR: 65, TEAMLEITER: 70 });
+  assert.deepEqual(structure.people.map((p) => [p.name, p.depth, p.tier, p.percent, p.managerName, p.editable]), [
+    ["Lisa", 0, "TEAMLEITER", 70, null, true],
+    ["Max", 1, "SENIOR", 65, "Lisa", true],
+    ["Mia", 1, "TEAMLEITER", 70, null, true],
+    ["Ole", 2, "BERATER", 60, "Mia", true],
+    ["Tom", 1, "BERATER", 60, "Lisa", true],
+    ["Paul", 0, "BERATER", 60, null, true],
   ]);
+  // Eine deaktivierte Teamleiterin bekommt keine Differenz mehr.
+  db.prepare("UPDATE users SET active = 0 WHERE id = ?").run(f.lisa);
+  assert.deepEqual(as(f.tom), [90, 90, 150]);
 });
 
 /* ------------------------------ Einstellen ------------------------------- */
 
-test("Fuehrungskraefte stellen nur ihre direkten Leute ein, mit Untergrenze", () => {
+test("individuelle Saetze legt nur die Verwaltung fest - Teamleiter nehmen ihren Leuten nichts weg", () => {
   const f = setup();
   const leader = user(f.leader);
-  setPersonCommission(user(f.lisa), f.tom, 80);
-  forbidden(() => setPersonCommission(user(f.lisa), f.max, 50));
+  forbidden(() => setPersonCommission(user(f.lisa), f.tom, 50));
+  forbidden(() => setPersonCommission(user(f.lisa), f.ole, 50));
   forbidden(() => setPersonCommission(user(f.tom), f.lisa, 100));
   forbidden(() => setPersonCommission(user(f.lisa), f.lisa, 100));
-  forbidden(() => setPersonCommission(user(f.lisa), f.paul, 50));
   forbidden(() => setPersonCommission(user(f.paul), f.paul, 90));
-  invalid(() => setPersonCommission(user(f.lisa), f.tom, 120), /0 und 100/);
   forbidden(() => setPersonCommission(leader, f.leader, 50));
-  // Eine zweite Teamleitung bekommt ebenfalls die volle Admin-Provision - da gibt es nichts einzustellen.
+  assert.throws(() => setPersonCommission(leader, f.outsider, 50), /nicht gefunden/);
+  invalid(() => setPersonCommission(leader, f.tom, 120), /0 und 100/);
+  // Eine zweite Person in der Geschaeftsfuehrung bekommt ebenfalls die volle Admin-Provision - da gibt es nichts einzustellen.
   const coLeader = Number(db.prepare("INSERT INTO users(team_id, manager_id, name, email, password_hash, role) VALUES (?, ?, 'Zweite Leitung', ?, '', 'LEADER')")
     .run(f.team, f.leader, `co-${++sequence}@example.test`).lastInsertRowid);
   invalid(() => setPersonCommission(leader, coLeader, 50), /volle Admin-Provision/);
-  saveCommissionSettings(leader, { minShare: 70 });
-  invalid(() => setPersonCommission(user(f.lisa), f.tom, 60), /Mindestens 70/);
-  setPersonCommission(user(f.lisa), f.tom, 70);
-  // Die Verwaltung darf darunter - und jede Ebene einstellen.
-  setPersonCommission(leader, f.max, 50);
+  // Die Verwaltung darf auf jeder Ebene abweichen.
+  setPersonCommission(leader, f.ole, 50);
   setPersonCommission(leader, f.lisa, 72.5);
-  // Recht entzogen: dann auch nicht mehr fuer die eigenen Leute.
-  db.prepare("INSERT INTO user_permissions(user_id, permission, allowed) VALUES (?, 'commissions.structure', 0)").run(f.lisa);
-  forbidden(() => setPersonCommission(user(f.lisa), f.tom, 90));
-  // Zurueck auf Standard geht mit null.
-  setPersonCommission(leader, f.tom, null);
-  assert.equal((db.prepare("SELECT COUNT(*) AS n FROM commission_people WHERE user_id = ?").get(f.tom) as { n: number }).n, 0);
-  // Wechselt Tom die Fuehrungskraft, gilt Lisas Einstellung nicht mehr.
+  const person = (id: number) => commissionStructure(leader).people.find((p) => p.id === id)!;
+  assert.deepEqual([person(f.lisa).value, person(f.lisa).percent, person(f.ole).percent], [72.5, 72.5, 50]);
+  // Zurueck auf die Stufe geht mit null.
+  setPersonCommission(leader, f.ole, null);
+  assert.equal((db.prepare("SELECT COUNT(*) AS n FROM commission_people WHERE user_id = ?").get(f.ole) as { n: number }).n, 0);
+  assert.deepEqual([person(f.ole).value, person(f.ole).percent], [null, 60]);
+  // Wechselt Tom die Fuehrungskraft, gilt wieder seine Stufe.
   setPersonCommission(leader, f.tom, 80);
-  db.prepare("UPDATE users SET manager_id = ? WHERE id = ?").run(f.paul, f.tom);
-  const tom = commissionStructure(leader).people.find((p) => p.id === f.tom)!;
-  assert.deepEqual([tom.managerName, tom.value], ["Paul", null]);
+  db.prepare("UPDATE users SET manager_id = ? WHERE id = ?").run(f.mia, f.tom);
+  assert.deepEqual([person(f.tom).managerName, person(f.tom).value, person(f.tom).percent], ["Mia", null, 60]);
+});
+
+test("die Saetze der Stufen: nur die Verwaltung, nie unter der Stufe darunter", () => {
+  const f = setup();
+  const leader = user(f.leader);
+  forbidden(() => saveCommissionSettings(user(f.lisa), { leadPercent: 90 }));
+  invalid(() => saveCommissionSettings(leader, { seniorPercent: 50 }), /Standardsatz/);
+  invalid(() => saveCommissionSettings(leader, { leadPercent: 62 }), /Senior Berater/);
+  invalid(() => saveCommissionSettings(leader, { leadPercent: 101 }), /0 und 100/);
+  const plain = (id: number) => commissionView(leader, id, DAY).tariffs.find((t) => t.name === "Licht Ökostrom 24")!.bands[0];
+  // Steigt der Standardsatz ueber einen alten Stufensatz, zieht die Stufe mit - niemand faellt unter die Stufe darunter.
+  saveCommissionSettings(leader, { standardPercent: 68 });
+  assert.deepEqual(commissionStructure(leader).tiers, { BERATER: 68, SENIOR: 68, TEAMLEITER: 70 });
+  assert.deepEqual([plain(f.max).now, plain(f.tom).cost?.now], [102, 105]);
+  // Ohne eigene Saetze bekommen alle den Standardsatz - dann gibt es auch keine Differenz.
+  assert.deepEqual(saveCommissionSettings(leader, { seniorPercent: "", leadPercent: null }).lead_percent, null);
+  assert.deepEqual(commissionStructure(leader).tiers, { BERATER: 68, SENIOR: 68, TEAMLEITER: 68 });
+  assert.deepEqual([plain(f.lisa).now, plain(f.tom).now, plain(f.tom).cost?.now], [102, 102, 102]);
 });
 
 test("Ausnahmen und Boni werden geprueft und erscheinen bei den richtigen Leuten", () => {

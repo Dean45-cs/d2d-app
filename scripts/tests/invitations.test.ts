@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { getDb } from "../../src/lib/db";
 import { authenticate, hashPassword } from "../../src/lib/auth";
-import { createInvitation, registerInvitation, decideInvitation, revokeInvitation, publicInvitation, setManager, invitationDashboard } from "../../src/lib/invitations";
+import { createInvitation, registerInvitation, decideInvitation, revokeInvitation, publicInvitation, setManager, setTier, placementManager, invitationDashboard } from "../../src/lib/invitations";
 import type { User } from "../../src/lib/types";
 
 const dir = mkdtempSync(path.join(tmpdir(), "d2d-invitations-"));
@@ -14,12 +14,13 @@ const db = getDb();
 after(() => { db.close(); global.__d2dDb = undefined; rmSync(dir, { recursive: true, force: true }); });
 const team = Number(db.prepare("INSERT INTO teams(name) VALUES ('Test')").run().lastInsertRowid);
 const otherTeam = Number(db.prepare("INSERT INTO teams(name) VALUES ('Other')").run().lastInsertRowid);
-function user(name: string, manager: number | null, role = "MEMBER", teamId = team) {
-  return Number(db.prepare("INSERT INTO users(team_id, manager_id, name, email, password_hash, role) VALUES (?, ?, ?, ?, ?, ?)")
-    .run(teamId, manager, name, `${name}@test.de`, hashPassword("password123"), role).lastInsertRowid);
+function user(name: string, manager: number | null, role = "MEMBER", teamId = team, tier = "BERATER") {
+  return Number(db.prepare("INSERT INTO users(team_id, manager_id, name, email, password_hash, role, tier) VALUES (?, ?, ?, ?, ?, ?, ?)")
+    .run(teamId, manager, name, `${name}@test.de`, hashPassword("password123"), role, tier).lastInsertRowid);
 }
+// root (Geschaeftsfuehrung) -> manager (Teamleiter) -> inviter (Berater)
 const root = user("root", null, "LEADER");
-const manager = user("manager", root);
+const manager = user("manager", root, "MEMBER", team, "TEAMLEITER");
 const inviter = user("inviter", manager);
 const peer = user("peer", root, "LEADER");
 const outsider = user("outsider", null, "LEADER", otherTeam);
@@ -43,7 +44,13 @@ test("registration grants no access; only the inviter's direct manager approves"
   decideInvitation(manager, id, "APPROVED");
   const created = authenticate("new@test.de", "password123")!;
   assert.ok(created);
-  assert.equal(created.manager_id, inviter);
+  // Ein Berater baut kein eigenes Team auf: die neue Person kommt zu seinem Teamleiter.
+  assert.equal(created.manager_id, manager);
+  assert.equal(created.tier, "BERATER");
+  assert.equal(invitationDashboard(person(inviter)).placement, "manager");
+  assert.equal(invitationDashboard(person(inviter)).reports.length, 0);
+  // Wer sie mitgebracht hat, bleibt an der Einladung vermerkt.
+  assert.deepEqual(db.prepare(`SELECT l.inviter_id FROM join_requests r JOIN invitation_links l ON l.id = r.invitation_id WHERE r.user_id = ?`).get(created.id), { inviter_id: inviter });
   assert.equal(created.team_id, team);
   assert.equal(created.role, "MEMBER");
   assert.throws(() => decideInvitation(manager, id, "APPROVED"), /bereits/);
@@ -104,4 +111,53 @@ test("approval rolls back when an email was taken after registration", () => {
   assert.throws(() => decideInvitation(manager, id, "APPROVED"), /vergeben/);
   assert.equal((db.prepare("SELECT status FROM join_requests WHERE id = ?").get(id) as { status: string }).status, "PENDING");
   decideInvitation(manager, id, "REJECTED");
+});
+
+test("a team of one's own starts at Teamleiter: placement, reporting lines and demotion", () => {
+  // Ein Teamleiter bekommt die Person selbst - freigegeben von seiner Fuehrungskraft.
+  const lead = createInvitation(manager);
+  registerInvitation(lead.token, input("lead-invite@test.de"));
+  decideInvitation(root, requestByToken(lead.token).id, "APPROVED");
+  const recruit = authenticate("lead-invite@test.de", "password123")!;
+  assert.equal(recruit.manager_id, manager);
+  assert.equal(invitationDashboard(person(manager)).placement, null);
+  // Direkt unter der Geschaeftsfuehrung: ein Berater bringt die Person zur Geschaeftsfuehrung.
+  const solo = user("solo", root);
+  assert.equal(placementManager(person(solo)).id, root);
+  // Niemand wird einem Berater oder Senior Berater unterstellt.
+  assert.throws(() => setManager(team, solo, inviter), /erst ab Teamleiter/);
+  setTier(team, inviter, "SENIOR");
+  assert.throws(() => setManager(team, solo, inviter), /erst ab Teamleiter/);
+  assert.equal(placementManager(person(inviter)).id, manager);
+  // Mit der Stufe Teamleiter geht beides - und Einladungen landen bei ihm selbst.
+  setTier(team, inviter, "TEAMLEITER");
+  setManager(team, solo, inviter);
+  assert.equal(placementManager(person(inviter)).id, inviter);
+  // Solange jemand unter ihm steht, bleibt er Teamleiter.
+  assert.throws(() => setTier(team, inviter, "BERATER"), /eine Person unter sich/);
+  assert.throws(() => setTier(team, manager, "SENIOR"), /Personen unter sich/);
+  setManager(team, solo, root);
+  setTier(team, inviter, "BERATER");
+  assert.equal(person(inviter).tier, "BERATER");
+  // Ungueltiges: unbekannte Stufe, fremdes Team, Geschaeftsfuehrung.
+  assert.throws(() => setTier(team, inviter, "CHEF"), /Unbekannte Stufe/);
+  assert.throws(() => setTier(otherTeam, inviter, "SENIOR"), /nicht gefunden/);
+  assert.throws(() => setTier(team, root, "TEAMLEITER"), /keine Stufe/);
+});
+
+test("placement skips inactive or ineligible managers and never leaves the team", () => {
+  // Altbestand: jemand steht unter einem Berater - die neue Person geht zur naechsten Fuehrungskraft darueber.
+  const loose = user("loose", inviter);
+  assert.equal(placementManager(person(loose)).id, manager);
+  // Ist der Teamleiter deaktiviert, uebernimmt die Geschaeftsfuehrung.
+  db.prepare("UPDATE users SET active = 0 WHERE id = ?").run(manager);
+  assert.equal(placementManager(person(inviter)).id, root);
+  db.prepare("UPDATE users SET active = 1 WHERE id = ?").run(manager);
+  // Ohne Fuehrungskraft oder im Kreis gibt es keinen Platz - und keine Endlosschleife.
+  const a = user("loop-a", null);
+  const b = user("loop-b", a);
+  db.prepare("UPDATE users SET manager_id = ? WHERE id = ?").run(b, a);
+  assert.throws(() => placementManager(person(a)), /keine aktive Führungskraft/);
+  assert.throws(() => createInvitation(a));
+  db.prepare("UPDATE users SET manager_id = ? WHERE id IN (?, ?, ?)").run(root, a, b, loose);
 });

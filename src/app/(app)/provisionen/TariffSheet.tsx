@@ -121,12 +121,13 @@ function BandRow({
     band.promo > 0 ? `davon ${money(band.promo)} Aktion${promoUntil ? ` bis ${shortDay(promoUntil)}` : ""}` : null,
     band.follow > 0 ? `später +${money(band.follow)} Folgeprovision` : null,
     bonus > 0 && band.now !== null ? `mit Bonus ${money(band.now + bonus)}` : null,
-    view.manager && band.keep !== undefined ? `du behältst ${money(band.keep)}` : null,
+    view.manager && band.keep !== undefined ? `für dich als Teamleiter ${money(band.keep)}` : null,
     view.admin && band.admin
       ? [
           `Admin ${money(band.admin.now)}${band.admin.follow > 0 ? ` + ${money(band.admin.follow)} später` : ""}`,
-          band.chain && view.subject !== null ? `Struktur ${money(band.chain.now)}` : null,
-          band.chain ? `bleibt ${money(band.admin.now - band.chain.now - bonus)}` : null,
+          // Nur nennen, wenn ein Teamleiter die Differenz bekommt - sonst steht der Betrag schon rechts.
+          band.cost && band.now !== null && band.cost.now > band.now ? `mit Teamleiter ${money(band.cost.now)}` : null,
+          band.cost ? `bleibt ${money(band.admin.now - band.cost.now - bonus)}` : null,
         ]
           .filter(Boolean)
           .join(" · ")
@@ -292,8 +293,8 @@ function AdminSection({ tariff }: { tariff: ViewTariff }) {
             )}
           </div>
           <p className="list-footer">
-            Ein fester Betrag gilt für die Abschlussprovision; die Folgeprovision wird weiter prozentual geteilt. Persönliche Sätze
-            verschieben auch Ausnahmen.
+            Ein fester Betrag gilt für die Abschlussprovision; die Folgeprovision wird weiter prozentual geteilt. Stufen und
+            individuelle Sätze verschieben auch Ausnahmen.
           </p>
           {error && <InlineError>{error}</InlineError>}
         </div>

@@ -5,8 +5,8 @@ import { setPersonCommission } from "@/lib/commissions/store";
 export const dynamic = "force-dynamic";
 
 /**
- * Was eine Person bekommt: { value: 80 } oder { value: null } fuer Standard.
- * Wer das darf, prueft setPersonCommission (Verwaltung oder direkte Fuehrungskraft).
+ * Individueller Satz einer Person: { value: 68 } oder { value: null } fuer "nach Stufe".
+ * Wer das darf, prueft setPersonCommission (nur mit "Provisionen verwalten").
  */
 export async function PUT(request: Request, { params }: { params: Promise<{ id: string }> }) {
   return handle(async () => {

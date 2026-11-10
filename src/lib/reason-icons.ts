@@ -3,7 +3,7 @@
  *
  * Frueher trug jeder Grund ein Emoji - je nach Geraet anders gezeichnet und
  * neben den eigenen Zeichen der App ein Fremdkoerper. Jetzt waehlt die
- * Teamleitung eines dieser Zeichen; gezeichnet werden sie in
+ * Geschaeftsfuehrung eines dieser Zeichen; gezeichnet werden sie in
  * src/components/ReasonIcon.tsx (gleiche Familie wie icons.tsx), getoent auf
  * einer Kachel in einem der Symboltoene aus brand.css.
  *

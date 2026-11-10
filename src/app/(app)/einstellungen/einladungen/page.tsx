@@ -10,7 +10,7 @@ export default async function InvitationsPage() {
   const user = await requireUser();
   return (
     <div className="page">
-      {/* An der Strukturspitze gibt die Teamleitung ihre Einladungen selbst frei. */}
+      {/* An der Strukturspitze gibt die Geschaeftsfuehrung ihre Einladungen selbst frei. */}
       <Invitations {...invitationDashboard(user)} selfApproves={user.manager_id === null && user.role === "LEADER"} />
     </div>
   );

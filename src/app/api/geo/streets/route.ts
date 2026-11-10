@@ -9,7 +9,7 @@ export const dynamic = "force-dynamic";
 
 /**
  * Liefert alle Strassen innerhalb der auf der Karte gezeichneten Flaeche.
- * Das Ergebnis wird noch nicht gespeichert - die Teamleitung waehlt erst aus,
+ * Das Ergebnis wird noch nicht gespeichert - die Geschaeftsfuehrung waehlt erst aus,
  * welche Strassen ins Gebiet wandern.
  */
 export async function POST(request: Request) {

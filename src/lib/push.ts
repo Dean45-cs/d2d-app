@@ -100,7 +100,7 @@ function loadVapid() {
   });
 
   // Die Push-Dienste wollen wissen, wen sie bei Problemen erreichen. Apple
-  // lehnt Platzhalter ab - deshalb die echte Adresse der Teamleitung.
+  // lehnt Platzhalter ab - deshalb die echte Adresse der Geschaeftsfuehrung.
   const leader = getDb()
     .prepare("SELECT email FROM users WHERE role = 'LEADER' ORDER BY id LIMIT 1")
     .get() as { email: string } | undefined;

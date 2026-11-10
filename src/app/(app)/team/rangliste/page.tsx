@@ -88,7 +88,7 @@ export default async function ComparePage({
   return (
     <div className="page">
       <PageHeader title="Rangliste" subtitle={`${RANGE_TITLE[key]} · ${metric.label}`}>
-        <SegmentedLinks ariaLabel="Team" current="rangliste" options={TEAM_VIEWS} className="max-w-md" />
+        <SegmentedLinks ariaLabel="Team" current="rangliste" options={TEAM_VIEWS} className="max-w-md seg-tight" />
       </PageHeader>
 
       <RangePicker current={key} keep={keep} className="mb-3 max-w-md" />

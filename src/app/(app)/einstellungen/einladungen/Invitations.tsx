@@ -16,6 +16,7 @@ import {
   IconShield,
   IconTrash,
   IconUserPlus,
+  IconUsers,
   IconX,
 } from "@/components/icons";
 
@@ -41,13 +42,15 @@ function useCanShare(): boolean {
 /**
  * Einladungen: Link erstellen und teilen, Beitritte freigeben, eigene Links
  * im Blick behalten. Freigeben darf nur die direkte Fuehrungskraft des
- * Einladenden - das prueft der Server.
+ * Einladenden - das prueft der Server. Ins eigene Team kommt die neue Person
+ * erst ab Teamleiter, sonst zur Fuehrungskraft des Einladenden (placement).
  */
 export function Invitations({
   own,
   approvals,
   approver,
   problem,
+  placement,
   reports,
   canCreate,
   selfApproves,
@@ -56,6 +59,8 @@ export function Invitations({
   approvals: InvitationRow[];
   approver: string | null;
   problem: string | null;
+  /** Bei wem landet, wen man mitbringt - null: bei einem selbst. */
+  placement: string | null;
   reports: { id: number; name: string }[];
   canCreate: boolean;
   selfApproves: boolean;
@@ -303,17 +308,42 @@ export function Invitations({
             </>
           )}
 
-          <ListLabel>Direkt unter dir</ListLabel>
-          {reports.length === 0 ? (
-            <p className="list px-4 py-4 text-subhead text-muted">Noch niemand</p>
-          ) : (
-            <ul className="list list-icons">
-              {reports.map((person) => (
-                <li key={person.id}>
-                  <Cell href={`/profil/${person.id}`} icon={<Avatar name={person.name} size={32} />} title={person.name} />
+          {placement !== null && (
+            <>
+              <ListLabel>Wer du mitbringst</ListLabel>
+              <ul className="list list-icons">
+                <li>
+                  <Cell
+                    icon={
+                      <span className="glyph">
+                        <IconUsers className="h-4 w-4" />
+                      </span>
+                    }
+                    title={`Kommt ins Team von ${placement}`}
+                    subtitle="Ein eigenes Team baust du ab Teamleiter auf"
+                    wrap
+                  />
                 </li>
-              ))}
-            </ul>
+              </ul>
+              <p className="list-footer">Dass du die Person mitgebracht hast, bleibt bei der Einladung vermerkt.</p>
+            </>
+          )}
+
+          {(placement === null || reports.length > 0) && (
+            <>
+              <ListLabel>Direkt unter dir</ListLabel>
+              {reports.length === 0 ? (
+                <p className="list px-4 py-4 text-subhead text-muted">Noch niemand</p>
+              ) : (
+                <ul className="list list-icons">
+                  {reports.map((person) => (
+                    <li key={person.id}>
+                      <Cell href={`/profil/${person.id}`} icon={<Avatar name={person.name} size={32} />} title={person.name} />
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </>
           )}
         </aside>
       </div>

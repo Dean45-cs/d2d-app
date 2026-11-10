@@ -352,7 +352,7 @@ export function TourClient({
 
   /*
    * Liegt die gewaehlte Strasse in einem Gebiet, dessen Haeuser noch nicht
-   * geladen sind (Teamleitung in einem fremden Gebiet), holt die Seite es
+   * geladen sind (Geschaeftsfuehrung in einem fremden Gebiet), holt die Seite es
    * nach - ohne die Tuer-Ansicht zu verlassen.
    */
   const loaded = useMemo(() => new Set(loadedTerritories), [loadedTerritories]);
@@ -481,7 +481,7 @@ export function TourClient({
   }
 
   /*
-   * Gebiete, deren Hausnummern noch nicht geladen sind (Teamleitung in
+   * Gebiete, deren Hausnummern noch nicht geladen sind (Geschaeftsfuehrung in
    * fremden Gebieten), kennen nur den Punkt ihrer Strassen. Liegt so eine
    * Strasse deutlich naeher als jede geladene offene Tuer, ist dort die
    * naechste Tuer zu suchen - nach dem Laden.

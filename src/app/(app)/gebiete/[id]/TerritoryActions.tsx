@@ -16,7 +16,7 @@ import type { FoundStreet } from "../StreetResult";
 type OtherArea = { id: number; name: string; area: Shape };
 
 /**
- * Seltene Aktionen der Teamleitung hinter den drei Punkten oben rechts:
+ * Seltene Aktionen der Geschaeftsfuehrung hinter den drei Punkten oben rechts:
  * Flaeche, Haeuser, Strassen, Loeschen. Was danach passiert, meldet ein Toast.
  */
 export function TerritoryActions({

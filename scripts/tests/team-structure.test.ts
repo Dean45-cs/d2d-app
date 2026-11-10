@@ -3,7 +3,7 @@ import { test } from "node:test";
 import { buildTeamStructure, type StructureMember, type StructureNode } from "../../src/lib/team-structure";
 
 function member(id: number, managerId: number | null, overrides: Partial<StructureMember> = {}): StructureMember {
-  return { id, manager_id: managerId, team_id: 1, name: `Person ${id}`, role: "MEMBER", active: 1, avatar: "", ...overrides };
+  return { id, manager_id: managerId, team_id: 1, name: `Person ${id}`, role: "MEMBER", tier: "BERATER", active: 1, avatar: "", ...overrides };
 }
 
 function flatten(roots: StructureNode[]): StructureNode[] {

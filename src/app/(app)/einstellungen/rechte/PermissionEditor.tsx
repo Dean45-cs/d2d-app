@@ -42,7 +42,7 @@ function fromMode(mode: Mode): boolean | null {
 function roleLine(member: EditableMember): string {
   const count = Object.keys(member.overrides).length;
   return [
-    member.role === "LEADER" ? "Teamleitung" : "Vertrieb",
+    member.role === "LEADER" ? "Geschäftsführung" : "Vertrieb",
     !member.active && "Deaktiviert",
     count > 0 && plural(count, "Abweichung", "Abweichungen"),
   ]
@@ -203,7 +203,7 @@ function MemberRights({ member, grantable }: { member: EditableMember; grantable
                   <li key={key}>
                     <Cell
                       title={label}
-                      subtitle={rolesOnly ? "Nur für Teamleitungen" : "Nicht vergebbar"}
+                      subtitle={rolesOnly ? "Nur für die Geschäftsführung" : "Nicht vergebbar"}
                       detail={member.effective[key] ? "Erlaubt" : "Nicht erlaubt"}
                     />
                   </li>

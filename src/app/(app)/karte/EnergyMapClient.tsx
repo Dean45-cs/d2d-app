@@ -41,7 +41,7 @@ import { MAP_VIEWS } from "../gebiete/views";
 
 interface Props {
   prices: MapPoint[];
-  /** Orte der eigenen Gebiete ohne Preis (nur fuer die Teamleitung) */
+  /** Orte der eigenen Gebiete ohne Preis (nur fuer die Geschaeftsfuehrung) */
   open: OpenPoint[];
   /** Jahreskosten des Musterhaushalts beim Bundesdurchschnitt */
   reference: Record<Energy, number>;
@@ -77,7 +77,7 @@ function located(point: { lat: number | null; lng: number | null }): LatLng | nu
 /**
  * Preise der Grundversorger auf der Karte: je teurer, desto kraeftiger das
  * Gruen - dort lohnt das Klingeln. Ein Tipp auf einen Ort oeffnet ihn im
- * Blatt; die Teamleitung traegt dort Preise ein.
+ * Blatt; die Geschaeftsfuehrung traegt dort Preise ein.
  */
 export function EnergyMapClient({
   prices,
@@ -521,7 +521,7 @@ export function EnergyMapClient({
   );
 }
 
-/** Alles zu einem Ort mit Preis - und fuer die Teamleitung: bearbeiten, loeschen. */
+/** Alles zu einem Ort mit Preis - und fuer die Geschaeftsfuehrung: bearbeiten, loeschen. */
 function PriceDetail({
   point,
   energy,

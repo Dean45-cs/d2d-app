@@ -8,7 +8,7 @@ import { splitTable } from "./table";
  * dort ist die Ersparnis beim Wechsel am groessten, also das beste Klingelgebiet.
  *
  * Es gibt keine offene, kostenlose API mit Grundversorger-Tarifen. Im
- * Normalfall traegt die Teamleitung die Preise deshalb selbst ein (direkt auf
+ * Normalfall traegt die Geschaeftsfuehrung die Preise deshalb selbst ein (direkt auf
  * der Energiekarte, einzeln oder als Tabelle). Wer doch eine Quelle hat - einen
  * Export des Tarifdatenanbieters oder eine als CSV veroeffentlichte Google-
  * Tabelle -, kann sie zusaetzlich taeglich abrufen lassen:

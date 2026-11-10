@@ -2,7 +2,8 @@ import { assertPermission, hasPermission } from "./permissions";
 import crypto from "node:crypto";
 import { getDb } from "./db";
 import { AuthError, hashPassword } from "./auth";
-import type { User } from "./types";
+import { canLeadTeam, isTier } from "./tiers";
+import type { Tier, User } from "./types";
 
 function activeUser(id: number) {
   const user = getDb().prepare("SELECT * FROM users WHERE id = ? AND active = 1").get(id) as User | undefined;
@@ -13,20 +14,42 @@ function activeUser(id: number) {
 export function invitationApprover(inviter: User): User {
   if (inviter.manager_id === null) {
     if (inviter.role === "LEADER") return inviter;
-    throw new Error("Bitte lass dir zuerst von der Teamleitung eine direkte Führungskraft zuordnen.");
+    throw new Error("Bitte lass dir zuerst von der Geschäftsführung eine direkte Führungskraft zuordnen.");
   }
   const manager = getDb().prepare("SELECT * FROM users WHERE id = ? AND active = 1").get(inviter.manager_id) as User | undefined;
-  if (!manager) throw new Error("Deine Führungskraft ist nicht mehr aktiv. Bitte die Teamleitung, dir eine neue zuzuordnen.");
+  if (!manager) throw new Error("Deine Führungskraft ist nicht mehr aktiv. Bitte die Geschäftsführung, dir eine neue zuzuordnen.");
   if (manager.team_id !== inviter.team_id || manager.id === inviter.id) {
     throw new Error("Die Zuordnung in der Struktur ist ungültig.");
   }
   return manager;
 }
 
+/**
+ * Unter wem landet, wen `inviter` mitbringt oder anlegt? Ein eigenes Team baut
+ * man erst ab Teamleiter auf: Geschaeftsfuehrung und Teamleiter bekommen die
+ * Person selbst, alle anderen bringen sie zu ihrer Fuehrungskraft - der
+ * naechsten aktiven Person darueber, die ein Team haben darf.
+ */
+export function placementManager(inviter: User): User {
+  if (canLeadTeam(inviter)) return inviter;
+  const db = getDb();
+  const seen = new Set([inviter.id]);
+  let current = inviter;
+  while (current.manager_id !== null && !seen.has(current.manager_id)) {
+    const manager = db.prepare("SELECT * FROM users WHERE id = ? AND team_id = ?").get(current.manager_id, inviter.team_id) as User | undefined;
+    if (!manager) break;
+    if (manager.active && canLeadTeam(manager)) return manager;
+    seen.add(manager.id);
+    current = manager;
+  }
+  throw new Error("Über dir gibt es gerade keine aktive Führungskraft. Bitte die Geschäftsführung, dich neu zuzuordnen.");
+}
+
 export function createInvitation(actorId: number) {
   const inviter = activeUser(actorId);
   assertPermission(inviter, "invitations.create");
   invitationApprover(inviter);
+  placementManager(inviter);
   const db = getDb();
   const { count } = db.prepare(`SELECT COUNT(*) AS count FROM invitation_links l
     WHERE inviter_id = ? AND revoked_at IS NULL AND expires_at > datetime('now')
@@ -91,8 +114,9 @@ export function decideInvitation(actorId: number, requestId: number, decision: "
       if (db.prepare("SELECT id FROM users WHERE lower(email) = ?").get(request.email)) {
         throw new Error("Diese E-Mail ist inzwischen vergeben. Bitte die Anfrage ablehnen.");
       }
+      // Nicht zwingend unter dem Einladenden: ein eigenes Team gibt es erst ab Teamleiter.
       userId = Number(db.prepare(`INSERT INTO users (team_id, manager_id, name, email, phone, password_hash, role)
-        VALUES (?, ?, ?, ?, ?, ?, 'MEMBER')`).run(inviter.team_id, inviter.id, request.name,
+        VALUES (?, ?, ?, ?, ?, ?, 'MEMBER')`).run(inviter.team_id, placementManager(inviter).id, request.name,
           request.email, request.phone, request.password_hash).lastInsertRowid);
     }
     db.prepare(`UPDATE join_requests SET status = ?, decided_at = datetime('now'), decided_by = ?,
@@ -103,7 +127,7 @@ export function decideInvitation(actorId: number, requestId: number, decision: "
 
 /**
  * Ist die Fuehrungskraft des Einladenden deaktiviert, kann sie offene
- * Beitritte nicht mehr bearbeiten - dann entscheidet die Teamleitung, statt
+ * Beitritte nicht mehr bearbeiten - dann entscheidet die Geschaeftsfuehrung, statt
  * dass die Anfrage haengen bleibt und die E-Mail blockiert.
  */
 function approverInactive(inviter: User): boolean {
@@ -145,8 +169,32 @@ export function setManager(teamId: number, userId: number, managerId: number | n
       SELECT id FROM users WHERE id = ? UNION SELECT u.id FROM users u JOIN descendants d ON u.manager_id = d.id
     ) SELECT id FROM descendants WHERE id = ?`).get(userId, managerId);
     if (cycle) throw new Error("Diese Zuordnung würde einen Kreis in der Struktur erzeugen.");
+    if (!canLeadTeam(manager)) {
+      throw new Error(`Ein eigenes Team gibt es erst ab Teamleiter. Mach ${manager.name} zuerst zum Teamleiter.`);
+    }
   }
   db.prepare("UPDATE users SET manager_id = ? WHERE id = ?").run(managerId, userId);
+}
+
+/**
+ * Stufe im Vertrieb setzen. Wer Leute unter sich hat, bleibt Teamleiter, bis
+ * sie einer anderen Fuehrungskraft zugeordnet sind - sonst stuende ein Team
+ * unter jemandem, der keines haben darf.
+ */
+export function setTier(teamId: number, userId: number, value: unknown): Tier {
+  if (!isTier(value)) throw new Error("Unbekannte Stufe.");
+  const db = getDb();
+  const member = db.prepare("SELECT * FROM users WHERE id = ? AND team_id = ?").get(userId, teamId) as User | undefined;
+  if (!member) throw new Error("Mitglied nicht gefunden.");
+  if (member.role === "LEADER") throw new Error("Die Geschäftsführung hat keine Stufe im Vertrieb.");
+  if (value !== "TEAMLEITER") {
+    const { count } = db.prepare("SELECT COUNT(*) AS count FROM users WHERE manager_id = ? AND id <> ?").get(userId, userId) as { count: number };
+    if (count > 0) {
+      throw new Error(`${member.name} hat noch ${count === 1 ? "eine Person" : `${count} Personen`} unter sich. Ordne sie zuerst einer anderen Führungskraft zu – nur Teamleiter haben ein eigenes Team.`);
+    }
+  }
+  db.prepare("UPDATE users SET tier = ? WHERE id = ?").run(value, userId);
+  return value;
 }
 
 export interface InvitationRow {
@@ -172,5 +220,13 @@ export function invitationDashboard(user: User) {
   catch (error) { problem = (error as Error).message; }
   const reports = db.prepare("SELECT id, name FROM users WHERE manager_id = ? AND team_id = ? AND active = 1 ORDER BY name")
     .all(user.id, user.team_id) as { id: number; name: string }[];
-  return { own, approvals: hasPermission(user, "invitations.approve") ? approvals : [], approver, problem, reports, canCreate: hasPermission(user, "invitations.create") };
+  // Wohin kommt, wen diese Person mitbringt? null: zu ihr selbst (Geschaeftsfuehrung, Teamleiter).
+  let placement: string | null = null;
+  if (!problem) {
+    try {
+      const target = placementManager(user);
+      placement = target.id === user.id ? null : target.name;
+    } catch (error) { problem = (error as Error).message; }
+  }
+  return { own, approvals: hasPermission(user, "invitations.approve") ? approvals : [], approver, problem, placement, reports, canCreate: hasPermission(user, "invitations.create") };
 }

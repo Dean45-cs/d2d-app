@@ -7,7 +7,7 @@ export interface CardSettings {
   /** null: Karte ausgeschaltet. */
   token: string | null;
   showPhone: boolean;
-  /** Rufnummer am Konto (traegt die Teamleitung ein) - "" ohne. */
+  /** Rufnummer am Konto (traegt die Geschaeftsfuehrung ein) - "" ohne. */
   phone: string;
   badgeNumber: string;
   teamName: string;

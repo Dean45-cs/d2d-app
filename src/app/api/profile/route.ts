@@ -6,7 +6,7 @@ export const dynamic = "force-dynamic";
 
 /**
  * Das eigene Profil bearbeiten: Text ueber sich und Profilbild. Name, Rolle
- * und Zugang bleiben Sache der Teamleitung.
+ * und Zugang bleiben Sache der Geschaeftsfuehrung.
  */
 export async function PATCH(request: Request) {
   return handle(async () => {

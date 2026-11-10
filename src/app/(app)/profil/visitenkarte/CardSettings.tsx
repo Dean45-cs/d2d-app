@@ -195,7 +195,7 @@ export function CardSettings({
         <li>
           <Cell
             title="Telefonnummer zeigen"
-            subtitle={initial.phone || "Keine Nummer hinterlegt – trägt die Teamleitung ein"}
+            subtitle={initial.phone || "Keine Nummer hinterlegt – trägt die Geschäftsführung ein"}
             wrap
             trailing={
               <Switch
@@ -212,7 +212,7 @@ export function CardSettings({
         </li>
       </ul>
       <p className="list-footer">
-        Dazu Bild, Name, {initial.teamName} und seit wann du dabei bist. Ausweisnummer und Rufnummer trägt die Teamleitung ein.
+        Dazu Bild, Name, {initial.teamName} und seit wann du dabei bist. Ausweisnummer und Rufnummer trägt die Geschäftsführung ein.
       </p>
 
       <ul className="list mt-6">

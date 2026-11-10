@@ -16,4 +16,4 @@ export type PatchMember = (
   undo?: Record<string, unknown>,
 ) => Promise<boolean>;
 
-export const ROLE_LABEL = { LEADER: "Teamleitung", MEMBER: "Vertrieb" } as const;
+export const ROLE_LABEL = { LEADER: "Geschäftsführung", MEMBER: "Vertrieb" } as const;

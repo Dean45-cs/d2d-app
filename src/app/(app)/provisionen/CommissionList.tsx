@@ -206,7 +206,7 @@ export function CommissionList({
           text={
             view.admin
               ? "Lade die Liste aus dem Portal hoch – danach siehst du hier, was jeder Tarif bringt."
-              : "Sobald die Teamleitung die Liste hochlädt, steht hier, welcher Tarif dir wie viel bringt."
+              : "Sobald die Geschäftsführung die Liste hochlädt, steht hier, welcher Tarif dir wie viel bringt."
           }
           action={
             view.admin && (
@@ -228,7 +228,7 @@ export function CommissionList({
                   </Link>
                 </Notice>
               ) : (
-                <Notice icon={<IconEuro className="h-5 w-5" />}>Die Beträge gibt die Teamleitung bald frei.</Notice>
+                <Notice icon={<IconEuro className="h-5 w-5" />}>Die Beträge gibt die Geschäftsführung bald frei.</Notice>
               ))}
             {view.combo.map((bonus) => (
               <Notice key={bonus.id} icon={<IconSparkles className="h-5 w-5" />}>
@@ -391,8 +391,8 @@ function TariffRow({
     kwh === null ? (tariff.bands.length > 1 ? `${tariff.bands.length} Staffeln` : tariff.bands[0] ? kwhRange(tariff.bands[0].from, tariff.bands[0].to) : null) : null,
     follow > 0 ? `+${money(follow)} später` : null,
     tariff.timing === "bei Lieferbeginn" ? "Auszahlung bei Lieferbeginn" : null,
-    view.manager && band?.keep !== undefined ? `du behältst ${money(band.keep)}` : null,
-    view.admin && band?.admin && band.chain ? `Admin ${money(band.admin.now)} · bleibt ${money(band.admin.now - band.chain.now - bonus)}` : null,
+    view.manager && band?.keep !== undefined ? `für dich ${money(band.keep)}` : null,
+    view.admin && band?.admin && band.cost ? `Admin ${money(band.admin.now)} · bleibt ${money(band.admin.now - band.cost.now - bonus)}` : null,
   ].filter(Boolean);
 
   return (
