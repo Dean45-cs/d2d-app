@@ -14,7 +14,7 @@ export default function LoadingTeam() {
   return (
     <div className="page" aria-busy="true" aria-label="Team wird geladen">
       <SkeletonHeader title="Team">
-        <SegmentedLinks ariaLabel="Team" current="feed" options={TEAM_VIEWS} className="max-w-md" />
+        <SegmentedLinks ariaLabel="Team" current="feed" options={TEAM_VIEWS} className="max-w-md seg-tight" />
       </SkeletonHeader>
       <div className="grid grid-cols-1 gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,340px)] lg:items-start">
         <div className="min-w-0">

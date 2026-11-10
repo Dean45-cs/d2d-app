@@ -36,7 +36,7 @@ export default async function AchievementsPage() {
         subtitle={me ? `Platz ${me.rank} im Team · ${number(progress.totalXp)} XP` : `${number(progress.totalXp)} XP`}
         actions={<LevelInfo progress={progress} />}
       >
-        <SegmentedLinks ariaLabel="Team" current="erfolge" options={TEAM_VIEWS} className="max-w-md" />
+        <SegmentedLinks ariaLabel="Team" current="erfolge" options={TEAM_VIEWS} className="max-w-md seg-tight" />
       </PageHeader>
 
       <div className="grid grid-cols-1 gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,400px)] lg:items-start">

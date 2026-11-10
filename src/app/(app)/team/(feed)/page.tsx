@@ -71,7 +71,7 @@ export default async function TeamPage({
           ) : undefined
         }
       >
-        <SegmentedLinks ariaLabel="Team" current="feed" options={TEAM_VIEWS} className="max-w-md" />
+        <SegmentedLinks ariaLabel="Team" current="feed" options={TEAM_VIEWS} className="max-w-md seg-tight" />
       </PageHeader>
 
       <div className="grid grid-cols-1 gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,340px)] lg:items-start">

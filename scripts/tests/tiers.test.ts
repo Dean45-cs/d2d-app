@@ -5,7 +5,9 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import Database from "better-sqlite3";
 import { getDb } from "../../src/lib/db";
-import { canLeadTeam, isTier, positionLabel, TIERS, TIER_LABEL } from "../../src/lib/tiers";
+import { buildPyramid, canLeadTeam, isTier, positionLabel, TIERS, TIER_LABEL } from "../../src/lib/tiers";
+import { activeHref, navigation } from "../../src/lib/nav";
+import { PERMISSIONS, type PermissionSet } from "../../src/lib/permission-definitions";
 import { loadSettings } from "../../src/lib/commissions/store";
 import type { User } from "../../src/lib/types";
 
@@ -30,6 +32,42 @@ test("Stufen heissen wie in der Praesentation - ein Team gibt es erst ab Teamlei
   assert.equal(positionLabel({ role: "LEADER", tier: "BERATER" }), "Geschäftsführung");
   assert.equal(positionLabel({ role: "MEMBER", tier: "SENIOR" }), "Senior Berater");
   assert.ok(isTier("TEAMLEITER") && !isTier("LEADER") && !isTier(null) && !isTier("teamleiter"));
+});
+
+test("Pyramide: von der Geschaeftsfuehrung zur Basis, nur Aktive, jede Stufe - auch die leere", () => {
+  const member = (id: number, name: string, tier: User["tier"], manager_id: number | null, patch: Partial<User> = {}) =>
+    ({ id, name, avatar: "", role: "MEMBER" as const, tier, active: 1, manager_id, ...patch });
+  const levels = buildPyramid([
+    member(1, "Kevin", "BERATER", null, { role: "LEADER", avatar: "/api/avatars/1" }),
+    member(2, "Sina", "TEAMLEITER", 1),
+    member(3, "Özlem", "BERATER", 2),
+    member(4, "Anna", "BERATER", 2),
+    member(5, "Zoe", "BERATER", 1),
+    member(6, "Ole", "BERATER", 2, { active: 0 }),
+    member(7, "Tom", "BERATER", 7),
+  ]);
+  assert.deepEqual(levels.map((level) => [level.key, level.label]), [
+    ["LEADER", "Geschäftsführung"], ["TEAMLEITER", "Teamleiter"], ["SENIOR", "Senior Berater"], ["BERATER", "Berater"],
+  ]);
+  // Deutsch sortiert (Ö bei O), Deaktivierte fehlen - auch in der Zahl "im Team".
+  assert.deepEqual(levels.map((level) => level.people.map((person) => person.name)), [["Kevin"], ["Sina"], [], ["Anna", "Özlem", "Tom", "Zoe"]]);
+  assert.deepEqual(levels[0].people[0], { id: 1, name: "Kevin", avatar: "/api/avatars/1", team: 2 });
+  assert.equal(levels[1].people[0].team, 2);
+  // Ein Berater hat kein Team - auch nicht, wenn er in der Datenbank sich selbst untersteht.
+  assert.ok(levels[3].people.every((person) => person.team === 0));
+  // Die Stufe der Geschaeftsfuehrung spielt keine Rolle: sie steht immer an der Spitze.
+  assert.deepEqual(buildPyramid([member(9, "Chefin", "SENIOR", null, { role: "LEADER" })]).map((level) => level.people.length), [1, 0, 0, 0]);
+  assert.deepEqual(buildPyramid([]).map((level) => level.people.length), [0, 0, 0, 0]);
+});
+
+test("Navigation: die Stufen stehen im Team - fuer alle, und der Reiter Team bleibt markiert", () => {
+  const none = Object.fromEntries(PERMISSIONS.map(({ key }) => [key, false])) as PermissionSet;
+  const nav = navigation("MEMBER", none, 7);
+  const team = nav.sidebar.find((section) => section.title === "Team")!;
+  assert.deepEqual(team.items.map((item) => item.href), ["/team", "/team/rangliste", "/team/erfolge", "/team/stufen"]);
+  assert.ok(nav.items.some((item) => item.href === "/team/stufen" && item.label === "Stufen" && item.icon === "pyramid"));
+  assert.equal(activeHref(team.items, "/team/stufen"), "/team/stufen");
+  assert.equal(activeHref(nav.tabs, "/team/stufen"), "/team");
 });
 
 test("Update: wer schon ein Team hat, wird einmalig Teamleiter - Saetze und spaetere Aenderungen bleiben unberuehrt", () => {

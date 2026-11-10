@@ -338,7 +338,14 @@ Alle in `src/components/`. Stil per Klassen aus `globals.css` (`@layer component
 - **Raster aus Kacheln** (Abzeichen) als `.tile-grid`: Haarlinien je Kachel,
   eine unvollständige letzte Reihe bleibt Fläche statt graue Lücke.
 - **Untertitel immer** auf Seiten, die als Reiter nebeneinanderstehen (Feed,
-  Rangliste, Erfolge) – sonst springt die Segmentleiste beim Wechsel.
+  Rangliste, Erfolge, Stufen) – sonst springt die Segmentleiste beim Wechsel. Vier
+  Reiter bekommen `seg-tight` (schmalerer Rand), damit auf dem Handy kein Wort
+  abgeschnitten wird.
+- **Pyramide** (`.pyramid`, Team › Stufen): je Stufe eine `.surface`, zentriert und nach
+  unten breiter (46 % bis 100 %, höchstens 720 px), 4 px Abstand – gestuft statt schräg,
+  damit die Flächen ihre Radien behalten und Profilbilder nie beschnitten werden. Darin
+  der Name der Stufe mit leiser Anzahl und die Leute als `Avatar` (48 px) mit Vornamen.
+  Farbe trägt nur man selbst: ein Ring im Akzent und das Wort „Du“.
 - **Selten Gebrauchtes** hinter `Menu` („…“).
 - **Nichts steht doppelt.** Das Profil ist kurz: man selbst, die eigenen Listen, für
   die Leitung die Verwaltung, dann „Einstellungen“. Was Gerät und Konto betrifft

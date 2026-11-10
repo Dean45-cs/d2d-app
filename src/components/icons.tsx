@@ -612,6 +612,15 @@ export function IconEuro(props: IconProps) {
 
 /* ---------------------------- Team & Feed ----------------------------- */
 
+/** Stufen im Team: eine Pyramide in drei Lagen. */
+export function IconPyramid(props: IconProps) {
+  return (
+    <Line {...props}>
+      <path d="M12 4.25 3.5 19.75h17L12 4.25Z" />
+      <path d="M9.25 9.5h5.5M6.4 14.6h11.2" />
+    </Line>
+  );
+}
 export function IconTrophy(props: IconProps) {
   return (
     <Line {...props}>

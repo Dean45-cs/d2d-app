@@ -13,7 +13,7 @@ export default function LoadingAchievements() {
   return (
     <div className="page" aria-busy="true" aria-label="Erfolge werden geladen">
       <SkeletonHeader title="Erfolge">
-        <SegmentedLinks ariaLabel="Team" current="erfolge" options={TEAM_VIEWS} className="max-w-md" />
+        <SegmentedLinks ariaLabel="Team" current="erfolge" options={TEAM_VIEWS} className="max-w-md seg-tight" />
       </SkeletonHeader>
       <div className="grid grid-cols-1 gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,400px)] lg:items-start">
         <div className="space-y-8">

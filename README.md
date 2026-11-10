@@ -28,6 +28,8 @@ Eine Web-App für Door-to-Door-Teams im Energievertrieb:
   Vergleich zum gleich langen Zeitraum davor – fürs Team und je Person
 - **Rangliste** – je Kennzahl, der eigene Platz samt Abstand zum nächsten,
   Team-Schnitt, Bestwert und Direktvergleich mit einem Kollegen
+- **Stufen** – wer Berater, Senior Berater oder Teamleiter ist, als Pyramide mit
+  Profilbildern: oben die Geschäftsführung, unten die breite Basis
 - **Team-Feed** – jeder Abschluss erscheint von selbst; dazu eigene Beiträge, Kommentare
   und „Gefällt mir“
 - **Abonnieren** – wer Kollegen abonniert, bekommt eine Push-Nachricht aufs Handy,
@@ -145,8 +147,8 @@ Die Sicherheitstests laufen über `npm test`, einschließlich
 
 Auf dem Handy schwebt unten eine Reiterleiste aus Glas: **Klinken · Karte · Team ·
 Profil**, mit dem Recht „Teamauswertung“ vorne zusätzlich **Übersicht**. Der Vertrieb
-landet direkt beim Klinken. „Karte“ umfasst Gebiete und Preise, „Team“ Feed, Rangliste
-und Erfolge, „Profil“ die eigenen Listen (**Provisionen**, mit dem Recht „Kundenliste pflegen“ auch
+landet direkt beim Klinken. „Karte“ umfasst Gebiete und Preise, „Team“ Feed, Rangliste, Erfolge
+und Stufen, „Profil“ die eigenen Listen (**Provisionen**, mit dem Recht „Kundenliste pflegen“ auch
 **Kunden**), das Gerät und – je nach Recht – die Verwaltung (Mitglieder, Einladungen, Rechte, Ablehnungsgründe, Energie & Tarif,
 Provisionsregeln). Auf
 iPad (ab 744 pt Breite, also auch iPad mini hochkant) und Rechner steht alles in einer
@@ -450,6 +452,14 @@ Stufen**. Ohne eigenen Satz bekommt eine Stufe so viel wie die darunter, nie wen
 - **Keine weiteren Ebenen.** Wird jemand im Team selbst Teamleiter, fällt die Differenz weg
   und er baut sein eigenes Team auf; an dessen Leuten verdient der frühere Teamleiter nichts.
   Ein Vertrag kostet so nie mehr als den Satz eines Teamleiters.
+
+**Die Pyramide** unter **Team › Stufen** (`/team/stufen`) zeigt allen, wer wo steht: oben
+die Geschäftsführung, darunter Teamleiter, Senior Berater und als breite Basis die Berater –
+jede Person mit Profilbild (ohne Bild das Kürzel) und Vornamen, innerhalb einer Stufe nach
+Namen. Ein Tipp führt ins Profil, man selbst trägt einen Ring und heißt „Du“; wer ein Team
+hat, darunter „6 im Team“. Leere Stufen bleiben als „Noch frei“ stehen, damit man sieht,
+wohin es geht. Deaktivierte fehlen, Provisionssätze stehen dort nicht. Aufbau in
+`buildPyramid` (`src/lib/tiers.ts`), Tests in `scripts/tests/tiers.test.ts`.
 
 Beispiel bei 184,62 € Admin-Provision und den Sätzen 65 / 70 / 75 %:
 
@@ -1324,8 +1334,8 @@ braucht es trotzdem eine Rechtsgrundlage, eine Information der Kundschaft und ei
 Löschfrist; das gehört mit dem eigenen Datenschutzbeauftragten abgestimmt. Die App gibt
 keine Frist vor und löscht nichts von selbst.
 
-**Vergleich, Feed und Profil** machen die Leistung jedes Einzelnen im Team sichtbar:
-Abschlüsse, Quoten und Platz sieht jeder, der angemeldet ist – im Vertrieb also auch die
+**Vergleich, Feed, Stufen und Profil** machen die Leistung jedes Einzelnen im Team sichtbar:
+Abschlüsse, Quoten, Platz und Stufe sieht jeder, der angemeldet ist – im Vertrieb also auch die
 Zahlen der Kollegen. Das ist eine Leistungsauswertung von Beschäftigten und gehört vor dem
 Einsatz mit dem Betriebsrat bzw. den Beschäftigten abgestimmt. Kundendaten tauchen dort
 nicht auf: ein Abschluss im Feed nennt Produkt und Gebiet, keine Adresse und keinen Namen.

@@ -13,7 +13,7 @@ export default function LoadingRanking() {
   return (
     <div className="page" aria-busy="true" aria-label="Rangliste wird geladen">
       <SkeletonHeader title="Rangliste">
-        <SegmentedLinks ariaLabel="Team" current="rangliste" options={TEAM_VIEWS} className="max-w-md" />
+        <SegmentedLinks ariaLabel="Team" current="rangliste" options={TEAM_VIEWS} className="max-w-md seg-tight" />
       </SkeletonHeader>
       <SkeletonSegmented className="mb-3 max-w-md" />
       <SkeletonChips widths={[100, 92, 84, 112]} className="mb-6" />
