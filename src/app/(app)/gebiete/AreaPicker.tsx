@@ -404,7 +404,7 @@ export function AreaPicker({
         <label className="relative min-w-0 flex-1">
           <IconSearch className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-muted" />
           <input
-            className="field pl-12"
+            className="field field-search pl-12"
             placeholder="Ort oder PLZ"
             value={query}
             onChange={(e) => setQuery(e.target.value)}

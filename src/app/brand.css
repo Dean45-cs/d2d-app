@@ -18,20 +18,22 @@
                     >= 3:1 auf Weiss und auf --bg
      --accent-ink   Schrift und kleine Zeichen in Gruen, >= 4.5:1 auch auf der Toenung
      --accent-vivid nur zum Toenen (color-mix), nie als Schrift
-     --primary-*    die Hauptaktion: tiefgruener Verlauf mit weisser Schrift,
+     --primary-*    die Hauptaktion: volle Flaeche mit weisser Schrift,
                     schon am hellen Ende >= 4.5:1 */
   --accent: var(--t-accent, #15904a);
   --accent-ink: var(--t-accent-ink, #0c6a34);
   --accent-vivid: var(--t-accent-vivid, #2fd161);
   --primary-top: var(--t-primary-top, #16884a);
   --primary-bottom: var(--t-primary-bottom, #0d6634);
-  --primary: var(--primary-bottom);
+  /* Die Flaeche der Hauptaktion ist das helle Ende: klar und frisch, weisse
+     Schrift >= 4.5:1. Das dunkle Ende bleibt fuer Gedrueckt und Tiefe. */
+  --primary: var(--primary-top);
   --on-primary: #ffffff;
   --elev-primary: none;
   /* Leise Auswahl (aktiver Reiter, Seitenleiste) */
   --accent-soft: color-mix(in srgb, var(--accent) 12%, transparent);
-  /* Markenflaeche (Kopfkarte der Uebersicht, Anmeldung): tiefes Gruen,
-     weisse Schrift >= 9:1 */
+  /* Tiefe Stufe der Marke: Teil jeder Akzentpalette (weisse Schrift
+     >= 9:1), in der App derzeit nicht als Flaeche im Einsatz. */
   --brand-deep: var(--t-brand-deep, #0f4d2a);
   --brand-deeper: var(--t-brand-deeper, #0a361e);
   --brand-glow: rgb(var(--t-brand-glow, 70 214 128) / 0.35);
@@ -64,12 +66,12 @@
   --warn-tint: color-mix(in srgb, #ff9f0a 16%, transparent);
 
   /* Diagramme: Tueren neutral, Abschluesse im Akzent (>= 3:1 auf Weiss) */
-  --chart-doors: var(--t-chart-doors, #8a978f);
-  --chart-met: var(--t-chart-met, #36413b);
+  --chart-doors: var(--t-chart-doors, #8e8e93);
+  --chart-met: var(--t-chart-met, #3a3a3c);
   --chart-sales: var(--accent);
   /* Verlauf: die Tuer-Saeule ist nur die Spur, in der die Abschluesse
      stehen - jeder Tag steht zusaetzlich als Text daneben (sr-only, title). */
-  --chart-doors-soft: var(--t-chart-doors-soft, #c9d2cd);
+  --chart-doors-soft: var(--t-chart-doors-soft, #d1d1d6);
 
   /* Teilgebiete auf der Karte. Sechs Farben, als Satz gegen Rot-, Gruen- und
      Blauschwaeche geprueft (simuliert, jedes Paar gegen jedes, hell und dunkel):
@@ -86,7 +88,7 @@
   /* Preisstufen der Energiekarte - sequenziell von grau (wenig Argument)
      zu tiefgruen (starkes Wechselargument). Die Helligkeit steigt stetig,
      so bleiben die Stufen auch ohne Farbsehen unterscheidbar. */
-  --price-0: var(--t-price-0, #c7ccc9);
+  --price-0: var(--t-price-0, #c7c7cc);
   --price-1: var(--t-price-1, #9dbfa8);
   --price-2: var(--t-price-2, #5fb37c);
   --price-3: var(--t-price-3, #22a052);
@@ -136,16 +138,16 @@
     --danger-tint: color-mix(in srgb, #ff453a 18%, transparent);
     --warn: #ffb547;
     --warn-tint: color-mix(in srgb, #ff9f0a 20%, transparent);
-    --chart-doors: var(--t-chart-doors-d, #8e9a94);
-    --chart-met: var(--t-chart-met-d, #d0d7d3);
-    --chart-doors-soft: var(--t-chart-doors-soft-d, #36403b);
+    --chart-doors: var(--t-chart-doors-d, #8e8e93);
+    --chart-met: var(--t-chart-met-d, #d1d1d6);
+    --chart-doors-soft: var(--t-chart-doors-soft-d, #3a3a3c);
     --plot-1: #3987e5;
     --plot-2: #c98500;
     --plot-3: #d55181;
     --plot-4: #008300;
     --plot-5: #7711ff;
     --plot-6: #aaaadd;
-    --price-0: var(--t-price-0-d, #4a4f4c);
+    --price-0: var(--t-price-0-d, #48484a);
     --price-1: var(--t-price-1-d, #3f6b4e);
     --price-2: var(--t-price-2-d, #2e8f52);
     --price-3: var(--t-price-3-d, #2bb45e);
@@ -174,16 +176,16 @@
   --danger-tint: color-mix(in srgb, #ff453a 18%, transparent);
   --warn: #ffb547;
   --warn-tint: color-mix(in srgb, #ff9f0a 20%, transparent);
-  --chart-doors: var(--t-chart-doors-d, #8e9a94);
-  --chart-met: var(--t-chart-met-d, #d0d7d3);
-  --chart-doors-soft: var(--t-chart-doors-soft-d, #36403b);
+  --chart-doors: var(--t-chart-doors-d, #8e8e93);
+  --chart-met: var(--t-chart-met-d, #d1d1d6);
+  --chart-doors-soft: var(--t-chart-doors-soft-d, #3a3a3c);
   --plot-1: #3987e5;
   --plot-2: #c98500;
   --plot-3: #d55181;
   --plot-4: #008300;
   --plot-5: #7711ff;
   --plot-6: #aaaadd;
-  --price-0: var(--t-price-0-d, #4a4f4c);
+  --price-0: var(--t-price-0-d, #48484a);
   --price-1: var(--t-price-1-d, #3f6b4e);
   --price-2: var(--t-price-2-d, #2e8f52);
   --price-3: var(--t-price-3-d, #2bb45e);

@@ -55,58 +55,62 @@
     "Inter", sans-serif;
   --font-mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
 
-  /* Typostufen nach Apple HIG (iOS, Dynamic Type "Large"). Nur diese. */
-  --text-display: 2.5rem;
-  --text-display--line-height: 2.75rem;
-  --text-display--letter-spacing: -0.028em;
+  /* Typostufen nach Apple HIG (iOS, Dynamic Type "Large"), eine Stufe
+     kompakter. Nur diese. Laufweite: die Systemschrift richtet sie je Groesse
+     selbst aus - Fliesstext bleibt darum fast unberuehrt, nur Titel laufen
+     etwas enger, damit sie gesetzt wirken. */
+  --text-display: 3rem;
+  --text-display--line-height: 3.25rem;
+  --text-display--letter-spacing: -0.03em;
   --text-display--font-weight: 700;
-  --text-large-title: 1.75rem;
-  --text-large-title--line-height: 2.125rem;
-  --text-large-title--letter-spacing: -0.014em;
+  --text-large-title: 2rem;
+  --text-large-title--line-height: 2.375rem;
+  --text-large-title--letter-spacing: -0.022em;
   --text-large-title--font-weight: 700;
   --text-title-1: 1.5rem;
   --text-title-1--line-height: 1.875rem;
-  --text-title-1--letter-spacing: -0.01em;
+  --text-title-1--letter-spacing: -0.018em;
   --text-title-1--font-weight: 700;
-  --text-title-2: 1.1875rem;
-  --text-title-2--line-height: 1.5rem;
-  --text-title-2--letter-spacing: -0.008em;
+  --text-title-2: 1.25rem;
+  --text-title-2--line-height: 1.5625rem;
+  --text-title-2--letter-spacing: -0.016em;
   --text-title-2--font-weight: 700;
   --text-title-3: 1.0625rem;
   --text-title-3--line-height: 1.375rem;
-  --text-title-3--letter-spacing: -0.006em;
+  --text-title-3--letter-spacing: -0.012em;
   --text-title-3--font-weight: 600;
   --text-headline: 0.9375rem;
   --text-headline--line-height: 1.25rem;
-  --text-headline--letter-spacing: -0.025em;
+  --text-headline--letter-spacing: -0.011em;
   --text-headline--font-weight: 600;
   --text-body: 0.9375rem;
   --text-body--line-height: 1.25rem;
-  --text-body--letter-spacing: -0.025em;
+  --text-body--letter-spacing: -0.011em;
   --text-callout: 0.875rem;
   --text-callout--line-height: 1.1875rem;
-  --text-callout--letter-spacing: -0.019em;
+  --text-callout--letter-spacing: -0.008em;
   --text-subhead: 0.8125rem;
   --text-subhead--line-height: 1.125rem;
-  --text-subhead--letter-spacing: -0.016em;
+  --text-subhead--letter-spacing: -0.005em;
   --text-footnote: 0.75rem;
   --text-footnote--line-height: 1rem;
-  --text-footnote--letter-spacing: -0.006em;
+  --text-footnote--letter-spacing: 0;
   --text-caption: 0.6875rem;
   --text-caption--line-height: 0.875rem;
+  --text-caption--letter-spacing: 0.005em;
   --text-caption-2: 0.625rem;
   --text-caption-2--line-height: 0.75rem;
-  --text-caption-2--letter-spacing: 0.006em;
+  --text-caption-2--letter-spacing: 0.01em;
   --text-caption-2--font-weight: 600;
 
   /* ------------------------------- Radien -------------------------------- */
-  /* Konzentrisch: innen = aussen - Abstand (28 - 8 = 20, 20 - 4 = 16 ...). */
-  --radius-xs: 4px;
-  --radius-sm: 6px;
+  /* Konzentrisch: innen = aussen - Abstand (26 - 8 = 18, 18 - 4 = 14 ...). */
+  --radius-xs: 5px;
+  --radius-sm: 7px;
   --radius-md: 10px;
-  --radius-lg: 12px;
-  --radius-xl: 14px;
-  --radius-2xl: 20px;
+  --radius-lg: 14px;
+  --radius-xl: 18px;
+  --radius-2xl: 26px;
   --radius-full: 9999px;
 
   /* ---------------------------- Tiefe & Bewegung ------------------------- */
@@ -124,43 +128,50 @@
    ========================================================================== */
 
 :root {
-  /* Neutrale mit einem Hauch Gruen: gehoeren zur Marke statt zum
-     Lavendelgrau der Systemvorgabe. Jedes Token liest zuerst sein
+  /* Neutrale wie auf iPhone und Mac: der gruppierte Grund #f2f2f7, darauf
+     weisse Flaechen, Schrift fast schwarz. Farbe traegt nur, was etwas
+     bedeutet oder sich bedienen laesst. Jedes Token liest zuerst sein
      --t-Gegenstueck (hell --t-name, dunkel --t-name-d): so bekommen Grund,
      Linien und Glas den Hauch der gewaehlten Akzentfarbe (themes.css). Mit
-     Deckkraft stehen sie als Tripel da: rgb(var(--t-tint, 70 90 80) / 0.1). */
-  --bg: var(--t-bg, #f2f4f3);
+     Deckkraft stehen sie als Tripel da: rgb(var(--t-tint, 120 120 128) / 0.12). */
+  --bg: var(--t-bg, #f2f2f7);
   --surface: #ffffff;
-  --surface-2: var(--t-bg, #f2f4f3);
-  /* Grund einer Karte, solange die Kacheln laden - hebt sich hell vom
+  --surface-2: var(--t-bg, #f2f2f7);
+  /* Grund einer Karte, solange die Kacheln laden - hebt sich vom
      Seitengrund ab (--surface-2 waere dort unsichtbar). */
-  --map-ground: var(--t-map-ground, #e3e7e5);
-  --fill: rgb(var(--t-tint, 70 90 80) / 0.1);
-  --fill-strong: rgb(var(--t-tint, 70 90 80) / 0.17);
-  --ink: var(--t-ink, #0b1510);
-  --ink-2: var(--t-ink-2, #36413b);
-  --muted: var(--t-muted, #5f6964);
-  --separator: rgb(var(--t-line, 40 60 50) / 0.13);
-  --scrim: rgb(var(--t-scrim, 4 14 9) / 0.32);
+  --map-ground: var(--t-map-ground, #e5e5ea);
+  --fill: rgb(var(--t-tint, 120 120 128) / 0.12);
+  --fill-strong: rgb(var(--t-tint, 120 120 128) / 0.2);
+  --ink: var(--t-ink, #1d1d1f);
+  --ink-2: var(--t-ink-2, #3a3a3c);
+  --muted: var(--t-muted, #6a6a6f);
+  --separator: rgb(var(--t-line, 60 60 67) / 0.14);
+  --scrim: rgb(var(--t-scrim, 10 10 15) / 0.3);
   --seg-thumb: #ffffff;
-  --hover: rgb(var(--t-tint, 70 90 80) / 0.07);
-  --press: rgb(var(--t-tint, 70 90 80) / 0.14);
+  --hover: rgb(var(--t-tint, 120 120 128) / 0.07);
+  --press: rgb(var(--t-tint, 120 120 128) / 0.16);
   /* Jede zweite Zeile einer Tabelle (Klinken) - haelt die Zeile auch in der Sonne. */
-  --zebra: rgb(var(--t-tint, 70 90 80) / 0.05);
+  --zebra: rgb(var(--t-tint, 120 120 128) / 0.06);
 
   /* Material "Liquid Glass" */
-  --glass-bg: rgb(var(--t-glass, 250 252 251) / 0.74);
-  --glass-strong: rgb(var(--t-glass, 250 252 251) / 0.86);
-  --glass-solid: var(--t-glass-solid, #f8faf9);
-  --glass-sheen: linear-gradient(180deg, rgb(255 255 255 / 0.55), rgb(255 255 255 / 0) 55%);
-  --glass-edge: inset 0 0.5px 0 0 rgb(255 255 255 / 0.9), inset 0 0 0 0.5px rgb(var(--t-shade, 10 30 20) / 0.07);
-  --glass-blur: blur(22px) saturate(180%);
+  --glass-bg: rgb(var(--t-glass, 249 249 251) / 0.72);
+  --glass-strong: rgb(var(--t-glass, 249 249 251) / 0.88);
+  --glass-solid: var(--t-glass-solid, #f7f7fa);
+  --glass-sheen: linear-gradient(180deg, rgb(255 255 255 / 0.5), rgb(255 255 255 / 0) 60%);
+  --glass-edge: inset 0 0.5px 0 0 rgb(255 255 255 / 0.9), inset 0 0 0 0.5px rgb(var(--t-shade, 10 10 20) / 0.08);
+  --glass-blur: blur(24px) saturate(180%);
 
-  /* Inhaltsflaechen liegen auf dem Grund: feine Kante, weicher Schatten. */
-  --elev-card: 0 0 0 1px rgb(var(--t-shade, 16 40 28) / 0.07), 0 1px 2px rgb(var(--t-shade, 16 40 28) / 0.03);
-  --elev-glass: 0 1px 2px rgb(var(--t-shade, 10 30 20) / 0.06), 0 10px 30px -10px rgb(var(--t-shade, 10 30 20) / 0.24);
-  --elev-float: 0 2px 6px rgb(var(--t-shade, 10 30 20) / 0.07), 0 28px 60px -18px rgb(var(--t-shade, 10 30 20) / 0.34);
-  --elev-thumb: 0 1px 2px rgb(var(--t-shade, 10 30 20) / 0.08), 0 3px 8px rgb(var(--t-shade, 10 30 20) / 0.1);
+  /* Blaetter: der gruppierte Grund als Glas, Listen darin weiss. */
+  --sheet-bg: color-mix(in srgb, var(--bg) 90%, transparent);
+  --sheet-surface: var(--surface);
+  --sheet-surface-2: var(--surface-2);
+
+  /* Inhaltsflaechen liegen ohne Kante und Schatten auf dem Grund - der
+     Unterschied der Helligkeit traegt sie. Tiefe hat nur, was schwebt. */
+  --elev-card: 0 0 #0000;
+  --elev-glass: 0 1px 3px rgb(var(--t-shade, 10 10 20) / 0.06), 0 8px 28px -8px rgb(var(--t-shade, 10 10 20) / 0.18);
+  --elev-float: 0 2px 8px rgb(var(--t-shade, 10 10 20) / 0.06), 0 24px 56px -16px rgb(var(--t-shade, 10 10 20) / 0.28);
+  --elev-thumb: 0 3px 1px rgb(0 0 0 / 0.04), 0 3px 8px rgb(0 0 0 / 0.12);
 
   /* Bewegung: kurz und federnd, nie im Weg */
   --dur-1: 150ms;
@@ -177,32 +188,36 @@
 }
 
 /* ==========================================================================
-   Neutrale Tokens - dunkel (gestaltet, nicht invertiert)
+   Neutrale Tokens - dunkel (gestaltet, nicht invertiert): Schwarz als Grund,
+   darauf die Flaechen in zwei Stufen Grau - wie iOS im Dunkelmodus
    ========================================================================== */
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
     --bg: #000000;
-    --surface: var(--t-surface-d, #141917);
-    --surface-2: var(--t-surface-2-d, #1f2522);
-    --map-ground: var(--t-map-ground-d, #1f2522);
-    --fill: rgb(var(--t-tint-d, 120 140 130) / 0.2);
-    --fill-strong: rgb(var(--t-tint-d, 120 140 130) / 0.3);
-    --ink: var(--t-ink-d, #f3f6f4);
-    --ink-2: var(--t-ink-2-d, #d0d7d3);
-    --muted: var(--t-muted-d, #a3aca7);
-    --separator: rgb(var(--t-line-d, 84 100 92) / 0.5);
-    --scrim: rgb(0 0 0 / 0.55);
-    --seg-thumb: var(--t-seg-thumb-d, #59625d);
-    --hover: rgb(var(--t-tint-d, 120 140 130) / 0.12);
-    --press: rgb(var(--t-tint-d, 120 140 130) / 0.22);
-    --zebra: rgb(var(--t-tint-d, 120 140 130) / 0.08);
-    --glass-bg: rgb(var(--t-glass-d, 26 32 29) / 0.72);
-    --glass-strong: rgb(var(--t-glass-d, 26 32 29) / 0.86);
-    --glass-solid: var(--t-glass-solid-d, #1a201d);
-    --glass-sheen: linear-gradient(180deg, rgb(255 255 255 / 0.07), rgb(255 255 255 / 0) 55%);
-    --glass-edge: inset 0 0.5px 0 0 rgb(255 255 255 / 0.2), inset 0 0 0 0.5px rgb(255 255 255 / 0.09);
-    --elev-card: inset 0 0.5px 0 rgb(255 255 255 / 0.06), 0 0 0 1px rgb(255 255 255 / 0.045);
+    --surface: var(--t-surface-d, #1c1c1e);
+    --surface-2: var(--t-surface-2-d, #2c2c2e);
+    --map-ground: var(--t-map-ground-d, #2c2c2e);
+    --fill: rgb(var(--t-tint-d, 120 120 128) / 0.24);
+    --fill-strong: rgb(var(--t-tint-d, 120 120 128) / 0.36);
+    --ink: var(--t-ink-d, #f5f5f7);
+    --ink-2: var(--t-ink-2-d, #d1d1d6);
+    --muted: var(--t-muted-d, #a1a1a6);
+    --separator: rgb(var(--t-line-d, 84 84 88) / 0.55);
+    --scrim: rgb(0 0 0 / 0.5);
+    --seg-thumb: var(--t-seg-thumb-d, #636366);
+    --hover: rgb(var(--t-tint-d, 120 120 128) / 0.14);
+    --press: rgb(var(--t-tint-d, 120 120 128) / 0.28);
+    --zebra: rgb(var(--t-tint-d, 120 120 128) / 0.1);
+    --glass-bg: rgb(var(--t-glass-d, 30 30 32) / 0.72);
+    --glass-strong: rgb(var(--t-glass-d, 30 30 32) / 0.88);
+    --glass-solid: var(--t-glass-solid-d, #232326);
+    --glass-sheen: linear-gradient(180deg, rgb(255 255 255 / 0.06), rgb(255 255 255 / 0) 60%);
+    --glass-edge: inset 0 0.5px 0 0 rgb(255 255 255 / 0.18), inset 0 0 0 0.5px rgb(255 255 255 / 0.08);
+    --sheet-bg: color-mix(in srgb, var(--surface) 90%, transparent);
+    --sheet-surface: var(--surface-2);
+    --sheet-surface-2: rgb(var(--t-tint-d, 120 120 128) / 0.3);
+    --elev-card: 0 0 #0000;
     --elev-glass: 0 1px 2px rgb(0 0 0 / 0.4), 0 12px 32px -10px rgb(0 0 0 / 0.7);
     --elev-float: 0 2px 6px rgb(0 0 0 / 0.4), 0 28px 60px -18px rgb(0 0 0 / 0.8);
     --elev-thumb: 0 1px 2px rgb(0 0 0 / 0.3), 0 3px 8px rgb(0 0 0 / 0.3);
@@ -211,26 +226,29 @@
 
 :root[data-theme="dark"] {
   --bg: #000000;
-  --surface: var(--t-surface-d, #141917);
-  --surface-2: var(--t-surface-2-d, #1f2522);
-  --map-ground: var(--t-map-ground-d, #1f2522);
-  --fill: rgb(var(--t-tint-d, 120 140 130) / 0.2);
-  --fill-strong: rgb(var(--t-tint-d, 120 140 130) / 0.3);
-  --ink: var(--t-ink-d, #f3f6f4);
-  --ink-2: var(--t-ink-2-d, #d0d7d3);
-  --muted: var(--t-muted-d, #a3aca7);
-  --separator: rgb(var(--t-line-d, 84 100 92) / 0.5);
-  --scrim: rgb(0 0 0 / 0.55);
-  --seg-thumb: var(--t-seg-thumb-d, #59625d);
-  --hover: rgb(var(--t-tint-d, 120 140 130) / 0.12);
-  --press: rgb(var(--t-tint-d, 120 140 130) / 0.22);
-  --zebra: rgb(var(--t-tint-d, 120 140 130) / 0.08);
-  --glass-bg: rgb(var(--t-glass-d, 26 32 29) / 0.72);
-  --glass-strong: rgb(var(--t-glass-d, 26 32 29) / 0.86);
-  --glass-solid: var(--t-glass-solid-d, #1a201d);
-  --glass-sheen: linear-gradient(180deg, rgb(255 255 255 / 0.07), rgb(255 255 255 / 0) 55%);
-  --glass-edge: inset 0 0.5px 0 0 rgb(255 255 255 / 0.2), inset 0 0 0 0.5px rgb(255 255 255 / 0.09);
-  --elev-card: inset 0 0.5px 0 rgb(255 255 255 / 0.06), 0 0 0 1px rgb(255 255 255 / 0.045);
+  --surface: var(--t-surface-d, #1c1c1e);
+  --surface-2: var(--t-surface-2-d, #2c2c2e);
+  --map-ground: var(--t-map-ground-d, #2c2c2e);
+  --fill: rgb(var(--t-tint-d, 120 120 128) / 0.24);
+  --fill-strong: rgb(var(--t-tint-d, 120 120 128) / 0.36);
+  --ink: var(--t-ink-d, #f5f5f7);
+  --ink-2: var(--t-ink-2-d, #d1d1d6);
+  --muted: var(--t-muted-d, #a1a1a6);
+  --separator: rgb(var(--t-line-d, 84 84 88) / 0.55);
+  --scrim: rgb(0 0 0 / 0.5);
+  --seg-thumb: var(--t-seg-thumb-d, #636366);
+  --hover: rgb(var(--t-tint-d, 120 120 128) / 0.14);
+  --press: rgb(var(--t-tint-d, 120 120 128) / 0.28);
+  --zebra: rgb(var(--t-tint-d, 120 120 128) / 0.1);
+  --glass-bg: rgb(var(--t-glass-d, 30 30 32) / 0.72);
+  --glass-strong: rgb(var(--t-glass-d, 30 30 32) / 0.88);
+  --glass-solid: var(--t-glass-solid-d, #232326);
+  --glass-sheen: linear-gradient(180deg, rgb(255 255 255 / 0.06), rgb(255 255 255 / 0) 60%);
+  --glass-edge: inset 0 0.5px 0 0 rgb(255 255 255 / 0.18), inset 0 0 0 0.5px rgb(255 255 255 / 0.08);
+  --sheet-bg: color-mix(in srgb, var(--surface) 90%, transparent);
+  --sheet-surface: var(--surface-2);
+  --sheet-surface-2: rgb(var(--t-tint-d, 120 120 128) / 0.3);
+  --elev-card: 0 0 #0000;
   --elev-glass: 0 1px 2px rgb(0 0 0 / 0.4), 0 12px 32px -10px rgb(0 0 0 / 0.7);
   --elev-float: 0 2px 6px rgb(0 0 0 / 0.4), 0 28px 60px -18px rgb(0 0 0 / 0.8);
   --elev-thumb: 0 1px 2px rgb(0 0 0 / 0.3), 0 3px 8px rgb(0 0 0 / 0.3);
@@ -586,26 +604,26 @@
   /* ---------------------------- Abschnitte ------------------------------- */
 
   .section-title {
-    font-size: var(--text-title-3);
-    line-height: var(--text-title-3--line-height);
-    letter-spacing: var(--text-title-3--letter-spacing);
+    font-size: var(--text-title-2);
+    line-height: var(--text-title-2--line-height);
+    letter-spacing: var(--text-title-2--letter-spacing);
     font-weight: 700;
     color: var(--ink);
   }
-  /* Kleine Ueberschrift ueber einer Liste, wie in den iOS-Einstellungen. */
+  /* Ueberschrift ueber einer Liste: in normaler Schreibweise, leise - wie
+     die Gruppen der iOS-Einstellungen heute, nicht mehr in Versalien. */
   .list-label {
     display: block;
-    padding: 0 16px 6px;
-    font-size: var(--text-caption);
-    line-height: var(--text-footnote--line-height);
+    padding: 0 16px 7px;
+    font-size: var(--text-subhead);
+    line-height: var(--text-subhead--line-height);
+    letter-spacing: var(--text-subhead--letter-spacing);
     font-weight: 600;
-    letter-spacing: 0.04em;
-    text-transform: uppercase;
     color: var(--muted);
   }
   /* Folgt die Gruppe einer anderen, steht sie mit Luft darunter. */
   * + .list-label {
-    margin-top: 18px;
+    margin-top: 22px;
   }
   .list-footer {
     padding: 8px 16px 0;
@@ -665,10 +683,10 @@
   }
   .cell-chevron {
     flex-shrink: 0;
-    width: 14px;
-    height: 14px;
+    width: 13px;
+    height: 13px;
     color: var(--muted);
-    opacity: 0.7;
+    opacity: 0.55;
   }
 
   /* Raster aus Kacheln auf einer Flaeche (Abzeichen): Haarlinien rechts und
@@ -715,18 +733,18 @@
     opacity: 0.4;
     cursor: not-allowed;
   }
-  /* Hauptaktion: tiefgruener Verlauf mit Lichtkante, weisse Schrift -
-     eine je Bildschirm. */
+  /* Hauptaktion: volle Akzentflaeche, weisse Schrift, flach - eine je
+     Bildschirm. */
   .btn-primary {
     background: var(--primary);
     color: var(--on-primary);
     box-shadow: var(--elev-primary);
   }
   .btn-primary:hover:not(:disabled) {
-    filter: brightness(1.07);
+    filter: brightness(1.06);
   }
   .btn-primary:active:not(:disabled) {
-    filter: brightness(0.95);
+    filter: brightness(0.92);
   }
   .btn-secondary {
     background: var(--fill);
@@ -817,7 +835,7 @@
     display: inline-flex;
     align-items: center;
     gap: 4px;
-    font-weight: 600;
+    font-weight: 500;
     color: var(--accent-ink);
     border-radius: var(--radius-sm);
   }
@@ -869,6 +887,12 @@
     background-position: right 12px center;
     background-size: 20px 20px;
   }
+  /* Suchfeld: Kapsel wie die Suchleisten des Systems. */
+  .field-search {
+    min-height: 44px;
+    padding-block: 10px;
+    border-radius: var(--radius-full);
+  }
   /* Feld in einer Zeile der Liste - ohne eigene Flaeche. */
   .field-bare {
     min-height: 44px;
@@ -913,9 +937,9 @@
     font-size: var(--text-subhead);
     line-height: var(--text-subhead--line-height);
     letter-spacing: var(--text-subhead--letter-spacing);
-    font-weight: 600;
+    font-weight: 500;
     white-space: nowrap;
-    color: var(--ink-2);
+    color: var(--ink);
     transition:
       background-color var(--dur-2) var(--ease-spring),
       color var(--dur-1) var(--ease-out),
@@ -930,6 +954,7 @@
   .seg > [aria-current="page"] {
     background: var(--seg-thumb);
     color: var(--ink);
+    font-weight: 600;
     box-shadow: var(--elev-thumb);
   }
   .seg-glass {
@@ -942,8 +967,8 @@
   }
   .seg-glass > [aria-pressed="true"],
   .seg-glass > [aria-current="page"] {
-    background: var(--accent-tint);
-    color: var(--accent-ink);
+    background: var(--fill-strong);
+    color: var(--ink);
     box-shadow: none;
   }
 
@@ -970,26 +995,24 @@
     color: var(--ink);
     font-size: var(--text-subhead);
     line-height: var(--text-subhead--line-height);
-    font-weight: 600;
+    letter-spacing: var(--text-subhead--letter-spacing);
+    font-weight: 500;
     white-space: nowrap;
     transition:
       background-color var(--dur-1) var(--ease-out),
+      color var(--dur-1) var(--ease-out),
       transform var(--dur-1) var(--ease-spring);
   }
   .chip:active {
     transform: scale(0.96);
   }
+  /* Gewaehlt: Schriftfarbe als Flaeche (hell schwarz, dunkel weiss) - ein
+     Filter ist keine Aktion, das Gruen bleibt der Hauptaktion. */
   .chip[aria-pressed="true"],
   .chip[aria-current="page"] {
-    background: var(--primary);
-    color: var(--on-primary);
-    box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.2), 0 1px 2px rgb(var(--t-deep-shadow, 8 60 30) / 0.25);
-  }
-  /* Auf dem gruenen Chip: Abschluss-Haken weiss statt gruen auf gruen. */
-  .chip[aria-pressed="true"] .glyph-result,
-  .chip[aria-current="page"] .glyph-result {
-    background: #ffffff;
-    color: var(--primary-bottom);
+    background: var(--ink);
+    color: var(--bg);
+    font-weight: 600;
   }
 
   /* -------------------------------- Plaketten ---------------------------- */
@@ -1006,6 +1029,7 @@
     color: var(--ink-2);
     font-size: var(--text-caption);
     line-height: var(--text-caption--line-height);
+    letter-spacing: var(--text-caption--letter-spacing);
     font-weight: 600;
     white-space: nowrap;
   }
@@ -1124,8 +1148,7 @@
   .avatar-initials {
     background: linear-gradient(180deg, var(--tone-hi), var(--tone-lo));
     color: #ffffff;
-    text-shadow: 0 0.5px 1px rgb(0 0 0 / 0.2);
-    box-shadow: inset 0 0.5px 0 rgb(255 255 255 / 0.35), inset 0 -0.5px 0 rgb(0 0 0 / 0.12);
+    letter-spacing: 0.01em;
   }
 
   /* Medaille eines erreichten Abzeichens (levels/Medal.tsx): Metall als
@@ -1228,10 +1251,13 @@
     max-height: calc(100dvh - env(safe-area-inset-top) - 24px);
     display: flex;
     flex-direction: column;
-    border-radius: 32px;
+    border-radius: 34px;
     overflow: hidden;
-    background-color: var(--glass-strong);
-    background-image: var(--glass-sheen);
+    /* Im Blatt gilt der gruppierte Grund: Listen und Flaechen darin sind
+       eine Stufe heller (hell weiss, dunkel das zweite Grau). */
+    --surface: var(--sheet-surface);
+    --surface-2: var(--sheet-surface-2);
+    background-color: var(--sheet-bg);
     -webkit-backdrop-filter: var(--glass-blur);
     backdrop-filter: var(--glass-blur);
     box-shadow: var(--glass-edge), var(--elev-float);
@@ -1286,15 +1312,12 @@
     height: 5px;
     border-radius: var(--radius-full);
     background: var(--fill-strong);
+    opacity: 0.9;
   }
   .sheet-body {
     overflow-y: auto;
     overscroll-behavior: contain;
     -webkit-overflow-scrolling: touch;
-  }
-  /* Listen im Blatt liegen auf fester Flaeche - lesbar ueber dem Glas. */
-  .sheet .list {
-    background: var(--surface);
   }
 
   /* --------------------------------- Menue ------------------------------- */
@@ -1422,70 +1445,64 @@
 
   /* ------------------------------ Kopfkarte ------------------------------ */
 
-  /* Markenflaeche der Uebersicht (HeroStats): tiefes Gruen mit Licht von
-     oben rechts, der Ring der Marke als Wasserzeichen. Weisse Schrift
-     >= 9:1, leise Schrift >= 4.5:1. */
+  /* Kopf der Uebersicht (HeroStats): eine ruhige weisse Flaeche. Oben das
+     Ergebnis - die Beschriftung im Akzent, die Zahl gross in der runden
+     Zahlenschrift -, darunter hinter einer Haarlinie der Weg dorthin. Keine
+     Markenflaeche, kein Verlauf: die Groesse der Zahl traegt die Seite. */
   .hero {
-    /* Platzhalter auf der Markenflaeche: helle statt graue Balken */
-    --fill: rgb(255 255 255 / 0.14);
     position: relative;
-    isolation: isolate;
-    overflow: hidden;
-    padding: 16px;
+    padding: 16px 16px 14px;
     border-radius: var(--radius-xl);
-    background: linear-gradient(170deg, var(--brand-deep), var(--brand-deeper));
-    color: #ffffff;
-  }
-  .hero-mark {
-    position: absolute;
-    top: -44px;
-    right: -44px;
-    z-index: -1;
-    width: 196px;
-    height: 196px;
-    color: #ffffff;
-    opacity: 0.05;
-    pointer-events: none;
+    background: var(--surface);
+    box-shadow: var(--elev-card);
+    color: var(--ink);
   }
   .hero-body {
     display: flex;
     flex-direction: column;
-    gap: 12px;
+    gap: 14px;
+  }
+  .hero-lead-label {
+    font-size: var(--text-subhead);
+    line-height: var(--text-subhead--line-height);
+    letter-spacing: var(--text-subhead--letter-spacing);
+    font-weight: 600;
+    color: var(--accent-ink);
+  }
+  .hero-value {
+    font-size: var(--text-display);
+    line-height: var(--text-display--line-height);
+    letter-spacing: var(--text-display--letter-spacing);
   }
   .hero-label {
     font-size: var(--text-footnote);
     line-height: var(--text-footnote--line-height);
-    font-weight: 600;
-    color: rgb(255 255 255 / 0.8);
+    font-weight: 500;
+    color: var(--muted);
   }
   .hero-hint {
-    margin-top: 2px;
+    margin-top: 1px;
     font-size: var(--text-caption);
     line-height: var(--text-caption--line-height);
-    color: rgb(255 255 255 / 0.72);
+    color: var(--muted);
   }
-  .hero-pill {
-    display: inline-flex;
-    align-items: center;
-    min-height: 26px;
-    padding: 2px 10px;
-    border-radius: var(--radius-full);
-    background: rgb(255 255 255 / 0.14);
-    box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.14);
-    font-size: var(--text-footnote);
-    line-height: var(--text-footnote--line-height);
-    font-weight: 600;
+  /* Die Quote neben der grossen Zahl: Text auf der Grundlinie, keine Plakette. */
+  .hero-note {
+    font-size: var(--text-subhead);
+    line-height: var(--text-subhead--line-height);
+    font-weight: 500;
+    color: var(--muted);
     white-space: nowrap;
   }
   .hero-stats {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
     padding-top: 12px;
-    border-top: 1px solid rgb(255 255 255 / 0.14);
+    border-top: 1px solid var(--separator);
   }
   .hero-stats > * + * {
-    padding-left: 12px;
-    border-left: 1px solid rgb(255 255 255 / 0.14);
+    padding-left: 14px;
+    border-left: 1px solid var(--separator);
   }
   .hero-stats > * {
     padding-right: 8px;
@@ -1500,7 +1517,9 @@
       gap: 32px;
     }
     .hero-body > :first-child {
-      width: 32%;
+      width: 30%;
+      padding-right: 32px;
+      border-right: 1px solid var(--separator);
     }
     .hero-stats {
       flex: 1;
@@ -1508,21 +1527,18 @@
       border-top: 0;
     }
     .hero-stats > * + * {
-      padding-left: 20px;
+      padding-left: 24px;
     }
   }
 
-  /* Seiten vor der App (Anmelden, Einladung): Licht der Marke von oben,
-     die Bildmarke mit gruen getoentem Schatten. */
+  /* Seiten vor der App (Anmelden, Einladung): der ruhige Grund, sonst
+     nichts - die Bildmarke ist die einzige Farbe und wirft einen weichen,
+     neutralen Schatten wie ein App-Symbol auf dem Home-Bildschirm. */
   .brand-backdrop {
-    background:
-      radial-gradient(90% 55% at 50% -8%, var(--backdrop-glow), transparent 72%),
-      radial-gradient(60% 40% at 100% 100%, var(--backdrop-glow-2), transparent 70%),
-      var(--bg);
+    background: var(--bg);
   }
   .brand-mark {
-    filter: drop-shadow(0 2px 3px rgb(var(--t-deep-shadow, 6 60 30) / 0.18))
-      drop-shadow(0 14px 22px rgb(var(--t-glow-shadow, 14 120 60) / 0.3));
+    filter: drop-shadow(0 1px 2px rgb(0 0 0 / 0.1)) drop-shadow(0 10px 24px rgb(0 0 0 / 0.14));
   }
 
   /* ------------------------------ Platzhalter ---------------------------- */
@@ -1614,12 +1630,13 @@
   }
 }
 
-/* Auf dem gewaehlten (gruenen) Chip bleibt Nebenschrift hell. In der
-   Helfer-Ebene, weil text-muted & Co. sonst die Komponenten-Ebene schlagen. */
+/* Auf dem gewaehlten Chip steht Nebenschrift in dessen Schriftfarbe, nur
+   leiser. In der Helfer-Ebene, weil text-muted & Co. sonst die
+   Komponenten-Ebene schlagen. */
 @layer utilities {
   .chip[aria-pressed="true"] :is(.text-muted, .text-ink-2, .text-danger),
   .chip[aria-current="page"] :is(.text-muted, .text-ink-2, .text-danger) {
-    color: rgb(255 255 255 / 0.8);
+    color: color-mix(in srgb, var(--bg) 72%, transparent);
   }
 }
 
@@ -1690,8 +1707,10 @@
   font-weight: 600;
   transition: opacity var(--dur-2) var(--ease-out);
 }
+/* Aktiv: neutrale Kapsel im Glas, Zeichen und Wort im Akzent - die Farbe
+   sagt "hier bist du", die Flaeche bleibt ruhig. */
 .tabbar-item[aria-current="page"] {
-  background: var(--accent-soft);
+  background: var(--fill);
   color: var(--accent-ink);
 }
 /* Beim Rollen nach unten schrumpft die Leiste auf den aktiven Reiter. */
@@ -1770,15 +1789,15 @@
   background: var(--hover);
 }
 .sidebar-item[aria-current="page"] {
-  background: var(--accent-soft);
-  color: var(--accent-ink);
+  background: var(--fill);
+  color: var(--ink);
   font-weight: 600;
 }
 .sidebar-item[aria-current="page"] > svg {
   color: var(--accent-ink);
 }
 .sidebar-heading {
-  padding: 8px 12px 4px;
+  padding: 10px 12px 4px;
   font-size: var(--text-footnote);
   line-height: var(--text-footnote--line-height);
   font-weight: 600;
@@ -1977,11 +1996,9 @@
   min-height: 36px;
   padding: 8px 16px;
   border-bottom: 1px solid var(--separator);
-  font-size: var(--text-caption);
-  line-height: var(--text-caption--line-height);
-  font-weight: 600;
-  letter-spacing: 0.02em;
-  text-transform: uppercase;
+  font-size: var(--text-footnote);
+  line-height: var(--text-footnote--line-height);
+  font-weight: 500;
   color: var(--muted);
 }
 .door-lead-col {

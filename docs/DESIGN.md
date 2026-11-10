@@ -6,12 +6,14 @@ stehen in `src/app/brand.css` (Marke: Akzent, Signale, Datenfarben) und
 dort nicht steht, gibt es nicht – Tailwinds eigene Farben, Schriftgrößen,
 Radien und Schatten sind per `@theme { --color-*: initial; … }` gelöscht.
 
-Leitbild: iOS 26 mit eigener Handschrift („Tiefgrün“). **Navigation und
-Bedienelemente aus Glas**, **Inhalt auf ruhigen, festen Flächen mit feiner
-Kante und weichem Schatten**. Neutrale mit einem Hauch Grün statt Systemgrau,
-genau **ein Akzent** (Energie-Grün), die **Hauptaktion kräftig** (tiefgrüner
-Verlauf, weiße Schrift). Kompakt, ohne Erklärtexte, eine Hauptaktion je
-Bildschirm.
+Leitbild: so, als käme die App von Apple selbst. **Navigation und
+Bedienelemente aus Glas**, **Inhalt auf ruhigen, festen Flächen ohne Kante und
+ohne Schatten** – Weiß auf dem gruppierten Grund trägt sich selbst. Neutrale
+sind die Systemgraus von iOS, genau **ein Akzent** (Energie-Grün), und Farbe
+steht nur dort, wo etwas bedienbar ist oder etwas bedeutet. Die **Hauptaktion
+ist die einzige volle Farbfläche** je Bildschirm. Keine Verläufe als Schmuck,
+keine Lichter, keine Versalien – Größe, Gewicht und Abstand der Schrift
+ordnen die Seite. Kompakt, ohne Erklärtexte.
 
 ---
 
@@ -21,20 +23,23 @@ Bildschirm.
 
 | Token | Hell | Dunkel | Rolle |
 | --- | --- | --- | --- |
-| `--bg` | `#f2f4f3` | `#000000` | Seitengrund (gruppiert) |
-| `--surface` | `#ffffff` | `#141917` | Inhaltsfläche: Listen, Kennzahlen, Beiträge |
-| `--surface-2` | `#f2f4f3` | `#1f2522` | Fläche auf Fläche (selten) |
-| `--map-ground` | `#e3e7e5` | `#1f2522` | Kartengrund, solange Kacheln laden (hebt sich vom Seitengrund ab) |
-| `--fill` / `--fill-strong` | `#465a50` 10 % / 17 % | `#788c82` 20 % / 30 % | Felder, Segmentleisten, Ringe-Spur |
-| `--zebra` | `#465a50` 5 % | `#788c82` 8 % | Jede zweite Zeile der Klinken-Tabelle |
-| `--ink` | `#0b1510` | `#f3f6f4` | Text |
-| `--ink-2` | `#36413b` | `#d0d7d3` | Beschriftung von Kennzahlen |
-| `--muted` | `#5f6964` | `#a3aca7` | Untertitel, Zeitangaben |
-| `--separator` | `#283c32` 13 % | `#54645c` 50 % | Haarlinien (eingerückt bis zur Schrift) |
-| `--elev-card` | Kante 4,5 % + weicher Schatten | Lichtkante innen | Kante und Schatten jeder Inhaltsfläche (`.surface`, `.list`, `.tile-grid`, `StatGrid`) |
+| `--bg` | `#f2f2f7` | `#000000` | Seitengrund (gruppiert) |
+| `--surface` | `#ffffff` | `#1c1c1e` | Inhaltsfläche: Listen, Kennzahlen, Beiträge |
+| `--surface-2` | `#f2f2f7` | `#2c2c2e` | Fläche auf Fläche (selten) |
+| `--map-ground` | `#e5e5ea` | `#2c2c2e` | Kartengrund, solange Kacheln laden (hebt sich vom Seitengrund ab) |
+| `--fill` / `--fill-strong` | `#787880` 12 % / 20 % | `#787880` 24 % / 36 % | Felder, Segmentleisten, Ringe-Spur, aktiver Reiter |
+| `--zebra` | `#787880` 6 % | `#787880` 10 % | Jede zweite Zeile der Klinken-Tabelle |
+| `--ink` | `#1d1d1f` | `#f5f5f7` | Text; als Fläche der gewählte Chip |
+| `--ink-2` | `#3a3a3c` | `#d1d1d6` | Beschriftung von Kennzahlen |
+| `--muted` | `#6a6a6f` | `#a1a1a6` | Untertitel, Zeitangaben, Gruppenüberschriften |
+| `--separator` | `#3c3c43` 14 % | `#545458` 55 % | Haarlinien (eingerückt bis zur Schrift) |
+| `--sheet-bg`, `--sheet-surface` | Grund 90 % / Weiß | Fläche 90 % / `#2c2c2e` | Blatt: der gruppierte Grund als Glas, Listen darin eine Stufe heller |
+| `--elev-card` | keine | keine | Inhaltsflächen haben weder Kante noch Schatten (`.surface`, `.list`, `.tile-grid`, `StatGrid`); nur bei „Kontrast erhöhen“ eine volle Kante |
 
-Alle Neutralen sind leicht ins Grün gezogen, damit Grund, Linien und Schrift zur
-Marke gehören. Der Seitengrund im Dunkeln bleibt Schwarz (OLED).
+Die Neutralen sind die Systemgraus von iOS – mit deren kaum sichtbarem kühlen
+Hauch, nicht in der Farbe der Marke. Tiefe entsteht aus Helligkeit: Weiß auf
+`#f2f2f7`, im Dunkeln zwei Stufen Grau auf Schwarz (OLED). Schatten hat nur, was
+schwebt (Glas, Blätter, Menüs, Toasts).
 
 ### Marke (brand.css)
 
@@ -43,12 +48,12 @@ Marke gehören. Der Seitengrund im Dunkeln bleibt Schwarz (OLED).
 | `--accent` | `#15904a` | `#30d158` | Füllung: Ringe, Fortschritt, Schalter, Abschluss-Zeichen |
 | `--accent-ink` | `#0c6a34` | `#34d66b` | Grüne **Schrift** und kleine Zeichen |
 | `--accent-tint` | Grün 16 % | Grün 20 % | Getönte Zweitaktion (`icon-btn-accent`), Auswahl in Listen |
-| `--accent-soft` | Akzent 12 % | Akzent 18 % | Leise Auswahl: aktiver Reiter, Seitenleiste |
-| `--primary` (`-top` → `-bottom`) | `#16884a` → `#0d6634` | `#16884a` → `#0e6b37` | **Hauptaktion**: `.btn-primary`, `.tray-btn-primary`, gewählter `.chip` |
+| `--accent-soft` | Akzent 12 % | Akzent 18 % | Leise Tönung im Akzent (selten) |
+| `--primary` (= `--primary-top`; `-bottom` als tiefe Stufe) | `#16884a` (`#0d6634`) | `#16884a` (`#0e6b37`) | **Hauptaktion**: `.btn-primary`, `.tray-btn-primary`, gewählte Tür in der Klinken-Liste |
 | `--on-primary` | `#ffffff` | `#ffffff` | Schrift und Zeichen auf `--primary` |
 | `--elev-primary` | Lichtkante + grüner Schatten | Lichtkante + Schatten | Tiefe der Hauptaktion |
-| `--brand-deep` → `--brand-deeper` | `#0f4d2a` → `#0a361e` | `#0e4426` → `#062414` | Markenfläche (Kopfkarte der Übersicht) |
-| `--brand-glow`, `--backdrop-glow(-2)` | Grün 35 % / 20 % / 8 % | Grün 35 % / 16 % / 6 % | Licht auf der Markenfläche bzw. hinter Anmelden/Einladung |
+| `--brand-deep` → `--brand-deeper` | `#0f4d2a` → `#0a361e` | `#0e4426` → `#062414` | Tiefe Markenstufe – in der App nicht mehr als Fläche im Einsatz, bleibt Teil jeder Akzentpalette |
+| `--brand-glow`, `--backdrop-glow(-2)` | Grün 35 % / 20 % / 8 % | Grün 35 % / 16 % / 6 % | Licht der Marke – ebenfalls nur noch Palette, keine Seite leuchtet |
 | `--on-accent` | `#ffffff` | `#062611` | Zeichen auf voller Akzentfläche – **nur Zeichen, keine Schrift** |
 | `--danger` / `--danger-tint` | `#c9182a` | `#ff6b6b` | Fehler, Löschen – nur klein, immer mit Wort oder Zeichen |
 | `--warn` / `--warn-tint` | `#a35a00` | `#ffb547` | Warnung (veraltet, prüfen) |
@@ -60,13 +65,20 @@ Marke gehören. Der Seitengrund im Dunkeln bleibt Schwarz (OLED).
 
 **Regeln**
 
-- Die **Hauptaktion ist kräftig**: flaches Tiefgrün `--primary` mit weißer
+- Die **Hauptaktion ist kräftig**: flaches Grün `--primary` mit weißer
   Schrift, ohne Glanz und Schatten (`.btn-primary`, `.tray-btn-primary`), eine je
-  Bildschirm. Gewählte Chips tragen denselben Verlauf, flacher. Zweitaktionen
-  sind grau (`.btn-secondary`) oder getönt (`icon-btn-accent`).
+  Bildschirm. Zweitaktionen sind grau (`.btn-secondary`) oder getönt
+  (`icon-btn-accent`).
+- **Auswahl ist neutral, nicht grün.** Ein gewählter Chip trägt die Schriftfarbe
+  als Fläche (hell fast schwarz, dunkel fast weiß), der aktive Reiter und der
+  aktive Eintrag der Seitenleiste eine graue Kapsel (`--fill`) – dort ist nur
+  das Zeichen bzw. Zeichen und Wort im Akzent. So bleibt das Grün der
+  Hauptaktion und dem Abschluss vorbehalten.
 - Der **grüne Kreis mit Haken** (`.glyph-result`) bedeutet ausschließlich
-  **Abschluss** – im Toast, in Kontakten, im Feed. Auf einem gewählten Chip wird
-  er weiß.
+  **Abschluss** – im Toast, in Kontakten, im Feed.
+- **Kein Schmuck:** keine Verläufe auf Flächen, keine Lichter hinter Seiten,
+  keine Glanzkugeln, keine Wasserzeichen. Verläufe gibt es nur, wo sie ein Bild
+  sind (Logo, Medaillen, Kürzel-Avatare).
 - Rot und Bernstein sind Signale, nie Dekoration, nie allein (immer Wort/Zeichen).
 - **Keine Emojis.** Ablehnungsgründe tragen ein Zeichen aus `ReasonIcon.tsx`
   (Schlüssel in `src/lib/reason-icons.ts`). Wo Gründe gewählt, gepflegt oder
@@ -87,31 +99,33 @@ Marke gehören. Der Seitengrund im Dunkeln bleibt Schwarz (OLED).
 
 | Paar | Vordergrund | Hintergrund | Kontrast |
 | --- | --- | --- | --- |
-| `--ink` (hell) | `#0b1510` | Fläche `#ffffff` | 18.60 |
-| `--ink-2` (hell) | `#36413b` | Fläche `#ffffff` | 10.63 |
-| `--muted` (hell) | `#5f6964` | Fläche `#ffffff` | 5.69 |
-| `--muted` (hell) | `#5f6964` | Grund `#f2f4f3` | 5.15 |
-| `--muted` auf `--fill` (hell) | `#5f6964` | Feld auf Weiß | 4.93 |
+| `--ink` (hell) | `#1d1d1f` | Fläche `#ffffff` | 16.83 |
+| `--ink-2` (hell) | `#3a3a3c` | Fläche `#ffffff` | 11.35 |
+| `--muted` (hell) | `#6a6a6f` | Fläche `#ffffff` | 5.38 |
+| `--muted` (hell) | `#6a6a6f` | Grund `#f2f2f7` | 4.82 |
+| `--muted` auf `--fill` (hell) | `#6a6a6f` | Feld auf Weiß | 4.68 |
 | `--accent-ink` (hell) | `#0c6a34` | Fläche `#ffffff` | 6.72 |
-| `--accent-ink` (hell) | `#0c6a34` | Grund `#f2f4f3` | 6.08 |
-| `--accent-ink` auf Tönung (hell) | `#0c6a34` | Tönung auf Weiß | 5.78 |
-| `--on-primary` (hell + dunkel) | `#ffffff` | `--primary-top` `#16884a` | 4.51 |
+| `--accent-ink` (hell) | `#0c6a34` | Grund `#f2f2f7` | 6.02 |
+| `--accent-ink` auf Tönung (hell) | `#0c6a34` | Tönung auf Weiß | 5.97 |
+| `--on-primary` (hell + dunkel) | `#ffffff` | `--primary` `#16884a` | 4.51 |
 | `--on-primary` (hell) | `#ffffff` | `--primary-bottom` `#0d6634` | 7.08 |
 | `--on-primary` (dunkel) | `#ffffff` | `--primary-bottom` `#0e6b37` | 6.61 |
-| Schrift auf Markenfläche | `#ffffff` | `--brand-deep` `#0f4d2a` | 9.93 |
-| leise Schrift auf Markenfläche | Weiß 80 % | `--brand-deep` | 6.97 |
+| gewählter Chip (hell) | Grund `#f2f2f7` | `--ink` `#1d1d1f` | 15.08 |
+| gewählter Chip (dunkel) | Grund `#000000` | `--ink` `#f5f5f7` | 19.29 |
 | `--accent` Bedienelement (hell) | `#15904a` | Fläche `#ffffff` | 4.10 (≥ 3 : 1 Grafik) |
-| `--chart-doors` (hell) | `#8a978f` | Fläche `#ffffff` | 3.04 (≥ 3 : 1 Grafik) |
+| `--accent` Bedienelement (hell) | `#15904a` | Grund `#f2f2f7` | 3.68 (≥ 3 : 1 Grafik) |
+| `--chart-doors` (hell) | `#8e8e93` | Fläche `#ffffff` | 3.26 (≥ 3 : 1 Grafik) |
 | `--danger` (hell) | `#c9182a` | Fläche `#ffffff` | 5.76 |
-| `--warn` (hell) | `#a35a00` | Grund `#f2f4f3` | 4.73 |
-| `--ink` (dunkel) | `#f3f6f4` | Fläche `#141917` | 16.34 |
-| `--ink-2` (dunkel) | `#d0d7d3` | Fläche `#141917` | 12.14 |
-| `--muted` (dunkel) | `#a3aca7` | Fläche `#141917` | 7.63 |
-| `--muted` (dunkel) | `#a3aca7` | Fläche 2 `#1f2522` | 6.70 |
-| `--accent-ink` (dunkel) | `#34d66b` | Fläche `#141917` | 9.29 |
+| `--warn` (hell) | `#a35a00` | Grund `#f2f2f7` | 4.68 |
+| `--ink` (dunkel) | `#f5f5f7` | Fläche `#1c1c1e` | 15.63 |
+| `--ink-2` (dunkel) | `#d1d1d6` | Fläche `#1c1c1e` | 11.18 |
+| `--muted` (dunkel) | `#a1a1a6` | Fläche `#1c1c1e` | 6.61 |
+| `--muted` (dunkel) | `#a1a1a6` | Fläche 2 `#2c2c2e` | 5.42 |
+| `--accent-ink` (dunkel) | `#34d66b` | Fläche `#1c1c1e` | 8.89 |
+| `--accent-ink` (dunkel) | `#34d66b` | Fläche 2 `#2c2c2e` | 7.28 |
 | `--on-accent` Zeichen (dunkel) | `#062611` | `--accent` | 8.03 |
-| `--danger` (dunkel) | `#ff6b6b` | Fläche `#141917` | 6.41 |
-| `--warn` (dunkel) | `#ffb547` | Fläche `#141917` | 10.12 |
+| `--danger` (dunkel) | `#ff6b6b` | Fläche `#1c1c1e` | 6.13 |
+| `--warn` (dunkel) | `#ffb547` | Fläche `#1c1c1e` | 9.68 |
 
 Alle Textpaare ≥ 4,5 : 1, alle Bedien-/Grafikpaare ≥ 3 : 1 – bis auf die
 Tür-Säule im Verlauf (`--chart-doors-soft`), die nur Spur ist; ihre Werte stehen
@@ -124,9 +138,10 @@ Haarlinien und `--muted` werden dunkler.
 Unter Einstellungen › Darstellung wählt jeder eine von zehn Akzentfarben – Grün
 (Standard), Petrol, Blau, Indigo, Violett, Pink, Rot, Orange, Gold, Graphit. Jede soll
 aussehen, als wäre die App in ihr erschienen, darum wechseln **alle Rollen** mit:
-Akzent, Akzentschrift, Hauptaktion, Markenfläche samt Licht, Hintergrund der Anmeldung,
-markenfarbene Schatten, Logo (`--logo-*`), Diagramme, Preisstufen und der Hauch Farbe
-in den Neutralen (Grund, Linien, Glas, Schatten).
+Akzent, Akzentschrift, Hauptaktion, Logo (`--logo-*`), Diagramme, Preisstufen und der
+Hauch Farbe in den Neutralen (Grund, Linien, Glas, Schatten). Beim Grün sind die
+Neutralen genau die Systemgraus; die anderen Farben drehen nur deren Ton – bei so
+wenig Buntheit ist das ein Hauch, keine Färbung.
 
 - **Ein Token, zwei Quellen:** jedes themenfähige Token liest zuerst sein
   `--t-`Gegenstück – hell `--t-name`, dunkel `--t-name-d` –, dahinter steht der grüne
@@ -168,18 +183,21 @@ dazu stehen gesammelt in `globals.css` – der Server rendert alles, nichts blit
 `.toolbar[data-stuck]`, `.seg-glass`, `.sheet`, `.menu`, `.toast`, `.map-ctrl`,
 `.map-chip`, `.tray`) teilen dieselben Tokens:
 
-- `--glass-bg` (74 % deckend) bzw. `--glass-strong` (86 %), darüber `--glass-sheen`
+- `--glass-bg` (72 % deckend) bzw. `--glass-strong` (88 %), darüber `--glass-sheen`
   (Glanzverlauf von oben), Rand `--glass-edge` (0,5 px Lichtkante innen),
-  Schatten `--elev-glass` / `--elev-float`.
-- Unschärfe `--glass-blur: blur(22px) saturate(180%)`.
+  Schatten `--elev-glass` / `--elev-float` – neutral, weich, ohne Farbstich.
+- Unschärfe `--glass-blur: blur(24px) saturate(180%)`.
+- **Blätter** (`.sheet`) sind der gruppierte Grund als Glas (`--sheet-bg`); darin
+  gilt `--surface: var(--sheet-surface)` – Listen stehen im Hellen weiß auf Grau,
+  im Dunkeln im zweiten Grau auf dem ersten. Wie die Blätter des Systems.
 - **Rückfälle:** ohne `backdrop-filter`, bei `prefers-reduced-transparency`, bei
   `prefers-contrast: more`, im Super-Energiesparmodus (`data-power="save"`) und mit
   „Glas“ bzw. „Kontrast erhöhen“ aus den Einstellungen (`data-glass="off"`,
   `data-contrast="more"`) wird Glas zur festen Fläche `--glass-solid`.
 - Glas nur für Dinge, die **über** Inhalt schweben. Inhalt selbst liegt auf
-  `--surface` mit `--elev-card` (feine Kante, weicher Schatten) – immer über die
-  Klasse `.surface` (bzw. `.list`, `.tile-grid`), nie `rounded-xl bg-surface`
-  von Hand. Nie Glas auf Glas, nie Karte in Karte.
+  `--surface`, ohne Kante und Schatten – immer über die Klasse `.surface` (bzw.
+  `.list`, `.tile-grid`), nie `rounded-xl bg-surface` von Hand. Nie Glas auf
+  Glas, nie Karte in Karte.
 
 ---
 
@@ -187,21 +205,26 @@ dazu stehen gesammelt in `globals.css` – der Server rendert alles, nichts blit
 
 Systemschrift (`-apple-system` → SF Pro; Rückfall Segoe UI/Roboto/Inter).
 Große Zahlen (`.kpi`) in SF Pro Rounded, leicht enger gesetzt. **Alle Zahlen
-tabellarisch** (`html` setzt `font-variant-numeric: tabular-nums`). Titel ab
-`title-3` laufen etwas enger als die Systemvorgabe (−0,6 % bis −3,5 %) – das
-lässt sie gesetzt statt voreingestellt wirken.
+tabellarisch** (`html` setzt `font-variant-numeric: tabular-nums`). Die
+Systemschrift richtet ihre Laufweite je Größe selbst aus – Fließtext bekommt
+darum fast nichts dazu (−1,1 %), nur Titel laufen spürbar enger (−1,2 % bis
+−3 %), damit sie gesetzt statt voreingestellt wirken. **Keine Versalien**:
+Gruppenüberschriften (`.list-label`) und Tabellenköpfe stehen in normaler
+Schreibweise, leise und halbfett. Gewicht sparsam: 700 nur für Titel und
+Kennzahlen, 600 für Hervorgehobenes und die gewählte Möglichkeit, 500 für
+ungewählte Segmente, Chips und Verweise.
 
 | Klasse | Größe / Zeile | Gewicht | Verwendung |
 | --- | --- | --- | --- |
-| `text-display` | 40 / 44 | 700 | Große Einzelzahl |
-| `text-large-title` | 28 / 34 | 700 | Seitentitel, Haupt-Kennzahl |
+| `text-display` | 48 / 52 | 700 | Große Einzelzahl (Kopf der Übersicht) |
+| `text-large-title` | 32 / 38 | 700 | Seitentitel, Haupt-Kennzahl |
 | `text-title-1` | 24 / 30 | 700 | Kennzahlen im Raster |
-| `text-title-2` | 19 / 24 | 700 | Zwischentitel |
-| `text-title-3` | 17 / 22 | 600 | Abschnittstitel, Blatt-Titel, Hausnummer in der Klinken-Liste (700) |
+| `text-title-2` | 20 / 25 | 700 | Abschnittstitel (`.section-title`) |
+| `text-title-3` | 17 / 22 | 600 | Blatt-Titel, Hausnummer in der Klinken-Liste (700) |
 | `text-headline` | 15 / 20 | 600 | Hervorgehobene Zeile |
 | `text-body` | 15 / 20 | 400 | Fließtext, Zeilentitel, Eingaben |
 | `text-callout` | 14 / 19 | 400 | – |
-| `text-subhead` | 13 / 18 | 400 | Knöpfe, Werte rechts |
+| `text-subhead` | 13 / 18 | 400 | Knöpfe, Werte rechts, Gruppenüberschrift (600) |
 | `text-footnote` | 12 / 16 | 400 | Untertitel, Beschriftungen |
 | `text-caption` | 11 / 14 | 400 | Zeitangaben |
 | `text-caption-2` | 10 / 12 | 600 | Reiterbeschriftung, Legende |
@@ -218,9 +241,9 @@ Eingabefelder haben immer mindestens 16 px – unter 16 px zoomt iOS.
   `@theme` (`--breakpoint-md`), in den Medienabfragen und in `Sheet.tsx`.
 - Seitenrand `--gutter`: 16 / 24 / 32 px (Handy / Tablet / Rechner).
 - Seitenbreiten: `.page` 1200 px, `.page-medium` 960 px, `.page-narrow` 680 px.
-- **Radien konzentrisch** (innen = außen − Abstand): `xs 4` · `sm 6` · `md 10`
-  · `lg 12` · `xl 14` · `2xl 20` · `full`. Listen und Flächen `xl`, Blätter
-  `2xl`, Felder `md`, Knöpfe und Plaketten `full`.
+- **Radien konzentrisch** (innen = außen − Abstand): `xs 5` · `sm 7` · `md 10`
+  · `lg 14` · `xl 18` · `2xl 26` · `full`. Listen und Flächen `xl`, Leisten aus
+  Glas `2xl`, Blätter 34, Felder `md`, Suchfelder, Knöpfe und Plaketten `full`.
 - Tippflächen ≥ 44 pt (`.btn` 40, `.btn-sm` 32 mit unsichtbar erweiterter
   Fläche, `.btn-lg` 48, Ergebnisknöpfe beim Klinken 60, auf dem iPad 76,
   Zeilen der Klinken-Liste 60, auf dem iPad 64).
@@ -271,7 +294,7 @@ Alle in `src/components/`. Stil per Klassen aus `globals.css` (`@layer component
 | `PageHeader` | `PageHeader.tsx` | Werkzeugleiste (Zurück, Aktionen) + großer Titel; wird beim Scrollen zu Glas mit kleinem Titel. `back.mobileOnly` für Seiten, die ab dem iPad selbst in der Seitenleiste stehen |
 | `Cell` | `ui.tsx` | Zeile einer gruppierten Liste (`ul.list`, `ul.list list-icons`) – Link, Knopf oder statisch; `wrap` lässt den Untertitel zweizeilig umbrechen statt ihn abzuschneiden |
 | `ListLabel`, `SectionHeader` | `ui.tsx` | Gruppenüberschrift (Versalien, klein) bzw. Abschnittstitel mit „Alle“ |
-| `HeroStats`, `SkeletonHero` | `HeroStats.tsx` | Kopfkarte der Übersicht auf der Markenfläche: Abschlüsse groß mit Quote, darunter Türen, Gespräche, Termine; der Ring der Marke als Wasserzeichen |
+| `HeroStats`, `SkeletonHero` | `HeroStats.tsx` | Kopf der Übersicht auf einer ruhigen weißen Fläche: „Abschlüsse“ im Akzent, die Zahl groß (`text-display`) mit der Quote daneben als leiser Text, darunter hinter einer Haarlinie Türen, Gespräche, Termine |
 | `StatGrid` | `ui.tsx` | Kennzahlen auf einer Fläche, Haarlinien dazwischen |
 | `ProgressRing`, `ProgressBar` | `ui.tsx` | Fortschritt im Akzent |
 | `Pill`, `StatusBadge` | `ui.tsx` | Plaketten (neutral, accent, danger, warn, ink) |
@@ -300,8 +323,12 @@ Alle in `src/components/`. Stil per Klassen aus `globals.css` (`@layer component
 
 ### Muster
 
-- **Übersicht** beginnt mit der Kopfkarte (`HeroStats`) – die einzige
-  tiefgrüne Fläche der Seite. Andere Seiten bleiben bei `StatGrid`.
+- **Übersicht** beginnt mit dem Kopf (`HeroStats`) – keine Markenfläche: die
+  größte Zahl der Seite trägt sie, wie die Zusammenfassungen in Health und
+  Fitness. Andere Seiten bleiben bei `StatGrid`.
+- **Abschnitte**: Titel in `title-2` bündig mit der Fläche darunter, rechts
+  höchstens ein Verweis in normalem Gewicht („Alle ›“). Zwischen Abschnitten
+  32 px, zwischen Titel und Fläche 10 px.
 - **Gruppierte Liste statt Karten.** Überschrift `ListLabel`, darunter
   `ul.list` mit `Cell`s. Kein Erklärtext – höchstens eine `list-footer`-Zeile.
 - **Eine Hauptaktion je Bildschirm** – oben rechts in der Werkzeugleiste als
@@ -367,8 +394,9 @@ läuft so auf den Punkt zu. App-Symbol: Energie-Grün mit Licht von oben links,
 feiner Lichtkante, heller Marke mit weichem Schatten und leicht leuchtendem
 Punkt. Wortmarke in der Systemschrift, „Carlsson“ fett, „Sales“ normal.
 Seiten vor der App (Anmelden, Einladung, Nicht gefunden) liegen auf
-`.brand-backdrop` (grünes Licht von oben); die Bildmarke beim Anmelden wirft
-einen grün getönten Schatten (`.brand-mark`).
+`.brand-backdrop` – dem ruhigen Grund, ohne Licht und Verlauf; die Bildmarke ist
+dort die einzige Farbe und wirft einen weichen, neutralen Schatten wie ein
+App-Symbol (`.brand-mark`).
 Dateien: `public/logo.svg`, `public/logo-mark.svg`, `public/icon.svg`,
 `public/icon-maskable.svg`; PNGs (inkl. Benachrichtigungs-Symbol
 `badge-96.png`) erzeugt `scripts/build-icons.mjs`.
