@@ -27,7 +27,7 @@ import { LogoutCell } from "./LogoutCell";
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Profil" };
 
-const TARIFRECHNER = process.env.NEXT_PUBLIC_TARIFRECHNER_URL ?? "https://portal-ep24.de/menues/tarifrechner/";
+const TARIFRECHNER = process.env.NEXT_PUBLIC_TARIFRECHNER_URL ?? "https://stromundgasportal.de/eingabe/";
 
 /**
  * Der Reiter "Profil": man selbst, die eigenen Listen - und fuer die Leitung

@@ -33,7 +33,7 @@ export default async function EnergySettingsPage() {
 
   const tarifrechner =
     process.env.NEXT_PUBLIC_TARIFRECHNER_URL ??
-    "https://portal-ep24.de/menues/tarifrechner/";
+    "https://stromundgasportal.de/eingabe/";
 
   // Zuletzt erfolgreich - waehrend ein Abruf laeuft, hat der neueste noch kein Ende.
   const lastRun = refresh?.success_at
@@ -141,7 +141,7 @@ export default async function EnergySettingsPage() {
   );
 }
 
-/** "portal-ep24.de" aus der vollen Adresse - lesbarer als der ganze Pfad. */
+/** "stromundgasportal.de" aus der vollen Adresse - lesbarer als der ganze Pfad. */
 function hostOf(url: string): string {
   try {
     const parsed = new URL(url);

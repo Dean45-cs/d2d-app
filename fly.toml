@@ -12,7 +12,7 @@ primary_region = "fra"
 [env]
   NODE_ENV = "production"
   DATABASE_PATH = "/data/d2d.db"
-  NEXT_PUBLIC_TARIFRECHNER_URL = "https://portal-ep24.de/menues/tarifrechner/"
+  NEXT_PUBLIC_TARIFRECHNER_URL = "https://stromundgasportal.de/eingabe/"
   # Energiekarte: Preise trägt die Teamleitung in der App ein. Eine
   # Tagesquelle ist optional - dann ENERGY_FEED_MODE = "csv" oder "json"
   # setzen und ENERGY_FEED_URL als Secret hinterlegen.

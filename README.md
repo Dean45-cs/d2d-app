@@ -180,7 +180,7 @@ einklappbaren Seitenleiste; beim Klinken bleibt sie im Auto-Modus schmal. Alte A
      App danach.
 4. **Auftrag erfassen** – der große grüne Button merkt den Auftrag vor **und öffnet im selben
    Moment den Tarifrechner des Partners**
-   (`https://portal-ep24.de/menues/tarifrechner/`, änderbar über
+   (`https://stromundgasportal.de/eingabe/`, änderbar über
    `NEXT_PUBLIC_TARIFRECHNER_URL`). Dort wird der Auftrag aufgenommen und unterschrieben –
    Kundendaten, Widerrufsbelehrung und Unterschrift gehören in den Tarifrechner und nicht
    ein zweites Mal in diese App. Das Fenster wird direkt beim Antippen geöffnet, damit kein
