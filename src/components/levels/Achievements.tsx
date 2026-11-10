@@ -58,7 +58,7 @@ export function Achievements({ achievements }: { achievements: Achievement[] }) 
 
   return (
     <section aria-labelledby="achievement-heading">
-      <div className="mb-2 flex items-end justify-between gap-4 px-1">
+      <div className="mb-2.5 flex items-end justify-between gap-4">
         <h2 id="achievement-heading" className="section-title">
           Abzeichen
         </h2>

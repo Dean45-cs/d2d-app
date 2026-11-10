@@ -126,21 +126,19 @@ export function AppearanceSettings() {
 function Preview() {
   return (
     <section className="surface overflow-hidden p-4" aria-label="Vorschau">
-      <div className="hero !p-4">
-        <div className="flex items-center gap-3">
-          <LogoMark size={36} />
-          <div className="min-w-0 flex-1">
-            <p className="hero-label">Abschlüsse heute</p>
-            <p className="kpi text-title-1">3</p>
-          </div>
-          <span className="hero-pill">31 % Quote</span>
+      <div className="flex items-center gap-3">
+        <LogoMark size={44} />
+        <div className="min-w-0 flex-1">
+          <p className="hero-lead-label">Abschlüsse heute</p>
+          <p className="flex items-baseline gap-2">
+            <span className="kpi text-title-1">3</span>
+            <span className="hero-note">31 % Quote</span>
+          </p>
         </div>
       </div>
-      <div className="mt-4 flex flex-wrap items-center gap-3">
+      <div className="mt-4 flex flex-wrap items-center gap-3 border-t border-separator pt-4">
         <span className="btn btn-primary btn-sm pointer-events-none">Auftrag starten</span>
-        <span className="chip pointer-events-none" aria-pressed="true">
-          Strom + Gas
-        </span>
+        <span className="badge badge-accent">In Arbeit</span>
       </div>
       <div className="mt-4 flex items-center gap-3">
         <ProgressRing value={14} max={20} size={36} stroke={4} />
@@ -232,7 +230,7 @@ function MiniApp({ colors }: { colors: { bg: string; card: string; ink: string; 
   );
 }
 
-/** Ein Farbknopf: der Verlauf der Hauptaktion, gewaehlt mit Ring und Haken. */
+/** Ein Farbknopf: die Farbe flach als Kreis, gewaehlt mit Ring und Haken - wie die Akzentfarben des Systems. */
 function AccentSwatch({
   id,
   palette,
@@ -244,7 +242,7 @@ function AccentSwatch({
   selected: boolean;
   onPick: () => void;
 }) {
-  const { primaryTop, primaryBottom, logo1 } = palette.light;
+  const { accent } = palette.light;
   return (
     <button
       type="button"
@@ -255,16 +253,16 @@ function AccentSwatch({
       className="flex min-w-0 flex-col items-center gap-1.5"
     >
       <span
-        className={`grid h-11 w-11 place-items-center rounded-full text-white transition-transform active:scale-95 ${
-          selected ? "ring-[3px] ring-offset-2 ring-offset-surface" : ""
+        className={`grid h-9 w-9 place-items-center rounded-full text-white transition-transform active:scale-95 ${
+          selected ? "ring-2 ring-offset-[3px] ring-offset-surface" : ""
         }`}
         style={{
-          background: `radial-gradient(120% 120% at 30% 20%, ${logo1}, transparent 55%), linear-gradient(160deg, ${primaryTop}, ${primaryBottom})`,
+          background: accent,
           // Der Ring in der Farbe selbst - so steht die Wahl auch neben ihrer Nachbarin fest.
-          ["--tw-ring-color" as string]: primaryTop,
+          ["--tw-ring-color" as string]: accent,
         }}
       >
-        {selected && <IconCheck className="h-5 w-5 drop-shadow-[0_1px_1px_rgb(0_0_0/0.3)]" />}
+        {selected && <IconCheck className="h-4 w-4" />}
       </span>
       <span className={`max-w-full truncate text-caption ${selected ? "font-semibold text-ink" : "text-muted"}`}>
         {ACCENT_LABEL[id]}

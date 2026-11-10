@@ -39,18 +39,18 @@ export function SectionHeader({
   // Titel und Verweis stehen auf einer Grundlinie; die 44-pt-Trefferflaeche
   // des Verweises waechst per Polster nach oben, ohne die Zeile hoeher zu machen.
   return (
-    <div className={`mb-2 flex min-h-11 items-end px-1 ${className}`}>
+    <div className={`mb-2.5 flex min-h-7 items-end ${className}`}>
       <div className="flex w-full items-baseline justify-between gap-4">
         <h2 className="section-title min-w-0 truncate">
           {title}
           {count !== undefined && (
-            <span className="ml-2 font-normal text-muted">{count}</span>
+            <span className="ml-1.5 font-normal text-muted">{count}</span>
           )}
         </h2>
         {href ? (
-          <Link href={href} className="link -mb-2 -mt-4 shrink-0 pb-2 pt-4 text-subhead">
+          <Link href={href} className="link -mb-2 -mt-4 shrink-0 gap-0.5 pb-2 pt-4 text-body font-normal">
             {linkLabel}
-            <IconChevronRight className="h-3.5 w-3.5" />
+            <IconChevronRight className="h-3 w-3 opacity-70" />
           </Link>
         ) : (
           action && <div className="flex shrink-0 items-center gap-2">{action}</div>

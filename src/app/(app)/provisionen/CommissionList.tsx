@@ -276,7 +276,7 @@ export function CommissionList({
                 <IconSearch className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-muted" />
                 <input
                   type="search"
-                  className="field pl-12"
+                  className="field field-search pl-12"
                   placeholder="Suchen"
                   value={query}
                   onChange={(event) => setQuery(event.target.value)}

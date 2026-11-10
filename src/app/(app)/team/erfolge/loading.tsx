@@ -55,7 +55,7 @@ export default function LoadingAchievements() {
             </div>
           </div>
           <section aria-hidden="true">
-            <div className="mb-2 flex items-end justify-between gap-4 px-1">
+            <div className="mb-2.5 flex items-end justify-between gap-4">
               <span className="section-title">Abzeichen</span>
               <SkeletonLine width={40} height={12} />
             </div>
