@@ -5,7 +5,7 @@ export default function LoadingSettings() {
     <SettingsLoading
       title="Einstellungen"
       back={false}
-      groups={[["", 1], ["Arbeit", 4], ["Mitteilungen", 1], ["Dieses Gerät", 2]]}
+      groups={[["", 6], ["Dieses Gerät", 3], ["Konto", 1]]}
     />
   );
 }

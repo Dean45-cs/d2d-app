@@ -10,8 +10,6 @@ import { commissionCounts } from "@/lib/commissions/store";
 import { berlinToday } from "@/lib/contracts";
 import { Avatar, Cell, ListLabel, PageHeader, ToneTile, type SymbolTone } from "@/components/ui";
 import { NAV_ICONS } from "@/components/nav-icons";
-import { InstallCell } from "@/components/InstallHint";
-import { PowerSaveCell } from "@/components/PowerSave";
 import {
   IconCalendar,
   IconChart,
@@ -22,11 +20,9 @@ import {
   IconMap,
   IconPlay,
   IconQr,
-  IconSparkles,
   IconTarget,
 } from "@/components/icons";
 import { LogoutCell } from "./LogoutCell";
-import { PasswordCell } from "./PasswordCell";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Profil" };
@@ -34,9 +30,10 @@ export const metadata: Metadata = { title: "Profil" };
 const TARIFRECHNER = process.env.NEXT_PUBLIC_TARIFRECHNER_URL ?? "https://portal-ep24.de/menues/tarifrechner/";
 
 /**
- * Der Reiter "Profil": man selbst, die eigenen Listen, das Geraet - und fuer
- * die Leitung die Verwaltung. Alles als gruppierte Liste wie in den
- * iOS-Einstellungen; jede Seite dahinter prueft ihre Rechte selbst.
+ * Der Reiter "Profil": man selbst, die eigenen Listen - und fuer die Leitung
+ * die Verwaltung. Kurz gehalten: was das Geraet und das Konto betrifft
+ * (Energiesparmodus, Installieren, Passwort), steht einmal, in den
+ * Einstellungen. Jede Seite dahinter prueft ihre Rechte selbst.
  */
 export default async function ProfileHubPage() {
   const user = await requireUser();
@@ -64,8 +61,8 @@ export default async function ProfileHubPage() {
         </li>
       </ul>
 
-      <ListLabel>Meine Arbeit</ListLabel>
-      <ul className="list list-icons">
+      {/* Die eigenen Listen - ohne Ueberschrift, die Zeilen sagen es selbst. */}
+      <ul className="list list-icons mt-6">
         {!rights["reports.team"] && (
           <li>
             <Cell href="/start" icon={<ToneTile tone="teal"><IconChart className="h-4 w-4" /></ToneTile>} title="Meine Zahlen" />
@@ -79,24 +76,6 @@ export default async function ProfileHubPage() {
             detail={openAppointments > 0 ? openAppointments : undefined}
           />
         </li>
-        <li>
-          <Cell
-            href="/profil/visitenkarte"
-            icon={<ToneTile tone="teal"><IconQr className="h-4 w-4" /></ToneTile>}
-            title="Visitenkarte"
-            detail={cardOn ? "An" : "Aus"}
-          />
-        </li>
-        {(user.role !== "LEADER" || rights["commissions.manage"]) && (
-          <li>
-            <Cell
-              href="/provisionen"
-              icon={<ToneTile tone="teal"><IconEuro className="h-4 w-4" /></ToneTile>}
-              title="Provisionen"
-              detail={commissions && commissions.review > 0 ? `${commissions.review} prüfen` : undefined}
-            />
-          </li>
-        )}
         {rights["customers.manage"] && (
           <li>
             <Cell
@@ -107,8 +86,23 @@ export default async function ProfileHubPage() {
             />
           </li>
         )}
+        {(user.role !== "LEADER" || rights["commissions.manage"]) && (
+          <li>
+            <Cell
+              href="/provisionen"
+              icon={<ToneTile tone="teal"><IconEuro className="h-4 w-4" /></ToneTile>}
+              title="Provisionen"
+              detail={commissions && commissions.review > 0 ? `${commissions.review} prüfen` : undefined}
+            />
+          </li>
+        )}
         <li>
-          <Cell href="/team/erfolge" icon={<ToneTile tone="brown"><IconSparkles className="h-4 w-4" /></ToneTile>} title="Erfolge" />
+          <Cell
+            href="/profil/visitenkarte"
+            icon={<ToneTile tone="brown"><IconQr className="h-4 w-4" /></ToneTile>}
+            title="Visitenkarte"
+            detail={cardOn ? "An" : "Aus"}
+          />
         </li>
         {/* In den Einstellungen ausgeblendete Bereiche bleiben hier erreichbar (globals.css, data-area-link). */}
         {rights["reports.team"] && (
@@ -122,20 +116,6 @@ export default async function ProfileHubPage() {
         <li data-area-link="team">
           <Cell href="/team" icon={<ToneTile tone="purple"><IconComment className="h-4 w-4" /></ToneTile>} title="Team" />
         </li>
-      </ul>
-
-      <ListLabel>Dieses Gerät</ListLabel>
-      <ul className="list list-icons">
-        <li>
-          <Cell
-            href="/einstellungen"
-            icon={<ToneTile tone="slate"><IconCog className="h-4 w-4" /></ToneTile>}
-            title="Einstellungen"
-            subtitle="Farbe, Klinken, Karte, Mitteilungen …"
-          />
-        </li>
-        <PowerSaveCell />
-        <InstallCell />
       </ul>
 
       {nav.admin.length > 0 && (
@@ -162,14 +142,13 @@ export default async function ProfileHubPage() {
         </>
       )}
 
-      <ListLabel>Werkzeuge</ListLabel>
-      <ul className="list list-icons">
+      {/* Geraet, Konto und Hilfe: alles Seltene liegt hinter "Einstellungen". */}
+      <ul className="list list-icons mt-6">
         <li>
           <Cell
-            href="/profil/einfuehrung"
-            icon={<ToneTile tone="magenta"><IconPlay className="h-4 w-4" /></ToneTile>}
-            title="Einführung"
-            subtitle="Alle Funktionen als Video"
+            href="/einstellungen"
+            icon={<ToneTile tone="slate"><IconCog className="h-4 w-4" /></ToneTile>}
+            title="Einstellungen"
           />
         </li>
         <li>
@@ -180,11 +159,13 @@ export default async function ProfileHubPage() {
             title="Tarifrechner"
           />
         </li>
-      </ul>
-
-      <ListLabel>Konto</ListLabel>
-      <ul className="list list-icons">
-        <PasswordCell />
+        <li>
+          <Cell
+            href="/profil/einfuehrung"
+            icon={<ToneTile tone="magenta"><IconPlay className="h-4 w-4" /></ToneTile>}
+            title="Einführung"
+          />
+        </li>
       </ul>
 
       <ul className="list mt-6">

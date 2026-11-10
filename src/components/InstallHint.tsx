@@ -11,7 +11,7 @@ interface InstallPromptEvent extends Event {
 }
 
 /**
- * "Als App installieren" als Zeile im Profil - solange die App noch im
+ * "Als App installieren" als Zeile in den Einstellungen - solange die App noch im
  * Browser laeuft. Android/Chrome zeigt den eigenen Dialog, auf iPhone und
  * iPad fuehrt eine kurze Anleitung durch Teilen -> "Zum Home-Bildschirm".
  */

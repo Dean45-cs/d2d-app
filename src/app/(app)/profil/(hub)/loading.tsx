@@ -1,6 +1,6 @@
-import { ListLabel, SkeletonHeader, SkeletonList, SkeletonText } from "@/components/ui";
+import { SkeletonHeader, SkeletonList, SkeletonText } from "@/components/ui";
 
-/** Platzhalter des Profil-Reiters - man selbst, dann die Gruppen wie in den Einstellungen. */
+/** Platzhalter des Profil-Reiters - man selbst, dann die eigenen Listen und die Einstellungen. */
 export default function LoadingProfileHub() {
   return (
     <div className="page-narrow" aria-busy="true" aria-label="Profil wird geladen">
@@ -18,12 +18,14 @@ export default function LoadingProfileHub() {
           </span>
         </div>
       </div>
-      <ListLabel>Meine Arbeit</ListLabel>
-      {/* Termine und Erfolge, dazu "Meine Zahlen" (Vertrieb) bzw. "Kunden" (Teamleitung). */}
-      <SkeletonList rows={3} icon="glyph" subtitle={false} />
-      <ListLabel>Dieses Gerät</ListLabel>
-      {/* Einstellungen, Energiesparmodus, dazu "Als App installieren" im Browser. */}
-      <SkeletonList rows={3} icon="glyph" subtitle />
+      {/* Termine und Visitenkarte, dazu "Meine Zahlen" (Vertrieb) bzw. "Kunden" (Teamleitung). */}
+      <div className="mt-6">
+        <SkeletonList rows={3} icon="glyph" subtitle={false} />
+      </div>
+      {/* Einstellungen, Tarifrechner, Einfuehrung. */}
+      <div className="mt-6">
+        <SkeletonList rows={3} icon="glyph" subtitle={false} />
+      </div>
     </div>
   );
 }

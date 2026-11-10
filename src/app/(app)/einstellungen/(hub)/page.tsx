@@ -1,14 +1,12 @@
 import type { Metadata } from "next";
 import { requireUser } from "@/lib/auth";
-import { permissionsFor } from "@/lib/permissions";
-import { navigation } from "@/lib/nav";
-import { Cell, ListLabel, PageHeader, type SymbolTone } from "@/components/ui";
-import { NAV_ICONS } from "@/components/nav-icons";
+import { Cell, ListLabel, PageHeader } from "@/components/ui";
 import { InstallCell } from "@/components/InstallHint";
 import { PowerSaveCell } from "@/components/PowerSave";
 import { SettingIcon } from "@/components/settings/controls";
 import { IconBell, IconDoor, IconLayers, IconMap, IconPalette, IconTarget } from "@/components/icons";
 import { AppearanceDetail, AreaDetail, GoalDetail, OfflineWarmCell, ResetCell } from "./HubParts";
+import { PasswordCell } from "./PasswordCell";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Einstellungen" };
@@ -17,16 +15,16 @@ export const metadata: Metadata = { title: "Einstellungen" };
  * Einstellungen: alles, was sich jeder selbst einrichtet - wie in den
  * iOS-Einstellungen eine gruppierte Liste, dahinter je Bereich eine Seite.
  * Gilt fuer dieses Geraet; nur die Mitteilungsarten haengen am Konto.
- * Fuer die Leitung steht die Verwaltung des Teams darunter.
+ * Die Verwaltung des Teams steht einmal - im Profil und in der Seitenleiste.
  */
 export default async function SettingsPage() {
-  const user = await requireUser();
-  const nav = navigation(user.role, permissionsFor(user), user.id);
+  await requireUser();
 
   return (
     <div className="page-narrow">
       <PageHeader title="Einstellungen" back={{ href: "/profil", label: "Profil", mobileOnly: true }} />
 
+      {/* Eine Liste statt dreier Gruppen - sechs Zeilen brauchen keine Ueberschriften. */}
       <ul className="list list-icons">
         <li>
           <Cell
@@ -36,10 +34,6 @@ export default async function SettingsPage() {
             subtitle={<AppearanceDetail />}
           />
         </li>
-      </ul>
-
-      <ListLabel>Arbeit</ListLabel>
-      <ul className="list list-icons">
         <li>
           <Cell
             href="/einstellungen/klinken"
@@ -74,10 +68,6 @@ export default async function SettingsPage() {
             detail={<GoalDetail />}
           />
         </li>
-      </ul>
-
-      <ListLabel>Mitteilungen</ListLabel>
-      <ul className="list list-icons">
         <li>
           <Cell
             href="/einstellungen/mitteilungen"
@@ -93,34 +83,12 @@ export default async function SettingsPage() {
         <PowerSaveCell />
         <OfflineWarmCell />
         <InstallCell />
+        <ResetCell />
       </ul>
 
-      {nav.admin.length > 0 && (
-        <>
-          <ListLabel>Verwaltung</ListLabel>
-          <ul className="list list-icons">
-            {nav.admin.map((item) => {
-              const Icon = NAV_ICONS[item.icon].line;
-              return (
-                <li key={item.href}>
-                  <Cell
-                    href={item.href}
-                    icon={
-                      <SettingIcon tone={ADMIN_TONES[item.icon] ?? "slate"}>
-                        <Icon />
-                      </SettingIcon>
-                    }
-                    title={item.label}
-                  />
-                </li>
-              );
-            })}
-          </ul>
-        </>
-      )}
-
-      <ul className="list list-icons mt-8">
-        <ResetCell />
+      <ListLabel>Konto</ListLabel>
+      <ul className="list list-icons">
+        <PasswordCell />
       </ul>
       <p className="list-footer">
         Einstellungen gelten für dieses Gerät. Worüber Push-Nachrichten kommen, gilt für dein Konto.
@@ -128,12 +96,3 @@ export default async function SettingsPage() {
     </div>
   );
 }
-
-/** Ton je Verwaltungseintrag - wie im Profil. */
-const ADMIN_TONES: Partial<Record<string, SymbolTone>> = {
-  users: "blue",
-  invite: "indigo",
-  shield: "slate",
-  list: "purple",
-  cog: "teal",
-};

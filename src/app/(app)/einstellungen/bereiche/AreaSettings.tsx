@@ -93,7 +93,7 @@ export function AreaSettings({ rights, home: initialHome }: { rights: AreaRights
           onChange={(on) => toggleArea("team", on)}
         />
       </ul>
-      <p className="list-footer">Klinken und Profil bleiben immer. Ausgeblendetes steht im Profil unter „Meine Arbeit“.</p>
+      <p className="list-footer">Klinken und Profil bleiben immer. Ausgeblendetes steht im Profil.</p>
 
       <ListLabel>Beim Öffnen</ListLabel>
       <ul className="list" role="radiogroup" aria-label="Beim Öffnen der App">
