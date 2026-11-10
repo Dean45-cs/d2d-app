@@ -8,6 +8,7 @@ import { activeDays, bestDay, getProfile, listFeed, teamTotals, type FeedScope }
 import { firstName, metricByKey, milestoneProgress, rank, saleStreak } from "@/lib/ranking";
 import { rangeToSince } from "@/lib/ranges";
 import { monthYear } from "@/lib/format";
+import { positionLabel } from "@/lib/tiers";
 import { getLevelProgress } from "@/lib/level-queries";
 import { DailyBars, fillDays } from "@/components/charts";
 import { Feed } from "@/components/community/Feed";
@@ -87,7 +88,7 @@ export default async function ProfilePage({
   const posts = listFeed(teamId, user.id, { scope, limit: 20 });
   const query = new URLSearchParams({ scope: scope.kind, user: String(profile.id) }).toString();
 
-  const roleLabel = profile.role === "LEADER" ? "Teamleitung" : "Vertrieb";
+  const roleLabel = positionLabel(profile);
 
   return (
     <div className="page">

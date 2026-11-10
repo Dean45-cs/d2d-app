@@ -50,7 +50,7 @@ test("a manager cannot take over a report's account that holds rights the manage
   assert.doesNotThrow(() => assertNoExtraRights(manager, report));
   db.prepare("INSERT INTO user_permissions(user_id, permission, allowed, granted_by) VALUES (?, 'reports.team', 1, ?)").run(report.id, leader.id);
   assert.throws(() => assertNoExtraRights(fresh(manager), fresh(report)), (error) => error instanceof AuthError && error.status === 403);
-  // Die Teamleitung darf immer.
+  // Die Geschaeftsfuehrung darf immer.
   assert.doesNotThrow(() => assertNoExtraRights(leader, fresh(report)));
 });
 
@@ -68,6 +68,7 @@ test("rights the actor lacks cannot be granted to a deactivated person and switc
 
 test("join requests of a deactivated manager's reports go to the team lead instead of hanging", () => {
   const manager = person("MEMBER", leader.id);
+  db.prepare("UPDATE users SET tier = 'TEAMLEITER' WHERE id = ?").run(manager.id);
   const inviter = person("MEMBER", manager.id);
   const { token } = createInvitation(inviter.id);
   registerInvitation(token, { name: "Neu", email: "neu-r4@example.test", password: "password123" });
@@ -78,7 +79,8 @@ test("join requests of a deactivated manager's reports go to the team lead inste
   assert.match(invitationDashboard(fresh(inviter)).problem ?? "", /Führungskraft ist nicht mehr aktiv/);
   decideInvitation(leader.id, request.id, "APPROVED");
   const created = db.prepare("SELECT manager_id FROM users WHERE email = 'neu-r4@example.test'").get() as { manager_id: number };
-  assert.equal(created.manager_id, inviter.id);
+  // Der Einladende ist Berater und sein Teamleiter deaktiviert: die neue Person kommt zur Geschaeftsfuehrung.
+  assert.equal(created.manager_id, leader.id);
 });
 
 /* ------------------------------- Gebiete ------------------------------- */

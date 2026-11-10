@@ -23,7 +23,7 @@ export default async function LoginPage() {
           <p className="mt-1 text-subhead text-muted">Melde dich mit deinem Team-Zugang an.</p>
         </div>
         <LoginForm />
-        <p className="mt-6 text-center text-footnote text-muted">Zugang gibt’s bei deiner Teamleitung.</p>
+        <p className="mt-6 text-center text-footnote text-muted">Zugang gibt’s bei deiner Geschäftsführung.</p>
       </section>
       <p className="text-center text-caption text-muted">© {new Date().getFullYear()} Carlsson Sales</p>
     </main>

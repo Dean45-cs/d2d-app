@@ -86,7 +86,7 @@ export function navigation(role: Role, rights: PermissionSet, userId?: number): 
   // Kundenliste: wer hinter den Abschluessen steht, fuer den Anruf nach Vertragsende.
   const kunden: NavItem[] = rights["customers.manage"] ? [{ href: "/kunden", label: "Kunden", icon: "contacts" }] : [];
   // Provisionsliste: welcher Tarif wie viel bringt - jede Person sieht ihre eigene.
-  // Die Teamleitung bekommt die Admin-Provision; eine Liste hat sie nur mit dem Verwaltungsrecht.
+  // Die Geschaeftsfuehrung bekommt die Admin-Provision; eine Liste hat sie nur mit dem Verwaltungsrecht.
   const provisionen: NavItem[] =
     role !== "LEADER" || rights["commissions.manage"] ? [{ href: "/provisionen", label: "Provisionen", icon: "euro" }] : [];
   const gebiete: NavItem = {

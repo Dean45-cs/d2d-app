@@ -2,7 +2,8 @@
 
 import { useRef, useState } from "react";
 import type { PermissionSet } from "@/lib/permission-definitions";
-import type { Role } from "@/lib/types";
+import type { Role, Tier } from "@/lib/types";
+import { TIERS, TIER_LABEL, canLeadTeam, positionLabel } from "@/lib/tiers";
 import { avatarToDataUrl, fileToAvatar } from "@/lib/avatar";
 import { Sheet } from "@/components/Sheet";
 import { useToast } from "@/components/Toast";
@@ -11,8 +12,8 @@ import { IconKey, IconMap, IconPerson, IconShield } from "@/components/icons";
 import { ROLE_LABEL, type MemberRow, type PatchMember } from "./types";
 
 /**
- * Alles zu einer Person in einem Blatt: Bild, Zahlen, Rolle, Fuehrungskraft,
- * Gebiete, Konto. Jede Aenderung gilt sofort und meldet sich per Toast.
+ * Alles zu einer Person in einem Blatt: Bild, Zahlen, Rolle, Stufe,
+ * Fuehrungskraft, Gebiete, Konto. Jede Aenderung gilt sofort und meldet sich per Toast.
  */
 export function MemberSheet({
   member: m,
@@ -41,6 +42,7 @@ export function MemberSheet({
   // Gewaehlter Wert, bis die frischen Daten da sind - "base" merkt sich den Stand davor.
   const [role, setRole] = useState<{ value: Role; base: Role } | null>(null);
   const [manager, setManager] = useState<{ value: number | null; base: number | null } | null>(null);
+  const [tier, setTier] = useState<{ value: Tier; base: Tier } | null>(null);
 
   const canManage = editable && rights["team.manage"];
   const canRole = editable && rights["team.roles"] && !isSelf;
@@ -48,6 +50,8 @@ export function MemberSheet({
   // Sind die frischen Daten da, gilt wieder der Server (auch nach "Rückgängig").
   if (role && role.base !== m.role) setRole(null);
   if (manager && manager.base !== m.manager_id) setManager(null);
+  if (tier && tier.base !== m.tier) setTier(null);
+  const shownTier = tier && tier.base === m.tier ? tier.value : m.tier;
   const shownRole = role && role.base === m.role ? role.value : m.role;
   const shownManager = manager && manager.base === m.manager_id ? manager.value : m.manager_id;
   const managerName = members.find((p) => p.id === m.manager_id)?.name;
@@ -79,10 +83,17 @@ export function MemberSheet({
     const ok = await onPatch(
       m.id,
       { role: next },
-      next === "LEADER" ? `${first} ist jetzt Teamleitung` : `${first} ist jetzt im Vertrieb`,
+      next === "LEADER" ? `${first} gehört jetzt zur Geschäftsführung` : `${first} ist jetzt im Vertrieb`,
       { role: m.role },
     );
     if (!ok) setRole(null);
+  }
+
+  async function changeTier(next: Tier) {
+    if (next === shownTier) return;
+    setTier({ value: next, base: m.tier });
+    const ok = await onPatch(m.id, { tier: next }, `${first} ist jetzt ${TIER_LABEL[next]}`, { tier: m.tier });
+    if (!ok) setTier(null);
   }
 
   async function saveBadge(value: string) {
@@ -169,6 +180,30 @@ export function MemberSheet({
         </ul>
       )}
 
+      {m.role === "MEMBER" && (
+        <>
+          <ListLabel>Stufe</ListLabel>
+          {canRole ? (
+            <Segmented
+              ariaLabel="Stufe"
+              value={shownTier}
+              onChange={(next) => void changeTier(next)}
+              options={TIERS.map((value) => ({ value, label: TIER_LABEL[value] }))}
+            />
+          ) : (
+            <ul className="list">
+              <li>
+                <Cell title={TIER_LABEL[m.tier]} />
+              </li>
+            </ul>
+          )}
+          <p className="list-footer">
+            Die Stufe bestimmt den Provisionssatz. Ab Teamleiter darf {first} ein eigenes Team aufbauen und bekommt von den Verträgen
+            der direkten Leute die Differenz zur eigenen Stufe.
+          </p>
+        </>
+      )}
+
       <ListLabel>Struktur</ListLabel>
       <ul className="list">
         <li>
@@ -184,10 +219,11 @@ export function MemberSheet({
                   {m.role === "LEADER" ? "Strukturspitze" : "Bitte zuordnen"}
                 </option>
                 {members
-                  .filter((p) => p.id !== m.id && (p.active || p.id === m.manager_id))
+                  // Ein Team haben nur die Geschaeftsfuehrung und Teamleiter - die bisherige Zuordnung bleibt waehlbar.
+                  .filter((p) => p.id !== m.id && ((p.active && canLeadTeam(p)) || p.id === m.manager_id))
                   .map((p) => (
                     <option key={p.id} value={p.id}>
-                      {p.name}
+                      {p.name} · {positionLabel(p)}
                       {p.active ? "" : " (deaktiviert)"}
                     </option>
                   ))}

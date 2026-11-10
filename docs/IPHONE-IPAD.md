@@ -44,7 +44,7 @@ fly apps create d2d-app
 # 3) Dauerhaften Speicher fuer die Datenbank (1 GB reicht fuer Jahre)
 fly volumes create d2d_data --region fra --size 1 --yes
 
-# 4) Geheimnisse setzen - daraus wird beim ersten Start die Teamleitung angelegt
+# 4) Geheimnisse setzen - daraus wird beim ersten Start die Geschaeftsfuehrung angelegt
 fly secrets set \
   SESSION_SECRET="$(node -e "console.log(require('crypto').randomBytes(32).toString('hex'))")" \
   SEED_LEADER_EMAIL="chef@deinefirma.de" \
@@ -54,15 +54,15 @@ fly secrets set \
 fly deploy
 ```
 
-Beim ersten Start legt die App Team, Teamleitung und Ablehnungsgruende selbst an -
+Beim ersten Start legt die App Team, Geschaeftsfuehrung und Ablehnungsgruende selbst an -
 ein Einrichtungsschritt ueber die Kommandozeile ist nicht noetig. Im Protokoll
 (`fly logs`) steht dann:
 
 ```
-[Start] Team „Door2Door Team“ und Teamleitung chef@deinefirma.de angelegt.
+[Start] Team „Door2Door Team“ und Geschäftsführung chef@deinefirma.de angelegt.
 ```
 
-Die Preise der Energiekarte traegt die Teamleitung danach in der App ein
+Die Preise der Energiekarte traegt die Geschaeftsfuehrung danach in der App ein
 (Energiekarte → Preis eintragen oder Tabelle).
 
 Ein spaeterer Neustart aendert daran nichts mehr: Sobald ein Nutzer existiert,

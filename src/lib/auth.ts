@@ -44,7 +44,7 @@ function sign(payload: string): string {
 
 /*
  * Das Token traegt den Sitzungsstand der Person (users.session_version).
- * Setzt die Teamleitung ein neues Passwort oder deaktiviert jemanden, zaehlt
+ * Setzt die Geschaeftsfuehrung ein neues Passwort oder deaktiviert jemanden, zaehlt
  * der Stand hoch - alle bisherigen Anmeldungen (z. B. auf einem verlorenen
  * Handy) gelten dann nicht mehr. Aeltere Tokens ohne Stand zaehlen als 0.
  */
@@ -97,7 +97,7 @@ export async function getCurrentUser(): Promise<User | null> {
   if (!session) return null;
   const user = getDb()
     .prepare(
-      `SELECT id, team_id, manager_id, name, email, role, phone, active,
+      `SELECT id, team_id, manager_id, name, email, role, tier, phone, active,
               avatar_src(id, avatar) AS avatar, bio, created_at
          FROM users WHERE id = ? AND active = 1 AND session_version = ?`,
     )

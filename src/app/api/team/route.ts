@@ -2,6 +2,7 @@ import { AuthError, hashPassword } from "@/lib/auth";
 import { assertPermission, requirePermission } from "@/lib/permissions";
 import { getDb } from "@/lib/db";
 import { handle, optionalAvatar, optionalText, requireText } from "@/lib/api";
+import { placementManager } from "@/lib/invitations";
 
 export const dynamic = "force-dynamic";
 
@@ -18,7 +19,7 @@ export async function POST(request: Request) {
     const role = body.role === "LEADER" ? "LEADER" : "MEMBER";
     if (role === "LEADER") {
       assertPermission(leader, "team.roles");
-      if (leader.role !== "LEADER") throw new AuthError("Nur Teamleitungen können Teamleitungen ernennen.", 403);
+      if (leader.role !== "LEADER") throw new AuthError("Nur die Geschäftsführung kann jemanden in die Geschäftsführung aufnehmen.", 403);
     }
 
     const exists = getDb()
@@ -39,7 +40,8 @@ export async function POST(request: Request) {
         role,
         optionalText(body.phone, 40),
         optionalAvatar(body.avatar),
-        leader.id,
+        // Ein eigenes Team gibt es erst ab Teamleiter - sonst kommt die Person zur Fuehrungskraft darueber.
+        placementManager(leader).id,
       ).lastInsertRowid as number;
 
     return { ok: true, id };

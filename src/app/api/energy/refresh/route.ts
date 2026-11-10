@@ -13,7 +13,7 @@ export const maxDuration = 60;
  *
  * Aufruf entweder
  *   - per Cron mit Header  Authorization: Bearer <ENERGY_REFRESH_TOKEN>
- *   - oder aus der App heraus durch die Teamleitung (Button "Jetzt aktualisieren").
+ *   - oder aus der App heraus durch die Geschaeftsfuehrung (Button "Jetzt aktualisieren").
  */
 async function authorise(request: Request): Promise<200 | 401 | 403> {
   const token = process.env.ENERGY_REFRESH_TOKEN;

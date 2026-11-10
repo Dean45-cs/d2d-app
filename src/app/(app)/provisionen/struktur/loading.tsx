@@ -1,6 +1,6 @@
 import { SkeletonHeader, SkeletonList, SkeletonSegmented } from "@/components/ui";
 
-/** Platzhalter der Personen - je Person Bild, Name und Anteil. */
+/** Platzhalter der Personen - je Person Bild, Name und Stufe. */
 export default function LoadingCommissionStructure() {
   return (
     <div className="page-narrow" aria-busy="true" aria-label="Personen werden geladen">

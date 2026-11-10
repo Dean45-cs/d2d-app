@@ -32,7 +32,7 @@ export default async function TourPage({
   const user = await requireUser();
   const params = await searchParams;
 
-  // Vertriebler sehen nur ihre zugeteilten Gebiete, die Teamleitung alle.
+  // Vertriebler sehen nur ihre zugeteilten Gebiete, die Geschaeftsfuehrung alle.
   const accessible = listAccessibleTerritories(user).filter((t) => t.status !== "DONE");
 
   const streetRows = (where: string, values: number[]) =>
@@ -108,8 +108,8 @@ export default async function TourPage({
   /*
    * Hausnummern und Klingeln fahren fuer die eigenen Gebiete komplett mit -
    * im Treppenhaus ist meist kein Netz, und genau dort werden sie gebraucht.
-   * Fremde Gebiete (Teamleitung, "alle Teamgebiete sehen") kommen erst dazu,
-   * wenn eines davon gewaehlt ist (?gebiet=…); sonst luede die Teamleitung
+   * Fremde Gebiete (Geschaeftsfuehrung, "alle Teamgebiete sehen") kommen erst dazu,
+   * wenn eines davon gewaehlt ist (?gebiet=…); sonst luede die Geschaeftsfuehrung
    * jedes Haus des ganzen Teams. Gebiete mit eigenen Terminen fahren mit,
    * damit "Termine heute" auch ohne Netz an die richtige Tuer fuehrt.
    */

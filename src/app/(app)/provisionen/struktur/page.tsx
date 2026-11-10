@@ -9,9 +9,8 @@ export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Provisionen · Personen" };
 
 /**
- * Wer was bekommt: Fuehrungskraefte geben ihren direkten Leuten einen Anteil
- * an der eigenen Provision, die Verwaltung stellt persoenliche Saetze ein.
- * Sichtbar ist immer nur, was darunter liegt.
+ * Wer welche Stufe hat: Teamleiter sehen ihre direkten Leute und was sie an
+ * deren Vertraegen bekommen, die Verwaltung das ganze Team samt Saetzen.
  */
 export default async function CommissionStructurePage() {
   const user = await requireUser();

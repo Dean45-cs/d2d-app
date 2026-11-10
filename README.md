@@ -13,12 +13,13 @@ Eine Web-App für Door-to-Door-Teams im Energievertrieb:
   stehen sie oben auf der Tour; bestätigt per WhatsApp oder SMS mit einem Tipp
 - **Digitale Visitenkarte** – QR-Code an der Tür: Kunden sehen Bild, Name, Team und
   Ausweisnummer live vom Server, und speichern den Kontakt
-- **Kundenliste** – die Teamleitung ordnet jedem Auftrag nachträglich den Kunden aus dem
+- **Kundenliste** – die Geschäftsführung ordnet jedem Auftrag nachträglich den Kunden aus dem
   Buchungsportal zu, mit Rufnummer und Vertragsende; vor Ablauf steht er unter „Fällig“
   zum Anrufen, Besuchen und Umberaten
-- **Provisionen** – die Liste aus dem Portal, mit Regeln der Teamleitung: jede Person sieht,
+- **Provisionen** – die Liste aus dem Portal, mit Regeln der Geschäftsführung: jede Person sieht,
   welcher Tarif ihr wie viel bringt (für den Verbrauch des Kunden auf den Euro genau),
-  Führungskräfte geben ihren Leuten einen Anteil weiter, dazu Boni je Tarif, Person oder
+  nach ihrer Stufe (Berater, Senior Berater, Teamleiter); Teamleiter bekommen von den
+  Verträgen ihrer direkten Leute die Differenz, dazu Boni je Tarif, Person oder
   für Strom + Gas – niemand sieht, was die Ebenen darüber bekommen
 - **Preise auf der Karte** – zeigt, wo der Grundversorger besonders teuer ist; Preise in Sekunden
   vom Preisblatt eingetragen oder als Tabelle aus Excel übernommen
@@ -56,17 +57,17 @@ funktioniert zusätzlich am Desktop.
 ```bash
 npm install
 cp .env.example .env.local        # Werte anpassen, vor allem SESSION_SECRET
-npm run db:seed                   # Datenbank + erste Teamleitung anlegen
+npm run db:seed                   # Datenbank + erste Geschäftsführung anlegen
 npm run dev                       # http://localhost:3000
 ```
 
-Beim Serverstart legt die App Team und Teamleitung automatisch an, sobald
+Beim Serverstart legt die App Team und Geschäftsführung automatisch an, sobald
 `SEED_LEADER_EMAIL` und `SEED_LEADER_PASSWORD` gesetzt sind – lokal genügt
 `npm run db:seed`. Danach lautet der Login standardmäßig:
 
-| Rolle       | E-Mail                | Passwort    |
-|-------------|-----------------------|-------------|
-| Teamleitung | `leitung@example.de`  | `start1234` |
+| Rolle            | E-Mail                | Passwort    |
+|------------------|-----------------------|-------------|
+| Geschäftsführung | `leitung@example.de`  | `start1234` |
 
 Eigene Zugangsdaten beim Seed setzen:
 
@@ -85,7 +86,7 @@ Geräte abgemeldet. Neu gesetzt von der Leitung wird es unter Profil › Verwalt
 
 ## Rollen und Berechtigungen
 
-| | Teamleitung | Vertrieb |
+| | Geschäftsführung | Vertrieb |
 |---|---|---|
 | Gebiete abstecken, aufteilen, Straßen pflegen, zuteilen | ✅ | – |
 | Mitarbeiter anlegen, Passwörter setzen | ✅ | – |
@@ -99,14 +100,15 @@ Geräte abgemeldet. Neu gesetzt von der Leitung wird es unter Profil › Verwalt
 | Kundenliste: Kunden zuordnen, Wiedervorlage, Export | ✅ | – |
 | Provisionsliste mit den eigenen Beträgen | ✅ (Admin-Provision) | ✅ |
 | Provisionen verwalten: Liste importieren, Regeln, Boni | ✅ | – |
-| Eigenen Leuten einen Anteil der Provision geben | ✅ | ✅ (mit eigener Struktur) |
+| Stufen vergeben (Berater, Senior Berater, Teamleiter) | ✅ | – |
+| Eigenes Team aufbauen, Differenz an dessen Verträgen | ✅ | ✅ (ab Teamleiter) |
 | Energiekarte | ✅ | ✅ |
 
 Die Tabelle beschreibt die Rollenstandards. Unter **Profil › Verwaltung › Rechte** lassen
-sich 23 Rechte pro Person auf **Standard**, **Erlauben** oder **Entziehen** setzen:
+sich 22 Rechte pro Person auf **Standard**, **Erlauben** oder **Entziehen** setzen:
 Gebiete erstellen/sehen/bearbeiten/zuteilen/löschen, Besuchskorrekturen, Türsperren,
-Teamtermine, Kundenliste, Provisionen verwalten, Provision der Struktur, Teamauswertung,
-Mitglieder- und Strukturverwaltung, Rollen, Berechtigungen, Einladungen, Energiepreise und
+Teamtermine, Kundenliste, Provisionen verwalten, Teamauswertung,
+Mitglieder- und Strukturverwaltung, Rollen und Stufen, Berechtigungen, Einladungen, Energiepreise und
 Referenzwerte, Tagesquelle, Ablehnungsgründe und Feedmoderation. Ein ausdrücklicher Entzug hat Vorrang vor
 automatischen Rechten; „Standard“ folgt der aktuellen Rolle und Struktur.
 
@@ -119,11 +121,12 @@ erstellenden Person selbst zugeteilt. Die erstellende Person behält Zugriff,
 auch nach Zuteilung an jemand anderen. Bestehende Gebiete behalten ihre Zuteilung.
 
 Strukturverantwortliche dürfen Berechtigungen für Personen unterhalb ihrer
-Struktur vergeben; Teamleitungen für andere Personen ihres Teams. Sie können
+Struktur vergeben; die Geschäftsführung für andere Personen ihres Teams. Sie können
 nur Rechte vergeben oder ändern, die sie selbst besitzen. Auch zusätzliche
 automatische Rechte beim Erlauben von „Gebiete erstellen“ werden dabei geprüft.
-Eigene Berechtigungen müssen andere Verantwortliche ändern. Die Ernennung von
-Teamleitungen bleibt echten Teamleitungen mit dem Recht „Rollen ändern“ vorbehalten.
+Eigene Berechtigungen müssen andere Verantwortliche ändern. Wer zur Geschäftsführung
+gehört und welche [Stufe](#stufen-im-vertrieb) jemand im Vertrieb hat, entscheidet nur die
+Geschäftsführung selbst – mit dem Recht „Rollen und Stufen ändern“.
 
 Im Vertrieb sind Gebiete auf selbst erstellte und zugeteilte Gebiete begrenzt.
 „Alle Teamgebiete sehen“ erweitert diesen Zugriff ausdrücklich und ermöglicht
@@ -189,7 +192,7 @@ einklappbaren Seitenleiste; beim Klinken bleibt sie im Auto-Modus schmal. Alte A
    Wiederholtes Bestätigen erzeugt keinen zweiten Verkauf. Bestehende Abschlüsse und
    bereits wartende Besuche bleiben erhalten.
 5. Vertippt? „Letzten Eintrag rückgängig machen“ – für eigene Einträge bis 15 Minuten,
-   die Teamleitung kann jederzeit korrigieren.
+   die Geschäftsführung kann jederzeit korrigieren.
 
 **Keine Tür ist je „erledigt“.** Kunden lassen sich beliebig oft antreffen – auch nach
 einem Abschluss, denn Leute ziehen um und Verträge laufen aus. Ein Abschluss sperrt
@@ -212,7 +215,7 @@ man selbst. „Bearbeiten“ pflegt Schilder, Haustyp und Sperre; „‹ Bahnhof
 zurück in die Straße, das Haus dabei im Blick. Ab neun Klingeln gibt es „Name filtern“.
 
 Wer ausdrücklich keinen Besuch will, bekommt über **Sperren** einen dauerhaften Eintrag
-fürs ganze Team – aufheben kann ihn nur die Teamleitung.
+fürs ganze Team – aufheben kann ihn nur die Geschäftsführung.
 
 ### Auf dem iPad
 
@@ -263,7 +266,7 @@ Mit Standortfreigabe weiß Klinken, wo man steht, und rechnet alles auf dem Ger�
   steht.
 - **Keine offene Tür mehr in der Straße:** „Weiter: …“ in der Ergebnisleiste führt in die
   nächstgelegene Straße mit offenen Türen.
-- **Teamleitung in fremden Gebieten:** Deren Häuser lädt die Tour erst bei Bedarf. Liegt
+- **Geschäftsführung in fremden Gebieten:** Deren Häuser lädt die Tour erst bei Bedarf. Liegt
   so ein Gebiet deutlich näher, lädt „In meiner Nähe“ es und sucht dort weiter.
 
 Die Entfernungen sind ehrlich: ist der Standort ungenau (über 50 m) oder hat eine
@@ -286,7 +289,7 @@ Gründe aus älteren Versionen bekommen beim ersten Start das passende Zeichen.
 
 ## Termine
 
-Unter **Termine** (Teamleitung: alle, Außendienst: die eigenen) steht, was an der Tür
+Unter **Termine** (Geschäftsführung: alle, Außendienst: die eigenen) steht, was an der Tür
 vereinbart wurde – nach Tagen geordnet, überfällige ganz oben und rot markiert. Von dort
 aus lässt sich anrufen, die Route öffnen oder der Termin abhaken; abgehakte stehen unter
 „Erledigt“ und lassen sich wieder öffnen. Termine von heute erscheinen zusätzlich
@@ -317,7 +320,7 @@ Nachricht erst am nächsten Tag liest. Rufnummern mit 0 vorn gelten als deutsche
 (`+49`), „+49 (0)171 …“ wird richtig gelesen.
 
 Dieselben zwei Knöpfe stehen unter **Termine** im Blatt eines Termins – für die eigenen,
-offenen und noch nicht vorbeigegangenen. Die Teamleitung bestätigt keine Termine im Namen
+offenen und noch nicht vorbeigegangenen. Die Geschäftsführung bestätigt keine Termine im Namen
 anderer. Rechenkern: `src/lib/confirmation.ts`, Tests in `scripts/tests/business-card.test.ts`.
 
 ### Terminerinnerungen per Push
@@ -359,7 +362,7 @@ einen laufenden Server neu starten. Tests: `npm test` (einschließlich
 
 An der Tür nimmt die App keine Kundendaten auf – Name, Anschrift und Unterschrift landen im
 Tarifrechner des Partners. Damit das Team einen Kunden nach Ende der Vertragslaufzeit
-trotzdem wieder anrufen oder besuchen und neu beraten kann, trägt die Teamleitung ihn
+trotzdem wieder anrufen oder besuchen und neu beraten kann, trägt die Geschäftsführung ihn
 nachträglich ein: unter **Kunden** (Seitenleiste, auf dem Handy unter Profil) steht jeder
 bestätigte Abschluss des Teams mit Adresse, Produkt, Datum und Verkäufer.
 
@@ -387,7 +390,7 @@ führende Null nicht verschwindet). Ohne gewählte Ansicht öffnet die Seite dor
 etwas zu tun ist: erst „Fällig“, dann „Ohne Kunde“.
 
 Die Liste sieht und pflegt, wer das Recht **„Kundenliste pflegen“** hat – standardmäßig die
-Teamleitung, unter **Rechte** auch einzeln vergebbar; sie umfasst dann alle Aufträge des
+Geschäftsführung, unter **Rechte** auch einzeln vergebbar; sie umfasst dann alle Aufträge des
 Teams. Kundendaten hängen am Abschluss: wird der Abschluss zurückgenommen, sind sie mit
 weg. „Kundendaten entfernen“ löscht sie, ohne den Abschluss anzutasten. Rechenregeln in
 `src/lib/contracts.ts`, Abfragen in `src/lib/customers.ts`, Tests in
@@ -404,7 +407,7 @@ Staffeln, davon die Aktion, später die Folgeprovision, die Boni und wann ausgez
 
 ### Die Liste aus dem Portal
 
-Die Provisionen in der Liste des Portals sind die der **Teamleitung** (Admin-Provision).
+Die Provisionen in der Liste des Portals sind die der **Geschäftsführung** (Admin-Provision).
 Unter **Profil › Verwaltung › Provisionsregeln › Liste importieren** wird der Export
 „Meine Provisionen“ als Excel-Datei hochgeladen (oder die Tabelle aus Excel eingefügt). Die
 App liest Anbieter, Tarif, Verbrauch von/bis, Grund-, Aktions- und Folgeprovision sowie
@@ -423,41 +426,67 @@ Abschluss/Anschluss (wann ausgezahlt wird) und zeigt vor dem Speichern, was neu 
 
 | Regel | Wer | Wirkung |
 |---|---|---|
-| Standardsatz | Teamleitung | z. B. 60 % der Admin-Provision für alle |
-| Ausnahme | Teamleitung | je Sparte, Anbieter oder Tarif ein anderer Satz oder ein fester Betrag – die genauere gilt: Tarif vor Anbieter vor Sparte vor Standard |
-| Persönlicher Satz | Teamleitung | für Leute direkt unter ihr, z. B. 70 %: verschiebt die ganze Liste um dieselben Prozentpunkte, auch bei Ausnahmen |
-| Anteil | jede Führungskraft | ihre direkten Leute bekommen einen Anteil ihrer eigenen Provision, z. B. 80 % – die Differenz bleibt bei ihr, über beliebig viele Ebenen |
+| Standardsatz | Geschäftsführung | der Satz der Stufe **Berater**, z. B. 65 % der Admin-Provision – damit starten alle |
+| Stufen | Geschäftsführung | **Senior Berater** und **Teamleiter** bekommen einen höheren Satz, z. B. 70 % und 75 %: die ganze Liste verschiebt sich um dieselben Prozentpunkte, auch bei Ausnahmen |
+| Ausnahme | Geschäftsführung | je Sparte, Anbieter oder Tarif ein anderer Satz oder ein fester Betrag – die genauere gilt: Tarif vor Anbieter vor Sparte vor Standard |
+| Individueller Satz | Geschäftsführung | für eine einzelne Person statt des Satzes ihrer Stufe, z. B. 68 % |
+| Differenz | automatisch | ein Teamleiter bekommt von jedem Vertrag seiner **direkten** Leute die Differenz zwischen seinem und ihrem Betrag |
 
-Ohne eigenen Anteil gilt für jemanden in einer Struktur der Standard, höchstens so viel, wie
-die Führungskraft selbst bekommt. Wechselt jemand die Führungskraft, gilt wieder der
-Standard. Die Teamleitung kann eine **Untergrenze** setzen (z. B. mindestens 70 % der
-eigenen Provision weitergeben) und entscheiden, ob **Aktions-** und **Folgeprovision**
-anteilig weitergegeben werden. Ein fester Betrag gilt für die Abschlussprovision; die
-Folgeprovision wird immer prozentual geteilt. Beispiel bei 150 € Admin-Provision:
+### Stufen im Vertrieb
+
+Jede Person im Vertrieb hat eine Stufe: **Berater**, **Senior Berater** oder **Teamleiter**.
+Die Geschäftsführung vergibt sie unter **Profil › Verwaltung › Mitglieder** im Blatt der
+Person (Recht „Rollen und Stufen ändern“); die Sätze stehen unter **Provisionsregeln ›
+Stufen**. Ohne eigenen Satz bekommt eine Stufe so viel wie die darunter, nie weniger.
+
+- **Wer mehr verkauft, steigt auf** – und bekommt bei gleich vielen Verträgen mehr. Jeder
+  behält den Satz seiner Stufe, egal unter wem er steht.
+- **Ein eigenes Team gibt es erst ab Teamleiter.** Nur der Geschäftsführung und Teamleitern
+  lassen sich Leute zuordnen. Wer Leute unter sich hat, bleibt Teamleiter, bis sie einer
+  anderen Führungskraft zugeordnet sind.
+- **Die Differenz zahlt die Firma.** Von jedem Vertrag seiner direkten Leute bekommt der
+  Teamleiter die Differenz zu seinem eigenen Betrag – dem Berater wird nichts abgezogen.
+  Ist die Person Senior Berater, ist die Differenz entsprechend kleiner.
+- **Keine weiteren Ebenen.** Wird jemand im Team selbst Teamleiter, fällt die Differenz weg
+  und er baut sein eigenes Team auf; an dessen Leuten verdient der frühere Teamleiter nichts.
+  Ein Vertrag kostet so nie mehr als den Satz eines Teamleiters.
+
+Beispiel bei 184,62 € Admin-Provision und den Sätzen 65 / 70 / 75 %:
 
 | | |
 |---|---:|
-| Lisa (persönlich 70 %) | 105 € |
-| Tom (80 % von Lisa) | 84 € |
-| Lisa behält an Toms Vertrag | 21 € |
-| Bleibt bei der Teamleitung | 45 € |
+| Tom (Berater) für seinen Vertrag | 120,00 € |
+| Lisa (Teamleiterin, Tom ist in ihrem Team) bekommt dazu | 18,47 € |
+| Lisa für einen eigenen Vertrag | 138,47 € |
+| Bleibt bei der Geschäftsführung an Toms Vertrag | 46,15 € |
+
+Die Geschäftsführung entscheidet außerdem, ob **Aktions-** und **Folgeprovision** anteilig
+weitergegeben werden. Ein fester Betrag gilt für die Abschlussprovision; die Folgeprovision
+wird immer prozentual geteilt. Ein individueller Satz gilt, solange die Person dieselbe
+Führungskraft hat – danach wieder ihre Stufe.
+
+**Beim Update** wird einmalig Teamleiter, wer schon Leute unter sich hat – niemand verliert
+sein Team. Die früheren Anteile („80 % von Lisa“) und die Untergrenze dafür gibt es nicht
+mehr; bis Sätze für Senior Berater und Teamleiter eingetragen sind, bekommen alle den
+Standardsatz.
 
 ### Boni
 
 Unter Provisionsregeln › Boni: **Tarif-Bonus** (je Tarif, Anbieter, Sparte oder für alle),
 **persönlicher Bonus** (etwa in der Einarbeitung) und **Kombi-Bonus** (Strom und Gas beim
-selben Kunden) – je Vertrag, auf Wunsch befristet. Boni bezahlt die Teamleitung aus ihrer
+selben Kunden) – je Vertrag, auf Wunsch befristet. Boni bezahlt die Geschäftsführung aus ihrer
 Marge, sie gehen an den, der verkauft, und stehen als Plakette am Tarif bzw. oben in der Liste.
 
 ### Wer was sieht
 
 - **Vertrieb**: nur die eigenen Euro-Beträge – nie die Admin-Provision, keinen Prozentsatz
   und nichts von den Ebenen darüber.
-- **Führungskräfte** (automatisch ab einer aktiven Person in der eigenen Struktur, Recht
-  „Provision der Struktur festlegen“): unter „Meine Leute“ ihre Struktur nach unten, die
-  Liste jeder Person darunter und was sie selbst an deren Verträgen behalten.
-- **Provisionen verwalten** (Teamleitung): Standardliste mit Admin-Provision und dem, was
-  bleibt, „Ansicht als …“ für jede Person, Import, Regeln und Boni.
+- **Teamleiter**: unter „Meine Leute“ ihre direkten Leute mit Stufe, die Liste jeder dieser
+  Personen und die Differenz, die sie selbst an deren Verträgen bekommen. Nicht die Leute
+  anderer Teamleiter, auch wenn die in der Struktur unter ihnen stehen.
+- **Provisionen verwalten** (Geschäftsführung): Standardliste mit Admin-Provision und dem, was
+  bleibt, „Ansicht als …“ für jede Person, Import, Regeln, Sätze der Stufen, individuelle
+  Sätze und Boni.
 
 Zugeschnitten wird auf dem Server: was jemand nicht sehen darf, verlässt ihn nicht.
 Rechenkern in `src/lib/commissions/model.ts`, Excel-Leser in `xlsx.ts` (ohne zusätzliche
@@ -465,7 +494,7 @@ Bibliothek), Tabellen-Import in `table.ts`, Abfragen und Sichtbarkeit in `store.
 `scripts/tests/commissions.test.ts` und `scripts/tests/commissions-store.test.ts`.
 
 **Als Nächstes geplant:** Tarif beim „Abschluss bestätigen“ und eine Auftragsübersicht, in
-der die Teamleitung jeden Vertrag prüft (Neu → An Distributor übermittelt → Freigegeben →
+der die Geschäftsführung jeden Vertrag prüft (Neu → An Distributor übermittelt → Freigegeben →
 Bereit zur Provisionierung → Ausgezahlt, jederzeit „In Klärung“ oder „Storniert/Abgelehnt“);
 danach „Mein Verdienst“ je Monat, Staffel-Boni und Stornos nach der Auszahlung.
 
@@ -479,7 +508,7 @@ Adresse der App
 - **Bild, Name, „Beratung Strom & Gas“ und das Team**
 - **„Aktiv im Team“ mit Datum und Uhrzeit des Abrufs** – ein Bildschirmfoto taugt so
   nicht als Nachweis
-- die **Ausweisnummer** (trägt die Teamleitung unter Mitglieder ein) und seit wann die
+- die **Ausweisnummer** (trägt die Geschäftsführung unter Mitglieder ein) und seit wann die
   Person dabei ist
 - auf Wunsch die **Rufnummer** zum Anrufen, und **Kontakt speichern** (vCard samt Bild)
 
@@ -538,7 +567,7 @@ sich dort ebenfalls abschalten.
 
 XP werden serverseitig aus den bestehenden Besuchen ermittelt: Altbestand zählt
 automatisch, gelöschte Besuche ziehen XP und Abzeichenfortschritt wieder ab.
-Die Rangliste berücksichtigt aktive Teammitglieder und Teamleitungen mit mindestens
+Die Rangliste berücksichtigt aktive Teammitglieder und die Geschäftsführung mit mindestens
 einem Besuch; gleiche Gesamt-XP teilen sich einen Platz. Gesamt-XP bleiben dauerhaft.
 Offline-Einträge zählen nach erfolgreicher Synchronisierung, am Tag der Speicherung
 auf dem Server. Stabile Anfrage-IDs verhindern doppelte Besuche, XP und Feedbeiträge
@@ -571,7 +600,7 @@ Türen, Abschlussquote und Antreffquote, für heute, 7 Tage, 30 Tage oder gesamt
 
 Fair bleibt es so: Eine **Quote** zählt erst ab 5 Gesprächen (Abschlussquote) bzw.
 20 Türen (Antreffquote); darunter steht man in der Liste, aber ohne Platz. Die
-**Teamleitung** kommt nur in die Wertung, wenn sie im Zeitraum selbst an Türen war.
+**Geschäftsführung** kommt nur in die Wertung, wenn sie im Zeitraum selbst an Türen war.
 
 ### Feed
 
@@ -583,7 +612,7 @@ Beitrag. Abschlüsse von vor dem Feed werden beim ersten Start nachgetragen.
 Dazu kann jeder **eigene Beiträge** schreiben (bis 500 Zeichen), **kommentieren** und
 **„Gefällt mir“** setzen. Unter einem Abschluss stehen Ein-Tipp-Glückwünsche („Glückwunsch!“)
 bereit. „Abonniert“ zeigt nur die Beiträge der Leute, denen man folgt. Eigene Beiträge
-und Kommentare löscht man selbst, die Teamleitung darf alle löschen.
+und Kommentare löscht man selbst, die Geschäftsführung darf alle löschen.
 
 ### Abonnieren und Push-Nachrichten
 
@@ -600,7 +629,7 @@ kommentiert oder einen abonniert.
 - Einrichten muss man nichts: Die Schlüssel (VAPID) erzeugt die App beim ersten Bedarf
   selbst und speichert sie in der Datenbank. Eigene Schlüssel gehen über
   `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY`, der Kontakt für die Push-Dienste über
-  `VAPID_SUBJECT` (sonst die E-Mail der Teamleitung).
+  `VAPID_SUBJECT` (sonst die E-Mail der Geschäftsführung).
 - Versendet wird direkt an die Push-Dienste von Apple, Google, Mozilla und Microsoft –
   ohne Zusatzdienst und ohne weitere Bibliothek (`src/lib/push.ts`). Andere Adressen
   nimmt der Server nicht an. Der Server muss diese Dienste erreichen können.
@@ -619,7 +648,7 @@ sich, „Dabei seit“, Abonnenten und Abonnierte, darunter die Reiter **Beiträ
 - Verlauf der letzten 14 Tage
 
 Über „Profil bearbeiten“ ändert jeder sein Bild und den Text über sich selbst; Name,
-Rolle und Zugang bleiben bei der Teamleitung.
+Rolle und Zugang bleiben bei der Geschäftsführung.
 
 ---
 
@@ -697,7 +726,7 @@ Die geladenen Hausnummern bleiben erhalten und werden an drei Stellen benutzt:
 
 - **Gebietsseite:** hinter jeder Straße steht „8 Nr.“ – aufgeklappt erscheint jedes
   Haus als Plakette: hohl = offen, grau = nochmal, getönt = erfasst, grün mit Haken = Abschluss. Damit sieht die
-  Teamleitung, was tatsächlich abgearbeitet ist, nicht nur die Summe.
+  Geschäftsführung, was tatsächlich abgearbeitet ist, nicht nur die Summe.
 - **An der Tür:** die Häuser der Straße stehen als Liste mit ihrem Stand; „Nr. filtern“
   findet eine Nummer schnell, eine fehlende lässt sich dort von Hand öffnen.
 - **Wohneinheiten:** kennt OpenStreetMap die Zahl der Wohnungen im Haus, zählt sie in
@@ -909,7 +938,7 @@ früheren Demowerten bereinigt.
 Eine kostenlose Schnittstelle mit Grundversorgungstarifen gibt es nicht (Anbieter wie
 ene't oder Verivox verkaufen sie als Webservice). Jeder Grundversorger muss seine Preise
 aber gut auffindbar im Internet veröffentlichen (§ 36 EnWG). Die App macht das Abtippen
-so kurz wie möglich – alles direkt auf der **Energiekarte** (nur Teamleitung):
+so kurz wie möglich – alles direkt auf der **Energiekarte** (nur Geschäftsführung):
 
 **Einzeln** – „Preis eintragen“, ein grauer Punkt auf der Karte oder „Eintragen“ in der
 Liste „Noch ohne Preis“:
@@ -1013,7 +1042,7 @@ Alternativ per Cron:
 curl -X POST https://deine-app.de/api/energy/refresh \
      -H "Authorization: Bearer $ENERGY_REFRESH_TOKEN"
 
-# 3) Von Hand: auf der Energiekarte über den Abruf-Knopf oben rechts (nur Teamleitung)
+# 3) Von Hand: auf der Energiekarte über den Abruf-Knopf oben rechts (nur Geschäftsführung)
 ```
 
 Jeder Lauf wird protokolliert; Quelle, Zeitpunkt und Ergebnis stehen unter
@@ -1146,9 +1175,9 @@ fly secrets set \
 fly deploy
 ```
 
-Team, Teamleitung und Ablehnungsgründe legt die App beim ersten Start selbst an
+Team, Geschäftsführung und Ablehnungsgründe legt die App beim ersten Start selbst an
 (`src/lib/bootstrap.ts`). Ein Einrichtungsschritt über die Kommandozeile entfällt. Die
-Preise der Energiekarte trägt die Teamleitung danach in der App ein.
+Preise der Energiekarte trägt die Geschäftsführung danach in der App ein.
 
 Geht genauso bei Railway, Render, Hetzner oder einem eigenen Server – Hauptsache, es gibt
 **dauerhaften Dateispeicher** für die SQLite-Datei. **Vercel und Netlify funktionieren
@@ -1283,7 +1312,7 @@ Die App speichert **personenbezogene Daten**, sobald an der Tür etwas zustande 
 - **Türeinträge** hängen an der Hausnummer bzw. am Namen des Klingelschilds.
 - **Termine** speichern Name und Rufnummer des Ansprechpartners.
 - Die **Kundenliste** speichert Name, Rufnummer, Kundennummer und Vertragslaufzeit je
-  Auftrag – von der Teamleitung aus dem Buchungsportal übernommen.
+  Auftrag – von der Geschäftsführung aus dem Buchungsportal übernommen.
 
 Unterschrift, Widerrufsbelehrung und die übrigen Vertragsdaten entstehen dagegen im
 Tarifrechner des Partners – diese App nimmt sie bewusst nicht auf. **Anrufe zum Umberaten
@@ -1333,27 +1362,32 @@ Die eingeladene Person legt Name, E-Mail und Passwort selbst fest. Ihr Konto wir
 erst bei Freigabe angelegt; vorher ist kein Login möglich.
 
 Die Freigabe oder Ablehnung erfolgt ausschließlich durch die **direkte Führungskraft
-des Einladenden**, ebenfalls unter **Einladungen**. Neue Mitglieder werden direkt
-unter dem Einladenden eingeordnet und erhalten die Rolle Vertrieb. Teamleitungen
-an der Strukturspitze (ohne eigene Führungskraft) bearbeiten ihre eigenen
+des Einladenden**, ebenfalls unter **Einladungen**. Neue Mitglieder erhalten die Rolle
+Vertrieb und die Stufe Berater. **Ins eigene Team kommen sie nur bei Teamleitern und der
+Geschäftsführung** – wer Berater oder Senior Berater ist, bringt die Person zu seiner
+eigenen Führungskraft (ist die deaktiviert, zur nächsten darüber). Wer sie mitgebracht
+hat, bleibt an der Einladung vermerkt, etwa für eine Werberprämie. Die Geschäftsführung
+an der Strukturspitze (ohne eigene Führungskraft) bearbeitet ihre eigenen
 Einladungen. Bei einer Strukturänderung ist die aktuelle direkte Führungskraft
 zuständig. Bereits eingereichte Anfragen bleiben nach Ablauf des Links bearbeitbar.
 
 Unter **Team → Struktur** zeigt ein Organigramm die vorhandenen Zuordnungen mit
-Profilbildern und Verbindungslinien. Teamleitungen, Führungskräfte mit eigenen
-Mitgliedern und Vertrieb sind farblich gekennzeichnet. Einzelne Zweige oder die
+Profilbildern und Verbindungslinien; an jeder Person steht ihre Stufe bzw.
+„Geschäftsführung“. Einzelne Zweige oder die
 gesamte Struktur lassen sich ein- und ausklappen; auf dem Handy steht der Baum
 untereinander. Die Ansicht enthält nur die bereits freigegebenen Personen,
 einschließlich deaktivierter Mitglieder. Nicht zugeordnete Personen stehen separat.
 
-Unter **Team → Mitglieder → Direkte Führungskraft** kann die Teamleitung die Zuordnung ändern.
-Kreise und Zuordnungen zu anderen Teams werden verhindert. Bestehende Mitglieder
-werden bei der Migration nur dann automatisch zugeordnet, wenn ihr Team genau eine
-Teamleitung hat. Andernfalls muss die Struktur zunächst manuell zugeordnet werden.
-Manuell angelegte Mitglieder werden der anlegenden Teamleitung zugeordnet.
+Unter **Team → Mitglieder → Direkte Führungskraft** kann die Geschäftsführung die Zuordnung ändern.
+Zur Wahl stehen die Geschäftsführung und Teamleiter; Kreise und Zuordnungen zu anderen
+Teams werden verhindert. Bestehende Mitglieder werden bei der Migration nur dann
+automatisch zugeordnet, wenn ihr Team genau eine Person in der Geschäftsführung hat.
+Andernfalls muss die Struktur zunächst manuell zugeordnet werden. Manuell angelegte
+Mitglieder werden der anlegenden Person zugeordnet, wenn sie ein Team haben darf – sonst
+deren Führungskraft.
 
 Der Status steht beim Einladenden; es werden keine Einladungs- oder Freigabe-E-Mails
 verschickt. Die neuen Tabellen und die Strukturspalte werden beim Serverstart
 angelegt. Einen bereits laufenden Server nach dem Update neu starten.
 
-Tests: `node --import tsx --test scripts/tests/invitations.test.ts`
+Tests: `node --import tsx --test scripts/tests/invitations.test.ts scripts/tests/tiers.test.ts`

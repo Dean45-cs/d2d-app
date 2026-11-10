@@ -19,7 +19,7 @@ export async function GET(
 }
 
 /**
- * Beitrag loeschen: den eigenen, als Teamleitung jeden. Ein Abschluss
+ * Beitrag loeschen: den eigenen, als Geschaeftsfuehrung jeden. Ein Abschluss
  * haengt am Eintrag an der Tuer und verschwindet nur mit ihm - sonst liesse
  * sich ein Vertrag aus dem Feed tilgen, der in den Zahlen weiter zaehlt.
  */

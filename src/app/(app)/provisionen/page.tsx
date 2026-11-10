@@ -22,7 +22,7 @@ export default async function CommissionsPage({
 }) {
   const user = await requireUser();
   const admin = permissionsFor(user)["commissions.manage"];
-  // Die Teamleitung bekommt die Admin-Provision - ohne Verwaltungsrecht gibt es fuer sie keine Liste.
+  // Die Geschaeftsfuehrung bekommt die Admin-Provision - ohne Verwaltungsrecht gibt es fuer sie keine Liste.
   if (user.role === "LEADER" && !admin) redirect("/profil");
   const params = await searchParams;
   const people = viewablePeople(user);

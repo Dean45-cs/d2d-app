@@ -90,7 +90,7 @@ export default async function EnergyMapPage({
       stale: false,
     }));
 
-  // Orte der eigenen Gebiete ohne Preis - nur die Teamleitung kann sie fuellen.
+  // Orte der eigenen Gebiete ohne Preis - nur die Geschaeftsfuehrung kann sie fuellen.
   const open: OpenPoint[] = isLeader
     ? openPlaces(user.team_id).map((place) => ({
         key: `o:${place.key}`,

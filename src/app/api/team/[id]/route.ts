@@ -3,7 +3,7 @@ import { assertMemberScope, assertNoExtraRights, assertPermission, structureIds 
 import type { User } from "@/lib/types";
 import { getDb } from "@/lib/db";
 import { handle, optionalAvatar, optionalText, requireText } from "@/lib/api";
-import { rejectPendingJoins, setManager } from "@/lib/invitations";
+import { rejectPendingJoins, setManager, setTier } from "@/lib/invitations";
 
 export const dynamic = "force-dynamic";
 
@@ -35,10 +35,18 @@ export async function PATCH(
       setManager(leader.team_id, userId, body.manager_id);
       return { ok: true };
     }
+    if (body.tier !== undefined) {
+      // Die Stufe bestimmt Provision und wer ein Team haben darf - wie die Rolle Sache der Geschaeftsfuehrung.
+      assertPermission(leader, "team.roles");
+      if (leader.role !== "LEADER") throw new AuthError("Nur die Geschäftsführung vergibt Stufen.", 403);
+      if (Object.keys(body).length !== 1) throw new Error("Bitte die Stufe separat ändern.");
+      setTier(leader.team_id, userId, body.tier);
+      return { ok: true };
+    }
     if (Object.keys(body).some((key) => key !== "role")) assertPermission(leader, "team.manage");
     if (body.role !== undefined) {
       assertPermission(leader, "team.roles");
-      if (leader.role !== "LEADER") throw new AuthError("Nur Teamleitungen können Rollen ändern.", 403);
+      if (leader.role !== "LEADER") throw new AuthError("Nur die Geschäftsführung kann Rollen ändern.", 403);
       if (!["LEADER", "MEMBER"].includes(body.role)) throw new Error("Unbekannte Rolle.");
       if (body.role === "MEMBER" && member.manager_id === null) throw new Error("Bitte zuerst eine direkte Führungskraft zuordnen.");
     }
@@ -73,10 +81,13 @@ export async function PATCH(
     }
     if (body.role !== undefined) {
       if (userId === leader.id && body.role !== "LEADER") {
-        throw new Error("Du kannst dir die Teamleitung nicht selbst entziehen.");
+        throw new Error("Du kannst dir die Geschäftsführung nicht selbst entziehen.");
       }
       fields.push("role = ?");
       values.push(body.role === "LEADER" ? "LEADER" : "MEMBER");
+      // Zurueck im Vertrieb mit Leuten darunter: als Teamleiter, sonst stuende ein Team unter jemandem, der keines haben darf.
+      const reports = db.prepare("SELECT 1 FROM users WHERE manager_id = ? AND id <> ? LIMIT 1").get(userId, userId);
+      if (body.role === "MEMBER" && member.role === "LEADER" && reports) fields.push("tier = 'TEAMLEITER'");
     }
     if (body.password) {
       const password = String(body.password);

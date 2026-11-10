@@ -33,7 +33,7 @@ export function AppointmentList({
   /** Echte Anzahl - die Listen selbst sind begrenzt. */
   counts: { open: number; overdue: number; done: number };
   isLeader: boolean;
-  /** Profilbilder je Mitarbeiter-ID - nur fuer die Teamleitung. */
+  /** Profilbilder je Mitarbeiter-ID - nur fuer die Geschaeftsfuehrung. */
   faces: Record<number, string>;
   back: { href: string; label: string; mobileOnly?: boolean };
   userId: number;

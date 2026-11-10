@@ -9,7 +9,7 @@ import { refreshEnergyPrices } from "./energy/refresh";
  *
  * Damit nach dem Deployen kein zusätzlicher Schritt über die Kommandozeile
  * nötig ist: Ist die Datenbank noch leer und sind Zugangsdaten hinterlegt,
- * werden Team und Teamleitung angelegt. Ist eine Tagesquelle für die
+ * werden Team und Geschäftsführung angelegt. Ist eine Tagesquelle für die
  * Energiekarte eingerichtet, wird sie einmal abgerufen.
  *
  * Läuft bewusst nur bei komplett leerer Nutzertabelle – ein versehentlicher
@@ -22,7 +22,7 @@ export async function bootstrap(): Promise<void> {
     count: number;
   };
 
-  // Ohne Teamleitung geht es trotzdem weiter: die Tagesquelle der
+  // Ohne Geschaeftsfuehrung geht es trotzdem weiter: die Tagesquelle der
   // Energiekarte haengt nicht an der Ersteinrichtung.
   if (count === 0) seedLeader();
 
@@ -41,7 +41,7 @@ export async function bootstrap(): Promise<void> {
   scheduleDailyRefresh();
 }
 
-/** Team und Teamleitung aus SEED_LEADER_EMAIL / SEED_LEADER_PASSWORD anlegen. */
+/** Team und Geschaeftsfuehrung aus SEED_LEADER_EMAIL / SEED_LEADER_PASSWORD anlegen. */
 function seedLeader(): void {
   const db = getDb();
   const email = process.env.SEED_LEADER_EMAIL?.trim().toLowerCase();
@@ -49,7 +49,7 @@ function seedLeader(): void {
 
   if (!email || !password) {
     console.warn(
-      "[Start] Die Datenbank ist leer und es wurde noch keine Teamleitung angelegt.\n" +
+      "[Start] Die Datenbank ist leer und es wurde noch keine Geschäftsführung angelegt.\n" +
         "        Setze SEED_LEADER_EMAIL und SEED_LEADER_PASSWORD und starte neu.\n" +
         '        Bei Fly.io:  fly secrets set SEED_LEADER_EMAIL="..." SEED_LEADER_PASSWORD="..."',
     );
@@ -62,7 +62,7 @@ function seedLeader(): void {
   }
 
   const teamName = process.env.SEED_TEAM?.trim() || "Door2Door Team";
-  const leaderName = process.env.SEED_LEADER_NAME?.trim() || "Teamleitung";
+  const leaderName = process.env.SEED_LEADER_NAME?.trim() || "Geschäftsführung";
 
   const teamId = db.prepare("INSERT INTO teams (name) VALUES (?)").run(teamName)
     .lastInsertRowid as number;
@@ -72,7 +72,7 @@ function seedLeader(): void {
   ).run(teamId, leaderName, email, hashPassword(password));
   ensureDefaultReasons(teamId);
 
-  console.log(`[Start] Team „${teamName}“ und Teamleitung ${email} angelegt.`);
+  console.log(`[Start] Team „${teamName}“ und Geschäftsführung ${email} angelegt.`);
 }
 
 /**

@@ -158,7 +158,7 @@ export default async function TeamPage({
                       <span className="min-w-0">
                         <span className="block truncate text-body">{person.name}</span>
                         <span className="block truncate text-footnote text-muted">
-                          {person.bio || (person.role === "LEADER" ? "Teamleitung" : "Vertrieb")}
+                          {person.bio || (person.role === "LEADER" ? "Geschäftsführung" : "Vertrieb")}
                         </span>
                       </span>
                     </Link>

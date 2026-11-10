@@ -92,7 +92,7 @@ export default async function ConnectionsPage({
                     {person.id === user.id && <span className="text-muted"> (du)</span>}
                   </span>
                   <span className="block truncate text-footnote text-muted">
-                    {person.bio || (person.role === "LEADER" ? "Teamleitung" : "Vertrieb")}
+                    {person.bio || (person.role === "LEADER" ? "Geschäftsführung" : "Vertrieb")}
                   </span>
                 </span>
               </Link>

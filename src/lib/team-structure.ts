@@ -1,6 +1,6 @@
 import type { User } from "./types";
 
-export type StructureMember = Pick<User, "id" | "team_id" | "manager_id" | "name" | "role" | "active" | "avatar">;
+export type StructureMember = Pick<User, "id" | "team_id" | "manager_id" | "name" | "role" | "tier" | "active" | "avatar">;
 
 export interface StructureNode {
   member: StructureMember;

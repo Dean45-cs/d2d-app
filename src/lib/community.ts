@@ -1,5 +1,5 @@
 import { getDb } from "./db";
-import type { Role } from "./types";
+import type { Role, Tier } from "./types";
 
 /*
  * Feed, Kommentare, "Gefällt mir", Abos und Profile.
@@ -29,6 +29,8 @@ export interface PersonRef {
 }
 
 export interface Profile extends PersonRef {
+  /** Stufe im Vertrieb - steht im Profil unter dem Namen. */
+  tier: Tier;
   bio: string;
   active: number;
   created_at: string;
@@ -44,7 +46,7 @@ export interface Profile extends PersonRef {
 export function getProfile(userId: number, teamId: number, viewerId: number): Profile | null {
   const row = getDb()
     .prepare(
-      `SELECT u.id, u.name, avatar_src(u.id, u.avatar) AS avatar, u.role, u.bio, u.active, u.created_at,
+      `SELECT u.id, u.name, avatar_src(u.id, u.avatar) AS avatar, u.role, u.tier, u.bio, u.active, u.created_at,
               (SELECT COUNT(*) FROM follows f
                  JOIN users x ON x.id = f.follower_id AND x.active = 1
                 WHERE f.followee_id = u.id)                                AS follower_count,

@@ -5,7 +5,7 @@ import { deleteComment, requireTeamComment } from "@/lib/community";
 
 export const dynamic = "force-dynamic";
 
-/** Kommentar loeschen: den eigenen, als Teamleitung jeden. */
+/** Kommentar loeschen: den eigenen, als Geschaeftsfuehrung jeden. */
 export async function DELETE(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   return handle(async () => {
     const user = await requireUser();

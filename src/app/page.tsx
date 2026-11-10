@@ -9,7 +9,7 @@ export const dynamic = "force-dynamic";
 export default async function Home() {
   const user = await getCurrentUser();
   if (!user) redirect("/login");
-  // Eigene Startseite aus den Einstellungen - sonst Uebersicht (Teamleitung) bzw. Klinken.
+  // Eigene Startseite aus den Einstellungen - sonst Uebersicht (Geschaeftsfuehrung) bzw. Klinken.
   const chosen = HOME_TARGETS[parseHome((await cookies()).get(HOME_COOKIE)?.value)];
   redirect(chosen ?? (hasPermission(user, "reports.team") ? "/start" : "/tour"));
 }

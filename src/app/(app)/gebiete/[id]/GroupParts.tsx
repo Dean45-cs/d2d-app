@@ -22,7 +22,7 @@ const STATUS_LABEL: Record<string, string> = { OPEN: "Offen", ACTIVE: "In Arbeit
 
 /**
  * Die anderen Teile eines aufgeteilten Gebiets: wer wo dran ist, wie weit
- * das Ganze ist - und fuer die Teamleitung der Weg zurueck zu einem Gebiet.
+ * das Ganze ist - und fuer die Geschaeftsfuehrung der Weg zurueck zu einem Gebiet.
  */
 export function GroupParts({
   territoryId,

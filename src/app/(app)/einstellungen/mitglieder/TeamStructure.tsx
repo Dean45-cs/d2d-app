@@ -4,6 +4,7 @@ import { useMemo, useState, type CSSProperties } from "react";
 import { IconChevronDown, IconChevronRight } from "@/components/icons";
 import { Avatar, ListLabel, plural } from "@/components/ui";
 import { buildTeamStructure, type StructureMember, type StructureNode } from "@/lib/team-structure";
+import { positionLabel } from "@/lib/tiers";
 
 /** Einrueckung je Ebene; tiefer als fuenf Ebenen rueckt nichts mehr ein. */
 const STEP = 16;
@@ -88,11 +89,11 @@ export function TeamStructure({
           const { member, children, descendantCount, rootReason } = node;
           const indent = 16 + Math.min(depth, MAX_DEPTH) * STEP;
           const expanded = !collapsed.has(member.id);
-          const role = member.role === "LEADER" ? "Teamleitung" : children.length ? "Führungskraft" : "Vertrieb";
+          const role = positionLabel(member);
           const facts = [
             member.id === currentUserId ? "Du" : null,
             member.active ? role : `${role}, deaktiviert`,
-            // "Strukturspitze" sagt bei der Teamleitung nichts Neues.
+            // "Strukturspitze" sagt bei der Geschaeftsfuehrung nichts Neues.
             rootReason && rootReason !== "top" ? CONTEXT[rootReason] : null,
             children.length
               ? descendantCount > children.length

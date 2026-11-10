@@ -7,7 +7,7 @@
  * Dutzend Leute, ein paar hunderttausend Besuche): 40 Personen, 60 Gebiete
  * mit je 12 Strassen zu 35 Hausnummern, ein Viertel davon
  * Mehrfamilienhaeuser mit 6 Klingeln, und 300.000 Besuche ueber ein halbes
- * Jahr. Zugang fuer alle: Passwort "start1234", die Teamleitung ist
+ * Jahr. Zugang fuer alle: Passwort "start1234", die Geschaeftsfuehrung ist
  * leitung@last.test, der Vertrieb vertrieb1@last.test ... vertrieb36@last.test.
  *
  * Deterministisch (fester Zufallsstartwert), damit Messungen vergleichbar bleiben.
@@ -56,7 +56,7 @@ db.transaction(() => {
     ),
   );
 
-  // Struktur: Teamleitung -> 3 Fuehrungskraefte -> Vertrieb.
+  // Struktur: Geschaeftsfuehrung -> 3 Teamleiter -> Vertrieb.
   const insertUser = db.prepare(
     `INSERT INTO users (team_id, manager_id, name, email, password_hash, role, created_at)
      VALUES (?, ?, ?, ?, ?, ?, ?)`,
@@ -65,6 +65,8 @@ db.transaction(() => {
   const managers = [1, 2, 3].map((n) =>
     Number(insertUser.run(team, leader, `Fuehrung ${n}`, `fuehrung${n}@last.test`, password, "MEMBER", sql(now - DAYS * 864e5)).lastInsertRowid),
   );
+  // Ein eigenes Team gibt es erst ab Teamleiter.
+  for (const id of managers) db.prepare("UPDATE users SET tier = 'TEAMLEITER' WHERE id = ?").run(id);
   const sellers: number[] = [];
   for (let n = 1; n <= PEOPLE - 4; n += 1) {
     sellers.push(Number(insertUser.run(team, managers[n % 3], `Vertrieb ${n}`, `vertrieb${n}@last.test`, password, "MEMBER", sql(now - DAYS * 864e5)).lastInsertRowid));

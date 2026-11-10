@@ -18,7 +18,7 @@ export default function LoadingProfileHub() {
           </span>
         </div>
       </div>
-      {/* Termine und Visitenkarte, dazu "Meine Zahlen" (Vertrieb) bzw. "Kunden" (Teamleitung). */}
+      {/* Termine und Visitenkarte, dazu "Meine Zahlen" (Vertrieb) bzw. "Kunden" (Geschaeftsfuehrung). */}
       <div className="mt-6">
         <SkeletonList rows={3} icon="glyph" subtitle={false} />
       </div>

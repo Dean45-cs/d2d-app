@@ -770,7 +770,7 @@ export function BlockSheet({
   return (
     <Sheet
       title={`${target} sperren?`}
-      subtitle="Gilt fürs ganze Team. Aufheben kann nur die Teamleitung."
+      subtitle="Gilt fürs ganze Team. Aufheben kann nur die Geschäftsführung."
       onClose={onClose}
       footer={
         <button

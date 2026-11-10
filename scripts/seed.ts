@@ -18,7 +18,7 @@ async function main() {
 
   // "||" statt "??": leere Zeilen aus .env.example zaehlen als nicht gesetzt.
   const teamName = process.env.SEED_TEAM || "Door2Door Team";
-  const leaderName = process.env.SEED_LEADER_NAME || "Teamleitung";
+  const leaderName = process.env.SEED_LEADER_NAME || "Geschäftsführung";
   const leaderEmail = (process.env.SEED_LEADER_EMAIL || "leitung@example.de").toLowerCase();
   const leaderPassword = process.env.SEED_LEADER_PASSWORD || "start1234";
 
@@ -41,9 +41,9 @@ async function main() {
       `INSERT INTO users (team_id, name, email, password_hash, role)
        VALUES (?, ?, ?, ?, 'LEADER')`,
     ).run(team.id, leaderName, leaderEmail, hashPassword(leaderPassword));
-    console.log(`Teamleitung angelegt: ${leaderEmail} / ${leaderPassword}`);
+    console.log(`Geschäftsführung angelegt: ${leaderEmail} / ${leaderPassword}`);
   } else {
-    console.log(`Teamleitung existiert bereits: ${leaderEmail}`);
+    console.log(`Geschäftsführung existiert bereits: ${leaderEmail}`);
   }
 
   ensureDefaultReasons(team.id);
@@ -157,7 +157,8 @@ function seedDemo(teamId: number) {
   const leader = db
     .prepare("SELECT id, name FROM users WHERE team_id = ? AND role = 'LEADER' ORDER BY id LIMIT 1")
     .get(teamId) as { id: number; name: string } | undefined;
-  if (leader && leader.name === "Teamleitung") {
+  // Der Standardname der ersten Person - auch der aus Datenbanken vor der Umbenennung.
+  if (leader && ["Teamleitung", "Geschäftsführung"].includes(leader.name)) {
     db.prepare("UPDATE users SET name = ? WHERE id = ?").run("Jonas Carlsson", leader.id);
   }
 

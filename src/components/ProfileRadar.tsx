@@ -34,7 +34,7 @@ const STEP = 360 / PROFILE_AXES.length;
 /**
  * Profil als Netzdiagramm: sechs Achsen, jede am eigenen Zeitraum davor
  * gemessen. Der gestrichelte Ring ist "wie vorher", der Aussenrand "doppelt
- * so viel" - was hinausragt, ist besser geworden. Die Teamleitung schaltet
+ * so viel" - was hinausragt, ist besser geworden. Die Geschaeftsfuehrung schaltet
  * zwischen Team und einzelnen Personen um; ein Tipp auf eine Achse zeigt,
  * woraus der Wert besteht.
  */

@@ -38,7 +38,7 @@ export async function DELETE(
       const ageMinutes =
         (Date.now() - new Date(`${visit.created_at.replace(" ", "T")}Z`).getTime()) / 60000;
       if (ageMinutes > 15) {
-        throw new Error("Der Eintrag ist älter als 15 Minuten – bitte an die Teamleitung wenden.");
+        throw new Error("Der Eintrag ist älter als 15 Minuten – bitte an die Geschäftsführung wenden.");
       }
     }
 
