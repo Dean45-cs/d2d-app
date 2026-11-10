@@ -3,7 +3,7 @@
 Ein Motion-Graphics-Video (1920 × 1080, 60 fps, rund 2:40 mit Ton), das alle Bereiche
 der App zeigt: Gebiete, Klinken, Termine, Abschluss, Visitenkarte, Preise, Übersicht,
 Team, Kunden und die Einstellungen. Fertig liegt es unter `public/einfuehrung.mp4`; in
-der App steht es unter **Profil › Werkzeuge › Einführung** (`/profil/einfuehrung`) mit
+der App steht es unter **Profil › Einführung** (`/profil/einfuehrung`) mit
 Kapitelmarken.
 
 Alles ist Code – kein Schnittprogramm, keine Fremdbilder, keine Musik-Lizenz:

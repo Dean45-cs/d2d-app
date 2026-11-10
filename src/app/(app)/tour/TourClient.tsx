@@ -1354,6 +1354,15 @@ export function TourClient({
         ? "Standort zu ungenau"
         : LOCATION_NOTE[location.status];
 
+  /*
+   * Nach dem Haustyp fragt die Leiste nur noch, wo die Karte mehrere
+   * Wohnungen kennt. Sonst stehen die vier Ergebnisse sofort da - ein Tipp
+   * weniger an jeder neuen Tuer; ein Mehrfamilienhaus legt der Knopf
+   * neben der Adresse an.
+   */
+  const askType = currentType === "" && suggestMfh;
+  const offerBuilding = currentType === "" && !suggestMfh && !doorLocked;
+
   /** Was die Ergebnisknoepfe gerade blockiert - in einem Satz. */
   const trayHint: string | null = !street
     ? "Straße wählen"
@@ -1367,7 +1376,7 @@ export function TourClient({
             : "Haus in der Liste wählen"
         : doorLocked
           ? "Gesperrt – hier nicht klingeln"
-          : currentType === ""
+          : askType
             ? "Was für ein Haus ist das?"
             : currentType === "MFH" && !inBuilding
               ? "Mehrfamilienhaus"
@@ -1387,7 +1396,7 @@ export function TourClient({
           : []
         : doorLocked
           ? [{ label: "Haus ansehen", icon: <IconHome className={TRAY_ICON} />, onClick: () => setSheet("house") }]
-          : currentType === ""
+          : askType
             ? [
                 { label: "Einfamilienhaus", icon: <IconHome className={TRAY_ICON} />, onClick: () => void chooseType("EFH"), primary: !suggestMfh },
                 { label: "Mehrfamilienhaus", icon: <IconBuilding className={TRAY_ICON} />, onClick: () => void chooseType("MFH"), primary: suggestMfh },
@@ -1416,6 +1425,7 @@ export function TourClient({
               .filter(Boolean)
               .join(" · "),
             onInfo: () => setSheet("house"),
+            onBuilding: offerBuilding ? () => void chooseType("MFH") : undefined,
           };
 
   const lastLine = (() => {

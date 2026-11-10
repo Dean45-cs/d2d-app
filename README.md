@@ -77,7 +77,7 @@ SEED_LEADER_EMAIL=chef@meinefirma.de SEED_LEADER_PASSWORD='EinLangesPasswort' np
 Mit `SEED_DEMO=1` werden zusätzlich zwei Beispiel-Mitarbeiter und zwei Beispiel-Gebiete
 angelegt – praktisch zum Ausprobieren, für den Echtbetrieb weglassen.
 
-**Das Startpasswort nach dem ersten Login ändern** (Profil › Konto › Passwort ändern).
+**Das Startpasswort nach dem ersten Login ändern** (Profil › Einstellungen › Passwort ändern).
 Das kann jede Person selbst – mit dem bisherigen Passwort; danach sind alle anderen
 Geräte abgemeldet. Neu gesetzt von der Leitung wird es unter Profil › Verwaltung › Mitglieder.
 
@@ -198,7 +198,9 @@ jemand da war), die Tür bleibt erfassbar. „Offen“ heißt nur: hier wurde no
 angetroffen – danach richten sich „Nur offene“, die Zählung „12 von 24 offen“ und
 „In meiner Nähe“. Zu ist eine Tür nur, wenn sie jemand ausdrücklich **sperrt**.
 
-Beim ersten Antippen einer Hausnummer fragt die App nach **Ein- oder Mehrfamilienhaus**.
+Eine Hausnummer antippen, Ergebnis antippen – mehr braucht eine Tür nicht. Nach **Ein- oder
+Mehrfamilienhaus** fragt die App nur, wo die Karte mehrere Wohnungen kennt; sonst macht der
+Knopf „MFH“ neben der Adresse aus der Tür ein Mehrfamilienhaus.
 Im Mehrfamilienhaus werden die Klingelschilder angelegt – entweder die Namen vom Brett
 abtippen oder „6 Klingeln ohne Namen“. Danach zählt jede Klingel als eigene Tür.
 
@@ -637,7 +639,8 @@ wieder her.
 | **Bereiche** | Übersicht, Karte und Team in Reiter- und Seitenleiste, womit die App startet, jeder Abschnitt der Übersicht bzw. von „Meine Zahlen“ |
 | **Ziele & Erfolge** | Tagesziele für Türen, Gespräche und Abschlüsse, XP-Hinweise, Level-Aufstieg melden |
 | **Mitteilungen** | Push auf diesem Gerät, Push je Anlass (Konto), Push-Hinweis im Feed, Vibration (Android), wie lange Meldungen stehen |
-| **Dieses Gerät** | Super-Energiesparmodus, Klinken und Termine für den Start ohne Netz speichern, als App installieren |
+| **Dieses Gerät** | Super-Energiesparmodus, Klinken und Termine für den Start ohne Netz speichern, als App installieren, alles zurücksetzen |
+| **Konto** | Passwort ändern |
 
 **Akzentfarben – als wäre die App in dieser Farbe erschienen.** Eine Farbe ist mehr als
 ein Knopf: Hauptaktion, Schrift im Akzent, Kopfkarte, Licht hinter der Anmeldung, Logo,
@@ -651,7 +654,7 @@ dem Home-Bildschirm bleibt grün.
 Was man sieht, steht als Merkmal am `<html>` (`data-accent`, `data-theme`, `data-text`,
 `data-hide` …) und wird **vor dem ersten Bild** gesetzt (`PREFS_SCRIPT`) – nichts blitzt
 grün oder hell auf, auch nicht in gespeicherten Seiten ohne Netz. Ausgeblendete Bereiche
-bleiben im Profil unter „Meine Arbeit“ erreichbar; gezählt wird weiter alles.
+bleiben im Profil erreichbar; gezählt wird weiter alles.
 
 Umsetzung: `src/lib/preferences.ts` (Speicher, Merkmale, Skript), `src/lib/theme-palette.ts`
 (Farben) → `npm run themes` schreibt `src/app/themes.css`; Seiten unter
@@ -1107,8 +1110,7 @@ dass jemand etwas einstellt:
   kaum zu sehen, aber weniger als halb so viele Pixel); Profilbilder laden erst, wenn
   sie ins Bild kommen.
 
-Wem das nicht reicht, schaltet unter **Profil → Dieses Gerät → Super-Energiesparmodus**
-(oder **Einstellungen › Dieses Gerät**)
+Wem das nicht reicht, schaltet unter **Profil › Einstellungen › Dieses Gerät → Super-Energiesparmodus**
 alles ab, was Akku kostet und an der Tür nicht gebraucht wird (gilt nur für dieses
 Gerät, wirkt sofort):
 

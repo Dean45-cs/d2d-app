@@ -28,7 +28,7 @@ export function PowerMode() {
   return null;
 }
 
-/** Der Schalter im Profil unter "Dieses Gerät". */
+/** Der Schalter in den Einstellungen unter "Dieses Gerät". */
 export function PowerSaveCell() {
   const saving = usePowerSaving();
   const toast = useToast();

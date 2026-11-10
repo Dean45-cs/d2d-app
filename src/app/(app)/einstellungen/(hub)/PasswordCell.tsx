@@ -10,7 +10,7 @@ import { syncPush } from "@/lib/push-client";
 
 const MIN_LENGTH = 8;
 
-/** "Passwort ändern" im Profil - das Startpasswort der Leitung durch ein eigenes ersetzen. */
+/** "Passwort ändern" in den Einstellungen - das Startpasswort der Leitung durch ein eigenes ersetzen. */
 export function PasswordCell() {
   const [open, setOpen] = useState(false);
   return (

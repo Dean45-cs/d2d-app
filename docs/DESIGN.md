@@ -279,7 +279,7 @@ Eingabefelder haben immer mindestens 16 px – unter 16 px zoomt iOS.
   dem Weg zur Unterseite erst das Skelett der Startseite.
 - Nichts läuft endlos, solange es nicht lädt: der Standort-Punkt pulsiert dreimal je
   neuer Position, dann ruht er (eine Dauerschleife hält die Grafik den ganzen Tag wach).
-- **Super-Energiesparmodus** (`data-power="save"` am `<html>`, Schalter im Profil):
+- **Super-Energiesparmodus** (`data-power="save"` am `<html>`, Schalter in den Einstellungen):
   setzt zugleich `data-theme="dark"` und eine schwarze Statusleiste. Schon vor React
   gesetzt (`POWER_SCRIPT` in `src/lib/power.ts`), damit nichts hell aufblitzt.
 
@@ -340,6 +340,11 @@ Alle in `src/components/`. Stil per Klassen aus `globals.css` (`@layer component
 - **Untertitel immer** auf Seiten, die als Reiter nebeneinanderstehen (Feed,
   Rangliste, Erfolge) – sonst springt die Segmentleiste beim Wechsel.
 - **Selten Gebrauchtes** hinter `Menu` („…“).
+- **Nichts steht doppelt.** Das Profil ist kurz: man selbst, die eigenen Listen, für
+  die Leitung die Verwaltung, dann „Einstellungen“. Was Gerät und Konto betrifft
+  (Energiesparmodus, Installieren, Zurücksetzen, Passwort), steht nur in den
+  Einstellungen; die Verwaltung nur im Profil und in der Seitenleiste. Eine Gruppe
+  bekommt nur dann eine Überschrift, wenn ihre Zeilen sich nicht selbst erklären.
 - **Bearbeiten im Blatt** (`Sheet`), Hauptknopf im Fuß als `btn-primary btn-lg btn-block`.
 - **Löschen**: `useConfirm` mit `danger`. Alles andere: Toast mit „Rückgängig“.
 - **Leere Zustände**: ein Zeichen, ein Satz, höchstens eine Aktion.
@@ -362,7 +367,9 @@ Alle in `src/components/`. Stil per Klassen aus `globals.css` (`@layer component
   Termine erscheinen als kompakte Zusammenfassung; ein Tipp öffnet
   die Liste mit Adresse, Anruf und Sprung zur Tür. Die Aktionsleiste bietet zuerst
   die fehlende Haus- oder Klingelauswahl, danach „Nicht da“, „Ohne Abschluss“,
-  „Termin“ und „Auftrag starten“. Inhalt und Toasts halten Abstand zur gemessenen
+  „Termin“ und „Auftrag starten“. **Zwei Tipps je Tür** – Zeile, Ergebnis: nach dem
+  Haustyp fragt die Leiste nur, wo die Karte mehrere Wohnungen kennt; sonst macht
+  „MFH“ neben der Adresse (`TrayTarget.onBuilding`) aus der Tür ein Mehrfamilienhaus. Inhalt und Toasts halten Abstand zur gemessenen
   Höhe der Leiste. Strom und Gas haben jeweils eine beschriftete Preiszeile mit
   Versorger und eigener Preisstufe. Der Standort meldet sich nur, wenn er etwas
   sagt: der Hinweis „Nächste offene Tür“ erst, wenn die gewählte Tür weit weg ist

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, type ReactNode } from "react";
-import { IconCalendar, IconChat, IconDoor, IconExternal, IconInfo } from "@/components/icons";
+import { IconBuilding, IconCalendar, IconChat, IconDoor, IconExternal, IconInfo } from "@/components/icons";
 
 export interface TrayAction {
   label: string;
@@ -19,6 +19,8 @@ export interface TrayTarget {
   /** Stand in Worten, dazu die Entfernung. */
   meta?: string;
   onInfo?: () => void;
+  /** Haustyp noch offen: hier wird aus der Tuer ein Mehrfamilienhaus mit Klingeln. */
+  onBuilding?: () => void;
 }
 
 /** Zeichen in der Leiste - auf dem iPad eine Stufe groesser. */
@@ -32,6 +34,9 @@ export const TRAY_ICON = "h-6 w-6 md:h-7 md:w-7";
  * Darueber steht, welche Tuer gewaehlt ist - nach dem Speichern bleibt sie
  * es, bis man selbst eine andere antippt.
  *
+ * Die Ergebnisse stehen sofort da, auch wenn der Haustyp noch offen ist -
+ * "MFH" neben der Adresse macht aus der Tuer ein Mehrfamilienhaus. Nur wo
+ * die Karte mehrere Wohnungen kennt, fragt die Leiste vorher nach.
  * Fehlende Einrichtung wird direkt hier angeboten. "Auftrag starten"
  * oeffnet den Tarifrechner; ein bestaetigter Abschluss kommt erst danach.
  */
@@ -98,6 +103,19 @@ export function OutcomeTray({
             <span className="block truncate text-subhead font-semibold">{target.title}</span>
             {target.meta && <span className="line-clamp-2 text-footnote text-ink-2">{target.meta}</span>}
           </span>
+          {target.onBuilding && (
+            <button
+              type="button"
+              className="btn btn-secondary btn-sm shrink-0"
+              onClick={target.onBuilding}
+              disabled={disabled}
+              aria-label={`${target.title} ist ein Mehrfamilienhaus – Klingeln anlegen`}
+              title="Mehrfamilienhaus"
+            >
+              <IconBuilding className="h-4 w-4" />
+              MFH
+            </button>
+          )}
           {target.onInfo && (
             <button type="button" className="icon-btn shrink-0" onClick={target.onInfo} aria-label={`${target.title} – Details`}>
               <IconInfo className="h-5 w-5" />
