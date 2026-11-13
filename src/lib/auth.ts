@@ -19,6 +19,16 @@ function secret(): string {
   return value;
 }
 
+/**
+ * Kennwert fuer Daten, die nicht im Klartext gespeichert werden sollen (etwa
+ * die IP-Adresse hinter einer Website-Anfrage): gleich fuer gleiche Eingaben,
+ * aber ohne den Server-Schluessel nicht zurueckzurechnen. `purpose` trennt
+ * die Verwendungen, damit ein Kennwert nie zu einem anderen passt.
+ */
+export function keyedHash(purpose: string, value: string): string {
+  return crypto.createHmac("sha256", secret()).update(`${purpose}\n${value}`).digest("hex").slice(0, 32);
+}
+
 /* ------------------------------ Passwoerter ------------------------------ */
 
 export function hashPassword(password: string): string {
