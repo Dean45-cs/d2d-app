@@ -34,7 +34,8 @@ export type IconName =
   | "shield"
   | "list"
   | "cog"
-  | "euro";
+  | "euro"
+  | "inbox";
 
 export interface NavItem {
   href: string;
@@ -86,6 +87,8 @@ export function navigation(role: Role, rights: PermissionSet, userId?: number): 
   };
   // Kundenliste: wer hinter den Abschluessen steht, fuer den Anruf nach Vertragsende.
   const kunden: NavItem[] = rights["customers.manage"] ? [{ href: "/kunden", label: "Kunden", icon: "contacts" }] : [];
+  // Posteingang des Kontaktformulars der Website. Zugeteilte Anfragen erreicht man auch ohne das Recht - ueber das Profil.
+  const anfragen: NavItem[] = rights["inquiries.manage"] ? [{ href: "/anfragen", label: "Anfragen", icon: "inbox" }] : [];
   // Provisionsliste: welcher Tarif wie viel bringt - jede Person sieht ihre eigene.
   // Die Geschaeftsfuehrung bekommt die Admin-Provision; eine Liste hat sie nur mit dem Verwaltungsrecht.
   const provisionen: NavItem[] =
@@ -133,12 +136,12 @@ export function navigation(role: Role, rights: PermissionSet, userId?: number): 
       href: "/profil",
       label: "Profil",
       icon: "profile",
-      match: ["/einstellungen", "/kunden", "/provisionen", ...me, ...(reports ? [] : ["/start"])],
+      match: ["/einstellungen", "/kunden", "/anfragen", "/provisionen", ...me, ...(reports ? [] : ["/start"])],
     },
   ];
 
   const sidebar: NavSection[] = [
-    { items: [start, tour, termine, ...kunden, ...provisionen] },
+    { items: [start, tour, termine, ...anfragen, ...kunden, ...provisionen] },
     { title: "Karte", items: [gebiete, preise], area: "map" },
     { title: "Team", items: [feed, rangliste, erfolge, stufen], area: "team" },
     ...(admin.length > 0 ? [{ title: "Verwaltung", items: admin }] : []),
@@ -148,7 +151,7 @@ export function navigation(role: Role, rights: PermissionSet, userId?: number): 
     tabs,
     sidebar,
     admin,
-    items: [start, tour, termine, ...kunden, ...provisionen, gebiete, preise, feed, rangliste, erfolge, stufen, ...admin],
+    items: [start, tour, termine, ...anfragen, ...kunden, ...provisionen, gebiete, preise, feed, rangliste, erfolge, stufen, ...admin],
   };
 }
 

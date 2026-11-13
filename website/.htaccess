@@ -1,0 +1,24 @@
+# Sicherheits-Header für Apache-Webspace (IONOS, Strato, all-inkl. u. a.).
+# Bei anderen Hostern dieselben Header in deren Einstellungen setzen.
+<IfModule mod_headers.c>
+  Header always set Strict-Transport-Security "max-age=31536000"
+  Header always set X-Content-Type-Options "nosniff"
+  Header always set X-Frame-Options "DENY"
+  Header always set Referrer-Policy "strict-origin-when-cross-origin"
+  Header always set Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=()"
+  # Ergänzt die CSP im <meta>-Tag um das, was nur als Header wirkt.
+  Header always set Content-Security-Policy "frame-ancestors 'none'"
+</IfModule>
+
+# Immer HTTPS.
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteCond %{HTTPS} !=on
+  RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
+</IfModule>
+
+# Keine Verzeichnislisten, keine versteckten Dateien ausliefern.
+Options -Indexes
+<FilesMatch "^\.">
+  Require all denied
+</FilesMatch>

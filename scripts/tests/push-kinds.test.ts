@@ -33,9 +33,9 @@ function person(team: number, name: string): User {
 test("alles ist an, bis jemand etwas abbestellt - und das bleibt fuer genau diese Art", () => {
   const team = Number(db.prepare("INSERT INTO teams(name) VALUES ('Push')").run().lastInsertRowid);
   const user = person(team, "push-one");
-  assert.deepEqual(pushKinds(user.id), { sale: true, comment: true, follow: true, reminder: true });
-  assert.deepEqual(setPushKinds(user.id, { comment: false, follow: false }), { sale: true, comment: false, follow: false, reminder: true });
-  assert.deepEqual(setPushKinds(user.id, { follow: true }), { sale: true, comment: false, follow: true, reminder: true });
+  assert.deepEqual(pushKinds(user.id), { sale: true, comment: true, follow: true, reminder: true, inquiry: true });
+  assert.deepEqual(setPushKinds(user.id, { comment: false, follow: false }), { sale: true, comment: false, follow: false, reminder: true, inquiry: true });
+  assert.deepEqual(setPushKinds(user.id, { follow: true }), { sale: true, comment: false, follow: true, reminder: true, inquiry: true });
   assert.equal((db.prepare("SELECT push_off FROM users WHERE id = ?").get(user.id) as { push_off: string }).push_off, "comment");
 });
 
