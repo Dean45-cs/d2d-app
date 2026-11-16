@@ -3,7 +3,7 @@
  * Einstellungen im Browser die Liste kennen. Gespeichert wird in push.ts.
  */
 
-export const PUSH_KINDS = ["sale", "comment", "follow", "reminder"] as const;
+export const PUSH_KINDS = ["sale", "comment", "follow", "reminder", "inquiry"] as const;
 export type PushKind = (typeof PUSH_KINDS)[number];
 
 export function isPushKind(value: unknown): value is PushKind {

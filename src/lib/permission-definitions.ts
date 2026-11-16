@@ -9,6 +9,7 @@ export const PERMISSIONS = [
   { key: "doors.unblock", group: "Vertrieb", label: "Türsperren aufheben", description: "Sperren in zugänglichen Gebieten aufheben." },
   { key: "appointments.team", group: "Vertrieb", label: "Teamtermine verwalten", description: "Termine aller Teammitglieder sehen, verschieben und abhaken." },
   { key: "customers.manage", group: "Vertrieb", label: "Kundenliste pflegen", description: "Den Aufträgen des Teams Kunden mit Telefonnummer und Vertragsende zuordnen, auslaufende Verträge zur Umberatung sehen und die Liste exportieren." },
+  { key: "inquiries.manage", group: "Vertrieb", label: "Website-Anfragen bearbeiten", description: "Alle Anfragen aus dem Kontaktformular der Website sehen, zuteilen, bearbeiten und löschen. Ohne dieses Recht sieht man nur die Anfragen, die einem zugeteilt wurden." },
   { key: "commissions.manage", group: "Provisionen", label: "Provisionen verwalten", description: "Liste vom Portal importieren, Regeln, Sätze der Stufen, individuelle Sätze und Boni festlegen. Sieht die Admin-Provisionen und was jede Person bekommt." },
   { key: "reports.team", group: "Auswertung", label: "Teamauswertung sehen", description: "Übersicht und Auswertungen des gesamten Teams einschließlich Besuchsdetails sehen." },
   { key: "team.manage", group: "Verwaltung", label: "Mitglieder verwalten", description: "Mitglieder anlegen, bearbeiten, deaktivieren und Passwörter setzen. Im Vertrieb auf die eigene Struktur begrenzt." },

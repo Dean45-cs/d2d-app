@@ -13,6 +13,10 @@ Eine Web-App für Door-to-Door-Teams im Energievertrieb:
   stehen sie oben auf der Tour; bestätigt per WhatsApp oder SMS mit einem Tipp
 - **Digitale Visitenkarte** – QR-Code an der Tür: Kunden sehen Bild, Name, Team und
   Ausweisnummer live vom Server, und speichern den Kontakt
+- **Anfragen von der Website** – das Kontaktformular der Firmenwebsite landet direkt in der
+  App: Posteingang mit Status, Zuteilung, Notizen und Antwort per Mail oder Anruf; Push bei
+  jeder neuen Anfrage. Der öffentliche Eingang ist von Anfang an gegen Spam und Missbrauch
+  abgesichert ([Anfragen von der Website](#anfragen-von-der-website))
 - **Kundenliste** – die Geschäftsführung ordnet jedem Auftrag nachträglich den Kunden aus dem
   Buchungsportal zu, mit Rufnummer und Vertragsende; vor Ablauf steht er unter „Fällig“
   zum Anrufen, Besuchen und Umberaten
@@ -100,6 +104,7 @@ Geräte abgemeldet. Neu gesetzt von der Leitung wird es unter Profil › Verwalt
 | Feed: posten, kommentieren, abonnieren | ✅ | ✅ |
 | Fremde Beiträge und Kommentare löschen | ✅ | – |
 | Kundenliste: Kunden zuordnen, Wiedervorlage, Export | ✅ | – |
+| Website-Anfragen: alle sehen, zuteilen, löschen | ✅ | nur zugeteilte bearbeiten |
 | Provisionsliste mit den eigenen Beträgen | ✅ (Admin-Provision) | ✅ |
 | Provisionen verwalten: Liste importieren, Regeln, Boni | ✅ | – |
 | Stufen vergeben (Berater, Senior Berater, Teamleiter) | ✅ | – |
@@ -107,9 +112,9 @@ Geräte abgemeldet. Neu gesetzt von der Leitung wird es unter Profil › Verwalt
 | Energiekarte | ✅ | ✅ |
 
 Die Tabelle beschreibt die Rollenstandards. Unter **Profil › Verwaltung › Rechte** lassen
-sich 22 Rechte pro Person auf **Standard**, **Erlauben** oder **Entziehen** setzen:
+sich 23 Rechte pro Person auf **Standard**, **Erlauben** oder **Entziehen** setzen:
 Gebiete erstellen/sehen/bearbeiten/zuteilen/löschen, Besuchskorrekturen, Türsperren,
-Teamtermine, Kundenliste, Provisionen verwalten, Teamauswertung,
+Teamtermine, Kundenliste, Website-Anfragen, Provisionen verwalten, Teamauswertung,
 Mitglieder- und Strukturverwaltung, Rollen und Stufen, Berechtigungen, Einladungen, Energiepreise und
 Referenzwerte, Tagesquelle, Ablehnungsgründe und Feedmoderation. Ein ausdrücklicher Entzug hat Vorrang vor
 automatischen Rechten; „Standard“ folgt der aktuellen Rolle und Struktur.
@@ -397,6 +402,52 @@ Teams. Kundendaten hängen am Abschluss: wird der Abschluss zurückgenommen, sin
 weg. „Kundendaten entfernen“ löscht sie, ohne den Abschluss anzutasten. Rechenregeln in
 `src/lib/contracts.ts`, Abfragen in `src/lib/customers.ts`, Tests in
 `scripts/tests/customers.test.ts`.
+
+## Anfragen von der Website
+
+Die Firmenwebsite liegt im Ordner [`website/`](website/README.md) und wird bei einem
+beliebigen Webhoster hochgeladen. Ihr Kontaktformular schickt an die App:
+`POST /api/public/inquiries` – die einzige Stelle, an der die App **ohne Anmeldung**
+schreibt. Die Anfragen erscheinen unter **Anfragen** (Seitenleiste, auf dem Handy unter
+Profil) mit Push-Nachricht.
+
+**Bearbeiten:** Wer das Recht „Website-Anfragen bearbeiten“ hat (Standard: Geschäftsführung),
+sieht alle Anfragen, teilt sie einer Person zu, markiert Spam und löscht. Wem eine Anfrage
+zugeteilt ist, sieht genau diese – auch ohne das Recht –, setzt den Status (Neu, In Arbeit,
+Erledigt) und schreibt interne Notizen. Antworten geht per Tipp: E-Mail mit vorbereitetem
+Text oder Anruf. Jede Änderung steht mit Person und Zeit im Verlauf.
+
+**Einrichten:** die Adresse der Website freigeben, sonst lehnt die App jede Absendung ab:
+
+```bash
+fly secrets set INQUIRY_ALLOWED_ORIGINS="https://carlssonsales.de,https://www.carlssonsales.de"
+```
+
+**Sicherheit – was der Eingang prüft, in dieser Reihenfolge:**
+
+| Prüfung | Verhalten |
+|---|---|
+| Herkunft (`Origin`) | nur freigegebene Domains und die App selbst, sonst 403; ohne `Origin` ebenfalls 403. CORS ohne Cookies/Credentials |
+| Format | nur JSON oder klassisches Formular, sonst 415; nur bekannte Felder werden gelesen |
+| Größe | höchstens 32 KB, wird beim Lesen abgebrochen (413); nur gültiges UTF-8 |
+| Bremse | 5 Absendungen je Absender in 15 Min., 20 am Tag, 3 je E-Mail-Adresse, 100 insgesamt – auch abgelehnte Versuche zählen (429) |
+| Roboter | unsichtbares Honigtopf-Feld und Mindest-Ausfüllzeit: Antwort wie bei Erfolg, gespeichert wird nichts |
+| Felder | Länge und Format je Feld; Steuer-, Null-Breite- und Richtungszeichen werden entfernt; E-Mail streng (kein `?`, `&`, `%` – nichts, was im mailto-Link Empfänger anhängt); Einwilligung zur Datenschutzerklärung Pflicht |
+| Spam | ab drei Links in den Spam-Ordner statt in den Posteingang |
+| Doppelte | gleiche E-Mail und Nachricht binnen 24 h nur einmal |
+| Fehler | interne Fehler nie nach außen, nur eine Kennung fürs Protokoll; Protokoll ohne Namen und Nachricht |
+
+Im Posteingang: Zugriff wird bei jeder Anfrage serverseitig geprüft, fremde und nicht
+vorhandene Anfragen sehen gleich aus (404); die Nachricht wird nur als Text angezeigt;
+Push-Nachrichten nennen nur Anliegen und PLZ, keinen Namen auf dem Sperrbildschirm.
+
+**Datenschutz:** Die IP-Adresse wird nie gespeichert, nur ein HMAC-Prüfwert davon. Spam
+löscht sich nach 30 Tagen, Erledigtes nach `INQUIRY_RETENTION_DAYS` (Standard 180) Tagen
+nach Abschluss; „Anfrage löschen“ entfernt sie sofort samt Verlauf (Art. 17 DSGVO). Der
+Text in `website/datenschutz.html` beschreibt das – die Platzhalter darin noch ausfüllen.
+
+Code in `src/lib/inquiries.ts`, Route in `src/app/api/public/inquiries/route.ts`, Tests in
+`scripts/tests/inquiries.test.ts`.
 
 ## Provisionen
 
@@ -1323,6 +1374,8 @@ Die App speichert **personenbezogene Daten**, sobald an der Tür etwas zustande 
 - **Termine** speichern Name und Rufnummer des Ansprechpartners.
 - Die **Kundenliste** speichert Name, Rufnummer, Kundennummer und Vertragslaufzeit je
   Auftrag – von der Geschäftsführung aus dem Buchungsportal übernommen.
+- **Website-Anfragen** speichern Name, E-Mail, Nachricht und optional Rufnummer und PLZ –
+  mit fester Löschfrist (siehe [Anfragen von der Website](#anfragen-von-der-website)).
 
 Unterschrift, Widerrufsbelehrung und die übrigen Vertragsdaten entstehen dagegen im
 Tarifrechner des Partners – diese App nimmt sie bewusst nicht auf. **Anrufe zum Umberaten
@@ -1332,7 +1385,7 @@ eingeholt und im Buchungsportal vermerkt. Ohne Einwilligung bleibt der Besuch an
 Für das, was hier liegt,
 braucht es trotzdem eine Rechtsgrundlage, eine Information der Kundschaft und eine
 Löschfrist; das gehört mit dem eigenen Datenschutzbeauftragten abgestimmt. Die App gibt
-keine Frist vor und löscht nichts von selbst.
+hier keine Frist vor und löscht nichts von selbst – mit Ausnahme der Website-Anfragen.
 
 **Vergleich, Feed, Stufen und Profil** machen die Leistung jedes Einzelnen im Team sichtbar:
 Abschlüsse, Quoten, Platz und Stufe sieht jeder, der angemeldet ist – im Vertrieb also auch die

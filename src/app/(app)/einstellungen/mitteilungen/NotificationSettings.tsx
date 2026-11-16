@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, type ReactNode } from "react";
-import { IconBell, IconCalendar, IconCheckCircle, IconComment, IconHistory, IconUserPlus, IconVibrate } from "@/components/icons";
+import { IconBell, IconCalendar, IconChat, IconCheckCircle, IconComment, IconHistory, IconUserPlus, IconVibrate } from "@/components/icons";
 import { PUSH_BANNER_KEY, PushRows } from "@/components/community/PushToggle";
 import { useToast } from "@/components/Toast";
 import { ListLabel, PageHeader } from "@/components/ui";
@@ -33,6 +33,12 @@ const KIND_ROWS: Array<{ kind: PushKind; title: string; subtitle: string; icon: 
     title: "Terminerinnerungen",
     subtitle: "15 Minuten vor einem Termin – ohne Namen und Adresse auf dem Sperrbildschirm",
     icon: <SettingIcon tone="indigo"><IconCalendar /></SettingIcon>,
+  },
+  {
+    kind: "inquiry",
+    title: "Website-Anfragen",
+    subtitle: "Neue Nachrichten aus dem Kontaktformular und Zuteilungen – ohne Namen auf dem Sperrbildschirm",
+    icon: <SettingIcon tone="purple"><IconChat /></SettingIcon>,
   },
 ];
 

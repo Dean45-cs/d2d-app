@@ -442,6 +442,52 @@ function migrate(db: Database.Database) {
 
   migrateCommissions(db);
   migrateTiers(db);
+  migrateInquiries(db);
+}
+
+/**
+ * Anfragen von der Website (src/lib/inquiries.ts). Kommen ohne Anmeldung
+ * herein - deshalb nur das Noetigste: keine IP-Adresse im Klartext, nur ein
+ * Kennwert, mit dem sich Missbrauch erkennen laesst. Notizen und
+ * Statuswechsel stehen als Verlauf daneben, wer was wann getan hat.
+ */
+function migrateInquiries(db: Database.Database) {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS inquiries (
+      id               INTEGER PRIMARY KEY AUTOINCREMENT,
+      team_id          INTEGER NOT NULL REFERENCES teams(id) ON DELETE CASCADE,
+      topic            TEXT NOT NULL DEFAULT 'BERATUNG'
+                       CHECK (topic IN ('BERATUNG','BERATER_PRUEFEN','BEWERBUNG','SONSTIGES')),
+      name             TEXT NOT NULL,
+      email            TEXT NOT NULL,
+      phone            TEXT NOT NULL DEFAULT '',
+      postal_code      TEXT NOT NULL DEFAULT '',
+      message          TEXT NOT NULL,
+      status           TEXT NOT NULL DEFAULT 'NEW'
+                       CHECK (status IN ('NEW','IN_PROGRESS','DONE','SPAM')),
+      assigned_user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+      source           TEXT NOT NULL DEFAULT '',
+      client_hash      TEXT NOT NULL DEFAULT '',
+      fingerprint      TEXT NOT NULL DEFAULT '',
+      consent_at       TEXT NOT NULL,
+      created_at       TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at       TEXT NOT NULL DEFAULT (datetime('now')),
+      closed_at        TEXT
+    );
+    CREATE INDEX IF NOT EXISTS idx_inquiries_team_status ON inquiries (team_id, status, id);
+    CREATE INDEX IF NOT EXISTS idx_inquiries_assigned ON inquiries (assigned_user_id) WHERE assigned_user_id IS NOT NULL;
+    CREATE INDEX IF NOT EXISTS idx_inquiries_fingerprint ON inquiries (fingerprint, created_at);
+
+    CREATE TABLE IF NOT EXISTS inquiry_events (
+      id         INTEGER PRIMARY KEY AUTOINCREMENT,
+      inquiry_id INTEGER NOT NULL REFERENCES inquiries(id) ON DELETE CASCADE,
+      user_id    INTEGER REFERENCES users(id) ON DELETE SET NULL,
+      kind       TEXT NOT NULL CHECK (kind IN ('NOTE','STATUS','ASSIGN')),
+      body       TEXT NOT NULL DEFAULT '',
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+    CREATE INDEX IF NOT EXISTS idx_inquiry_events ON inquiry_events (inquiry_id, id);
+  `);
 }
 
 /**

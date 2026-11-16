@@ -4,6 +4,7 @@ import {
   IconCalendar,
   IconChart,
   IconChartFill,
+  IconChat,
   IconCog,
   IconComment,
   IconContacts,
@@ -46,4 +47,5 @@ export const NAV_ICONS: Record<IconName, { line: IconComponent; fill: IconCompon
   list: { line: IconList, fill: IconList },
   cog: { line: IconCog, fill: IconCog },
   euro: { line: IconEuro, fill: IconEuro },
+  inbox: { line: IconChat, fill: IconChat },
 };

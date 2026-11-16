@@ -5,6 +5,7 @@ import { navigation } from "@/lib/nav";
 import { getLevelProgress } from "@/lib/level-queries";
 import { countAppointments } from "@/lib/queries";
 import { countCustomers } from "@/lib/customers";
+import { countInquiries, hasInquiryAccess } from "@/lib/inquiries";
 import { cardSettings } from "@/lib/card-queries";
 import { commissionCounts } from "@/lib/commissions/store";
 import { berlinToday } from "@/lib/contracts";
@@ -13,6 +14,7 @@ import { NAV_ICONS } from "@/components/nav-icons";
 import {
   IconCalendar,
   IconChart,
+  IconChat,
   IconCog,
   IconComment,
   IconContacts,
@@ -42,6 +44,7 @@ export default async function ProfileHubPage() {
   const level = getLevelProgress(user.team_id, user.id);
   const openAppointments = countAppointments(user.team_id, { userId: user.id }).open;
   const dueCustomers = rights["customers.manage"] ? countCustomers(user.team_id, berlinToday()).due : 0;
+  const inquiries = hasInquiryAccess(user) ? countInquiries(user) : null;
   const cardOn = cardSettings(user.id).token !== null;
   const commissions = rights["commissions.manage"] ? commissionCounts(user.team_id) : null;
 
@@ -76,6 +79,16 @@ export default async function ProfileHubPage() {
             detail={openAppointments > 0 ? openAppointments : undefined}
           />
         </li>
+        {inquiries && (
+          <li>
+            <Cell
+              href="/anfragen"
+              icon={<ToneTile tone="purple"><IconChat className="h-4 w-4" /></ToneTile>}
+              title="Anfragen"
+              detail={inquiries.new > 0 ? `${inquiries.new} neu` : inquiries.open > 0 ? `${inquiries.open} offen` : undefined}
+            />
+          </li>
+        )}
         {rights["customers.manage"] && (
           <li>
             <Cell
