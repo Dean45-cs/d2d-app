@@ -193,3 +193,37 @@ test("Laufender Vergleich bleibt einen Arbeitstag stehen", () => {
   saveDraft(null, store, 3000);
   assert.equal(loadDraft(store, 3000), null);
 });
+
+test("Skizze: jede Zeile lässt sich nachrechnen, die Jahre ergeben die Ersparnis", async () => {
+  const { buildSketch } = await import("../../src/lib/tariff-sketch");
+  const clean = (text: string) => text.replace(/\s/g, " ");
+  const result = compareTariffs(2000, 2, KIEL, [{ price: E_WIE_EINFACH, meta: "E" }]);
+  const sketch = buildSketch(result, result.offers[0], { current: "Stadtwerke Kiel", offer: "E wie Einfach" }, "STROM");
+  assert.equal(sketch.title, "Ihr Strom über 2 Jahre");
+  assert.equal(clean(sketch.subtitle), "bei 2.000 kWh im Jahr");
+  assert.deepEqual(sketch.years.map((y) => y.label), ["1. Jahr", "2. Jahr"]);
+  // 1. Jahr: 837,40 € − 80,00 € Bonus = 757,40 € gegen 852,00 €
+  assert.deepEqual(
+    Object.values(sketch.years[0].offer).map((v) => v && clean(v)),
+    ["837,40 €", "− 80,00 €", "757,40 €"],
+  );
+  assert.deepEqual(sketch.years[0].current, { gross: sketch.years[0].current.gross, bonus: null, net: null });
+  assert.equal(clean(sketch.years[0].differenceText), "94,60 €");
+  assert.equal(clean(sketch.years[1].differenceText), "14,60 €");
+  assert.equal(sketch.years.reduce((sum, y) => sum + y.difference, 0).toFixed(2), "109.20");
+  assert.equal(clean(sketch.currentTotal), "1.704,00 €");
+  assert.equal(clean(sketch.offerTotal), "1.594,80 €");
+  assert.equal(`${sketch.savingLabel} ${clean(sketch.savingText)}`, "Sie sparen 109,20 €");
+  assert.equal(clean(sketch.monthly), "69,78 € statt 71,00 €");
+
+  // Nur dank Bonus günstiger: das 2. Jahr steht rot (negativ) auf dem Papier.
+  const heavy = compareTariffs(3500, 2, KIEL, [{ price: E_WIE_EINFACH, meta: "E" }]);
+  const loss = buildSketch(heavy, heavy.offers[0], { current: "Kiel", offer: "E" }, "STROM");
+  assert.equal(clean(loss.years[0].differenceText), "15,10 €");
+  assert.equal(clean(loss.years[1].differenceText), "− 64,90 €");
+  assert.equal(`${loss.savingLabel} ${clean(loss.savingText)}`, "Neu teurer um 49,80 €");
+
+  const gas = buildSketch(compareTariffs(15000, 1, KIEL, [{ price: OSTROM, meta: "O" }]), compareTariffs(15000, 1, KIEL, [{ price: OSTROM, meta: "O" }]).offers[0], { current: "a", offer: "b" }, "GAS");
+  assert.equal(gas.title, "Ihr Gas im ersten Jahr");
+  assert.equal(gas.years.length, 1);
+});
