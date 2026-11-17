@@ -1,6 +1,8 @@
 "use client";
 
+import { useState } from "react";
 import { Segmented } from "@/components/ui";
+import { IconPencil } from "@/components/icons";
 import {
   breakEvenText,
   eur,
@@ -14,6 +16,7 @@ import {
 } from "@/lib/tariff-compare";
 import type { ContractDraft } from "@/lib/tariff-memory";
 import { contractLabel, tariffName } from "./ContractFields";
+import { SketchView } from "./SketchView";
 
 interface Row {
   key: string;
@@ -45,6 +48,7 @@ export function CompareResult({
   years: number;
   onYears: (years: number) => void;
 }) {
+  const [sketching, setSketching] = useState(false);
   const best = comparison.best;
   const wins = best !== null && best.saving > 0.004;
   const currentTitle = contractLabel(current) || "Aktueller Vertrag";
@@ -62,7 +66,8 @@ export function CompareResult({
     { key: "current", title: currentTitle, subtitle: "", cost: comparison.current, offer: null },
   ].sort((a, b) => a.cost.total - b.cost.total || Number(a.offer === null) - Number(b.offer === null));
 
-  const choices = Array.from({ length: Math.max(3, years) }, (_, index) => index + 1);
+  // 1, 2, 3 Jahre und der eingestellte Zeitraum - mehr Segmente passen auf dem Handy nicht lesbar nebeneinander.
+  const choices = [...new Set([1, 2, 3, years])].sort((a, b) => a - b);
 
   return (
     <div>
@@ -98,6 +103,15 @@ export function CompareResult({
           </div>
         </dl>
       </section>
+
+      {/* Paper Selling: dieselbe Rechnung Zeile fuer Zeile zum Mitlesen, am Ende als Bild fuer den Kunden. */}
+      <button type="button" className="btn btn-secondary btn-lg btn-block mt-3" onClick={() => setSketching(true)}>
+        <IconPencil className="h-5 w-5" />
+        Als Skizze zeigen
+      </button>
+      {sketching && (
+        <SketchView comparison={comparison} sparte={sparte} current={current} onClose={() => setSketching(false)} />
+      )}
 
       <div className="mt-4">
         <Segmented<string>

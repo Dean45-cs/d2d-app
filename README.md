@@ -419,6 +419,20 @@ steht dabei „Im 1. Jahr … günstiger, ab dem 2. Jahr … pro Jahr teurer“.
 nennt die Annahme gleichbleibender Preise und dass der Grundversorger in der Regel keine
 Preisgarantie hat.
 
+**Als Skizze zeigen** (Paper Selling): Unter der Ersparnis schreibt die App die Rechnung wie
+von Hand auf Karopapier – Spalten „Heute“, „Neu“ und „Ersparnis“, eine Zeile je Jahr, im
+1. Jahr der Bonus als eigene Minuszeile, unten die Summe mit durchgestrichenem alten Preis,
+eingekreist „Sie sparen 109,20 €“ und zuletzt der Abschlag im Monat. Aufgebaut in vier
+Schritten (heute · neu mit Bonus · Ersparnis · Abschlag), damit der Berater Zeile für Zeile
+erklärt: ein Tipp aufs Papier oder „Weiter“ schreibt die nächste Zeile, „Alles zeigen“ springt
+ans Ende. Jede Zahl lässt sich mit dem Taschenrechner nachrechnen, und die Ersparnis je Jahr
+zeigt, was Portale verschweigen: ist ein Tarif nur dank Bonus günstiger, steht das 2. Jahr rot
+mit Minus da. Mit mehreren Tarifen wechselt man oben, welcher gezeichnet wird. Am Ende
+**Als Bild teilen** (WhatsApp, Nachrichten …; am Rechner wird das Bild gespeichert) – der Kunde
+hat die Rechnung danach auf seinem Handy. Die Schrift ist die Handschrift des Geräts
+(Noteworthy auf iPhone und iPad), die Spalten richten sich nach deren gemessener Breite.
+Inhalt in `src/lib/tariff-sketch.ts`, Zeichnung in `src/components/tariff/PaperSketch.tsx`.
+
 **Bewusst nicht dabei:** Provisionen (der Bildschirm wird dem Kunden gezeigt), Speichern der
 Rechnung am Auftrag oder beim Kunden, Preise teamweit teilen. Rechenkern in
 `src/lib/tariff-compare.ts`, Gedächtnis des Geräts in `src/lib/tariff-memory.ts`, Daten vom

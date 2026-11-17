@@ -319,6 +319,7 @@ Alle in `src/components/`. Stil per Klassen aus `globals.css` (`@layer component
 | `ActivityRings`, `LevelSummary`, `LevelBadge` | `levels/LevelCard.tsx` | Fitness-Ringe, Level |
 | `ProviderSummary`, `PriceBadge` | `ProviderRating.tsx` | Grundversorger und Preisstufe |
 | `TariffComparison` | `tariff/TariffComparison.tsx` | Tarifvergleich als Blatt (Klinken) oder Seite: Eingabe für den Berater, Ergebnis zum Vorzeigen. Je Vertrag eine `.surface` mit Namensfeld (Vorschläge aus der Provisionsliste als `.menu`) und drei Feldern; die Einheit des Grundpreises („€/Jahr ⇄“) ist ein Knopf in der Beschriftung. Ergebnis: `.hero` mit der Ersparnis in `hero-value`, Zeitraum als `Segmented`, darunter `ol.list` nach Gesamtkosten – „spart …“ als `badge`, getönt nur beim Günstigsten, „ab dem 2. Jahr teurer“ in `--warn` mit Worten |
+| `SketchView`, `PaperSketch` | `tariff/SketchView.tsx`, `tariff/PaperSketch.tsx` | Paper Selling: die Rechnung als Skizze im Vollbild (`.sketch-stage`, über dem Blatt), in vier Schritten geschrieben (`.sketch-in`: Schrift blendet ein, Linien ziehen sich), unten „Zurück/Weiter“ bzw. „Als Bild teilen“. Das Papier ist ein **Bild** wie Logo und Medaillen: eigene, feste Farben (Karopapier, blauer Stift, Rot fürs Durchstreichen und Minus, Grün für die Ersparnis), Handschrift des Systems (Noteworthy); wechselt nicht mit Akzent oder Hell/Dunkel – auch nicht im geteilten PNG |
 | `Logo`, `LogoMark` | `Logo.tsx` | Marke |
 | Zeichen | `icons.tsx` | Eine Familie (SF-Symbols-artig, 1,75 px Strich), gefüllte Variante für aktive Reiter |
 

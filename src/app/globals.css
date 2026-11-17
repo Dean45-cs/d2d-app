@@ -1586,6 +1586,76 @@
     }
   }
 
+  /* ------------------------------- Skizze -------------------------------- */
+
+  /* Paper Selling (tariff/SketchView): Vollbild ueber allem, auch ueber dem
+     Blatt beim Klinken. Oben Schliessen und Schritt, in der Mitte das Papier
+     (ein Bild, darum ohne Kante und Schatten), unten zwei grosse Knoepfe im
+     Daumenbereich. */
+  .sketch-stage {
+    position: fixed;
+    inset: 0;
+    z-index: 65;
+    display: flex;
+    flex-direction: column;
+    background: var(--bg);
+    padding-top: env(safe-area-inset-top);
+    animation: sketch-fade var(--dur-2) var(--ease-out) both;
+  }
+  .sketch-bar {
+    display: flex;
+    flex-shrink: 0;
+    align-items: center;
+    gap: 8px;
+    min-height: 52px;
+    padding: 0 16px;
+  }
+  .sketch-scroll {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding: 0 16px 16px;
+  }
+  .sketch-paper {
+    display: block;
+    width: 100%;
+    max-width: 560px;
+    margin-inline: auto;
+    overflow: hidden;
+    border-radius: var(--radius-lg);
+    -webkit-tap-highlight-color: transparent;
+  }
+  .sketch-actions {
+    display: grid;
+    flex-shrink: 0;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    width: 100%;
+    max-width: 592px;
+    margin-inline: auto;
+    padding: 12px 16px calc(12px + env(safe-area-inset-bottom));
+  }
+  /* Was gerade dazukommt, wird geschrieben: Schrift blendet ein, Linien ziehen sich. */
+  .sketch-in {
+    animation: sketch-fade 420ms var(--ease-out) both;
+  }
+  .sketch-in .sketch-stroke {
+    stroke-dasharray: 1;
+    stroke-dashoffset: 1;
+    animation: sketch-draw 650ms var(--ease-out) 180ms forwards;
+  }
+  @keyframes sketch-fade {
+    from {
+      opacity: 0;
+    }
+  }
+  @keyframes sketch-draw {
+    to {
+      stroke-dashoffset: 0;
+    }
+  }
+
   /* Seiten vor der App (Anmelden, Einladung): der ruhige Grund, sonst
      nichts - die Bildmarke ist die einzige Farbe und wirft einen weichen,
      neutralen Schatten wie ein App-Symbol auf dem Home-Bildschirm. */
