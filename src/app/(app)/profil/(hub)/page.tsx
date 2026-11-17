@@ -11,6 +11,7 @@ import { berlinToday } from "@/lib/contracts";
 import { Avatar, Cell, ListLabel, PageHeader, ToneTile, type SymbolTone } from "@/components/ui";
 import { NAV_ICONS } from "@/components/nav-icons";
 import {
+  IconCalculator,
   IconCalendar,
   IconChart,
   IconCog,
@@ -74,6 +75,13 @@ export default async function ProfileHubPage() {
             icon={<ToneTile tone="indigo"><IconCalendar className="h-4 w-4" /></ToneTile>}
             title={rights["appointments.team"] ? "Termine" : "Meine Termine"}
             detail={openAppointments > 0 ? openAppointments : undefined}
+          />
+        </li>
+        <li>
+          <Cell
+            href="/tarifvergleich"
+            icon={<ToneTile tone="magenta"><IconCalculator className="h-4 w-4" /></ToneTile>}
+            title="Tarifvergleich"
           />
         </li>
         {rights["customers.manage"] && (

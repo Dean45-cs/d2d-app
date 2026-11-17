@@ -35,6 +35,8 @@ const NEARBY_KM = 30;
 export interface PriceInfo {
   /** Arbeitspreis in ct/kWh */
   ct: number;
+  /** Grundpreis in Euro pro Jahr laut Preisblatt - null, wenn er fehlt */
+  base: number | null;
   /** Jahreskosten des Musterhaushalts in Euro */
   year: number;
   step: PriceStep;
@@ -91,6 +93,7 @@ export function providerLookup(teamId?: number): ProviderLookup {
     if (year === null) return null;
     return {
       ct,
+      base,
       year,
       step: referenceStep(year, reference[energy]),
       delta: Math.round(year - reference[energy]),

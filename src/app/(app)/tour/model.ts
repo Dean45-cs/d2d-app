@@ -101,7 +101,8 @@ export type SheetName =
   | "house"
   | "block"
   | "day"
-  | "card";
+  | "card"
+  | "compare";
 
 export const EMPTY_VISITS: Map<string, LocalVisits> = new Map();
 

@@ -9,6 +9,8 @@ import { usePrefs } from "@/components/PrefsSync";
 import { EmptyState, OutcomeGlyph } from "@/components/ui";
 import { IconBan, IconBell, IconBuilding, IconHome, IconMap, IconPlus, IconSparkles } from "@/components/icons";
 import { beginSaleDraft } from "@/lib/sale-drafts-client";
+import { TariffComparison } from "@/components/tariff/TariffComparison";
+import { comparePlace, type CompareTariffOption } from "@/lib/tariff-compare";
 import type {
   AppointmentRow,
   DoorbellWithStats,
@@ -105,6 +107,8 @@ interface Props {
   /** Offene eigene Termine - was davon heute ist, entscheidet das Geraet. */
   appointments: AppointmentRow[];
   tarifrechnerUrl: string;
+  /** Tarife der Provisionsliste fuer den Tarifvergleich - nur Namen, keine Betraege. */
+  compareTariffs: CompareTariffOption[];
   /** Wer Terminbestaetigungen unterschreibt, samt Visitenkarte (falls eingeschaltet). */
   sender: Sender;
 }
@@ -180,6 +184,7 @@ export function TourClient({
   recent,
   appointments,
   tarifrechnerUrl,
+  compareTariffs,
   sender,
 }: Props) {
   const router = useRouter();
@@ -1469,6 +1474,7 @@ export function TourClient({
               onStreet={() => setSheet("street")}
               onDay={() => setSheet("day")}
               onCard={sender.cardToken ? () => setSheet("card") : undefined}
+              onCompare={() => setSheet("compare")}
             />
           )}
         </div>
@@ -1632,7 +1638,37 @@ export function TourClient({
         />
       )}
       {sheet === "sale" && (
-        <SaleSheet place={place} product={product} busy={busy} onPick={startSale} onClose={() => setSheet(null)} />
+        <SaleSheet
+          place={place}
+          product={product}
+          busy={busy}
+          onPick={startSale}
+          onCompare={() => setSheet("compare")}
+          onClose={() => setSheet(null)}
+        />
+      )}
+      {sheet === "compare" && (
+        <TariffComparison
+          layout="sheet"
+          tariffs={compareTariffs}
+          places={[]}
+          context={{
+            plz: territory?.postal_code ?? "",
+            label: currentNumber ? place : territory?.name ?? "",
+            place: territory ? comparePlace(territory.provider, territory.name) : null,
+          }}
+          initialSparte={product === "GAS" ? "GAS" : "STROM"}
+          onClose={() => setSheet(null)}
+          // Erst mit gewaehlter Tuer: der Auftrag gehoert zu einer Adresse.
+          onStartSale={
+            trayHint === null && !busy
+              ? (sparte) => {
+                  setProduct(sparte);
+                  setSheet("sale");
+                }
+              : undefined
+          }
+        />
       )}
       {sheet === "house" && currentNumber && !housesPending && (
         <HouseSheet

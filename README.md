@@ -9,6 +9,9 @@ Eine Web-App für Door-to-Door-Teams im Energievertrieb:
 - **Ablehnungsgründe mit einem Tap** – konfigurierbare Kachel-Auswahl statt Freitext
 - **Auftrag erfassen** – öffnet den Tarifrechner des Partners und merkt einen offenen Auftrag vor;
   erst die anschließende Bestätigung zählt als Abschluss
+- **Tarifvergleich** – an der Tür in Sekunden zeigen, was ein neuer Tarif über die ganze
+  Laufzeit spart, nicht nur im 1. Jahr mit Bonus; Grundversorger vorbelegt, Tarife aus der
+  Provisionsliste, Strom und Gas
 - **Termine mit Uhrzeit** – Vorschläge für den Abend, Rufnummer dazu, und am nächsten Tag
   stehen sie oben auf der Tour; bestätigt per WhatsApp oder SMS mit einem Tipp
 - **Digitale Visitenkarte** – QR-Code an der Tür: Kunden sehen Bild, Name, Team und
@@ -359,6 +362,68 @@ eine inzwischen geänderte Zuteilung erfordert ein erneutes Laden der Seite. Die
 Die Datenbank wird beim nächsten Serverstart automatisch erweitert. Nach dem Update
 einen laufenden Server neu starten. Tests: `npm test` (einschließlich
 `scripts/tests/sales-reminders-handover.test.ts`).
+
+## Tarifvergleich
+
+Vergleichsportale und die Tarifliste zeigen meist die Ersparnis im 1. Jahr samt Bonus. Der
+Bonus kommt aber nur einmal – über zwei Jahre sieht die Reihenfolge oft anders aus. Der
+Tarifvergleich rechnet deshalb immer über den ganzen Zeitraum:
+
+| | |
+|---|---|
+| Jahreskosten | Grundpreis €/Jahr + Verbrauch kWh × Arbeitspreis ct/kWh / 100 |
+| Gesamtkosten über N Jahre | N × Jahreskosten − Bonus (der Bonus zählt einmal, im 1. Jahr) |
+| Ersparnis | Gesamtkosten aktueller Vertrag − Gesamtkosten neuer Tarif |
+| Abschlag | Jahreskosten / 12, ohne Bonus |
+| Break-even | (N × (Grundpreis alt − neu) + Bonus neu − Bonus alt) / (N × (Arbeitspreis neu − alt) / 100) |
+
+Ist der Arbeitspreis des neuen Tarifs höher, ist er **bis** zum Break-even günstiger, sonst
+**ab** diesem Verbrauch. Beispiel mit 2.000 kWh über 2 Jahre gegen Stadtwerke Kiel (120,60 €/Jahr,
+36,57 ct): E wie Einfach (0 €, 41,87 ct, 80 € Bonus) kostet 1.594,80 € statt 1.704,00 € und spart
+109,20 €, günstiger bis ca. 3.030 kWh; OStrom (194,71 €/Jahr, 33,53 ct, 100 € Bonus) kostet
+1.630,62 €, spart 73,38 €, günstiger ab ca. 793 kWh – und ist im 1. Jahr 86,69 € günstiger, ab
+dem 2. Jahr aber 13,31 € im Jahr teurer.
+
+**Wo:** Beim Klinken über das Rechner-Zeichen oben rechts und unter **Auftrag starten ›
+Erst Tarife vergleichen** – als Blatt über der Tür, auch ohne Netz. Mit gewählter Tür steht
+unter dem Ergebnis **Auftrag starten**, die Sparte ist dann schon gewählt. Außerdem als eigene
+Seite **Tarifvergleich** (Seitenleiste, auf dem Handy unter Profil) für Termine, Beratung am
+Telefon und das iPad.
+
+**Eingabe** (für den Berater): Strom oder Gas, Jahresverbrauch, Zeitraum (Standard 2 Jahre,
+an Laufzeit oder Preisgarantie anpassbar, 1 bis 5 Jahre), der aktuelle Vertrag und beliebig
+viele neue Tarife – je Arbeitspreis, Grundpreis und Bonus. Der Grundpreis ist je Zeile **pro
+Monat oder pro Jahr** eingebbar (ein Tipp auf „€/Jahr ⇄“ rechnet um), denn die Jahresabrechnung
+nennt ihn meist pro Jahr, Portale pro Monat. Unter jedem Tarif steht schon beim Tippen, was er
+kostet und spart – ein Tippfehler wie „3657“ statt „36,57“ fällt so sofort auf.
+
+- **Aktueller Vertrag:** beim Klinken ist der Grundversorger des Gebiets vom Preisblatt
+  eingetragen (Energiekarte), auf der Seite nach PLZ oder über die Orte der eigenen Gebiete.
+  Ein Nachbarort zählt nicht – dort kann ein anderer Versorger liefern.
+- **Neue Tarife** werden aus der **Provisionsliste** gewählt statt abgetippt: Tippen sucht in
+  Anbieter und Tarifname der Sparte, Tarife, deren Staffel zum Verbrauch passt, stehen vorn.
+  Freie Eingabe geht immer.
+- **Preise merkt sich das Gerät** je Tarif und PLZ (Tarifpreise hängen vom Netzgebiet ab und
+  stehen nicht in der Provisionsliste). An der nächsten Tür derselben PLZ stehen sie als
+  „+ Anbieter“ zum Antippen da, und wer einen gemerkten Tarif wählt, bekommt seine Preise
+  gleich mit. Gemerkt werden die letzten 60 Tarife für ein halbes Jahr; Kundendaten nicht.
+- Der laufende Vergleich bleibt auf dem Gerät stehen (einen Arbeitstag lang), auch über den
+  Wechsel in den Tarifrechner des Partners. An einer Tür in einer anderen PLZ beginnt er frisch.
+
+**Ergebnis** (zum Vorzeigen): oben in groß „Über 2 Jahre sparen Sie 109,20 €“ mit Tarif und
+bisherigen bzw. neuen Gesamtkosten – oder ehrlich „Ihr aktueller Vertrag bleibt am
+günstigsten“. Darunter der Zeitraum zum Umschalten (1, 2, 3 Jahre – daran sieht der Kunde,
+warum der Bonus nicht alles ist) und alle Tarife samt aktuellem Vertrag nach Gesamtkosten:
+Ersparnis, Break-even, 1. Jahr, Folgejahr und Abschlag. Ist ein Tarif nur dank Bonus günstiger,
+steht dabei „Im 1. Jahr … günstiger, ab dem 2. Jahr … pro Jahr teurer“. Der Hinweis darunter
+nennt die Annahme gleichbleibender Preise und dass der Grundversorger in der Regel keine
+Preisgarantie hat.
+
+**Bewusst nicht dabei:** Provisionen (der Bildschirm wird dem Kunden gezeigt), Speichern der
+Rechnung am Auftrag oder beim Kunden, Preise teamweit teilen. Rechenkern in
+`src/lib/tariff-compare.ts`, Gedächtnis des Geräts in `src/lib/tariff-memory.ts`, Daten vom
+Server in `src/lib/tariff-options.ts`, Oberfläche in `src/components/tariff/`. Tests mit den
+Kontrollwerten oben in `scripts/tests/tariff-compare.test.ts`.
 
 ## Kundenliste
 
@@ -1222,6 +1287,7 @@ src/
       start/          Übersicht (Team) bzw. Meine Zahlen
       tour/           Türerfassung (das Herzstück)
       termine/        Vereinbarte Termine, Bestätigung per WhatsApp/SMS
+      tarifvergleich/ Tarifvergleich als eigene Seite (beim Klinken als Blatt)
       kunden/         Kundenliste: Kunde je Auftrag, Vertragsende, Wiedervorlage
       provisionen/    Provisionsliste je Person, Struktur (Anteile, persönliche Sätze)
       team/           Feed, Beitrag, Rangliste, Erfolge
@@ -1248,6 +1314,9 @@ src/
     theme-palette.ts  Akzentfarben aus dem Grün ableiten (OKLCH, Kontraste); color.ts rechnet
     appointments.ts   Terminzeiten, Vorschläge, Beschriftung
     customers.ts      Kundenliste: Abfragen, Speichern, Wiedervorlage
+    tariff-compare.ts Tarifvergleich: Gesamtkosten über N Jahre, Ersparnis, Break-even, Eingaben
+    tariff-memory.ts  Tarifvergleich: Preise je Tarif und PLZ und laufender Vergleich im Gerät
+    tariff-options.ts Tarifvergleich: Tarife (ohne Beträge) und Grundversorger vom Server
     commissions/      Provisionen: Rechenkern, Excel- und Tabellen-Import, Sichtbarkeit je Rolle
     contracts.ts      Vertragsende, Fälligkeit, Datumsformate
     confirmation.ts   Terminbestätigung: Text, WhatsApp- und SMS-Links

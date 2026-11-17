@@ -109,6 +109,16 @@ export function IconChart(props: IconProps) {
     </Line>
   );
 }
+/** Tarifvergleich: Rechner mit Anzeige und Tasten. */
+export function IconCalculator(props: IconProps) {
+  return (
+    <Line {...props}>
+      <rect x="5" y="3" width="14" height="18" rx="3" />
+      <rect x="8" y="6" width="8" height="3.5" rx="1" />
+      <path d="M8.75 13.25h.01M12 13.25h.01M15.25 13.25h.01M8.75 17h.01M12 17h.01M15.25 17h.01" strokeWidth={2.25} />
+    </Line>
+  );
+}
 export function IconChartFill(props: IconProps) {
   return (
     <Solid {...props}>

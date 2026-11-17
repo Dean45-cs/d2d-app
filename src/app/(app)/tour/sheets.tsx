@@ -8,6 +8,7 @@ import {
   IconBan,
   IconUndo,
   IconBuilding,
+  IconCalculator,
   IconCheck,
   IconCloudUp,
   IconCrosshair,
@@ -442,12 +443,15 @@ export function SaleSheet({
   product,
   busy,
   onPick,
+  onCompare,
   onClose,
 }: {
   place: string;
   product: EnergyType;
   busy: boolean;
   onPick: (product: EnergyType) => void;
+  /** Vorher zeigen, was der Kunde ueber die Laufzeit spart. */
+  onCompare?: () => void;
   onClose: () => void;
 }) {
   return (
@@ -466,6 +470,23 @@ export function SaleSheet({
           </button>
         ))}
       </div>
+      {onCompare && (
+        <ul className="list list-icons mt-4">
+          <li>
+            <Cell
+              onClick={onCompare}
+              icon={
+                <span className="glyph">
+                  <IconCalculator className="h-4 w-4" />
+                </span>
+              }
+              title="Erst Tarife vergleichen"
+              subtitle="Ersparnis über die Laufzeit"
+              chevron
+            />
+          </li>
+        </ul>
+      )}
     </Sheet>
   );
 }
