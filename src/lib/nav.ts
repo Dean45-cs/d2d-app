@@ -34,7 +34,8 @@ export type IconName =
   | "shield"
   | "list"
   | "cog"
-  | "euro";
+  | "euro"
+  | "calculator";
 
 export interface NavItem {
   href: string;
@@ -90,6 +91,8 @@ export function navigation(role: Role, rights: PermissionSet, userId?: number): 
   // Die Geschaeftsfuehrung bekommt die Admin-Provision; eine Liste hat sie nur mit dem Verwaltungsrecht.
   const provisionen: NavItem[] =
     role !== "LEADER" || rights["commissions.manage"] ? [{ href: "/provisionen", label: "Provisionen", icon: "euro" }] : [];
+  // Tarifvergleich ueber die Laufzeit - beim Klinken als Blatt, hier als eigene Seite.
+  const vergleich: NavItem = { href: "/tarifvergleich", label: "Tarifvergleich", icon: "calculator" };
   const gebiete: NavItem = {
     href: "/gebiete",
     label: rights["territories.view_all"] ? "Gebiete" : "Meine Gebiete",
@@ -133,12 +136,12 @@ export function navigation(role: Role, rights: PermissionSet, userId?: number): 
       href: "/profil",
       label: "Profil",
       icon: "profile",
-      match: ["/einstellungen", "/kunden", "/provisionen", ...me, ...(reports ? [] : ["/start"])],
+      match: ["/einstellungen", "/kunden", "/provisionen", "/tarifvergleich", ...me, ...(reports ? [] : ["/start"])],
     },
   ];
 
   const sidebar: NavSection[] = [
-    { items: [start, tour, termine, ...kunden, ...provisionen] },
+    { items: [start, tour, termine, vergleich, ...kunden, ...provisionen] },
     { title: "Karte", items: [gebiete, preise], area: "map" },
     { title: "Team", items: [feed, rangliste, erfolge, stufen], area: "team" },
     ...(admin.length > 0 ? [{ title: "Verwaltung", items: admin }] : []),
@@ -148,7 +151,7 @@ export function navigation(role: Role, rights: PermissionSet, userId?: number): 
     tabs,
     sidebar,
     admin,
-    items: [start, tour, termine, ...kunden, ...provisionen, gebiete, preise, feed, rangliste, erfolge, stufen, ...admin],
+    items: [start, tour, termine, vergleich, ...kunden, ...provisionen, gebiete, preise, feed, rangliste, erfolge, stufen, ...admin],
   };
 }
 

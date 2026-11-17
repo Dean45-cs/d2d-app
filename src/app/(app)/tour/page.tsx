@@ -18,6 +18,7 @@ import { readArea } from "@/lib/geo/area";
 import type { StreetWithStats } from "@/lib/queries";
 import { getLevelProgress } from "@/lib/level-queries";
 import { cardSettings } from "@/lib/card-queries";
+import { compareTariffOptions } from "@/lib/tariff-options";
 import { berlinMidnight, berlinSlot } from "@/lib/format";
 import type { Territory } from "@/lib/types";
 
@@ -201,6 +202,7 @@ export default async function TourPage({
         process.env.NEXT_PUBLIC_TARIFRECHNER_URL ??
         "https://stromundgasportal.de/eingabe/"
       }
+      compareTariffs={compareTariffOptions(user.team_id)}
       sender={{ name: user.name, teamName: card.teamName, cardToken: card.token }}
     />
   );

@@ -1,6 +1,7 @@
 import type { ReactElement } from "react";
 import {
   IconBolt,
+  IconCalculator,
   IconCalendar,
   IconChart,
   IconChartFill,
@@ -46,4 +47,5 @@ export const NAV_ICONS: Record<IconName, { line: IconComponent; fill: IconCompon
   list: { line: IconList, fill: IconList },
   cog: { line: IconCog, fill: IconCog },
   euro: { line: IconEuro, fill: IconEuro },
+  calculator: { line: IconCalculator, fill: IconCalculator },
 };

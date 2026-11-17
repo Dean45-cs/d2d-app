@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { IconCalendar, IconChevronDown, IconCloudUp, IconOffline, IconQr } from "@/components/icons";
+import { IconCalculator, IconCalendar, IconChevronDown, IconCloudUp, IconOffline, IconQr } from "@/components/icons";
 import { ProgressRing } from "@/components/ui";
 import { ProviderLine } from "@/components/ProviderRating";
 import { usePrefs } from "@/components/PrefsSync";
@@ -23,6 +23,7 @@ export function TourHeader({
   onStreet,
   onDay,
   onCard,
+  onCompare,
 }: {
   street: StreetWithStats | null;
   territory: TerritoryLite | null;
@@ -34,6 +35,8 @@ export function TourHeader({
   onDay: () => void;
   /** Visitenkarte zum Vorzeigen - nur, wenn sie eingeschaltet ist. */
   onCard?: () => void;
+  /** Tarifvergleich: was der Kunde ueber die Laufzeit spart. */
+  onCompare?: () => void;
 }) {
   // Tagesziel fuer den Ring oben links - dasselbe wie unter "Erfolge" (Einstellungen -> Ziele).
   const { goalDoors } = usePrefs();
@@ -60,6 +63,11 @@ export function TourHeader({
         </button>
         <span className="flex-1" />
         <QueueBadge online={online} pendingCount={pendingCount} onClick={onDay} />
+        {onCompare && (
+          <button type="button" onClick={onCompare} className="icon-btn" aria-label="Tarifvergleich">
+            <IconCalculator className="h-6 w-6" />
+          </button>
+        )}
         {onCard && (
           <button type="button" onClick={onCard} className="icon-btn" aria-label="Visitenkarte zeigen" data-tour="card">
             <IconQr className="h-6 w-6" />
