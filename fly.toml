@@ -8,6 +8,10 @@ app = "d2d-app"
 primary_region = "fra"
 
 [build]
+  [build.args]
+    # Visitenkarten (QR-Code an der Tuer) unter der Firmenadresse zeigen.
+    # Leer lassen = Karte bleibt unter der Adresse der App.
+    NEXT_PUBLIC_CARD_ORIGIN = "https://carlssonsales.de"
 
 [env]
   NODE_ENV = "production"

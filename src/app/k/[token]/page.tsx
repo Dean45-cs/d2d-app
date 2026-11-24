@@ -1,9 +1,10 @@
 import type { Metadata } from "next";
 import { headers } from "next/headers";
+import { redirect } from "next/navigation";
 import { Logo } from "@/components/Logo";
 import { Avatar, Cell, EmptyState } from "@/components/ui";
 import { IconCheckCircle, IconPhone, IconQr } from "@/components/icons";
-import { CARD_ROLE, cardPath, checkedAt, memberSince } from "@/lib/business-card";
+import { CARD_ORIGIN, CARD_ROLE, cardPath, checkedAt, isCardToken, memberSince } from "@/lib/business-card";
 import { publicCard } from "@/lib/card-queries";
 import { telHref } from "@/lib/contracts";
 
@@ -49,6 +50,13 @@ export async function generateMetadata({ params }: { params: Promise<{ token: st
  */
 export default async function CardPage({ params }: { params: Promise<{ token: string }> }) {
   const { token } = await params;
+  // Gibt es eine Firmenseite, zeigt nur sie die Karte - auch aeltere Links
+  // auf die App landen dort, damit der Kunde immer dieselbe Adresse sieht.
+  if (CARD_ORIGIN && isCardToken(token)) {
+    const list = await headers();
+    const host = list.get("x-forwarded-host") ?? list.get("host") ?? "";
+    if (host !== new URL(CARD_ORIGIN).host) redirect(`${CARD_ORIGIN}${cardPath(token)}`);
+  }
   const card = publicCard(token);
   return (
     <main className="brand-backdrop min-h-dvh px-4 pb-[max(2rem,env(safe-area-inset-bottom))] pt-[max(3rem,env(safe-area-inset-top))]">
