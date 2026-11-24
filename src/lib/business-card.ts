@@ -25,6 +25,14 @@ export function isCardToken(value: unknown): value is string {
   return typeof value === "string" && new RegExp(`^[A-Za-z0-9_-]{${CARD_TOKEN_LENGTH}}$`).test(value);
 }
 
+/**
+ * Feste Adresse fuer Kartenlinks, z. B. https://carlssonsales.de - dann zeigen
+ * QR-Code, Bestaetigung und Kontakt auf die Firmenseite, die die Karte von
+ * hier abholt (/k/[token]/daten). Leer: die Adresse der App selbst.
+ * Wird beim Build eingesetzt (NEXT_PUBLIC_), siehe Dockerfile und fly.toml.
+ */
+export const CARD_ORIGIN = (process.env.NEXT_PUBLIC_CARD_ORIGIN ?? "").trim().replace(/\/+$/, "");
+
 /** Pfad der Karte - kurz, weil er im QR-Code und in jeder Bestaetigung steht. */
 export function cardPath(token: string): string {
   return `/k/${token}`;

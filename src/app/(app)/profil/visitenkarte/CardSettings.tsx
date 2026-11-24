@@ -164,7 +164,7 @@ export function CardSettings({
       <ul className="list list-icons mt-4">
         <li>
           <Cell
-            href={cardPath(settings.token)}
+            href={url || cardPath(settings.token)}
             external
             icon={<ToneTile tone="teal"><IconExternal className="h-4 w-4" /></ToneTile>}
             title="Vorschau öffnen"

@@ -1,4 +1,4 @@
-import { cardPath, cardVcard, vcardFilename } from "@/lib/business-card";
+import { CARD_ORIGIN, cardPath, cardVcard, vcardFilename } from "@/lib/business-card";
 import { publicCard } from "@/lib/card-queries";
 
 export const dynamic = "force-dynamic";
@@ -13,7 +13,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ toke
       headers: { "content-type": "text/plain; charset=utf-8", "cache-control": "no-store" },
     });
   }
-  const url = new URL(cardPath(token), request.url).toString();
+  const url = new URL(cardPath(token), CARD_ORIGIN || request.url).toString();
   return new Response(cardVcard(card, url), {
     headers: {
       "content-type": "text/vcard; charset=utf-8",

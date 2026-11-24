@@ -12,6 +12,10 @@ WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 ENV NEXT_TELEMETRY_DISABLED=1
+# Feste Adresse fuer Visitenkarten-Links (z. B. https://carlssonsales.de),
+# kommt aus fly.toml [build.args] - Next.js setzt sie beim Build ein.
+ARG NEXT_PUBLIC_CARD_ORIGIN=""
+ENV NEXT_PUBLIC_CARD_ORIGIN=$NEXT_PUBLIC_CARD_ORIGIN
 # Beim Build wird nichts aus der Datenbank gelesen; der Pfad wird erst zur
 # Laufzeit aus DATABASE_PATH gesetzt.
 RUN npm run build

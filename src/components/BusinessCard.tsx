@@ -6,7 +6,7 @@ import { Sheet } from "./Sheet";
 import { QrCode } from "./QrCode";
 import { Avatar, Cell, ListLabel } from "./ui";
 import { IconChat, IconComment } from "./icons";
-import { cardPath } from "@/lib/business-card";
+import { CARD_ORIGIN, cardPath } from "@/lib/business-card";
 import { smsHref, whatsappHref } from "@/lib/confirmation";
 
 /** Wer eine Terminbestaetigung unterschreibt - und ob ein Kartenlink dazukommt. */
@@ -18,13 +18,13 @@ export interface Sender {
 }
 
 /**
- * Volle Adresse der Karte. Die Adresse der App kennt nur der Browser (hinter
- * dem Hoster steht der Server unter einem anderen Namen) - darum erst nach
- * dem ersten Bild, vorher "".
+ * Volle Adresse der Karte. Mit CARD_ORIGIN die Firmenseite, sonst die Adresse
+ * der App - die kennt nur der Browser (hinter dem Hoster steht der Server
+ * unter einem anderen Namen), darum erst nach dem ersten Bild, vorher "".
  */
 export function useCardUrl(token: string | null): string {
   const [origin, setOrigin] = useState("");
-  useEffect(() => setOrigin(window.location.origin), []);
+  useEffect(() => setOrigin(CARD_ORIGIN || window.location.origin), []);
   return token && origin ? `${origin}${cardPath(token)}` : "";
 }
 
