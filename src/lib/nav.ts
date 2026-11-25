@@ -102,8 +102,8 @@ export function navigation(role: Role, rights: PermissionSet, userId?: number): 
   const feed: NavItem = { href: "/team", label: "Feed", icon: "comment", match: ["/profil/"] };
   const rangliste: NavItem = { href: "/team/rangliste", label: "Rangliste", icon: "trophy" };
   const erfolge: NavItem = { href: "/team/erfolge", label: "Erfolge", icon: "sparkles" };
-  // Wer auf welcher Stufe steht - als Pyramide mit Profilbildern.
-  const stufen: NavItem = { href: "/team/stufen", label: "Stufen", icon: "pyramid" };
+  // Die Karriereleiter: wer auf welchem Rang steht und was zum naechsten fehlt.
+  const stufen: NavItem = { href: "/team/stufen", label: "Karriere", icon: "pyramid" };
 
   const admin: NavItem[] = [
     ...(rights["team.manage"] || rights["structure.manage"] || rights["team.roles"]
@@ -120,6 +120,9 @@ export function navigation(role: Role, rights: PermissionSet, userId?: number): 
       : []),
     ...(rights["energy.reference"] || rights["energy.manage"] || rights["energy.refresh"]
       ? [{ href: "/einstellungen/energie", label: "Energie & Tarif", icon: "cog" as const }]
+      : []),
+    ...(role === "LEADER" && rights["team.roles"]
+      ? [{ href: "/einstellungen/raenge", label: "Ränge", icon: "pyramid" as const }]
       : []),
     ...(rights["commissions.manage"]
       ? [{ href: "/einstellungen/provisionen", label: "Provisionsregeln", icon: "euro" as const }]

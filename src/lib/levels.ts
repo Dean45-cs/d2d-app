@@ -1,38 +1,11 @@
-import { OUTCOME_LABEL, type VisitOutcome } from "./types";
+/*
+ * Erfolge: Abzeichen und Tagesziele aus nachpruefbarer App-Aktivitaet.
+ * XP und Level gibt es nicht mehr - den Aufstieg zeigt die Karriereleiter
+ * (src/lib/ranks.ts).
+ */
 
-/** Pro Besuch gilt genau ein Ergebnis. Ein Abschluss bringt insgesamt 100 XP. */
-export const XP_RULES: Array<{
-  outcome: VisitOutcome;
-  label: string;
-  xp: number;
-  description: string;
-}> = [
-  { outcome: "NOT_HOME", label: OUTCOME_LABEL.NOT_HOME, xp: 5, description: "Auch ein dokumentierter Versuch zählt." },
-  { outcome: "MET_NO_SALE", label: OUTCOME_LABEL.MET_NO_SALE, xp: 15, description: "Jedes echte Gespräch bringt Erfahrung." },
-  { outcome: "APPOINTMENT", label: OUTCOME_LABEL.APPOINTMENT, xp: 40, description: "Ein vereinbarter Termin ist der nächste Schritt." },
-  { outcome: "SALE", label: OUTCOME_LABEL.SALE, xp: 100, description: "Ein dokumentierter Abschluss wird belohnt." },
-];
-
-export const LEVEL_TITLES = [
-  { level: 1, title: "Einstieg" },
-  { level: 5, title: "Türöffner" },
-  { level: 10, title: "Gesprächsprofi" },
-  { level: 20, title: "Abschlussprofi" },
-  { level: 30, title: "Gebietskenner" },
-  { level: 50, title: "Vertriebsmeister" },
-  { level: 75, title: "Legende" },
-];
-
-export interface LevelProgress {
-  totalXp: number;
-  level: number;
-  title: string;
-  levelStartXp: number;
-  nextLevelXp: number;
-  xpInLevel: number;
-  xpForNextLevel: number;
-  xpToNextLevel: number;
-  percent: number;
+function nonNegativeInteger(value: number): number {
+  return Number.isFinite(value) ? Math.max(0, Math.min(Number.MAX_SAFE_INTEGER, Math.floor(value))) : 0;
 }
 
 export interface LevelTotals {
@@ -40,48 +13,6 @@ export interface LevelTotals {
   met: number;
   appointments: number;
   sales: number;
-}
-
-export function xpForOutcome(outcome: VisitOutcome): number {
-  return XP_RULES.find((rule) => rule.outcome === outcome)?.xp ?? 0;
-}
-
-function nonNegativeInteger(value: number): number {
-  return Number.isFinite(value) ? Math.max(0, Math.min(Number.MAX_SAFE_INTEGER, Math.floor(value))) : 0;
-}
-
-/** Kumulierte Schwelle: 0, 100, 250, 450 …; jedes weitere Level kostet 50 XP mehr. */
-function threshold(level: number): number {
-  return 25 * (level - 1) * (level + 2);
-}
-
-/** Benötigte Gesamt-XP für ein Level, z. B. für den Titel-Ausblick. */
-export function xpForLevel(level: number): number {
-  return threshold(Math.max(1, nonNegativeInteger(level)));
-}
-
-export function levelProgress(xp: number): LevelProgress {
-  const totalXp = nonNegativeInteger(xp);
-  // Inverse der quadratischen Kurve, damit auch sehr große Werte sofort berechnet werden.
-  let level = Math.floor((Math.sqrt(9 + (4 * totalXp) / 25) - 3) / 2) + 1;
-  // Gleitkomma-Rundung direkt an einer Schwelle korrigieren.
-  if (threshold(level) > totalXp) level -= 1;
-  if (threshold(level + 1) <= totalXp) level += 1;
-  const levelStartXp = threshold(level);
-  const nextLevelXp = threshold(level + 1);
-  const xpInLevel = totalXp - levelStartXp;
-  const xpForNextLevel = nextLevelXp - levelStartXp;
-  return {
-    totalXp,
-    level,
-    title: LEVEL_TITLES.findLast((entry) => entry.level <= level)!.title,
-    levelStartXp,
-    nextLevelXp,
-    xpInLevel,
-    xpForNextLevel,
-    xpToNextLevel: nextLevelXp - totalXp,
-    percent: (xpInLevel / xpForNextLevel) * 100,
-  };
 }
 
 /** Schwierigkeit ist eine redaktionelle Zielstaffel, kein Branchenbenchmark. */

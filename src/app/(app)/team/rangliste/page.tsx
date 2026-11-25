@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { requireUser } from "@/lib/auth";
 import { teamTotals, type PersonTotals } from "@/lib/community";
+import { loadRanks } from "@/lib/ranks";
+import { positionLabel } from "@/lib/tiers";
 import {
   METRICS,
   bestValue,
@@ -16,7 +18,7 @@ import {
   type Metric,
   type RankEntry,
 } from "@/lib/ranking";
-import { Avatar, EmptyState, ListLabel, Notice, PageHeader, SegmentedLinks, plural } from "@/components/ui";
+import { Avatar, EmptyState, ListLabel, Notice, PageHeader, SegmentedLinks } from "@/components/ui";
 import { IconCheck, IconTrendDown, IconTrendUp, IconTrophy } from "@/components/icons";
 import { RangePicker } from "@/components/RangePicker";
 import { parseRange, previousRange, rangeToSince, type RangeKey } from "@/lib/ranges";
@@ -56,6 +58,7 @@ export default async function ComparePage({
   const metric = metricByKey(params.kennzahl);
 
   const totals = teamTotals(user.team_id, { since: rangeToSince(key) });
+  const ranks = loadRanks(user.team_id);
   const board = rank(metric, totals);
   const ranked = board.filter((e) => e.rank !== null);
 
@@ -134,6 +137,7 @@ export default async function ComparePage({
                   metric={metric}
                   isMe={entry.user_id === user.id}
                   delta={delta(entry)}
+                  position={positionLabel({ role: entry.role, tier: entry.tier ?? "BERATER" }, ranks)}
                 />
               ))}
             </ol>
@@ -216,11 +220,14 @@ function RankRow({
   metric,
   isMe,
   delta,
+  position,
 }: {
   entry: RankEntry;
   metric: Metric;
   isMe: boolean;
   delta: number | null;
+  /** Der Rang - klein vor den Zahlen. */
+  position: string;
 }) {
   return (
     <li>
@@ -234,7 +241,7 @@ function RankRow({
           <span className="block truncate text-footnote text-muted">
             {entry.rank === null && metric.rate
               ? `${entry[metric.rate.den]} von ${metric.rate.min} ${metric.rate.basis}`
-              : `${entry.doors} Türen · ${plural(entry.met, "Gespräch", "Gespräche")} · ${entry.sales} Abschl.`}
+              : `${position} · ${entry.doors} Türen · ${entry.sales} Abschl.`}
           </span>
         </span>
         {delta !== null && delta !== 0 && (

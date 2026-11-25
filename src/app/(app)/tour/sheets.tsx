@@ -16,6 +16,7 @@ import {
   IconNavigate,
   IconPencil,
   IconPlus,
+  IconPyramid,
   IconSearch,
   IconTrash,
   IconX,
@@ -32,7 +33,6 @@ import {
 import type { StreetWithStats, Totals, VisitRow } from "@/lib/queries";
 import type { BuildingType, RejectionReason } from "@/lib/types";
 import type { QueuedWrite } from "@/lib/offline-queue";
-import type { LevelProgress } from "@/lib/levels";
 import { normalizeSlot, quickSlots, slotDate, slotLabel, slotTime, toSlot } from "@/lib/appointments";
 import { parseDoorbellLines, type DoorbellInput } from "@/lib/doorbells";
 import { byDistance, distanceText, type Distance } from "@/lib/geo/nearby";
@@ -825,7 +825,6 @@ export function BlockSheet({
 
 export function DaySheet({
   totals,
-  level,
   pending,
   online,
   recent,
@@ -835,7 +834,6 @@ export function DaySheet({
   onClose,
 }: {
   totals: Totals;
-  level: LevelProgress;
   pending: QueuedWrite[];
   online: boolean;
   recent: VisitRow[];
@@ -863,14 +861,14 @@ export function DaySheet({
       <ul className="list mt-4">
         <li>
           <Cell
-            href="/team/erfolge"
+            href="/team/stufen"
             icon={
-              <ProgressRing value={level.xpInLevel} max={level.xpForNextLevel} size={36} stroke={4}>
-                {level.level}
-              </ProgressRing>
+              <span className="glyph">
+                <IconPyramid className="h-4 w-4" />
+              </span>
             }
-            title={`Level ${level.level} · ${level.title}`}
-            subtitle={`Noch ${level.xpToNextLevel.toLocaleString("de-DE")} XP bis Level ${level.level + 1}`}
+            title="Karriereleiter"
+            subtitle="Was dir bis zum nächsten Rang fehlt"
           />
         </li>
       </ul>

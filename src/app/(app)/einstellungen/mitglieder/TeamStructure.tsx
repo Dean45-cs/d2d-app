@@ -5,6 +5,7 @@ import { IconChevronDown, IconChevronRight } from "@/components/icons";
 import { Avatar, ListLabel, plural } from "@/components/ui";
 import { buildTeamStructure, type StructureMember, type StructureNode } from "@/lib/team-structure";
 import { positionLabel } from "@/lib/tiers";
+import { useRanks } from "@/components/ranks/RanksContext";
 
 /** Einrueckung je Ebene; tiefer als fuenf Ebenen rueckt nichts mehr ein. */
 const STEP = 16;
@@ -30,6 +31,7 @@ export function TeamStructure({
   currentUserId: number;
   onOpen: (id: number) => void;
 }) {
+  const ranks = useRanks();
   const roots = useMemo(() => buildTeamStructure(members), [members]);
   const [collapsed, setCollapsed] = useState<Set<number>>(new Set());
 
@@ -89,7 +91,7 @@ export function TeamStructure({
           const { member, children, descendantCount, rootReason } = node;
           const indent = 16 + Math.min(depth, MAX_DEPTH) * STEP;
           const expanded = !collapsed.has(member.id);
-          const role = positionLabel(member);
+          const role = positionLabel(member, ranks);
           const facts = [
             member.id === currentUserId ? "Du" : null,
             member.active ? role : `${role}, deaktiviert`,

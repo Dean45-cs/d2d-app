@@ -303,7 +303,7 @@ test("der Vertrieb sieht nur eigene Euro-Betraege - nie Admin-Provision oder Sae
   assert.deepEqual([spot.bands[0].now, spot.bands[0].individual, spot.timing], [null, true, "bei Lieferbeginn"]);
 });
 
-test("niemand sieht, was die Ebenen darueber bekommen - und kein Teamleiter ueber seine direkten Leute hinaus", () => {
+test("niemand sieht, was die Ebenen darueber bekommen - Fuehrungskraefte sehen nur ihre eigene Struktur", () => {
   const f = setup();
   // Nach oben und zur Seite: verboten.
   forbidden(() => commissionView(user(f.tom), f.lisa, DAY));
@@ -311,9 +311,9 @@ test("niemand sieht, was die Ebenen darueber bekommen - und kein Teamleiter uebe
   forbidden(() => commissionView(user(f.paul), f.lisa, DAY));
   forbidden(() => commissionView(user(f.lisa), f.paul, DAY));
   forbidden(() => commissionView(user(f.lisa), f.leader, DAY));
-  // Keine weiteren Ebenen: Ole gehoert zu Mias Team, und Mia baut als Teamleiterin ihr eigenes auf.
-  forbidden(() => commissionView(user(f.lisa), f.ole, DAY));
-  forbidden(() => commissionView(user(f.lisa), f.mia, DAY));
+  // Ueber alle Ebenen der eigenen Struktur, aber nicht zur Seite: Mia sieht Tom nicht.
+  assert.equal(commissionView(user(f.lisa), f.ole, DAY).manager, true);
+  assert.equal(commissionView(user(f.lisa), f.mia, DAY).manager, true);
   forbidden(() => commissionView(user(f.mia), f.tom, DAY));
   // Toms eigene Liste nennt nur Toms Betraege.
   const tom = commissionView(user(f.tom), f.tom, DAY);
@@ -321,9 +321,9 @@ test("niemand sieht, was die Ebenen darueber bekommen - und kein Teamleiter uebe
   assert.equal(plain.bands[0].now, 90);
   assert.ok(!numbers(tom).includes(105), "Lisas Betrag steckt in Toms Ansicht");
   assert.ok(!JSON.stringify(tom).includes('"keep"'));
-  // "Meine Leute" zeigt nur die direkten - ohne Saetze.
+  // "Meine Leute" zeigt die eigene Struktur als Baum - ohne Saetze.
   const structure = commissionStructure(user(f.lisa));
-  assert.deepEqual(structure.people.map((p) => p.id), [f.max, f.tom]);
+  assert.deepEqual(structure.people.map((p) => [p.id, p.depth]), [[f.max, 0], [f.mia, 0], [f.ole, 1], [f.tom, 0]]);
   assert.equal(structure.tiers, null);
   assert.ok(structure.people.every((p) => p.percent === null && p.value === null && !p.editable));
   assert.deepEqual(commissionStructure(user(f.mia)).people.map((p) => p.id), [f.ole]);
@@ -334,7 +334,7 @@ test("niemand sieht, was die Ebenen darueber bekommen - und kein Teamleiter uebe
   forbidden(() => commissionView(user(f.tom), f.ole, DAY));
 });
 
-test("Teamleiter sehen ihre direkten Leute und die Differenz, die sie daran bekommen", () => {
+test("Fuehrungskraefte sehen ihre Leute und die Differenz, die sie daran bekommen", () => {
   const f = setup();
   const leader = user(f.leader);
   const plainBand = (viewer: number, subject: number) =>
@@ -345,22 +345,31 @@ test("Teamleiter sehen ihre direkten Leute und die Differenz, die sie daran beko
   assert.deepEqual([plainBand(f.lisa, f.tom).now, plainBand(f.lisa, f.tom).keep], [90, 15]);
   assert.deepEqual([plainBand(f.lisa, f.max).now, plainBand(f.lisa, f.max).keep], [97.5, 7.5]);
   assert.deepEqual([plainBand(f.mia, f.ole).now, plainBand(f.mia, f.ole).keep], [90, 15]);
+  // Zwei Ebenen tief: Mia hat den gleichen Satz wie Lisa - Lisa bekommt an Oles Vertraegen nichts mehr.
+  assert.deepEqual([plainBand(f.lisa, f.ole).keep, plainBand(f.lisa, f.mia).keep], [0, 0]);
   assert.ok(!JSON.stringify(tomFromLisa).includes('"admin":{'));
   assert.ok(!JSON.stringify(tomFromLisa).includes('"cost":'));
   assert.deepEqual(
     commissionStructure(user(f.lisa)).people.map((p) => [p.name, p.tier, p.managerId === f.lisa]),
-    [["Max", "SENIOR", true], ["Tom", "BERATER", true]],
+    [["Max", "SENIOR", true], ["Mia", "TEAMLEITER", false], ["Ole", "BERATER", false], ["Tom", "BERATER", true]],
   );
   // Ein individueller Satz aendert die Differenz - mehr als der Teamleiter selbst ergibt null, nie ein Minus.
   setPersonCommission(leader, f.tom, 68);
   assert.deepEqual([plainBand(f.lisa, f.tom).now, plainBand(f.lisa, f.tom).keep], [102, 3]);
   setPersonCommission(leader, f.tom, 80);
   assert.deepEqual([plainBand(f.lisa, f.tom).now, plainBand(f.lisa, f.tom).keep], [120, 0]);
-  // Wird Tom selbst Teamleiter, faellt die Differenz weg - Lisa sieht seine Liste nicht mehr.
+  // Wird Tom selbst Teamleiter, faellt die Differenz weg.
   setPersonCommission(leader, f.tom, null);
   db.prepare("UPDATE users SET tier = 'TEAMLEITER' WHERE id = ?").run(f.tom);
-  forbidden(() => commissionView(user(f.lisa), f.tom, DAY));
+  assert.equal(plainBand(f.lisa, f.tom).keep, 0);
   assert.equal(plainBand(f.tom, f.tom).now, 105);
+  // In der eigenen Liste steht, was man an Vertraegen der Raenge darunter bekommt.
+  assert.deepEqual(plainBand(f.lisa, f.lisa).team, [
+    { label: "Junior Teamleiter", now: 7.5, follow: 0 },
+    { label: "Senior Berater", now: 7.5, follow: 0 },
+    { label: "Berater", now: 15, follow: 0 },
+  ]);
+  assert.equal(plainBand(f.max, f.max).team, undefined, "ohne Team kein Abschnitt fuers Team");
 });
 
 test("die Geschaeftsfuehrung sieht alles: Admin-Betraege, Kosten je Vertrag und Ansicht als", () => {
@@ -382,7 +391,7 @@ test("die Geschaeftsfuehrung sieht alles: Admin-Betraege, Kosten je Vertrag und 
   assert.deepEqual(as(f.mia), [105, 105, 150]);
   assert.deepEqual(as(f.paul), [90, 90, 150]);
   const structure = commissionStructure(leader);
-  assert.deepEqual(structure.tiers, { BERATER: 60, SENIOR: 65, TEAMLEITER: 70 });
+  assert.deepEqual(structure.tiers, { BERATER: 60, SENIOR: 65, JUNIOR_LEAD: 65, TEAMLEITER: 70 });
   assert.deepEqual(structure.people.map((p) => [p.name, p.depth, p.tier, p.percent, p.managerName, p.editable]), [
     ["Lisa", 0, "TEAMLEITER", 70, null, true],
     ["Max", 1, "SENIOR", 65, "Lisa", true],
@@ -428,21 +437,25 @@ test("individuelle Saetze legt nur die Verwaltung fest - Teamleiter nehmen ihren
   assert.deepEqual([person(f.tom).managerName, person(f.tom).value, person(f.tom).percent], ["Mia", null, 60]);
 });
 
-test("die Saetze der Stufen: nur die Verwaltung, nie unter der Stufe darunter", () => {
+test("die Saetze der Raenge: nur die Verwaltung, nie unter dem Rang darunter", () => {
   const f = setup();
   const leader = user(f.leader);
   forbidden(() => saveCommissionSettings(user(f.lisa), { leadPercent: 90 }));
-  invalid(() => saveCommissionSettings(leader, { seniorPercent: 50 }), /Standardsatz/);
-  invalid(() => saveCommissionSettings(leader, { leadPercent: 62 }), /Senior Berater/);
+  invalid(() => saveCommissionSettings(leader, { seniorPercent: 50 }), /Senior Berater bekommt mindestens so viel wie Berater/);
+  invalid(() => saveCommissionSettings(leader, { leadPercent: 62 }), /Teamleiter bekommt mindestens/);
+  invalid(() => saveCommissionSettings(leader, { juniorPercent: 64 }), /Junior Teamleiter bekommt mindestens so viel wie Senior Berater/);
+  saveCommissionSettings(leader, { juniorPercent: 67 });
+  invalid(() => saveCommissionSettings(leader, { leadPercent: 66 }), /Teamleiter bekommt mindestens so viel wie Junior Teamleiter/);
+  saveCommissionSettings(leader, { juniorPercent: null });
   invalid(() => saveCommissionSettings(leader, { leadPercent: 101 }), /0 und 100/);
   const plain = (id: number) => commissionView(leader, id, DAY).tariffs.find((t) => t.name === "Licht Ökostrom 24")!.bands[0];
   // Steigt der Standardsatz ueber einen alten Stufensatz, zieht die Stufe mit - niemand faellt unter die Stufe darunter.
   saveCommissionSettings(leader, { standardPercent: 68 });
-  assert.deepEqual(commissionStructure(leader).tiers, { BERATER: 68, SENIOR: 68, TEAMLEITER: 70 });
+  assert.deepEqual(commissionStructure(leader).tiers, { BERATER: 68, SENIOR: 68, JUNIOR_LEAD: 68, TEAMLEITER: 70 });
   assert.deepEqual([plain(f.max).now, plain(f.tom).cost?.now], [102, 105]);
   // Ohne eigene Saetze bekommen alle den Standardsatz - dann gibt es auch keine Differenz.
   assert.deepEqual(saveCommissionSettings(leader, { seniorPercent: "", leadPercent: null }).lead_percent, null);
-  assert.deepEqual(commissionStructure(leader).tiers, { BERATER: 68, SENIOR: 68, TEAMLEITER: 68 });
+  assert.deepEqual(commissionStructure(leader).tiers, { BERATER: 68, SENIOR: 68, JUNIOR_LEAD: 68, TEAMLEITER: 68 });
   assert.deepEqual([plain(f.lisa).now, plain(f.tom).now, plain(f.tom).cost?.now], [102, 102, 102]);
 });
 

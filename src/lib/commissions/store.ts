@@ -2,7 +2,8 @@ import { getDb } from "../db";
 import { AuthError } from "../auth";
 import { ValidationError } from "../api";
 import { berlinToday, normalizeDay } from "../contracts";
-import { hasPermission } from "../permissions";
+import { hasPermission, structureIds } from "../permissions";
+import { loadRanks } from "../ranks";
 import type { Tier, User } from "../types";
 import {
   SPARTEN,
@@ -29,8 +30,11 @@ import {
   type RuleScope,
   type Segment,
   type Sparte,
+  TIER_PERCENT_FIELD,
+  tierDifference,
   tierPercents,
 } from "./model";
+import { TIERS, canLeadTeam, rankLabel, tierIndex, type RankSetup } from "../tiers";
 import { isIndividual, tariffKey, type ImportRow } from "./table";
 
 /*
@@ -39,8 +43,8 @@ import { isIndividual, tariffKey, type ImportRow } from "./table";
  *
  *   - Vertrieb: nur die eigenen Euro-Betraege. Keine Admin-Provision, kein
  *     Prozentsatz, nichts von den Ebenen darueber.
- *   - Teamleiter: zusaetzlich ihre direkten Leute und die Differenz, die sie
- *     an deren Vertraegen bekommen. Keine weiteren Ebenen.
+ *   - Raenge mit Team: zusaetzlich die Leute in ihrer Struktur und die
+ *     Differenz, die sie an deren Vertraegen bekommen.
  *   - "Provisionen verwalten" (Geschaeftsfuehrung): alles, auch "Ansicht als".
  *
  * Jede Ansicht wird hier zugeschnitten - was ein Browser nicht sehen darf,
@@ -71,6 +75,7 @@ export interface TeamCommissions {
   people: PersonSetting[];
   bonuses: CommissionBonus[];
   members: CommissionMember[];
+  ranks: RankSetup;
 }
 
 /* -------------------------------- Laden --------------------------------- */
@@ -113,7 +118,7 @@ export function loadTariffs(teamId: number): CommissionTariff[] {
 
 export function loadSettings(teamId: number): CommissionSettings {
   const row = getDb()
-    .prepare("SELECT standard_percent, share_promo, share_follow, senior_percent, lead_percent FROM commission_settings WHERE team_id = ?")
+    .prepare("SELECT standard_percent, share_promo, share_follow, senior_percent, junior_percent, lead_percent FROM commission_settings WHERE team_id = ?")
     .get(teamId) as CommissionSettings | undefined;
   return row ?? { ...DEFAULT_SETTINGS };
 }
@@ -147,6 +152,7 @@ export function loadTeamCommissions(teamId: number): TeamCommissions {
       )
       .all(teamId) as CommissionBonus[],
     members: loadMembers(teamId),
+    ranks: loadRanks(teamId),
   };
 }
 
@@ -162,6 +168,7 @@ export function calculatorFor(data: TeamCommissions, day: string): Calculator {
     people: data.people,
     members: data.members,
     promoActive: promoActiveOn(data.latest, day),
+    ranks: data.ranks,
   });
 }
 
@@ -172,18 +179,20 @@ function assertManage(actor: User): void {
 }
 
 /**
- * Die direkten Leute eines Teamleiters, an deren Vertraegen er die Differenz
- * bekommt - nicht deren Leute und keine anderen Teamleiter (wie Calculator.lead).
+ * Die Leute in der Struktur unter einem Rang mit Team - an deren Vertraegen
+ * er (ueber alle Ebenen) mitverdienen kann. Ohne Team-Rang niemand.
  */
-export function ledIds(viewer: Pick<User, "id" | "team_id" | "role" | "tier" | "active">): number[] {
-  if (!viewer.active || viewer.role !== "MEMBER" || viewer.tier !== "TEAMLEITER") return [];
+export function ledIds(viewer: User, ranks: RankSetup = loadRanks(viewer.team_id)): number[] {
+  if (!viewer.active || viewer.role !== "MEMBER" || !canLeadTeam(viewer, ranks)) return [];
+  const below = structureIds(viewer);
+  if (below.length === 0) return [];
   const rows = getDb()
-    .prepare("SELECT id FROM users WHERE manager_id = ? AND team_id = ? AND role = 'MEMBER' AND tier <> 'TEAMLEITER' AND id <> ?")
-    .all(viewer.id, viewer.team_id, viewer.id) as Array<{ id: number }>;
+    .prepare(`SELECT id FROM users WHERE team_id = ? AND role = 'MEMBER' AND id IN (${below.map(() => "?").join(",")})`)
+    .all(viewer.team_id, ...below) as Array<{ id: number }>;
   return rows.map((row) => row.id);
 }
 
-/** Eigene Liste, die der direkten Leute - oder mit "Provisionen verwalten" jede im Team. */
+/** Eigene Liste, die der Leute in der eigenen Struktur - oder mit "Provisionen verwalten" jede im Team. */
 export function canViewCommissions(viewer: User, subjectId: number): boolean {
   if (!viewer.active) return false;
   if (subjectId === viewer.id) return true;
@@ -202,8 +211,13 @@ export interface ViewBand {
   promo: number;
   follow: number;
   individual: boolean;
-  /** Teamleiter: die Differenz, die er selbst an diesem Vertrag bekommt. */
+  /** Fuehrungskraft schaut auf eine Person ihrer Struktur: was sie selbst an diesem Vertrag bekommt. */
   keep?: number;
+  /**
+   * Eigene Liste eines Rangs mit Team: was man an einem Vertrag eines
+   * niedrigeren Rangs direkt unter sich bekommt - nur im Detailblatt.
+   */
+  team?: Array<{ label: string; now: number; follow: number }>;
   /** Nur mit "Provisionen verwalten". */
   admin?: Payout;
   /** Nur mit "Provisionen verwalten": was der Vertrag kostet - Person plus Differenz fuer den Teamleiter (ohne Boni). */
@@ -253,8 +267,10 @@ export interface CommissionView {
   subject: CommissionViewPerson | null;
   /** Darf die Ansicht Admin-Betraege zeigen? */
   admin: boolean;
-  /** Schaut ein Teamleiter auf eine seiner direkten Personen? */
+  /** Schaut eine Fuehrungskraft auf eine Person in ihrer Struktur? */
   manager: boolean;
+  /** Rang der angezeigten Person (Name aus den Einstellungen) - null bei der Standardliste. */
+  rank: string | null;
   configured: boolean;
   stand: { label: string; validFrom: string; promoUntil: string | null; promoActive: boolean } | null;
   tariffs: ViewTariff[];
@@ -291,8 +307,13 @@ export function commissionView(viewer: User, subjectId: number | null = viewer.i
   // Die Geschaeftsfuehrung (ohne Verwaltungsrecht) hat keine eigene Partnerliste - ihre Provision ist die Admin-Provision.
   if (subject && subject.role === "LEADER" && !admin) throw new AuthError("Keine Berechtigung: Provisionen verwalten.", 403);
 
-  // Teamleiter schaut auf eine direkte Person: er sieht, was er an ihren Vertraegen bekommt.
-  const manager = !admin && subject !== null && calc.lead(subject.id) === viewer.id;
+  // Fuehrungskraft schaut auf eine Person ihrer Struktur: sie sieht, was sie an deren Vertraegen bekommt.
+  const manager = !admin && subject !== null && subject.id !== viewer.id && calc.uplines(subject.id).includes(viewer.id);
+  // Eigene Liste mit Team: was man an Vertraegen der Raenge darunter bekommt.
+  const teamTiers =
+    subject && subject.role === "MEMBER" && canLeadTeam(subject, data.ranks)
+      ? TIERS.slice(0, tierIndex(subject.tier)).reverse()
+      : [];
   const tariffRules = new Map(
     data.rules.filter((rule) => rule.scope === "TARIFF").map((rule) => [rule.scope_value, { id: rule.id, mode: rule.mode, value: rule.value }]),
   );
@@ -311,8 +332,16 @@ export function commissionView(viewer: User, subjectId: number | null = viewer.i
         individual: Boolean(band.individual),
       };
       if (manager && subject) {
-        const extra = calc.override(subject.id, tariff, band);
+        const extra = calc.overrideFor(viewer.id, subject.id, tariff, band);
         if (extra) out.keep = extra.now;
+      }
+      if (own && teamTiers.length > 0) {
+        out.team = teamTiers
+          .map((tier) => {
+            const share = tierDifference(own, calc.atTier(tier, tariff, band));
+            return share ? { label: rankLabel(tier, data.ranks), now: share.now, follow: share.follow } : null;
+          })
+          .filter((entry): entry is { label: string; now: number; follow: number } => entry !== null && (entry.now > 0 || entry.follow > 0));
       }
       if (admin) {
         out.admin = calc.admin(band);
@@ -352,6 +381,7 @@ export function commissionView(viewer: User, subjectId: number | null = viewer.i
     subject: subject ? { id: subject.id, name: subject.name, avatar: subject.avatar } : null,
     admin,
     manager,
+    rank: subject && subject.role === "MEMBER" ? rankLabel(subject.tier, data.ranks) : null,
     configured: calc.configured,
     stand: data.latest
       ? {
@@ -380,7 +410,9 @@ export interface StructurePerson {
   /** Ebene in der Teamansicht (0 = direkt unter der Geschaeftsfuehrung). */
   depth: number;
   tier: Tier;
-  /** Teamleiter direkt darueber, der die Differenz bekommt. */
+  /** Name des Rangs aus den Einstellungen. */
+  rank: string;
+  /** Die erste Fuehrungskraft darueber, die an den Vertraegen mitverdient. */
   managerId: number | null;
   managerName: string | null;
   /** Nur mit "Provisionen verwalten": individueller Satz (null = nach Stufe) und der Satz, der gilt. */
@@ -417,6 +449,7 @@ export function commissionStructure(viewer: User): CommissionStructure {
       active: Boolean(member.active),
       depth,
       tier: setting.tier ?? "BERATER",
+      rank: rankLabel(setting.tier ?? "BERATER", data.ranks),
       managerId: setting.managerId,
       managerName: setting.managerId !== null ? byId.get(setting.managerId)?.name ?? null : null,
       value: admin ? setting.value : null,
@@ -426,8 +459,16 @@ export function commissionStructure(viewer: User): CommissionStructure {
   };
 
   if (!admin) {
-    const led = new Set(ledIds(viewer));
-    for (const member of data.members) if (led.has(member.id)) add(member, 0);
+    const led = new Set(ledIds(viewer, data.ranks));
+    // Eigene Struktur als Baum ab einem selbst.
+    const walkOwn = (parent: number, depth: number) => {
+      for (const member of data.members) {
+        if (member.manager_id !== parent || !led.has(member.id) || people.some((p) => p.id === member.id)) continue;
+        add(member, depth);
+        walkOwn(member.id, depth + 1);
+      }
+    };
+    walkOwn(viewer.id, 0);
     return { admin, configured: calc.configured, tiers: null, people };
   }
 
@@ -479,10 +520,17 @@ function euroValue(value: unknown, field: string): number {
   return Math.round(n * 100) / 100;
 }
 
-/** Standardsatz (Stufe Berater), Saetze fuer Senior Berater und Teamleiter, Weitergabe von Aktions- und Folgeprovision. */
+/** Standardsatz (Rang Berater), Saetze der hoeheren Raenge, Weitergabe von Aktions- und Folgeprovision. */
 export function saveCommissionSettings(
   actor: User,
-  patch: { standardPercent?: unknown; seniorPercent?: unknown; leadPercent?: unknown; sharePromo?: unknown; shareFollow?: unknown },
+  patch: {
+    standardPercent?: unknown;
+    seniorPercent?: unknown;
+    juniorPercent?: unknown;
+    leadPercent?: unknown;
+    sharePromo?: unknown;
+    shareFollow?: unknown;
+  },
 ): CommissionSettings {
   assertManage(actor);
   const current = loadSettings(actor.team_id);
@@ -490,27 +538,45 @@ export function saveCommissionSettings(
   if (patch.standardPercent !== undefined) next.standard_percent = percentValue(patch.standardPercent, "Standardsatz");
   if (patch.sharePromo !== undefined) next.share_promo = patch.sharePromo ? 1 : 0;
   if (patch.shareFollow !== undefined) next.share_follow = patch.shareFollow ? 1 : 0;
-  // Leer: die Stufe bekommt so viel wie die darunter.
+  // Leer: der Rang bekommt so viel wie der darunter.
+  const ranks = loadRanks(actor.team_id);
   const optional = (value: unknown, field: string) => (value === null || value === "" ? null : percentValue(value, field));
-  if (patch.seniorPercent !== undefined) next.senior_percent = optional(patch.seniorPercent, "Satz für Senior Berater");
-  if (patch.leadPercent !== undefined) next.lead_percent = optional(patch.leadPercent, "Satz für Teamleiter");
-  // Geprueft wird nur, was gerade gesetzt wird - steigt spaeter der Standardsatz, zieht tierPercents die Stufen mit.
-  const base = next.standard_percent ?? 0;
-  if (patch.seniorPercent !== undefined && next.senior_percent !== null && next.senior_percent < base) {
-    throw new ValidationError("Ein Senior Berater bekommt mindestens den Standardsatz.");
+  const fields: Array<[unknown, Tier]> = [
+    [patch.seniorPercent, "SENIOR"],
+    [patch.juniorPercent, "JUNIOR_LEAD"],
+    [patch.leadPercent, "TEAMLEITER"],
+  ];
+  for (const [value, tier] of fields) {
+    if (value !== undefined) next[TIER_PERCENT_FIELD[tier]] = optional(value, `Satz für ${rankLabel(tier, ranks)}`);
   }
-  if (patch.leadPercent !== undefined && next.lead_percent !== null && next.lead_percent < Math.max(base, next.senior_percent ?? base)) {
-    throw new ValidationError("Ein Teamleiter bekommt mindestens so viel wie ein Senior Berater.");
+  // Geprueft wird nur, was gerade gesetzt wird - steigt spaeter der Standardsatz, zieht tierPercents die Raenge mit.
+  for (const [value, tier] of fields) {
+    const own = next[TIER_PERCENT_FIELD[tier]];
+    if (value === undefined || own === null) continue;
+    const below = TIERS.slice(0, tierIndex(tier));
+    const floor = Math.max(...below.map((other) => next[TIER_PERCENT_FIELD[other]] ?? 0));
+    if (own < floor) {
+      throw new ValidationError(`${rankLabel(tier, ranks)} bekommt mindestens so viel wie ${rankLabel(below[below.length - 1], ranks)}.`);
+    }
   }
   getDb()
     .prepare(
-      `INSERT INTO commission_settings (team_id, standard_percent, share_promo, share_follow, senior_percent, lead_percent, updated_by, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'))
+      `INSERT INTO commission_settings (team_id, standard_percent, share_promo, share_follow, senior_percent, junior_percent, lead_percent, updated_by, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
        ON CONFLICT(team_id) DO UPDATE SET standard_percent = excluded.standard_percent, share_promo = excluded.share_promo,
-         share_follow = excluded.share_follow, senior_percent = excluded.senior_percent, lead_percent = excluded.lead_percent,
-         updated_by = excluded.updated_by, updated_at = excluded.updated_at`,
+         share_follow = excluded.share_follow, senior_percent = excluded.senior_percent, junior_percent = excluded.junior_percent,
+         lead_percent = excluded.lead_percent, updated_by = excluded.updated_by, updated_at = excluded.updated_at`,
     )
-    .run(actor.team_id, next.standard_percent, next.share_promo, next.share_follow, next.senior_percent, next.lead_percent, actor.id);
+    .run(
+      actor.team_id,
+      next.standard_percent,
+      next.share_promo,
+      next.share_follow,
+      next.senior_percent,
+      next.junior_percent,
+      next.lead_percent,
+      actor.id,
+    );
   return next;
 }
 
@@ -925,6 +991,7 @@ export interface CommissionAdmin {
   providers: string[];
   tariffs: Array<{ id: number; provider: string; name: string; sparte: Sparte }>;
   members: Array<{ id: number; name: string; active: boolean }>;
+  ranks: RankSetup;
 }
 
 /** Alles fuer die Seite "Provisionsregeln" - nur mit "Provisionen verwalten". */
@@ -942,6 +1009,7 @@ export function commissionAdmin(actor: User): CommissionAdmin {
   const names = new Map(data.members.map((member) => [member.id, member.name]));
   const active = data.tariffs.filter((tariff) => tariff.active);
   return {
+    ranks: data.ranks,
     latest: data.latest,
     counts: {
       tariffs: active.length,

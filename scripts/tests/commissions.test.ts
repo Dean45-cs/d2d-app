@@ -13,6 +13,7 @@ import {
   money,
   payoutLabel,
   tariffBonuses,
+  tierDifference,
   type CommissionBand,
   type CommissionBonus,
   type CommissionPerson,
@@ -21,8 +22,9 @@ import {
   type CommissionTariff,
   type PersonSetting,
 } from "../../src/lib/commissions/model";
+import { DEFAULT_RANKS, type RankSetup } from "../../src/lib/tiers";
 
-/* Rechenkern ohne Datenbank: Regeln, Stufen, individuelle Saetze, Differenz fuer Teamleiter, Boni. */
+/* Rechenkern ohne Datenbank: Regeln, Raenge, individuelle Saetze, Differenz ueber alle Ebenen, Boni. */
 
 const band = (base: number, promo = 0, follow = 0, from = 1, to = 100000): CommissionBand => ({
   kwh_from: from, kwh_to: to, base_eur: base, promo_eur: promo, follow_eur: follow, individual: 0,
@@ -49,13 +51,16 @@ const members: CommissionPerson[] = [
 const LEADER = 1, LISA = 2, TOM = 3, MAX = 4, PAUL = 5, MIA = 6, OLE = 7;
 /** Die Saetze der Praesentation: Berater 65 %, Senior Berater 70 %, Teamleiter 75 %. */
 const tiered = (patch: Partial<CommissionSettings> = {}) => settings({ standard_percent: 65, senior_percent: 70, lead_percent: 75, ...patch });
-const calc = (opts: { settings?: CommissionSettings; rules?: CommissionRule[]; people?: PersonSetting[]; members?: CommissionPerson[]; promoActive?: boolean } = {}) =>
+const calc = (
+  opts: { settings?: CommissionSettings; rules?: CommissionRule[]; people?: PersonSetting[]; members?: CommissionPerson[]; promoActive?: boolean; ranks?: RankSetup } = {},
+) =>
   createCalculator({
     settings: opts.settings ?? settings(),
     rules: opts.rules ?? [],
     people: opts.people ?? [],
     members: opts.members ?? members,
     promoActive: opts.promoActive ?? true,
+    ranks: opts.ranks,
   });
 
 test("Betraege werden kaufmaennisch auf Cent gerundet", () => {
@@ -126,7 +131,7 @@ test("Stufen: Berater, Senior Berater und Teamleiter bekommen ihren Satz - egal,
   const t = tariff(6, "Lichtwerk", "Licht Ökostrom 24", [band(184.62, 0, 40)]);
   const [b] = t.bands;
   const c = calc({ settings: tiered() });
-  assert.deepEqual(c.tiers, { BERATER: 65, SENIOR: 70, TEAMLEITER: 75 });
+  assert.deepEqual(c.tiers, { BERATER: 65, SENIOR: 70, JUNIOR_LEAD: 70, TEAMLEITER: 75 });
   assert.equal(c.person(PAUL, t, b)!.now, 120);
   assert.equal(c.person(TOM, t, b)!.now, 120, "ein Berater im Team eines Teamleiters behaelt seine 65 %");
   assert.equal(c.person(MAX, t, b)!.now, 129.23);
@@ -138,45 +143,85 @@ test("Stufen: Berater, Senior Berater und Teamleiter bekommen ihren Satz - egal,
   assert.deepEqual([gas.person(TOM, t, b)!.now, gas.person(LISA, t, b)!.now], [92.31, 110.77]);
   assert.deepEqual(c.setting(MAX), { kind: "TIER", tier: "SENIOR", value: null, percent: 70, managerId: LISA });
   assert.deepEqual(c.setting(LEADER), { kind: "ADMIN", tier: null, value: null, percent: null, managerId: null });
-  // Ohne eigenen Satz bekommt eine Stufe so viel wie die darunter - nie weniger.
-  assert.deepEqual(calc().tiers, { BERATER: 60, SENIOR: 60, TEAMLEITER: 60 });
-  assert.deepEqual(calc({ settings: tiered({ senior_percent: null }) }).tiers, { BERATER: 65, SENIOR: 65, TEAMLEITER: 75 });
-  assert.deepEqual(calc({ settings: tiered({ standard_percent: 72 }) }).tiers, { BERATER: 72, SENIOR: 72, TEAMLEITER: 75 });
+  // Ohne eigenen Satz bekommt ein Rang so viel wie der darunter - nie weniger.
+  assert.deepEqual(calc().tiers, { BERATER: 60, SENIOR: 60, JUNIOR_LEAD: 60, TEAMLEITER: 60 });
+  assert.deepEqual(calc({ settings: tiered({ senior_percent: null }) }).tiers, { BERATER: 65, SENIOR: 65, JUNIOR_LEAD: 65, TEAMLEITER: 75 });
+  assert.deepEqual(calc({ settings: tiered({ standard_percent: 72 }) }).tiers, { BERATER: 72, SENIOR: 72, JUNIOR_LEAD: 72, TEAMLEITER: 75 });
+  assert.deepEqual(calc({ settings: tiered({ junior_percent: 72 }) }).tiers, { BERATER: 65, SENIOR: 70, JUNIOR_LEAD: 72, TEAMLEITER: 75 });
+  assert.deepEqual(calc({ settings: tiered({ junior_percent: 80 }) }).tiers, { BERATER: 65, SENIOR: 70, JUNIOR_LEAD: 80, TEAMLEITER: 80 });
   assert.equal(calc({ settings: DEFAULT_SETTINGS }).tiers, null);
 });
 
-test("ein Teamleiter bekommt die Differenz nur von seinen direkten Leuten - keine weiteren Ebenen", () => {
+test("die Differenz geht ueber alle Ebenen nach oben - nie mehr als der Satz der obersten Person", () => {
   const t = tariff(7, "Lichtwerk", "Licht Ökostrom 24", [band(184.62, 0, 40)]);
   const [b] = t.bands;
   const c = calc({ settings: tiered() });
   // 75 % - 65 % = 10 %: rund 18,46 € je Vertrag eines Beraters, beim Senior Berater 5 %.
-  assert.deepEqual([c.lead(TOM), c.override(TOM, t, b)], [LISA, { now: 18.47, promo: 0, follow: 4 }]);
-  assert.deepEqual([c.lead(MAX), c.override(MAX, t, b)!.now], [LISA, 9.24]);
-  // Wer selbst Teamleiter ist, baut sein eigenes Team auf: die Differenz faellt weg.
-  assert.deepEqual([c.lead(MIA), c.override(MIA, t, b)], [null, null]);
-  // Ole gehoert zu Mia - Lisa bekommt von seinen Vertraegen nichts.
-  assert.deepEqual([c.lead(OLE), c.override(OLE, t, b)!.now], [MIA, 18.47]);
+  assert.deepEqual(c.overrides(TOM, t, b), [{ userId: LISA, payout: { now: 18.47, promo: 0, follow: 4 } }]);
+  assert.deepEqual([c.uplines(MAX), c.overrideFor(LISA, MAX, t, b)!.now], [[LISA], 9.24]);
+  // Teamleiterin unter Teamleiterin: gleicher Satz, die obere bekommt nichts.
+  assert.deepEqual([c.uplines(MIA), c.overrides(MIA, t, b), c.overrideFor(LISA, MIA, t, b)!.now], [[LISA], [], 0]);
+  // Ole -> Mia -> Lisa: Mia bekommt die Differenz, Lisa nichts mehr (gleicher Satz wie Mia).
+  assert.deepEqual(c.uplines(OLE), [MIA, LISA]);
+  assert.deepEqual(c.overrides(OLE, t, b).map((entry) => [entry.userId, entry.payout.now]), [[MIA, 18.47]]);
   // Direkt unter der Geschaeftsfuehrung verdient niemand mit.
-  assert.deepEqual([c.lead(PAUL), c.override(PAUL, t, b), c.lead(LISA), c.lead(LEADER)], [null, null, null, null]);
-  // Dem Berater wird nichts abgezogen: der Vertrag kostet seinen Betrag plus die Differenz.
+  assert.deepEqual([c.uplines(PAUL), c.overrides(PAUL, t, b), c.uplines(LISA), c.uplines(LEADER)], [[], [], [], []]);
+  assert.equal(c.setting(PAUL).managerId, null);
+  // Dem Berater wird nichts abgezogen: der Vertrag kostet seinen Betrag plus die Differenzen.
   assert.equal(c.cost(TOM, t, b)!.now, 138.47);
   assert.equal(c.cost(OLE, t, b)!.now, 138.47, "auch zwei Ebenen tief kostet ein Vertrag nie mehr als 75 %");
   assert.equal(c.cost(PAUL, t, b)!.now, 120);
   assert.equal(c.cost(MIA, t, b)!.now, 138.47);
   assert.deepEqual(c.cost(LEADER, t, b), { now: 0, promo: 0, follow: 0 });
 
-  // Nur Teamleiter haben ein Team: steht jemand unter einem Berater, bekommt der nichts.
+  // Ohne Team-Rang bekommt man nichts: steht jemand unter einem Berater, rechnet der Teamleiter darueber.
   const loose = members.map((m) => (m.id === OLE ? { ...m, manager_id: TOM } : m));
-  assert.deepEqual([calc({ settings: tiered(), members: loose }).lead(OLE), calc({ settings: tiered(), members: loose }).override(OLE, t, b)], [null, null]);
+  assert.deepEqual(calc({ settings: tiered(), members: loose }).overrides(OLE, t, b).map((entry) => entry.userId), [LISA]);
   // Ein deaktivierter Teamleiter bekommt keine Differenz mehr.
   const gone = members.map((m) => (m.id === LISA ? { ...m, active: 0 } : m));
-  assert.equal(calc({ settings: tiered(), members: gone }).lead(TOM), null);
+  assert.deepEqual(calc({ settings: tiered(), members: gone }).uplines(TOM), []);
   // Ein individueller Satz ueber dem des Teamleiters: die Differenz ist null, nie negativ.
   const high = calc({ settings: tiered(), people: [{ user_id: TOM, kind: "RATE", value: 80, manager_id: LISA }] });
-  assert.deepEqual([high.person(TOM, t, b)!.now, high.override(TOM, t, b)!.now], [147.7, 0]);
+  assert.deepEqual([high.person(TOM, t, b)!.now, high.overrides(TOM, t, b), high.overrideFor(LISA, TOM, t, b)!.now], [147.7, [], 0]);
   // Die Aktionsprovision teilt sich wie der Betrag.
   const promo = tariff(8, "Ostwerk", "Ost Strom 24", [band(100, 40)]);
-  assert.deepEqual(c.override(TOM, promo, promo.bands[0]), { now: 14, promo: 4, follow: 0 });
+  assert.deepEqual(c.overrideFor(LISA, TOM, promo, promo.bands[0]), { now: 14, promo: 4, follow: 0 });
+});
+
+test("das Beispiel aus der Absprache: 100 € Vertrag, Berater -> Senior mit Team -> Teamleiter", () => {
+  // Berater 60 %, Senior 65 %, Junior Teamleiter 70 %, Teamleiter 75 %.
+  const four = settings({ standard_percent: 60, senior_percent: 65, junior_percent: 70, lead_percent: 75 });
+  const t = tariff(20, "Lichtwerk", "Licht 24", [band(100)]);
+  const [b] = t.bands;
+  // Hier darf auch der Senior ein Team haben: Max (Berater) -> Lisa (Senior) -> Tom (Teamleiter).
+  const ranks: RankSetup = { ...DEFAULT_RANKS, SENIOR: { label: "Senior Berater", team: true } };
+  const chain: CommissionPerson[] = [
+    { id: 1, manager_id: null, role: "LEADER", tier: "BERATER" },
+    { id: 30, manager_id: 1, role: "MEMBER", tier: "TEAMLEITER" },
+    { id: 31, manager_id: 30, role: "MEMBER", tier: "SENIOR" },
+    { id: 32, manager_id: 31, role: "MEMBER", tier: "BERATER" },
+  ];
+  const c = calc({ settings: four, members: chain, ranks });
+  assert.equal(c.person(32, t, b)!.now, 60);
+  assert.deepEqual(c.overrides(32, t, b).map((entry) => [entry.userId, entry.payout.now]), [[31, 5], [30, 10]]);
+  assert.equal(c.cost(32, t, b)!.now, 75);
+  // Ohne Lisa dazwischen bekommt Tom 75 - 60 = 15 €.
+  const direct = chain.map((m) => (m.id === 32 ? { ...m, manager_id: 30 } : m));
+  assert.deepEqual(calc({ settings: four, members: direct, ranks }).overrides(32, t, b).map((entry) => entry.payout.now), [15]);
+  // Mit den Raengen ab Werk hat der Senior kein Team: Tom bekommt die ganzen 15 €.
+  const plain = calc({ settings: four, members: chain });
+  assert.deepEqual(plain.overrides(32, t, b).map((entry) => [entry.userId, entry.payout.now]), [[30, 15]]);
+  // Junior Teamleiter dazwischen: Ben (Berater) -> Jana (Junior TL) -> Tom.
+  const junior = chain.map((m) => (m.id === 31 ? { ...m, tier: "JUNIOR_LEAD" as const } : m));
+  const j = calc({ settings: four, members: junior });
+  assert.deepEqual(j.overrides(32, t, b).map((entry) => [entry.userId, entry.payout.now]), [[31, 10], [30, 5]]);
+  // Verkauft Jana selbst: Tom bekommt 5 €.
+  assert.deepEqual(j.overrides(31, t, b).map((entry) => [entry.userId, entry.payout.now]), [[30, 5]]);
+  // Jana deaktiviert: Tom rechnet ab Bens Betrag.
+  const away = junior.map((m) => (m.id === 31 ? { ...m, active: 0 } : m));
+  assert.deepEqual(calc({ settings: four, members: away }).overrides(32, t, b).map((entry) => [entry.userId, entry.payout.now]), [[30, 15]]);
+  // Was ein Rang mit Team an einem Rang darunter bekommt - fuer das Detailblatt.
+  assert.deepEqual(tierDifference(j.atTier("TEAMLEITER", t, b), j.atTier("BERATER", t, b)), { now: 15, promo: 0, follow: 0 });
 });
 
 test("ein individueller Satz gilt nur bei derselben Fuehrungskraft - alte Anteile zaehlen nicht mehr", () => {
@@ -214,7 +259,7 @@ test("ein Kreis in der Struktur haengt die Rechnung nicht auf", () => {
   ];
   const t = tariff(10, "Lichtwerk", "Licht Ökostrom 24", [band(100)]);
   const c = calc({ settings: tiered(), members: loop });
-  assert.deepEqual([c.lead(10), c.lead(11), c.lead(12), c.lead(13)], [11, null, null, null]);
+  assert.deepEqual([c.uplines(10), c.uplines(11), c.uplines(12), c.uplines(13)], [[11], [], [], []]);
   assert.deepEqual([c.person(10, t, t.bands[0])!.now, c.cost(10, t, t.bands[0])!.now, c.cost(13, t, t.bands[0])!.now], [65, 75, 65]);
 });
 

@@ -1,15 +1,11 @@
 "use client";
 
-import { useSyncExternalStore } from "react";
-import { IconChat, IconCheckCircle, IconDoor, IconSparkles, IconTrophy } from "@/components/icons";
+import { IconChat, IconCheckCircle, IconDoor } from "@/components/icons";
 import { ListLabel, PageHeader } from "@/components/ui";
-import { GoalStepper, PrefSwitch, SettingIcon, SwitchRow } from "@/components/settings/controls";
-import { onXpHintsChange, setXpHints, xpHintsOn } from "@/lib/level-feedback";
+import { GoalStepper, SettingIcon } from "@/components/settings/controls";
 
-/** Tagesziele fuer die Ringe und was nach einem Besuch gemeldet wird. */
+/** Tagesziele fuer die Ringe. Die Ziele fuer den naechsten Rang stellt die Geschaeftsfuehrung unter Raenge ein. */
 export function GoalSettings() {
-  const xpHints = useSyncExternalStore(onXpHintsChange, xpHintsOn, () => true);
-
   return (
     <div className="page-narrow">
       <PageHeader title="Ziele & Erfolge" back={{ href: "/einstellungen", label: "Einstellungen" }} />
@@ -36,25 +32,8 @@ export function GoalSettings() {
         />
       </ul>
       <p className="list-footer">
-        Für die Ringe unter „Erfolge“ und den Ring beim Klinken. XP gibt es weiter nur für die Besuche selbst.
+        Für die Ringe unter „Erfolge“ und den Ring beim Klinken. Was für den nächsten Rang fehlt, steht unter Team › Karriere.
       </p>
-
-      <ListLabel>Nach einem Besuch</ListLabel>
-      <ul className="list list-icons">
-        <SwitchRow
-          title="XP-Hinweise"
-          subtitle="„+100 XP“ in der Meldung nach einem Besuch"
-          icon={<SettingIcon tone="brown"><IconSparkles /></SettingIcon>}
-          checked={xpHints}
-          onChange={setXpHints}
-        />
-        <PrefSwitch
-          name="levelUp"
-          title="Level-Aufstieg melden"
-          subtitle="Eigene Meldung mit dem neuen Titel, wenn ein Level erreicht ist"
-          icon={<SettingIcon tone="purple"><IconTrophy /></SettingIcon>}
-        />
-      </ul>
     </div>
   );
 }

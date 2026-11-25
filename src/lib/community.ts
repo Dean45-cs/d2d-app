@@ -26,6 +26,8 @@ export interface PersonRef {
   name: string;
   avatar: string;
   role: Role;
+  /** Rang im Vertrieb - im Feed klein unter dem Namen. */
+  tier?: Tier;
 }
 
 export interface Profile extends PersonRef {
@@ -199,11 +201,13 @@ export interface SaleInfo {
 
 export interface FeedPost {
   id: number;
-  kind: "TEXT" | "SALE";
+  kind: "TEXT" | "SALE" | "RANK";
   body: string;
   created_at: string;
   user: PersonRef;
   sale: SaleInfo | null;
+  /** Befoerderung: der neue Rang und wer befoerdert hat. */
+  rank: { tier: Tier; by: string | null } | null;
   like_count: number;
   comment_count: number;
   liked: boolean;
@@ -224,13 +228,16 @@ export type FeedScope =
 
 interface PostRow {
   id: number;
-  kind: "TEXT" | "SALE";
+  kind: "TEXT" | "SALE" | "RANK";
   body: string;
   created_at: string;
   user_id: number;
   user_name: string;
   user_avatar: string;
   user_role: Role;
+  user_tier: Tier;
+  rank_tier: Tier | null;
+  rank_by_name: string | null;
   energy_type: string | null;
   territory_name: string | null;
   territory_city: string | null;
@@ -242,7 +249,8 @@ interface PostRow {
 
 const POST_SQL = `
   SELECT p.id, p.kind, p.body, p.created_at, p.user_id,
-         u.name AS user_name, avatar_src(u.id, u.avatar) AS user_avatar, u.role AS user_role,
+         u.name AS user_name, avatar_src(u.id, u.avatar) AS user_avatar, u.role AS user_role, u.tier AS user_tier,
+         p.rank_tier, rb.name AS rank_by_name,
          v.energy_type, t.name AS territory_name, t.city AS territory_city,
          CASE WHEN p.visit_id IS NULL THEN NULL ELSE
            (SELECT COUNT(*) FROM visits v2
@@ -254,6 +262,7 @@ const POST_SQL = `
                   WHERE l.post_id = p.id AND l.user_id = ?)            AS liked
     FROM posts p
     JOIN users u ON u.id = p.user_id
+    LEFT JOIN users rb ON rb.id = p.rank_by
     LEFT JOIN visits v ON v.id = p.visit_id
     LEFT JOIN territories t ON t.id = v.territory_id
 `;
@@ -330,7 +339,7 @@ function withComments(rows: PostRow[], preview: number | null): FeedPost[] {
     kind: row.kind,
     body: row.body,
     created_at: row.created_at,
-    user: { id: row.user_id, name: row.user_name, avatar: row.user_avatar, role: row.user_role },
+    user: { id: row.user_id, name: row.user_name, avatar: row.user_avatar, role: row.user_role, tier: row.user_tier },
     sale:
       row.kind === "SALE"
         ? {
@@ -340,6 +349,7 @@ function withComments(rows: PostRow[], preview: number | null): FeedPost[] {
             number: row.sale_number ?? 0,
           }
         : null,
+    rank: row.kind === "RANK" && row.rank_tier ? { tier: row.rank_tier, by: row.rank_by_name } : null,
     like_count: row.like_count,
     comment_count: row.comment_count,
     liked: Boolean(row.liked),
@@ -361,11 +371,11 @@ export function deletePost(postId: number): void {
 export function requireTeamPost(
   postId: number,
   teamId: number,
-): { id: number; user_id: number; kind: "TEXT" | "SALE"; visit_id: number | null } {
+): { id: number; user_id: number; kind: "TEXT" | "SALE" | "RANK"; visit_id: number | null } {
   const row = getDb()
     .prepare("SELECT id, user_id, kind, visit_id FROM posts WHERE id = ? AND team_id = ?")
     .get(postId, teamId) as
-    | { id: number; user_id: number; kind: "TEXT" | "SALE"; visit_id: number | null }
+    | { id: number; user_id: number; kind: "TEXT" | "SALE" | "RANK"; visit_id: number | null }
     | undefined;
   if (!row) throw new Error("Beitrag nicht gefunden.");
   return row;
@@ -412,11 +422,12 @@ interface CommentRow {
   user_name: string;
   user_avatar: string;
   user_role: Role;
+  user_tier: Tier;
 }
 
 const COMMENT_SQL = `
   SELECT c.id, c.post_id, c.body, c.created_at, c.user_id,
-         u.name AS user_name, avatar_src(u.id, u.avatar) AS user_avatar, u.role AS user_role
+         u.name AS user_name, avatar_src(u.id, u.avatar) AS user_avatar, u.role AS user_role, u.tier AS user_tier
     FROM post_comments c
     JOIN users u ON u.id = c.user_id
 `;
@@ -427,7 +438,7 @@ function toComment(row: CommentRow): FeedComment {
     post_id: row.post_id,
     body: row.body,
     created_at: row.created_at,
-    user: { id: row.user_id, name: row.user_name, avatar: row.user_avatar, role: row.user_role },
+    user: { id: row.user_id, name: row.user_name, avatar: row.user_avatar, role: row.user_role, tier: row.user_tier },
   };
 }
 
@@ -471,6 +482,8 @@ export interface PersonTotals {
   user_name: string;
   avatar: string;
   role: Role;
+  /** Rang im Vertrieb - steht klein unter dem Namen. */
+  tier?: Tier;
   doors: number;
   met: number;
   sales: number;
@@ -498,7 +511,7 @@ export function teamTotals(
   params.push(teamId);
   return getDb()
     .prepare(
-      `SELECT u.id AS user_id, u.name AS user_name, avatar_src(u.id, u.avatar) AS avatar, u.role,
+      `SELECT u.id AS user_id, u.name AS user_name, avatar_src(u.id, u.avatar) AS avatar, u.role, u.tier,
               COUNT(v.id) AS doors,
               COALESCE(SUM(v.outcome IN ('MET_NO_SALE','APPOINTMENT','SALE')), 0) AS met,
               COALESCE(SUM(v.outcome = 'SALE'), 0)        AS sales,

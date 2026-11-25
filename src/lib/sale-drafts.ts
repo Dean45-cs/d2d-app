@@ -19,7 +19,7 @@ export function listSaleDrafts(user: User): SaleDraft[] {
     .all(user.team_id, user.id) as SaleDraft[];
 }
 
-/** A draft never creates a visit, XP or a feed post. Its address is immutable. */
+/** A draft never creates a visit or a feed post. Its address is immutable. */
 export function changeSaleDraft(user: User, body: Record<string, unknown>) {
   const key = parseVisitRequestId(body.draftKey);
   if (!key) throw new Error("Auftrags-ID fehlt.");

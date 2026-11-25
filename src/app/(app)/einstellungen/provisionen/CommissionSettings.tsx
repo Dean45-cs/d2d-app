@@ -6,9 +6,9 @@ import { Sheet } from "@/components/Sheet";
 import { useToast } from "@/components/Toast";
 import { useConfirm } from "@/components/useConfirm";
 import { Cell, InlineError, ListLabel, PageHeader, Pill, Segmented, Switch, ToneTile, plural } from "@/components/ui";
-import { IconCloudUp, IconEuro, IconList, IconPlus, IconSparkles, IconUsers } from "@/components/icons";
+import { IconCloudUp, IconEuro, IconList, IconPlus, IconPyramid, IconSparkles, IconUsers } from "@/components/icons";
 import { money, percentLabel, SPARTE_LABEL, SPARTEN, tierPercents, type BonusScope, type RuleMode, type RuleScope, type Sparte } from "@/lib/commissions/model";
-import { TIER_LABEL } from "@/lib/tiers";
+import { TIERS } from "@/lib/tiers";
 import type { AdminBonus, AdminRule, CommissionAdmin } from "@/lib/commissions/store";
 import { parseInput, send, shortDay } from "../../provisionen/client";
 import { ImportSheet } from "./ImportSheet";
@@ -16,7 +16,6 @@ import { ImportSheet } from "./ImportSheet";
 type Open =
   | { kind: "import" }
   | { kind: "standard" }
-  | { kind: "tier"; tier: "SENIOR" | "TEAMLEITER" }
   | { kind: "rule"; rule: AdminRule | null }
   | { kind: "bonus"; bonus: AdminBonus | null };
 
@@ -35,9 +34,9 @@ function period(from: string | null, to: string | null): string | null {
 }
 
 /**
- * Provisionsregeln: die Liste vom Portal, der Standardsatz (Stufe Berater)
- * und die Saetze der hoeheren Stufen, Ausnahmen je Sparte, Anbieter oder
- * Tarif und die Boni. Wer welche Stufe hat, steht unter Provisionen › Personen.
+ * Provisionsregeln: die Liste vom Portal, der Standardsatz (Rang Berater),
+ * Ausnahmen je Sparte, Anbieter oder Tarif und die Boni. Die Saetze der
+ * hoeheren Raenge stehen unter Einstellungen › Raenge.
  */
 export function CommissionSettings({ data, today, openImport }: { data: CommissionAdmin; today: string; openImport: boolean }) {
   const router = useRouter();
@@ -45,12 +44,6 @@ export function CommissionSettings({ data, today, openImport }: { data: Commissi
   const [open, setOpen] = useState<Open | null>(openImport ? { kind: "import" } : null);
   const { settings, latest, counts } = data;
   const tiers = tierPercents(settings);
-  // Was eine Stufe mehr bringt als die darunter - "wie Berater", solange nichts festgelegt ist.
-  const tierDetail = (tier: "SENIOR" | "TEAMLEITER") => {
-    const stored = tier === "SENIOR" ? settings.senior_percent : settings.lead_percent;
-    if (stored === null || tiers === null) return tier === "SENIOR" ? "wie Berater" : "wie Senior Berater";
-    return percentLabel(tiers[tier]);
-  };
 
   async function patchSettings(body: Record<string, unknown>, done: string) {
     const result = await send("/api/commissions/settings", "PATCH", body);
@@ -126,7 +119,7 @@ export function CommissionSettings({ data, today, openImport }: { data: Commissi
               <Cell
                 onClick={() => setOpen({ kind: "standard" })}
                 title="Standardsatz"
-                subtitle="Stufe Berater – Anteil der Admin-Provision"
+                subtitle={`Rang ${data.ranks.BERATER.label} – Anteil der Admin-Provision`}
                 detail={settings.standard_percent === null ? "nicht festgelegt" : percentLabel(settings.standard_percent)}
                 tone={settings.standard_percent === null ? "accent" : undefined}
                 chevron
@@ -163,31 +156,26 @@ export function CommissionSettings({ data, today, openImport }: { data: Commissi
         </section>
 
         <section>
-          <ListLabel>Stufen</ListLabel>
-          <ul className="list">
+          <ListLabel>Ränge</ListLabel>
+          <ul className="list list-icons">
             <li>
               <Cell
-                onClick={() => setOpen({ kind: "tier", tier: "SENIOR" })}
-                title={TIER_LABEL.SENIOR}
-                subtitle="Satz nach dem ersten Aufstieg"
-                detail={tierDetail("SENIOR")}
-                chevron
-              />
-            </li>
-            <li>
-              <Cell
-                onClick={() => setOpen({ kind: "tier", tier: "TEAMLEITER" })}
-                title={TIER_LABEL.TEAMLEITER}
-                subtitle="Darf ein eigenes Team aufbauen"
-                detail={tierDetail("TEAMLEITER")}
-                chevron
+                href="/einstellungen/raenge"
+                icon={<ToneTile tone="indigo"><IconPyramid className="h-4 w-4" /></ToneTile>}
+                title="Sätze, Team und Ziele je Rang"
+                subtitle={
+                  tiers
+                    ? TIERS.map((tier) => `${data.ranks[tier].label} ${percentLabel(tiers[tier])}`).join(" · ")
+                    : "Erst den Standardsatz festlegen"
+                }
+                wrap
               />
             </li>
           </ul>
           <p className="list-footer">
-            Eine höhere Stufe bringt auf jeden Tarif dieselben Prozentpunkte mehr, auch bei Ausnahmen. Ein Teamleiter bekommt außerdem
-            von jedem Vertrag seiner direkten Leute die Differenz zu deren Betrag – die zahlst du aus deiner Marge, den Leuten wird
-            nichts abgezogen. Weitere Ebenen gibt es nicht.
+            Ein höherer Rang bringt auf jeden Tarif dieselben Prozentpunkte mehr, auch bei Ausnahmen. Ränge mit Team bekommen an
+            jedem Vertrag ihrer Leute die Differenz zum höchsten Satz darunter, über alle Ebenen – die zahlst du aus deiner Marge,
+            den Leuten wird nichts abgezogen.
           </p>
         </section>
 
@@ -271,8 +259,8 @@ export function CommissionSettings({ data, today, openImport }: { data: Commissi
               <Cell
                 href="/provisionen/struktur"
                 icon={<ToneTile tone="indigo"><IconUsers className="h-4 w-4" /></ToneTile>}
-                title="Stufen und individuelle Sätze"
-                subtitle="Wer welche Stufe hat und was sie bekommt"
+                title="Ränge und individuelle Sätze"
+                subtitle="Wer welchen Rang hat und was er bekommt"
               />
             </li>
           </ul>
@@ -283,32 +271,10 @@ export function CommissionSettings({ data, today, openImport }: { data: Commissi
       {open?.kind === "standard" && (
         <PercentSheet
           title="Standardsatz"
-          hint="So viel Prozent der Admin-Provision bekommt ein Berater – die Stufe, mit der alle starten."
+          hint={`So viel Prozent der Admin-Provision bekommt ${data.ranks.BERATER.label} – der Rang, mit dem alle starten.`}
           value={settings.standard_percent}
           onClose={() => setOpen(null)}
           onSave={(value) => patchSettings({ standardPercent: value }, `Standardsatz ${value === null ? "" : percentLabel(value)}`)}
-        />
-      )}
-      {open?.kind === "tier" && (
-        <PercentSheet
-          // Neu gemountet je Stufe: das Feld startet mit deren Wert.
-          key={open.tier}
-          title={TIER_LABEL[open.tier]}
-          hint={
-            open.tier === "SENIOR"
-              ? "So viel Prozent der Admin-Provision bekommt ein Senior Berater. Leer: wie ein Berater."
-              : "So viel Prozent der Admin-Provision bekommt ein Teamleiter – und von den Verträgen seiner direkten Leute die Differenz zu deren Betrag. Leer: wie ein Senior Berater."
-          }
-          value={open.tier === "SENIOR" ? settings.senior_percent : settings.lead_percent}
-          optional
-          placeholder={open.tier === "SENIOR" ? "wie Berater" : "wie Senior Berater"}
-          onClose={() => setOpen(null)}
-          onSave={(value) =>
-            patchSettings(
-              open.tier === "SENIOR" ? { seniorPercent: value } : { leadPercent: value },
-              value === null ? `${TIER_LABEL[open.tier]}: kein eigener Satz` : `${TIER_LABEL[open.tier]} ${percentLabel(value)}`,
-            )
-          }
         />
       )}
       {open?.kind === "rule" && <RuleSheet key={open.rule?.id ?? "neu"} rule={open.rule} data={data} onClose={() => setOpen(null)} />}

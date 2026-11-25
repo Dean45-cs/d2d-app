@@ -1,4 +1,5 @@
 import type { Role, Tier } from "../types";
+import { DEFAULT_RANKS, TIERS, type RankSetup } from "../tiers";
 
 /*
  * Provisionen - der Rechenkern, ohne Datenbank (laeuft auch im Browser).
@@ -10,14 +11,16 @@ import type { Role, Tier } from "../types";
  *   1. Ein Standardsatz fuer alle (z. B. 60 %), Ausnahmen je Sparte, Anbieter
  *      oder Tarif - ein anderer Satz oder ein fester Betrag. Die genauere
  *      Regel gewinnt: Tarif vor Anbieter vor Sparte vor Standard.
- *   2. Jede Person hat eine Stufe: Berater (der Standardsatz), Senior
- *      Berater, Teamleiter. Eine hoehere Stufe verschiebt die ganze Liste um
- *      dieselben Prozentpunkte: 70 % statt 65 % sind ueberall 5 Punkte mehr,
- *      auch bei Ausnahmen. Ein individueller Satz ersetzt die Stufe.
- *   3. Ein Teamleiter bekommt von jedem Vertrag seiner direkten Leute die
- *      Differenz zwischen seinem und ihrem Betrag. Die zahlt die Firma - der
- *      Person wird nichts weggenommen. Nur direkte Leute, keine weiteren
- *      Ebenen; wird jemand selbst Teamleiter, faellt die Differenz weg.
+ *   2. Jede Person hat einen Rang: Berater (der Standardsatz), Senior
+ *      Berater, Junior Teamleiter, Teamleiter. Ein hoeherer Rang verschiebt
+ *      die ganze Liste um dieselben Prozentpunkte: 70 % statt 65 % sind
+ *      ueberall 5 Punkte mehr, auch bei Ausnahmen. Ein individueller Satz
+ *      ersetzt den Rang.
+ *   3. Die Differenz geht ueber alle Ebenen nach oben: Jede Fuehrungskraft
+ *      mit Team-Rang bekommt an einem Vertrag den Unterschied zwischen ihrem
+ *      Betrag und dem hoechsten Betrag unter ihr in der Kette. Die Firma zahlt
+ *      so nie mehr als den Satz der obersten Person - und dem Verkaeufer wird
+ *      nichts weggenommen. Gleicher Rang darueber bekommt nichts.
  *
  * Boni kommen obendrauf, gehen an den, der verkauft, und bezahlt sie die
  * Geschaeftsfuehrung. Wer was sehen darf, entscheidet der Server (store.ts) - hier
@@ -71,8 +74,9 @@ export interface CommissionSettings {
   /** Aktions- und Folgeprovision anteilig weitergeben (1) oder behalten (0). */
   share_promo: number;
   share_follow: number;
-  /** Satz ab Senior Berater bzw. Teamleiter; null: wie die Stufe darunter. */
+  /** Satz ab Senior Berater, Junior Teamleiter bzw. Teamleiter; null: wie der Rang darunter. */
   senior_percent: number | null;
+  junior_percent: number | null;
   lead_percent: number | null;
 }
 
@@ -81,19 +85,33 @@ export const DEFAULT_SETTINGS: CommissionSettings = {
   share_promo: 1,
   share_follow: 1,
   senior_percent: null,
+  junior_percent: null,
   lead_percent: null,
 };
 
+/** Welche Spalte den Satz eines Rangs haelt - Berater ist der Standardsatz. */
+export const TIER_PERCENT_FIELD: Record<Tier, keyof Pick<CommissionSettings, "standard_percent" | "senior_percent" | "junior_percent" | "lead_percent">> = {
+  BERATER: "standard_percent",
+  SENIOR: "senior_percent",
+  JUNIOR_LEAD: "junior_percent",
+  TEAMLEITER: "lead_percent",
+};
+
 /**
- * Der Satz jeder Stufe in Prozent der Admin-Provision; null ohne
- * Standardsatz. Eine hoehere Stufe bekommt nie weniger als die darunter -
- * auch wenn der Standardsatz spaeter ueber einen alten Stufensatz steigt.
+ * Der Satz jedes Rangs in Prozent der Admin-Provision; null ohne
+ * Standardsatz. Ein hoeherer Rang bekommt nie weniger als der darunter -
+ * auch wenn der Standardsatz spaeter ueber einen alten Rangsatz steigt.
  */
 export function tierPercents(settings: CommissionSettings): Record<Tier, number> | null {
   const standard = settings.standard_percent;
   if (standard === null) return null;
-  const senior = Math.max(standard, settings.senior_percent ?? standard);
-  return { BERATER: standard, SENIOR: senior, TEAMLEITER: Math.max(senior, settings.lead_percent ?? senior) };
+  const out = {} as Record<Tier, number>;
+  let floor = standard;
+  for (const tier of TIERS) {
+    floor = Math.max(floor, settings[TIER_PERCENT_FIELD[tier]] ?? floor);
+    out[tier] = floor;
+  }
+  return out;
 }
 
 export interface CommissionRule {
@@ -269,23 +287,29 @@ function sum(a: Payout, b: Payout): Payout {
 
 /** Wie eine Person gerade gerechnet wird - fuer die Anzeige der Einstellung. */
 export interface ResolvedSetting {
-  /** ADMIN: die Geschaeftsfuehrung mit der vollen Admin-Provision. TIER: nach Stufe. */
+  /** ADMIN: die Geschaeftsfuehrung mit der vollen Admin-Provision. TIER: nach Rang. */
   kind: "ADMIN" | "TIER";
-  /** Stufe im Vertrieb; null bei der Geschaeftsfuehrung. */
+  /** Rang im Vertrieb; null bei der Geschaeftsfuehrung. */
   tier: Tier | null;
-  /** Individueller Satz in Prozent der Admin-Provision; null = nach Stufe. */
+  /** Individueller Satz in Prozent der Admin-Provision; null = nach Rang. */
   value: number | null;
   /** Der Satz, der gilt; null bei der Geschaeftsfuehrung und ohne Standardsatz. */
   percent: number | null;
-  /** Teamleiter direkt darueber, der an den Vertraegen dieser Person die Differenz bekommt. */
+  /** Die erste Fuehrungskraft darueber, die an den Vertraegen dieser Person mitverdient. */
   managerId: number | null;
+}
+
+/** Wer an einem Vertrag ueber dem Verkaeufer mitverdient - von unten nach oben. */
+export interface Override {
+  userId: number;
+  payout: Payout;
 }
 
 export interface Calculator {
   /** Gibt es schon einen Standardsatz? Sonst sieht der Vertrieb keine Betraege. */
   configured: boolean;
   promoActive: boolean;
-  /** Satz je Stufe; null ohne Standardsatz. */
+  /** Satz je Rang; null ohne Standardsatz. */
   tiers: Record<Tier, number> | null;
   rule(tariff: CommissionTariff): EffectiveRule;
   admin(band: CommissionBand): Payout;
@@ -293,11 +317,15 @@ export interface Calculator {
   standard(tariff: CommissionTariff, band: CommissionBand): Payout | null;
   /** Was diese Person bekommt; null bei individueller Provision oder ohne Standardsatz. */
   person(userId: number, tariff: CommissionTariff, band: CommissionBand): Payout | null;
-  /** Der Teamleiter direkt ueber dieser Person, der die Differenz bekommt - sonst null. */
-  lead(userId: number): number | null;
-  /** Was dieser Teamleiter an einem Vertrag der Person bekommt: die Differenz zum eigenen Betrag. */
-  override(userId: number, tariff: CommissionTariff, band: CommissionBand): Payout | null;
-  /** Was ein Vertrag der Person insgesamt kostet: ihr Betrag plus die Differenz fuer den Teamleiter. */
+  /** Was ein Rang (ohne individuellen Satz) bekommt. */
+  atTier(tier: Tier, tariff: CommissionTariff, band: CommissionBand): Payout | null;
+  /** Alle Fuehrungskraefte darueber, die an Vertraegen dieser Person mitverdienen koennen - von unten nach oben. */
+  uplines(userId: number): number[];
+  /** Wer an einem Vertrag der Person mitverdient und wie viel - nur, wer wirklich etwas bekommt. */
+  overrides(userId: number, tariff: CommissionTariff, band: CommissionBand): Override[];
+  /** Was `leadId` an einem Vertrag von `userId` bekommt; null, wenn er nicht in der Kette steht. */
+  overrideFor(leadId: number, userId: number, tariff: CommissionTariff, band: CommissionBand): Payout | null;
+  /** Was ein Vertrag der Person insgesamt kostet: ihr Betrag plus alle Differenzen darueber. */
   cost(userId: number, tariff: CommissionTariff, band: CommissionBand): Payout | null;
   setting(userId: number): ResolvedSetting;
 }
@@ -308,8 +336,10 @@ export function createCalculator(input: {
   people: PersonSetting[];
   members: CommissionPerson[];
   promoActive: boolean;
+  ranks?: RankSetup;
 }): Calculator {
   const { settings, promoActive } = input;
+  const ranks = input.ranks ?? DEFAULT_RANKS;
   const standard = settings.standard_percent;
   const tiers = tierPercents(settings);
   const index = indexRules(input.rules);
@@ -317,16 +347,24 @@ export function createCalculator(input: {
   const stored = new Map(input.people.map((setting) => [setting.user_id, setting]));
 
   /**
-   * Nur die direkte Fuehrungskraft, und nur als aktiver Teamleiter: Wer selbst
-   * Teamleiter ist, baut sein eigenes Team auf - an ihm verdient niemand.
+   * Die Kette nach oben: jede aktive Fuehrungskraft mit Team-Rang, bis zur
+   * Geschaeftsfuehrung (die bekommt ohnehin die Admin-Provision). Wer
+   * deaktiviert ist oder keinen Team-Rang hat, wird uebersprungen - die Person
+   * darueber rechnet dann ab dem hoechsten Betrag darunter weiter.
    */
-  function lead(userId: number): number | null {
-    const person = members.get(userId);
-    if (!person || person.role === "LEADER" || person.tier === "TEAMLEITER" || person.manager_id === null) return null;
-    const manager = members.get(person.manager_id);
-    if (!manager || manager.id === person.id || manager.role === "LEADER") return null;
-    if (manager.tier !== "TEAMLEITER" || manager.active === 0) return null;
-    return manager.id;
+  function uplines(userId: number): number[] {
+    const out: number[] = [];
+    const seen = new Set([userId]);
+    let current = members.get(userId);
+    if (!current || current.role === "LEADER") return out;
+    while (current && current.manager_id !== null && !seen.has(current.manager_id)) {
+      const manager = members.get(current.manager_id);
+      if (!manager || manager.role === "LEADER") break;
+      seen.add(manager.id);
+      if (manager.active !== 0 && ranks[manager.tier]?.team) out.push(manager.id);
+      current = manager;
+    }
+    return out;
   }
 
   /** Individueller Satz - gilt nur bei derselben Fuehrungskraft wie beim Festlegen. */
@@ -335,12 +373,21 @@ export function createCalculator(input: {
     return saved && saved.kind === "RATE" && saved.manager_id === person.manager_id ? saved.value : null;
   }
 
+  function percentOf(userId: number): number | null {
+    const person = members.get(userId);
+    if (!person || person.role === "LEADER") return null;
+    return individual(person) ?? tiers?.[person.tier] ?? null;
+  }
+
   function setting(userId: number): ResolvedSetting {
     const person = members.get(userId);
     if (person?.role === "LEADER") return { kind: "ADMIN", tier: null, value: null, percent: null, managerId: null };
     const tier = person?.tier ?? "BERATER";
     const value = person ? individual(person) : null;
-    return { kind: "TIER", tier, value, percent: value ?? tiers?.[tier] ?? null, managerId: lead(userId) };
+    const percent = value ?? tiers?.[tier] ?? null;
+    // Die erste Fuehrungskraft darueber, die mehr bekommt - nur die verdient an den Vertraegen mit.
+    const managerId = uplines(userId).find((id) => (percentOf(id) ?? 0) > (percent ?? 0)) ?? null;
+    return { kind: "TIER", tier, value, percent, managerId };
   }
 
   function rule(tariff: CommissionTariff): EffectiveRule {
@@ -352,28 +399,49 @@ export function createCalculator(input: {
     return teamPayout(band, rule(tariff), settings, promoActive);
   }
 
-  function person(userId: number, tariff: CommissionTariff, band: CommissionBand): Payout | null {
-    if (members.get(userId)?.role === "LEADER") return band.individual ? null : adminPayout(band, promoActive);
+  function atPercent(percent: number, tariff: CommissionTariff, band: CommissionBand): Payout | null {
     if (standard === null || band.individual) return null;
-    // Stufe oder individueller Satz verschieben die Liste um dieselben Prozentpunkte.
-    const percent = setting(userId).percent ?? standard;
+    // Rang oder individueller Satz verschieben die Liste um dieselben Prozentpunkte.
     return teamPayout(band, rule(tariff), settings, promoActive, percent - standard);
   }
 
-  function override(userId: number, tariff: CommissionTariff, band: CommissionBand): Payout | null {
-    const leadId = lead(userId);
-    if (leadId === null) return null;
-    const own = person(userId, tariff, band);
-    const above = person(leadId, tariff, band);
-    return own && above ? difference(above, own) : null;
+  function person(userId: number, tariff: CommissionTariff, band: CommissionBand): Payout | null {
+    if (members.get(userId)?.role === "LEADER") return band.individual ? null : adminPayout(band, promoActive);
+    if (standard === null) return null;
+    return atPercent(percentOf(userId) ?? standard, tariff, band);
+  }
+
+  function atTier(tier: Tier, tariff: CommissionTariff, band: CommissionBand): Payout | null {
+    return tiers ? atPercent(tiers[tier], tariff, band) : null;
+  }
+
+  function overrides(userId: number, tariff: CommissionTariff, band: CommissionBand): Override[] {
+    let best = person(userId, tariff, band);
+    if (!best || members.get(userId)?.role === "LEADER") return [];
+    const out: Override[] = [];
+    for (const leadId of uplines(userId)) {
+      const own = person(leadId, tariff, band);
+      if (!own) continue;
+      const share = difference(own, best);
+      if (share.now > 0 || share.follow > 0) out.push({ userId: leadId, payout: share });
+      if (own.now > best.now || own.follow > best.follow) {
+        best = { now: Math.max(own.now, best.now), promo: Math.max(own.promo, best.promo), follow: Math.max(own.follow, best.follow) };
+      }
+    }
+    return out;
+  }
+
+  function overrideFor(leadId: number, userId: number, tariff: CommissionTariff, band: CommissionBand): Payout | null {
+    if (!uplines(userId).includes(leadId)) return null;
+    if (!person(userId, tariff, band)) return null;
+    return overrides(userId, tariff, band).find((entry) => entry.userId === leadId)?.payout ?? { now: 0, promo: 0, follow: 0 };
   }
 
   function cost(userId: number, tariff: CommissionTariff, band: CommissionBand): Payout | null {
     if (members.get(userId)?.role === "LEADER") return band.individual ? null : { now: 0, promo: 0, follow: 0 };
     const own = person(userId, tariff, band);
     if (!own) return null;
-    const extra = override(userId, tariff, band);
-    return extra ? sum(own, extra) : own;
+    return overrides(userId, tariff, band).reduce((total, entry) => sum(total, entry.payout), own);
   }
 
   return {
@@ -384,11 +452,18 @@ export function createCalculator(input: {
     admin: (band) => adminPayout(band, promoActive),
     standard: standardPayout,
     person,
-    lead,
-    override,
+    atTier,
+    uplines,
+    overrides,
+    overrideFor,
     cost,
     setting,
   };
+}
+
+/** Was ein Rang mit Team an einem Vertrag eines niedrigeren Rangs direkt unter ihm bekommt. */
+export function tierDifference(upper: Payout | null, lower: Payout | null): Payout | null {
+  return upper && lower ? difference(upper, lower) : null;
 }
 
 /* --------------------------------- Boni --------------------------------- */

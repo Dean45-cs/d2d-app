@@ -2,8 +2,10 @@
 
 import { useRef, useState } from "react";
 import type { PermissionSet } from "@/lib/permission-definitions";
-import type { Role, Tier } from "@/lib/types";
-import { TIERS, TIER_LABEL, canLeadTeam, positionLabel } from "@/lib/tiers";
+import type { Role } from "@/lib/types";
+import { canLeadTeam, positionLabel, rankLabel } from "@/lib/tiers";
+import { useRanks } from "@/components/ranks/RanksContext";
+import { PromoteSheet } from "@/components/ranks/PromoteSheet";
 import { avatarToDataUrl, fileToAvatar } from "@/lib/avatar";
 import { Sheet } from "@/components/Sheet";
 import { useToast } from "@/components/Toast";
@@ -12,7 +14,7 @@ import { IconKey, IconMap, IconPerson, IconShield } from "@/components/icons";
 import { ROLE_LABEL, type MemberRow, type PatchMember } from "./types";
 
 /**
- * Alles zu einer Person in einem Blatt: Bild, Zahlen, Rolle, Stufe,
+ * Alles zu einer Person in einem Blatt: Bild, Zahlen, Rolle, Rang,
  * Fuehrungskraft, Gebiete, Konto. Jede Aenderung gilt sofort und meldet sich per Toast.
  */
 export function MemberSheet({
@@ -42,7 +44,8 @@ export function MemberSheet({
   // Gewaehlter Wert, bis die frischen Daten da sind - "base" merkt sich den Stand davor.
   const [role, setRole] = useState<{ value: Role; base: Role } | null>(null);
   const [manager, setManager] = useState<{ value: number | null; base: number | null } | null>(null);
-  const [tier, setTier] = useState<{ value: Tier; base: Tier } | null>(null);
+  const [promote, setPromote] = useState(false);
+  const ranks = useRanks();
 
   const canManage = editable && rights["team.manage"];
   const canRole = editable && rights["team.roles"] && !isSelf;
@@ -50,8 +53,6 @@ export function MemberSheet({
   // Sind die frischen Daten da, gilt wieder der Server (auch nach "Rückgängig").
   if (role && role.base !== m.role) setRole(null);
   if (manager && manager.base !== m.manager_id) setManager(null);
-  if (tier && tier.base !== m.tier) setTier(null);
-  const shownTier = tier && tier.base === m.tier ? tier.value : m.tier;
   const shownRole = role && role.base === m.role ? role.value : m.role;
   const shownManager = manager && manager.base === m.manager_id ? manager.value : m.manager_id;
   const managerName = members.find((p) => p.id === m.manager_id)?.name;
@@ -89,13 +90,6 @@ export function MemberSheet({
     if (!ok) setRole(null);
   }
 
-  async function changeTier(next: Tier) {
-    if (next === shownTier) return;
-    setTier({ value: next, base: m.tier });
-    const ok = await onPatch(m.id, { tier: next }, `${first} ist jetzt ${TIER_LABEL[next]}`, { tier: m.tier });
-    if (!ok) setTier(null);
-  }
-
   async function saveBadge(value: string) {
     const next = value.trim();
     const previous = m.badge_number ?? "";
@@ -110,6 +104,17 @@ export function MemberSheet({
     setManager({ value: next, base: m.manager_id });
     const ok = await onPatch(m.id, { manager_id: next }, "Struktur gespeichert", { manager_id: m.manager_id });
     if (!ok) setManager(null);
+  }
+
+  if (promote) {
+    return (
+      <PromoteSheet
+        person={{ id: m.id, name: m.name, tier: m.tier }}
+        reports={direct}
+        managerName={managerName ?? null}
+        onClose={() => setPromote(false)}
+      />
+    );
   }
 
   return (
@@ -182,24 +187,21 @@ export function MemberSheet({
 
       {m.role === "MEMBER" && (
         <>
-          <ListLabel>Stufe</ListLabel>
-          {canRole ? (
-            <Segmented
-              ariaLabel="Stufe"
-              value={shownTier}
-              onChange={(next) => void changeTier(next)}
-              options={TIERS.map((value) => ({ value, label: TIER_LABEL[value] }))}
-            />
-          ) : (
-            <ul className="list">
-              <li>
-                <Cell title={TIER_LABEL[m.tier]} />
-              </li>
-            </ul>
-          )}
+          <ListLabel>Rang</ListLabel>
+          <ul className="list">
+            <li>
+              {canRole ? (
+                <Cell onClick={() => setPromote(true)} title={rankLabel(m.tier, ranks)} detail="Ändern" chevron />
+              ) : (
+                <Cell title={rankLabel(m.tier, ranks)} />
+              )}
+            </li>
+          </ul>
           <p className="list-footer">
-            Die Stufe bestimmt den Provisionssatz. Ab Teamleiter darf {first} ein eigenes Team aufbauen und bekommt von den Verträgen
-            der direkten Leute die Differenz zur eigenen Stufe.
+            Der Rang bestimmt den Provisionssatz.{" "}
+            {ranks[m.tier].team
+              ? `${first} darf ein eigenes Team haben und bekommt an den Verträgen der Leute die Differenz.`
+              : "Mit einem Team-Rang darf die Person eigene Leute haben."}
           </p>
         </>
       )}
@@ -219,11 +221,11 @@ export function MemberSheet({
                   {m.role === "LEADER" ? "Strukturspitze" : "Bitte zuordnen"}
                 </option>
                 {members
-                  // Ein Team haben nur die Geschaeftsfuehrung und Teamleiter - die bisherige Zuordnung bleibt waehlbar.
-                  .filter((p) => p.id !== m.id && ((p.active && canLeadTeam(p)) || p.id === m.manager_id))
+                  // Ein Team haben nur die Geschaeftsfuehrung und Raenge mit Team - die bisherige Zuordnung bleibt waehlbar.
+                  .filter((p) => p.id !== m.id && ((p.active && canLeadTeam(p, ranks)) || p.id === m.manager_id))
                   .map((p) => (
                     <option key={p.id} value={p.id}>
-                      {p.name} · {positionLabel(p)}
+                      {p.name} · {positionLabel(p, ranks)}
                       {p.active ? "" : " (deaktiviert)"}
                     </option>
                   ))}

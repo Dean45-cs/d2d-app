@@ -8,21 +8,20 @@ import { Avatar, Cell, EmptyState, InlineError, ListLabel, Notice, PageHeader, P
 import { IconShield, IconUsers } from "@/components/icons";
 import { money, percentLabel } from "@/lib/commissions/model";
 import type { CommissionStructure, StructurePerson } from "@/lib/commissions/store";
-import { TIER_LABEL } from "@/lib/tiers";
 import { parseInput, send } from "../client";
 
 /** "Teamleiter · 75 %", "Berater · individuell 68 %" - Saetze nur fuer die Verwaltung. */
 function settingLabel(person: StructurePerson): string {
-  const tier = TIER_LABEL[person.tier];
+  const tier = person.rank;
   if (person.value !== null) return `${tier} · individuell ${percentLabel(person.value)}`;
   return person.percent !== null ? `${tier} · ${percentLabel(person.percent)}` : tier;
 }
 
 /**
- * Personen, ihre Stufe und was sie bekommen. Ein Teamleiter sieht seine
- * direkten Leute; die Verwaltung das ganze Team (eingerueckt nach Ebene) und
- * legt dort individuelle Saetze fest. Die Stufe selbst vergibt die
- * Geschaeftsfuehrung unter Mitglieder.
+ * Personen, ihr Rang und was sie bekommen. Ein Rang mit Team sieht seine
+ * Struktur; die Verwaltung das ganze Team (eingerueckt nach Ebene) und legt
+ * dort individuelle Saetze fest. Den Rang selbst vergibt die
+ * Geschaeftsfuehrung unter Mitglieder oder auf der Karriereleiter.
  */
 export function StructureList({ structure, viewerId }: { structure: CommissionStructure; viewerId: number }) {
   const [open, setOpen] = useState<StructurePerson | null>(null);
@@ -79,8 +78,8 @@ export function StructureList({ structure, viewerId }: { structure: CommissionSt
           </ul>
           <p className="list-footer">
             {admin
-              ? "Jede Person bekommt den Satz ihrer Stufe. Ein Teamleiter bekommt von den Verträgen seiner direkten Leute die Differenz zu deren Betrag – nicht von weiteren Ebenen und nicht von anderen Teamleitern."
-              : "Deine Leute bekommen den Betrag ihrer Stufe. Du bekommst von jedem ihrer Verträge die Differenz zu deinem Betrag obendrauf – ihnen wird nichts abgezogen."}
+              ? "Jede Person bekommt den Satz ihres Rangs. Jede Führungskraft mit Team bekommt an den Verträgen ihrer Leute die Differenz zum höchsten Satz darunter – über alle Ebenen, nie mehr als der Satz der obersten Person."
+              : "Deine Leute bekommen den Betrag ihres Rangs. Du bekommst an ihren Verträgen die Differenz zum höchsten Betrag unter dir obendrauf – ihnen wird nichts abgezogen."}
           </p>
         </>
       )}
@@ -118,7 +117,7 @@ function PersonSheet({
   const parsed = parseInput(value);
   const valid = parsed !== null && !Number.isNaN(parsed) && parsed >= 0 && parsed <= 100;
   const tierPercent = structure.tiers?.[person.tier] ?? null;
-  const tier = TIER_LABEL[person.tier];
+  const tier = person.rank;
 
   async function save(next: number | null) {
     setBusy(true);
@@ -129,7 +128,7 @@ function PersonSheet({
       setError(result.error);
       return;
     }
-    toast(next === null ? `${person.name}: nach Stufe` : `${person.name}: ${percentLabel(next)}`);
+    toast(next === null ? `${person.name}: nach Rang` : `${person.name}: ${percentLabel(next)}`);
     onClose();
     router.refresh();
   }
@@ -138,7 +137,7 @@ function PersonSheet({
     valid && parsed !== null
       ? `Von 100 € Admin-Provision bekommt ${person.name} ${money(parsed)}${
           tierPercent !== null && parsed !== tierPercent
-            ? ` – ${percentLabel(Math.abs(parsed - tierPercent))} ${parsed > tierPercent ? "über" : "unter"} der Stufe ${tier}, auch bei Ausnahmen`
+            ? ` – ${percentLabel(Math.abs(parsed - tierPercent))} ${parsed > tierPercent ? "über" : "unter"} dem Rang ${tier}, auch bei Ausnahmen`
             : ""
         }.`
       : null;
@@ -179,7 +178,7 @@ function PersonSheet({
                   className="field pr-12 tabular-nums"
                   inputMode="decimal"
                   autoComplete="off"
-                  placeholder={tierPercent !== null ? `nach Stufe · ${String(tierPercent).replace(".", ",")}` : "nach Stufe"}
+                  placeholder={tierPercent !== null ? `nach Rang · ${String(tierPercent).replace(".", ",")}` : "nach Rang"}
                   value={value}
                   onChange={(e) => setValue(e.target.value)}
                 />
@@ -187,13 +186,13 @@ function PersonSheet({
               </div>
               {example && <p className="list-footer">{example}</p>}
               <p className="list-footer">
-                Nur für Abweichungen von der Stufe. Die Stufe selbst änderst du unter Mitglieder im Blatt der Person.
+                Nur für Abweichungen vom Rang. Den Rang selbst änderst du unter Mitglieder oder auf der Karriereleiter.
               </p>
             </div>
             <ul className="list">
               <li>
                 <Cell
-                  title="Nach Stufe rechnen"
+                  title="Nach Rang rechnen"
                   subtitle={
                     tierPercent !== null ? `${tier} · ${percentLabel(tierPercent)}` : "Noch kein Standardsatz festgelegt"
                   }
@@ -206,7 +205,7 @@ function PersonSheet({
           </>
         ) : (
           <Notice icon={<IconShield className="h-5 w-5" />}>
-            {person.name} ist {tier}. Stufe und Provision legt die Geschäftsführung fest.
+            {person.name} ist {tier}. Rang und Provision legt die Geschäftsführung fest.
           </Notice>
         )}
         <ul className="list">
@@ -215,7 +214,7 @@ function PersonSheet({
           </li>
           {person.editable && (
             <li>
-              <Cell href="/einstellungen/mitglieder" title="Stufe ändern unter Mitglieder" />
+              <Cell href="/einstellungen/mitglieder" title="Rang ändern unter Mitglieder" />
             </li>
           )}
         </ul>

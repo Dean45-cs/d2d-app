@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { requireUser } from "@/lib/auth";
 import { permissionsFor } from "@/lib/permissions";
 import { commissionView, viewablePeople } from "@/lib/commissions/store";
+import { careerFor } from "@/lib/ranks";
 import { CommissionList } from "./CommissionList";
 
 export const dynamic = "force-dynamic";
@@ -34,9 +35,13 @@ export default async function CommissionsPage({
     else if (people.some((person) => person.id === requested)) subjectId = requested;
   }
 
+  // Die eigene Rang-Karte steht nur ueber der eigenen Liste.
+  const career = own && subjectId === user.id ? careerFor(user, user) : null;
+
   return (
     <CommissionList
       view={commissionView(user, subjectId)}
+      career={career}
       people={people}
       self={{ id: user.id, ownList: own }}
       showStructure={admin || people.length > 0}

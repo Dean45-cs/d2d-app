@@ -12,6 +12,7 @@ import { MemberSheet, PasswordSheet } from "./MemberSheet";
 import { syncPush } from "@/lib/push-client";
 import { TeamStructure } from "./TeamStructure";
 import { positionLabel } from "@/lib/tiers";
+import { useRanks } from "@/components/ranks/RanksContext";
 import type { MemberRow, PatchMember } from "./types";
 
 type SheetState = { kind: "member" | "password"; id: number } | { kind: "create" } | null;
@@ -34,6 +35,7 @@ export function TeamTable({
 }) {
   const router = useRouter();
   const toast = useToast();
+  const ranks = useRanks();
   const { confirm, dialog } = useConfirm();
   const [view, setView] = useState<"list" | "structure">("list");
   const [sheet, setSheet] = useState<SheetState>(null);
@@ -185,7 +187,7 @@ export function TeamTable({
                     </td>
                     <td>
                       <span className="flex flex-wrap items-center gap-2">
-                        {positionLabel(m)}
+                        {positionLabel(m, ranks)}
                         {!m.active && <Pill>Deaktiviert</Pill>}
                       </span>
                     </td>
@@ -286,6 +288,7 @@ function MemberList({
   currentUserId: number;
   onOpen: (id: number) => void;
 }) {
+  const ranks = useRanks();
   return (
     <>
       <ListLabel>{label}</ListLabel>
@@ -299,7 +302,7 @@ function MemberList({
               title={m.name}
               subtitle={[
                 m.id === currentUserId && "Du",
-                positionLabel(m),
+                positionLabel(m, ranks),
                 m.territories.length > 0 && plural(m.territories.length, "Gebiet", "Gebiete"),
                 reports && plural(m.doors, "Tür", "Türen"),
               ]

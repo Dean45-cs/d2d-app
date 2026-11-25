@@ -16,7 +16,6 @@ import { TourClient } from "./TourClient";
 import { providerLookup } from "@/lib/energy/provider";
 import { readArea } from "@/lib/geo/area";
 import type { StreetWithStats } from "@/lib/queries";
-import { getLevelProgress } from "@/lib/level-queries";
 import { cardSettings } from "@/lib/card-queries";
 import { compareTariffOptions } from "@/lib/tariff-options";
 import { berlinMidnight, berlinSlot } from "@/lib/format";
@@ -175,7 +174,6 @@ export default async function TourPage({
   return (
     <TourClient
       userId={user.id}
-      initialProgress={getLevelProgress(user.team_id, user.id)}
       territories={territories.map((t) => ({
         id: t.id,
         name: t.name,

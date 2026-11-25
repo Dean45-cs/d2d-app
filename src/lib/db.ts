@@ -445,21 +445,97 @@ function migrate(db: Database.Database) {
 }
 
 /**
- * Stufen im Vertrieb (src/lib/tiers.ts): Berater, Senior Berater, Teamleiter.
- * Nur die Geschaeftsfuehrung und Teamleiter haben Leute unter sich. Wer beim
- * Update schon ein Team hat, wird deshalb einmalig Teamleiter - niemand
- * verliert seine Leute. Die Saetze der Stufen stehen bei den Provisionen.
+ * Raenge im Vertrieb (src/lib/tiers.ts): Berater, Senior Berater, Junior
+ * Teamleiter, Teamleiter. Wer beim ersten Update schon ein Team hatte, wurde
+ * einmalig Teamleiter - niemand verliert seine Leute. Die Saetze stehen bei
+ * den Provisionen, Namen, Team-Schalter und Ziele in rank_settings/rank_goals.
  */
 function migrateTiers(db: Database.Database) {
   const fresh = !hasColumn(db, "users", "tier");
-  addColumn(db, "users", "tier", "TEXT NOT NULL DEFAULT 'BERATER' CHECK (tier IN ('BERATER','SENIOR','TEAMLEITER'))");
+  addColumn(db, "users", "tier", `TEXT NOT NULL DEFAULT 'BERATER' CHECK (tier IN ${TIER_CHECK})`);
   if (fresh) {
     db.exec(`UPDATE users SET tier = 'TEAMLEITER'
       WHERE role = 'MEMBER' AND EXISTS (SELECT 1 FROM users report WHERE report.manager_id = users.id)`);
   }
-  // NULL: die Stufe bekommt so viel wie die Stufe darunter.
+  // Der Junior Teamleiter kam spaeter dazu - die alte Pruefung kennt ihn noch nicht.
+  widenCheck(db, "users", "('BERATER','SENIOR','TEAMLEITER')", TIER_CHECK);
+  // NULL: der Rang bekommt so viel wie der Rang darunter.
   addColumn(db, "commission_settings", "senior_percent", "REAL");
+  addColumn(db, "commission_settings", "junior_percent", "REAL");
   addColumn(db, "commission_settings", "lead_percent", "REAL");
+  // Befoerdert, aber die Feier noch nicht gesehen: der neue Rang. NULL: nichts zu feiern.
+  addColumn(db, "users", "rank_celebrate", "TEXT");
+  // Fuer welchen Rang die Fuehrungskraft schon "bereit" gemeldet bekam - je Rang nur einmal.
+  addColumn(db, "users", "rank_ready_tier", "TEXT");
+
+  db.exec(`
+    /* Name und Team-Schalter je Rang. Fehlt eine Zeile, gilt DEFAULT_RANKS. */
+    CREATE TABLE IF NOT EXISTS rank_settings (
+      team_id    INTEGER NOT NULL REFERENCES teams(id) ON DELETE CASCADE,
+      tier       TEXT NOT NULL CHECK (tier IN ${TIER_CHECK}),
+      label      TEXT NOT NULL DEFAULT '',
+      team       INTEGER NOT NULL DEFAULT 0,
+      updated_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+      updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+      PRIMARY KEY (team_id, tier)
+    );
+
+    /* Ziele fuer den Aufstieg in einen Rang (tier = der Zielrang). Alle muessen erfuellt sein.
+       period: SINCE_RANK, LAST_MONTHS (months), MONTH, QUARTER; bei MONTHS und TEAM_SIZE ohne Belang. */
+    CREATE TABLE IF NOT EXISTS rank_goals (
+      id         INTEGER PRIMARY KEY AUTOINCREMENT,
+      team_id    INTEGER NOT NULL REFERENCES teams(id) ON DELETE CASCADE,
+      tier       TEXT NOT NULL CHECK (tier IN ${TIER_CHECK}),
+      kind       TEXT NOT NULL CHECK (kind IN ('SALES','STROM','GAS','MONTHS','TEAM_SIZE','TEAM_SUM','TEAM_AVG')),
+      target     REAL NOT NULL,
+      period     TEXT NOT NULL DEFAULT 'SINCE_RANK' CHECK (period IN ('SINCE_RANK','LAST_MONTHS','MONTH','QUARTER')),
+      months     INTEGER,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+    CREATE INDEX IF NOT EXISTS idx_rank_goals_team ON rank_goals (team_id, tier, id);
+
+    /* Jeder Rangwechsel. Der letzte Eintrag ist das Datum fuer "seit letztem Aufstieg";
+       ohne Eintrag zaehlt der Tag, an dem die Person in die App kam. */
+    CREATE TABLE IF NOT EXISTS rank_history (
+      id         INTEGER PRIMARY KEY AUTOINCREMENT,
+      team_id    INTEGER NOT NULL REFERENCES teams(id) ON DELETE CASCADE,
+      user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      from_tier  TEXT,
+      tier       TEXT NOT NULL,
+      changed_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+    CREATE INDEX IF NOT EXISTS idx_rank_history_user ON rank_history (user_id, id);
+  `);
+
+  // Beitraege zur Befoerderung im Team-Feed (posts.kind = 'RANK').
+  widenCheck(db, "posts", "('TEXT','SALE')", "('TEXT','SALE','RANK')");
+  addColumn(db, "posts", "rank_tier", "TEXT");
+  // Wer befoerdert hat - steht unter dem Glueckwunsch.
+  addColumn(db, "posts", "rank_by", "INTEGER REFERENCES users(id) ON DELETE SET NULL");
+}
+
+const TIER_CHECK = "('BERATER','SENIOR','JUNIOR_LEAD','TEAMLEITER')";
+
+/**
+ * Eine CHECK-Liste in einer bestehenden Tabelle erweitern. SQLite kann eine
+ * Pruefung nicht aendern; die neue Liste erlaubt aber nur mehr als die alte,
+ * vorhandene Zeilen bleiben gueltig. Deshalb genuegt es, den gespeicherten
+ * Tabellentext zu ersetzen - ohne die Tabelle samt Fremdschluesseln neu zu bauen.
+ */
+function widenCheck(db: Database.Database, table: string, from: string, to: string): void {
+  const row = db.prepare("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = ?").get(table) as { sql: string } | undefined;
+  if (!row || !row.sql.includes(from)) return;
+  const version = db.pragma("schema_version", { simple: true }) as number;
+  db.unsafeMode(true);
+  try {
+    db.pragma("writable_schema = ON");
+    db.prepare("UPDATE sqlite_master SET sql = replace(sql, ?, ?) WHERE type = 'table' AND name = ?").run(from, to, table);
+    db.pragma(`schema_version = ${version + 1}`);
+  } finally {
+    db.pragma("writable_schema = OFF");
+    db.unsafeMode(false);
+  }
 }
 
 /**
@@ -649,7 +725,7 @@ function migrateCommunity(db: Database.Database) {
       id         INTEGER PRIMARY KEY AUTOINCREMENT,
       team_id    INTEGER NOT NULL REFERENCES teams(id) ON DELETE CASCADE,
       user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-      kind       TEXT NOT NULL CHECK (kind IN ('TEXT','SALE')),
+      kind       TEXT NOT NULL CHECK (kind IN ('TEXT','SALE','RANK')),
       body       TEXT NOT NULL DEFAULT '',
       visit_id   INTEGER REFERENCES visits(id) ON DELETE CASCADE,
       created_at TEXT NOT NULL DEFAULT (datetime('now'))

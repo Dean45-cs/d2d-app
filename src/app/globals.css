@@ -437,6 +437,19 @@
     transform: rotate(360deg);
   }
 }
+@keyframes rank-reach {
+  0% {
+    opacity: 0;
+    transform: translateY(16px) scale(0.96);
+  }
+  60% {
+    opacity: 1;
+    transform: translateY(-2px) scale(1.03);
+  }
+  100% {
+    transform: none;
+  }
+}
 
 @media (prefers-reduced-motion: reduce) {
   *,
@@ -704,53 +717,377 @@
       0 1px 0 var(--separator);
   }
 
-  /* Stufen im Team als Pyramide: je Stufe eine Flaeche, nach unten breiter.
-     Gestuft statt schraeg - so behalten die Flaechen ihre Radien, und die
-     Profilbilder bleiben auch bei vielen Leuten ganz im Bild. */
-  .pyramid {
+  /* ------------------------------ Raenge ------------------------------- */
+
+  /* Der eigene Rang als Karte (Provisionen, Profil, Erfolge): links Rang und
+     was fehlt, rechts vier Sprossen von unten nach oben. Farbe nur fuer die
+     eigene Sprosse - die Form traegt die Aussage, nicht das Gruen allein. */
+  .rank-card {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 14px 12px 14px 16px;
+    touch-action: manipulation;
+    transition: background-color var(--dur-1) var(--ease-out);
+  }
+  .rank-card:hover {
+    background: color-mix(in srgb, var(--surface), var(--ink) 3%);
+  }
+  .rank-card:active {
+    background: color-mix(in srgb, var(--surface), var(--ink) 7%);
+  }
+  .rank-card-bar {
+    display: block;
+    height: 4px;
+    margin-top: 10px;
+    max-width: 240px;
+    overflow: hidden;
+    border-radius: var(--radius-full);
+    background: var(--fill-strong);
+  }
+  .rank-card-bar > span {
+    display: block;
+    height: 100%;
+    border-radius: inherit;
+    background: var(--accent);
+    transition: width 600ms var(--ease-spring);
+  }
+  .rank-card-rungs {
     display: flex;
     flex-direction: column;
     align-items: center;
     gap: 4px;
-    width: 100%;
-    max-width: 720px;
-    margin-inline: auto;
+    flex-shrink: 0;
   }
-  .pyramid-step {
-    /* --step: 0 an der Spitze bis 3 an der Basis. */
-    width: calc(46% + var(--step, 0) * 18%);
-    /* Breit genug fuer "Geschäftsführung 1" in einer Zeile - waechst mit der Schriftgroesse. */
-    min-width: min(100%, 10.5rem);
-    padding: 12px 8px 8px;
-    text-align: center;
+  .rank-card-rung {
+    /* Nach oben schmaler - eine Leiter, die sich nach oben verjuengt. */
+    width: calc(28px - var(--rung, 0) * 3px);
+    height: 6px;
+    border-radius: var(--radius-full);
+    background: var(--fill-strong);
   }
-  .pyramid-people {
+  .rank-card-rung[data-state="done"] {
+    background: color-mix(in srgb, var(--accent) 40%, var(--fill-strong));
+  }
+  .rank-card-rung[data-state="now"] {
+    background: var(--accent);
+  }
+  .rank-card-rung[data-state="ready"] {
+    background: transparent;
+    box-shadow: inset 0 0 0 1.5px var(--accent);
+  }
+
+  /* Verbrauch des Kunden: ein grosses Feld, darauf zielt man an der Tuer. */
+  .kwh-hero {
+    padding: 12px 16px 12px;
+  }
+  .kwh-hero-input {
+    min-width: 0;
+    flex: 1;
+    border: 0;
+    padding: 0;
+    background: transparent;
+    color: var(--ink);
+    font-size: var(--text-large-title);
+    line-height: var(--text-large-title--line-height);
+    letter-spacing: var(--text-large-title--letter-spacing);
+    font-weight: 700;
+    outline: none;
+  }
+  .kwh-hero-input::placeholder {
+    color: var(--fill-strong);
+    font-weight: 600;
+  }
+  .kwh-hero:focus-within {
+    box-shadow: var(--elev-card), inset 0 0 0 2px var(--accent);
+  }
+
+  /* Die Karriereleiter: links eine durchgehende Holm-Linie mit einer Marke je
+     Sprosse, rechts die Flaeche mit Rang, Zielen und Leuten. Oben der hoechste
+     Rang. Erreichte Sprossen tragen einen Haken, die eigene den vollen Akzent,
+     die naechste einen Ring - Form und Wort ("Du", "Nächster Rang") sagen es
+     auch ohne Farbe. */
+  .ladder {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .ladder::before {
+    content: "";
+    position: absolute;
+    left: 11px;
+    top: 22px;
+    bottom: 22px;
+    width: 2px;
+    border-radius: 1px;
+    background: var(--separator);
+  }
+  .ladder-rung {
+    position: relative;
+    display: grid;
+    grid-template-columns: 24px minmax(0, 1fr);
+    gap: 12px;
+    align-items: start;
+    animation: rise var(--dur-3) var(--ease-out) both;
+    animation-delay: calc(var(--rung, 0) * 40ms);
+  }
+  .ladder-mark {
+    position: relative;
+    z-index: 1;
+    display: grid;
+    place-items: center;
+    width: 24px;
+    height: 24px;
+    margin-top: 14px;
+    border-radius: var(--radius-full);
+    background: var(--bg);
+    box-shadow: inset 0 0 0 2px var(--fill-strong);
+    color: var(--on-accent);
+  }
+  .ladder-rung[data-state="done"] .ladder-mark {
+    background: color-mix(in srgb, var(--accent) 55%, var(--bg));
+    box-shadow: none;
+  }
+  .ladder-rung[data-state="now"] .ladder-mark {
+    background: var(--accent);
+    box-shadow: 0 0 0 4px var(--accent-tint);
+  }
+  .ladder-rung[data-state="next"] .ladder-mark {
+    box-shadow: inset 0 0 0 2px var(--accent);
+  }
+  .ladder-body {
+    padding: 12px 16px 14px;
+  }
+  .ladder-rung[data-state="now"] .ladder-body {
+    box-shadow: var(--elev-card), inset 0 0 0 1.5px var(--accent);
+  }
+  .ladder-tag {
+    flex-shrink: 0;
+    padding: 2px 8px;
+    border-radius: var(--radius-full);
+    background: var(--fill);
+    color: var(--ink-2);
+    font-size: var(--text-caption);
+    line-height: var(--text-caption--line-height);
+    font-weight: 600;
+  }
+  .ladder-tag-now {
+    background: var(--accent-tint);
+    color: var(--accent-ink);
+  }
+  .ladder-goals {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-top: 12px;
+  }
+  .ladder-goal-bar {
+    display: block;
+    height: 4px;
+    margin-top: 6px;
+    overflow: hidden;
+    border-radius: var(--radius-full);
+    background: var(--fill-strong);
+  }
+  .ladder-goal-bar > span {
+    display: block;
+    height: 100%;
+    border-radius: inherit;
+    background: var(--accent);
+    transition: width 700ms var(--ease-spring);
+  }
+  .ladder-people {
     display: flex;
     flex-wrap: wrap;
-    justify-content: center;
-    margin-top: 4px;
+    gap: 2px;
+    margin: 10px -6px 0;
   }
-  .pyramid-person {
+  .ladder-person {
     display: flex;
     flex-direction: column;
     align-items: center;
     gap: 4px;
-    width: 64px;
+    width: 56px;
     padding: 6px 2px;
     border-radius: var(--radius-lg);
     touch-action: manipulation;
     transition: background-color var(--dur-1) var(--ease-out);
   }
-  .pyramid-person:hover {
+  .ladder-person:hover {
     background: var(--hover);
   }
-  .pyramid-person:active {
+  .ladder-person:active {
     background: var(--press);
   }
   /* Man selbst: ein Ring im Akzent - Form und Wort ("Du"), nicht nur Farbe. */
-  .pyramid-me {
+  .ladder-me {
     outline: 2.5px solid var(--accent);
     outline-offset: 2px;
+  }
+  /* Bereit fuer den Aufstieg: ein Punkt oben rechts am Bild. */
+  .ladder-ready {
+    position: absolute;
+    right: -2px;
+    top: -2px;
+    width: 12px;
+    height: 12px;
+    border-radius: var(--radius-full);
+    background: var(--accent);
+    box-shadow: 0 0 0 2px var(--surface);
+  }
+
+  /* Rang-Verlauf im Profil: eine kleine Zeitleiste, oben der aktuelle Rang. */
+  .rank-history {
+    display: flex;
+    flex-direction: column;
+    padding: 6px 0;
+  }
+  .rank-history-item {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-height: 52px;
+    padding: 6px 16px;
+  }
+  .rank-history-item + .rank-history-item::before {
+    content: "";
+    position: absolute;
+    left: 20px;
+    top: -14px;
+    height: 28px;
+    width: 2px;
+    background: var(--separator);
+  }
+  .rank-history-dot {
+    position: relative;
+    z-index: 1;
+    width: 10px;
+    height: 10px;
+    flex-shrink: 0;
+    border-radius: var(--radius-full);
+    background: var(--fill-strong);
+  }
+  .rank-history-item[data-current] .rank-history-dot {
+    background: var(--accent);
+  }
+
+  /* Befoerderung im Feed: Zeichen in getoenter Flaeche - der volle gruene
+     Kreis bleibt dem Abschluss vorbehalten. */
+  .glyph.glyph-rank {
+    background: var(--accent-tint);
+    color: var(--accent-ink);
+  }
+  .rank-post-quote {
+    padding: 10px 14px;
+    border-radius: var(--radius-lg);
+    background: var(--fill);
+  }
+
+  /* Die Feier nach der Befoerderung: ein ganzer Bildschirm, ruhig, mit der
+     Leiter, auf der die neue Sprosse aufleuchtet. Einmal - danach nie wieder. */
+  .rank-celebration {
+    position: fixed;
+    inset: 0;
+    z-index: 80;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    padding: max(24px, env(safe-area-inset-top)) 24px max(24px, env(safe-area-inset-bottom));
+    background: var(--bg);
+    animation: fade-in var(--dur-3) var(--ease-out) both;
+  }
+  .rank-celebration-body {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    max-width: 420px;
+    margin-inline: auto;
+    text-align: center;
+  }
+  .rank-celebration-ladder {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    width: 100%;
+    max-width: 280px;
+    margin-bottom: 32px;
+  }
+  .rank-celebration-rung {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 14px;
+    border-radius: var(--radius-lg);
+    background: var(--surface);
+    color: var(--muted);
+    text-align: left;
+    animation: rise var(--dur-3) var(--ease-out) both;
+    animation-delay: calc(var(--rung, 0) * 60ms);
+  }
+  .rank-celebration-dot {
+    width: 12px;
+    height: 12px;
+    flex-shrink: 0;
+    border-radius: var(--radius-full);
+    background: var(--fill-strong);
+  }
+  .rank-celebration-name {
+    min-width: 0;
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: var(--text-subhead);
+    line-height: var(--text-subhead--line-height);
+  }
+  .rank-celebration-rung[data-state="done"] .rank-celebration-dot {
+    background: color-mix(in srgb, var(--accent) 55%, var(--fill-strong));
+  }
+  /* Die neue Sprosse: kommt zuletzt, waechst kurz und fuellt sich. */
+  .rank-celebration-rung[data-state="now"] {
+    color: var(--ink);
+    font-weight: 600;
+    box-shadow: inset 0 0 0 2px var(--accent);
+    animation: rank-reach 700ms var(--ease-pop) 420ms both;
+  }
+  .rank-celebration-rung[data-state="now"] .rank-celebration-dot {
+    background: var(--accent);
+    animation: check-pop 500ms var(--ease-pop) 700ms both;
+  }
+  .rank-celebration-kicker {
+    color: var(--muted);
+    font-size: var(--text-subhead);
+    line-height: var(--text-subhead--line-height);
+    font-weight: 600;
+    animation: rise var(--dur-3) var(--ease-out) 600ms both;
+  }
+  .rank-celebration-title {
+    margin-top: 4px;
+    font-size: var(--text-large-title);
+    line-height: var(--text-large-title--line-height);
+    letter-spacing: var(--text-large-title--letter-spacing);
+    font-weight: 700;
+    animation: number-in 600ms var(--ease-out) 680ms both;
+  }
+  .rank-celebration-text {
+    margin-top: 8px;
+    color: var(--muted);
+    font-size: var(--text-body);
+    line-height: var(--text-body--line-height);
+    animation: rise var(--dur-3) var(--ease-out) 800ms both;
+  }
+  .rank-celebration-actions {
+    display: grid;
+    gap: 8px;
+    width: 100%;
+    max-width: 420px;
+    margin-inline: auto;
+    animation: rise var(--dur-3) var(--ease-out) 900ms both;
   }
 
   /* -------------------------------- Knoepfe ------------------------------ */

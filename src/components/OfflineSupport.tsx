@@ -6,7 +6,6 @@ import { IconOffline } from "./icons";
 import { Notice } from "./ui";
 import { useToast } from "./Toast";
 import { getQueue, QUEUE_FLUSHED_EVENT, startAutoFlush, subscribe, type FlushResult } from "@/lib/offline-queue";
-import { levelFeedbackText } from "@/lib/level-feedback";
 import { copyLabel, forgetOfflineCopy, offlineCopyTime, warmOfflinePages } from "@/lib/offline-pages";
 
 /**
@@ -53,14 +52,7 @@ export function OfflineSupport({ userId, renderedAt }: { userId: number; rendere
       startAutoFlush((result: FlushResult) => {
         window.dispatchEvent(new CustomEvent(QUEUE_FLUSHED_EVENT, { detail: result }));
         if (result.sent > 0) {
-          toast(
-            [
-              result.sent === 1 ? "1 Eintrag nachgesendet" : `${result.sent} Einträge nachgesendet`,
-              levelFeedbackText(result.progression),
-            ]
-              .filter(Boolean)
-              .join(" · "),
-          );
+          toast(result.sent === 1 ? "1 Eintrag nachgesendet" : `${result.sent} Einträge nachgesendet`);
         }
         if (result.rejected > 0) {
           toast(

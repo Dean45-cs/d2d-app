@@ -1,56 +1,7 @@
-import Link from "next/link";
-import type { DailyGoal, LevelProgress } from "@/lib/levels";
-import { IconChevronRight } from "@/components/icons";
-import { ProgressRing } from "@/components/ui";
+import type { DailyGoal } from "@/lib/levels";
 
 const number = (value: number) => value.toLocaleString("de-DE");
 
-/** "Lv. 12" als kleine Plakette - in Listen neben dem Namen. */
-export function LevelBadge({ progress }: { progress: LevelProgress }) {
-  return (
-    <span className="badge" title={progress.title}>
-      Lv. {number(progress.level)}
-    </span>
-  );
-}
-
-/**
- * Level als Zeile mit Ring: Zahl in der Mitte, Titel daneben, darunter
- * der Weg zum naechsten Level. Ohne Hooks - laeuft auf Server-Seiten.
- */
-export function LevelSummary({
-  progress,
-  href,
-  label = "Level",
-}: {
-  progress: LevelProgress;
-  href?: string;
-  label?: string;
-}) {
-  const content = (
-    <>
-      <ProgressRing value={progress.xpInLevel} max={Math.max(progress.xpForNextLevel, 1)} size={64} stroke={6}>
-        <span className="text-title-3">{number(progress.level)}</span>
-      </ProgressRing>
-      <span className="min-w-0 flex-1">
-        <span className="block text-footnote font-semibold text-ink-2">{label}</span>
-        <span className="block truncate text-title-3">{progress.title}</span>
-        <span className="block text-footnote text-muted">
-          {number(progress.totalXp)} XP · noch {number(progress.xpToNextLevel)} bis Lv. {number(progress.level + 1)}
-        </span>
-      </span>
-      {href && <IconChevronRight className="cell-chevron" />}
-    </>
-  );
-  const cls = "flex items-center gap-4 surface p-4";
-  return href ? (
-    <Link href={href} className={`${cls} cell-tap`}>
-      {content}
-    </Link>
-  ) : (
-    <div className={cls}>{content}</div>
-  );
-}
 
 const RING_COLORS: Record<string, string> = {
   doors: "var(--chart-doors)",

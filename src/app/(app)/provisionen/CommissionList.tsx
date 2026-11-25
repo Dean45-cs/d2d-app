@@ -4,7 +4,9 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Cell, EmptyState, ListLabel, Notice, PageHeader, Pill, Segmented, SegmentedLinks, plural } from "@/components/ui";
-import { IconCog, IconEuro, IconSearch, IconSparkles } from "@/components/icons";
+import { IconCog, IconEuro, IconSearch, IconSparkles, IconX } from "@/components/icons";
+import { RankCard } from "@/components/ranks/RankCard";
+import type { CareerSummary } from "@/lib/ranks-model";
 import { kwhRange, money, SPARTE_LABEL, type Sparte } from "@/lib/commissions/model";
 import type { CommissionView, CommissionViewPerson, ViewBand, ViewTariff } from "@/lib/commissions/store";
 import { shortDay } from "./client";
@@ -53,18 +55,21 @@ function searchable(text: string): string {
 }
 
 /**
- * Die Provisionsliste: je Anbieter die Tarife mit dem eigenen Betrag.
- * Mit dem Verbrauch des Kunden zeigt jede Zeile genau die passende Staffel -
- * Tarife, die dafuer nicht gelten, fallen raus.
+ * Die Provisionsliste. Oben der eigene Rang, darunter das Feld fuer den
+ * Verbrauch des Kunden: ohne Eingabe die Tarife nach Anbieter, mit Eingabe
+ * genau die passende Staffel und die besten Tarife zuerst - Tarife, die fuer
+ * den Verbrauch nicht gelten, fallen raus.
  */
 export function CommissionList({
   view,
+  career,
   people,
   self,
   showStructure,
   reviewOnly,
 }: {
   view: CommissionView;
+  career: CareerSummary | null;
   people: CommissionViewPerson[];
   self: { id: number; ownList: boolean };
   showStructure: boolean;
@@ -83,6 +88,7 @@ export function CommissionList({
 
   const kwhDigits = kwhText.replace(/\D/g, "");
   const kwh = kwhDigits ? Number(kwhDigits) : null;
+  const sorted = byAmount || kwh !== null;
   const subjectName = view.subject?.name ?? null;
   const viewingOther = view.subject !== null && view.subject.id !== self.id;
   const hasOther = view.tariffs.some((tariff) => tariff.sparte === "SONSTIGES");
@@ -108,12 +114,13 @@ export function CommissionList({
       }
       list.push(entry);
     }
-    if (byAmount) list.sort((a, b) => b.value - a.value || a.tariff.name.localeCompare(b.tariff.name, "de"));
+    // Mit Verbrauch stehen die besten Tarife oben - danach sucht man an der Tuer.
+    if (sorted) list.sort((a, b) => b.value - a.value || a.tariff.name.localeCompare(b.tariff.name, "de"));
     return { rows: list, outside: missing };
-  }, [view.tariffs, query, sparte, business, extrasOnly, kwh, byAmount, review, showInactive]);
+  }, [view.tariffs, query, sparte, business, extrasOnly, kwh, sorted, review, showInactive]);
 
   const groups = useMemo(() => {
-    if (byAmount) return [{ provider: "", rows }];
+    if (sorted) return [{ provider: "", rows }];
     const map = new Map<string, Shown[]>();
     for (const row of rows) {
       const list = map.get(row.tariff.provider) ?? [];
@@ -123,7 +130,7 @@ export function CommissionList({
     return [...map.entries()]
       .sort(([a], [b]) => a.localeCompare(b, "de"))
       .map(([provider, list]) => ({ provider, rows: list }));
-  }, [rows, byAmount]);
+  }, [rows, sorted]);
 
   const open = openId !== null ? view.tariffs.find((tariff) => tariff.id === openId) ?? null : null;
   // Boni fuer alle Tarife stehen einmal oben - an jeder Zeile waeren sie nur Rauschen.
@@ -174,6 +181,12 @@ export function CommissionList({
           />
         )}
       </PageHeader>
+
+      {career && (
+        <div className="mb-4">
+          <RankCard career={career} />
+        </div>
+      )}
 
       {viewOptions.length > 1 && (
         <div className="mb-4 flex items-center gap-3">
@@ -246,6 +259,33 @@ export function CommissionList({
               </Notice>
             ))}
 
+            <div className="kwh-hero surface">
+              <label htmlFor="commission-kwh" className="block text-footnote font-semibold text-muted">
+                Verbrauch des Kunden
+              </label>
+              <div className="mt-1 flex items-center gap-2">
+                <input
+                  id="commission-kwh"
+                  className="kwh-hero-input tabular-nums"
+                  inputMode="numeric"
+                  enterKeyHint="done"
+                  autoComplete="off"
+                  placeholder="z. B. 3.200"
+                  value={kwhText}
+                  onChange={(event) => setKwhText(event.target.value.replace(/[^\d.]/g, "").slice(0, 12))}
+                />
+                <span className="shrink-0 text-title-3 text-muted">kWh</span>
+                {kwhText && (
+                  <button type="button" className="icon-btn shrink-0" onClick={() => setKwhText("")} aria-label="Verbrauch löschen">
+                    <IconX className="h-4 w-4" />
+                  </button>
+                )}
+              </div>
+              <p className="mt-1 text-footnote text-muted">
+                {kwh === null ? "Zeigt die passende Staffel und die besten Tarife zuerst." : `Die besten Tarife für ${kwh.toLocaleString("de-DE")} kWh stehen oben.`}
+              </p>
+            </div>
+
             <Segmented
               ariaLabel="Sparte"
               value={sparte}
@@ -258,34 +298,19 @@ export function CommissionList({
               ]}
             />
 
-            <div className="grid grid-cols-[minmax(0,10rem)_minmax(0,1fr)] gap-2">
-              <label className="relative block">
-                <span className="sr-only">Jahresverbrauch des Kunden in kWh</span>
-                <input
-                  className="field pr-12 tabular-nums"
-                  inputMode="numeric"
-                  enterKeyHint="done"
-                  autoComplete="off"
-                  placeholder="Verbrauch"
-                  value={kwhText}
-                  onChange={(event) => setKwhText(event.target.value.replace(/[^\d.]/g, "").slice(0, 12))}
-                />
-                <span className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-subhead text-muted">kWh</span>
-              </label>
-              <label className="relative block">
-                <IconSearch className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-muted" />
-                <input
-                  type="search"
-                  className="field field-search pl-12"
-                  placeholder="Suchen"
-                  value={query}
-                  onChange={(event) => setQuery(event.target.value)}
-                  aria-label="Tarif oder Anbieter suchen"
-                  enterKeyHint="search"
-                  autoComplete="off"
-                />
-              </label>
-            </div>
+            <label className="relative block">
+              <IconSearch className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-muted" />
+              <input
+                type="search"
+                className="field field-search pl-12"
+                placeholder="Tarif oder Anbieter suchen"
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                aria-label="Tarif oder Anbieter suchen"
+                enterKeyHint="search"
+                autoComplete="off"
+              />
+            </label>
 
             <div className="chips -mx-4 px-4" role="group" aria-label="Filter">
               <button type="button" className="chip" aria-pressed={business === "PRIVAT"} onClick={() => setBusiness(business === "PRIVAT" ? "ALLE" : "PRIVAT")}>
@@ -297,9 +322,11 @@ export function CommissionList({
               <button type="button" className="chip" aria-pressed={extrasOnly} onClick={() => setExtrasOnly((on) => !on)}>
                 Aktion & Bonus
               </button>
-              <button type="button" className="chip" aria-pressed={byAmount} onClick={() => setByAmount((on) => !on)}>
-                Höchste zuerst
-              </button>
+              {kwh === null && (
+                <button type="button" className="chip" aria-pressed={byAmount} onClick={() => setByAmount((on) => !on)}>
+                  Höchste zuerst
+                </button>
+              )}
               {view.admin && reviewCount > 0 && (
                 <button type="button" className="chip" aria-pressed={review} onClick={() => setReview((on) => !on)}>
                   Prüfen · {reviewCount}
@@ -326,15 +353,18 @@ export function CommissionList({
             <div className="mt-2 space-y-6">
               {groups.map((group) => (
                 <section key={group.provider || "alle"}>
-                  {group.provider && <ListLabel>{group.provider}</ListLabel>}
+                  {group.provider ? (
+                    <ListLabel>{group.provider}</ListLabel>
+                  ) : (
+                    kwh !== null && <ListLabel>{`Beste für ${kwh.toLocaleString("de-DE")} kWh`}</ListLabel>
+                  )}
                   <ul className="list">
                     {group.rows.map((row) => (
                       <li key={row.tariff.id}>
                         <TariffRow
                           row={row}
-                          kwh={kwh}
                           view={view}
-                          showProvider={byAmount}
+                          showProvider={sorted}
                           showSparte={sparte === "ALLE"}
                           onOpen={() => setOpenId(row.tariff.id)}
                         />
@@ -365,14 +395,12 @@ export function CommissionList({
 
 function TariffRow({
   row,
-  kwh,
   view,
   showProvider,
   showSparte,
   onOpen,
 }: {
   row: Shown;
-  kwh: number | null;
   view: CommissionView;
   showProvider: boolean;
   showSparte: boolean;
@@ -383,16 +411,13 @@ function TariffRow({
   const bonus = tariff.bonuses.reduce((sum, item) => sum + item.amount, 0);
   // An der Zeile nur Boni fuer bestimmte Tarife - die fuer alle stehen oben.
   const special = tariff.bonuses.filter((item) => !item.everywhere).reduce((sum, item) => sum + item.amount, 0);
-  const follow = band ? band.follow : 0;
+  // Schlank: wer, welche Staffel - alles Weitere (Folgeprovision, Auszahlung, Team) steht im Detailblatt.
   const details = [
     showProvider ? tariff.provider : null,
     showSparte ? SPARTE_LABEL[tariff.sparte] : null,
     tariff.segment === "GEWERBE" ? "Gewerbe" : null,
-    kwh === null ? (tariff.bands.length > 1 ? `${tariff.bands.length} Staffeln` : tariff.bands[0] ? kwhRange(tariff.bands[0].from, tariff.bands[0].to) : null) : null,
-    follow > 0 ? `+${money(follow)} später` : null,
-    tariff.timing === "bei Lieferbeginn" ? "Auszahlung bei Lieferbeginn" : null,
-    view.manager && band?.keep !== undefined ? `für dich ${money(band.keep)}` : null,
-    view.admin && band?.admin && band.cost ? `Admin ${money(band.admin.now)} · bleibt ${money(band.admin.now - band.cost.now - bonus)}` : null,
+    band ? kwhRange(band.from, band.to) : tariff.bands.length > 1 ? `${tariff.bands.length} Staffeln` : null,
+    view.admin && band?.admin && band.cost ? `bleibt ${money(band.admin.now - band.cost.now - bonus)}` : null,
   ].filter(Boolean);
 
   return (

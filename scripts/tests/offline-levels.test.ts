@@ -11,8 +11,6 @@ import {
   subscribe,
   type QueuedWrite,
 } from "../../src/lib/offline-queue";
-import { levelProgress } from "../../src/lib/levels";
-import type { LevelFeedback } from "../../src/lib/level-feedback";
 
 const STORAGE_KEY = "d2d_pending_visits";
 const firstUser = 11;
@@ -61,8 +59,8 @@ function queueVisit(key: string, ownerUserId = firstUser) {
   return enqueue(key, { clientRequestId: key, outcome: "SALE" }, { ownerUserId });
 }
 
-function confirmed(progression?: LevelFeedback): Response {
-  return Response.json({ ok: true, ...(progression ? { progression } : {}) });
+function confirmed(): Response {
+  return Response.json({ ok: true });
 }
 
 test("full or blocked device storage never reports an unsaved visit as queued", () => {
@@ -93,11 +91,10 @@ test("legacy delivery waits until its retry key can be persisted", async () => {
 test("failed queue removal keeps a confirmed request for a safe idempotent retry", async () => {
   queueVisit("storage-removal-request");
   storage.setItem = () => { throw new Error("Storage blocked"); };
-  globalThis.fetch = async () => confirmed({ progress: levelProgress(100), awardedXp: 100, previousLevel: 1, levelUp: true });
+  globalThis.fetch = async () => confirmed();
   const result = await flush(firstUser);
   assert.equal(result.remaining, 1);
   assert.equal(result.sent, 0);
-  assert.equal(result.progression, undefined);
 });
 
 test("the request ID from the original online attempt survives enqueue and every retry", async () => {
@@ -115,7 +112,6 @@ test("the request ID from the original online attempt survives enqueue and every
   };
   const failed = await flush(firstUser);
   assert.deepEqual({ sent: failed.sent, remaining: failed.remaining, rejected: failed.rejected }, { sent: 0, remaining: 1, rejected: 0 });
-  assert.equal(failed.progression, undefined);
   assert.equal(storedQueue()[0].payload.clientRequestId, payload.clientRequestId);
 
   const retried = await flush(firstUser);
@@ -191,7 +187,6 @@ for (const status of [401, 429, 500, 503]) {
     assert.equal(result.sent, 0);
     assert.equal(result.rejected, 0);
     assert.equal(result.remaining, 2);
-    assert.equal(result.progression, undefined);
     assert.equal(storage.getItem(STORAGE_KEY), initialQueue);
 
     globalThis.fetch = async () => confirmed();
@@ -266,7 +261,7 @@ test("a bell removed on the device also leaves the queued house descriptions", (
   assert.deepEqual(other.payload.doorbells, [{ label: "Müller" }]);
 });
 
-test("network failures stop the queue without awarding XP or dropping later visits", async () => {
+test("network failures stop the queue without dropping later visits", async () => {
   queueVisit("offline-first-request");
   queueVisit("offline-second-request");
   let calls = 0;
@@ -279,69 +274,52 @@ test("network failures stop the queue without awarding XP or dropping later visi
   assert.equal(result.sent, 0);
   assert.equal(result.rejected, 0);
   assert.equal(result.remaining, 2);
-  assert.equal(result.progression, undefined);
 });
 
-test("confirmed XP aggregates across a batch while zero-XP replays preserve the latest balance", async () => {
+test("a whole batch is confirmed one entry at a time", async () => {
   queueVisit("batch-first-request");
   queueVisit("batch-second-request");
   queueVisit("batch-replayed-request");
   enqueue("A house", { streetId: 5 }, { url: "/api/houses", kind: "house", ownerUserId: firstUser });
-  const feedback: Array<LevelFeedback | undefined> = [
-    { progress: levelProgress(100), awardedXp: 5, previousLevel: 1, levelUp: true },
-    { progress: levelProgress(200), awardedXp: 100, previousLevel: 2, levelUp: false },
-    { progress: levelProgress(200), awardedXp: 0, previousLevel: 2, levelUp: false },
-    undefined,
-  ];
   let calls = 0;
-  globalThis.fetch = async () => confirmed(feedback[calls++]);
+  globalThis.fetch = async () => {
+    calls += 1;
+    return confirmed();
+  };
   const result = await flush(firstUser);
-  assert.equal(result.sent, 4);
-  assert.equal(result.remaining, 0);
-  assert.deepEqual(result.progression, {
-    progress: levelProgress(200),
-    awardedXp: 105,
-    previousLevel: 1,
-    levelUp: true,
-  });
+  assert.deepEqual([result.sent, result.remaining, calls], [4, 0, 4]);
 });
 
-test("an unreadable success response retains the visit and a later replay adds no phantom XP", async () => {
+test("an unreadable success response retains the visit for an idempotent replay", async () => {
   queueVisit("lost-response-request");
   const sentIds: unknown[] = [];
   globalThis.fetch = async (_url, options) => {
     sentIds.push(bodyOf(options).clientRequestId);
     if (sentIds.length === 1) return new Response('{"ok":true,', { status: 200 });
-    return confirmed({ progress: levelProgress(100), awardedXp: 0, previousLevel: 2, levelUp: false });
+    return confirmed();
   };
   const first = await flush(firstUser);
   assert.equal(first.sent, 0);
   assert.equal(first.remaining, 1);
-  assert.equal(first.progression, undefined);
 
   const retry = await flush(firstUser);
   assert.equal(retry.sent, 1);
   assert.equal(retry.remaining, 0);
-  assert.equal(retry.progression?.awardedXp, 0);
-  assert.equal(retry.progression?.levelUp, false);
-  assert.equal(retry.progression?.progress.totalXp, 100);
   assert.deepEqual(sentIds, ["lost-response-request", "lost-response-request"]);
 });
 
-test("a partially delivered batch reports only confirmed XP and retains its failed tail", async () => {
+test("a partially delivered batch reports only confirmed entries and retains its failed tail", async () => {
   queueVisit("partial-first-request");
   queueVisit("partial-second-request");
-  const progression = { progress: levelProgress(100), awardedXp: 100, previousLevel: 1, levelUp: true };
   let calls = 0;
   globalThis.fetch = async () => {
     calls += 1;
     if (calls === 2) throw new TypeError("Connection lost");
-    return confirmed(progression);
+    return confirmed();
   };
   const result = await flush(firstUser);
   assert.equal(result.sent, 1);
   assert.equal(result.remaining, 1);
-  assert.deepEqual(result.progression, progression);
   assert.equal(getQueue(firstUser)[0].payload.clientRequestId, "partial-second-request");
 });
 

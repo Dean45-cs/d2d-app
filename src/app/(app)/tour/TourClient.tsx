@@ -7,7 +7,7 @@ import { CardQrSheet, ConfirmSheet, useCardUrl, type Sender } from "@/components
 import { useToast } from "@/components/Toast";
 import { usePrefs } from "@/components/PrefsSync";
 import { EmptyState, OutcomeGlyph } from "@/components/ui";
-import { IconBan, IconBell, IconBuilding, IconHome, IconMap, IconPlus, IconSparkles } from "@/components/icons";
+import { IconBan, IconBell, IconBuilding, IconHome, IconMap, IconPlus } from "@/components/icons";
 import { beginSaleDraft } from "@/lib/sale-drafts-client";
 import { TariffComparison } from "@/components/tariff/TariffComparison";
 import { comparePlace, type CompareTariffOption } from "@/lib/tariff-compare";
@@ -51,8 +51,6 @@ import {
   worthSuggesting,
   type Distance,
 } from "@/lib/geo/nearby";
-import type { LevelProgress } from "@/lib/levels";
-import { levelFeedbackText, xpHintsOn, type LevelFeedback } from "@/lib/level-feedback";
 import { buzz, pref } from "@/lib/preferences";
 import { BuildingHeader } from "./BuildingHeader";
 import { DoorFilter, DoorTable, DoorTableAction, type DoorRow } from "./DoorTable";
@@ -90,7 +88,6 @@ import { useQueue } from "./useQueue";
 
 interface Props {
   userId: number;
-  initialProgress: LevelProgress;
   territories: TerritoryLite[];
   streets: StreetWithStats[];
   /** Gebiete, deren Hausnummern und Klingeln mitgekommen sind - die anderen kommen bei Bedarf. */
@@ -171,7 +168,6 @@ function houseRowKey(number: string): string {
  */
 export function TourClient({
   userId,
-  initialProgress,
   territories,
   streets,
   loadedTerritories,
@@ -191,25 +187,6 @@ export function TourClient({
   const toast = useToast();
   /** Was sich jeder unter Einstellungen -> Klinken selbst einrichtet. */
   const prefs = usePrefs();
-
-  /* ------------------------------ Level --------------------------------- */
-
-  const [level, setLevel] = useState(initialProgress);
-  useEffect(() => setLevel(initialProgress), [initialProgress]);
-  const receiveProgress = useCallback(
-    (feedback?: LevelFeedback, quiet = false) => {
-      if (!feedback) return;
-      setLevel(feedback.progress);
-      // Nach dem Speichern meldet der Ergebnis-Toast den Aufstieg mit.
-      if (feedback.levelUp && !quiet && pref("levelUp")) {
-        toast(`Level ${feedback.progress.level} · ${feedback.progress.title}`, {
-          icon: <IconSparkles className="h-5 w-5 text-accent-ink" />,
-          duration: 4000,
-        });
-      }
-    },
-    [toast],
-  );
 
   /* ------------------------------ Auswahl -------------------------------- */
 
@@ -246,9 +223,7 @@ export function TourClient({
   /* Die Uhr des Geraets - erst nach dem Einblenden; "heute" entscheidet die Tuer. */
   const [now, setNow] = useState<Date | null>(null);
 
-  // Der Toast "nachgesendet" nennt den Aufstieg schon - kein zweiter.
-  const receiveQuietly = useCallback((feedback?: LevelFeedback) => receiveProgress(feedback, true), [receiveProgress]);
-  const { pending, online, sendNow } = useQueue(userId, receiveQuietly, toast);
+  const { pending, online, sendNow } = useQueue(userId, toast);
   const book = useDoorBook(houseNumbers, doorbells, pending);
 
   /* --------------------------- Geraet & Umgebung ------------------------- */
@@ -920,7 +895,6 @@ export function TourClient({
         router.refresh();
         return { status: "error" };
       }
-      receiveProgress(data.progression, true);
       if (data.deleted || data.id === null) {
         toast("Dieser Eintrag wurde bereits zurückgenommen");
         router.refresh();
@@ -932,7 +906,6 @@ export function TourClient({
         status: "saved",
         id: data.id as number,
         door: { streetId: streetId!, number, label: bell?.label ?? "", notHome: outcome === "NOT_HOME" },
-        progression: data.progression,
       };
     } catch {
       // Kein Netz: lokal puffern, damit nichts verloren geht.
@@ -957,13 +930,7 @@ export function TourClient({
     if (result.status === "error") return;
     const base =
       result.status === "saved"
-        ? [
-            text,
-            levelFeedbackText(result.progression),
-            result.progression?.levelUp && pref("levelUp") ? result.progression.progress.title : null,
-          ]
-            .filter(Boolean)
-            .join(" · ")
+        ? text
         : result.loggedOut
           ? `${text} · ${LOGGED_OUT}`
           : `${text} · offline gemerkt`;
@@ -988,9 +955,7 @@ export function TourClient({
         return;
       }
       setLastSaved(null);
-      receiveProgress(data.progression, true);
-      const xp = Number(data.progression?.awardedXp ?? 0);
-      toast(xp < 0 && xpHintsOn() ? `Zurückgenommen · ${xp.toLocaleString("de-DE").replace("-", "−")} XP` : "Zurückgenommen");
+      toast("Zurückgenommen");
       // Der Eintrag ist weg - die sofortige Zaehlung an der Tuer auch.
       const house = doneKey(door.streetId, door.number);
       book.uncountVisit(door.label ? bellSlot(house, door.label) : house, door.notHome);
@@ -1081,7 +1046,6 @@ export function TourClient({
     setSheet(null);
     toast("Auftrag vorgemerkt – danach bestätigen");
     void flush(userId).then((result) => {
-      receiveProgress(result.progression);
       if (result.sent > 0 && navigator.onLine) router.refresh();
     });
     if (!win) window.location.href = tarifrechnerUrl;
@@ -1092,7 +1056,7 @@ export function TourClient({
   if (territories.length === 0) {
     return (
       <div className="page-narrow pt-12">
-        <PendingSales userId={userId} onProgress={receiveProgress} />
+        <PendingSales userId={userId} />
         <EmptyState
           boxed
           icon={<IconMap className="h-6 w-6" />}
@@ -1507,7 +1471,7 @@ export function TourClient({
             />
           )}
 
-          <PendingSales userId={userId} onProgress={receiveProgress} />
+          <PendingSales userId={userId} />
 
           {inBuilding ? (
             <>
@@ -1720,7 +1684,6 @@ export function TourClient({
       {sheet === "day" && (
         <DaySheet
           totals={todayTotals}
-          level={level}
           pending={pending}
           online={online}
           recent={recent}

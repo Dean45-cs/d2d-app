@@ -64,7 +64,7 @@ export default async function SettingsPage() {
             href="/einstellungen/ziele"
             icon={<SettingIcon tone="brown"><IconTarget /></SettingIcon>}
             title="Ziele & Erfolge"
-            subtitle="Tagesziele, XP, Level"
+            subtitle="Tagesziele für die Ringe"
             detail={<GoalDetail />}
           />
         </li>

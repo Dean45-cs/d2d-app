@@ -7,7 +7,6 @@ import { normalizeSlot } from "./appointments";
 import { appointmentTimeZone, appointmentUtc } from "./appointment-time";
 import type { Territory, User, VisitOutcome } from "./types";
 import { createVisitOnce, findVisitRequest, parseVisitRequestId } from "./visit-idempotency";
-import { getLevelProgress } from "./level-queries";
 
 const OUTCOMES: VisitOutcome[] = ["NOT_HOME", "MET_NO_SALE", "APPOINTMENT", "SALE"];
 
@@ -53,10 +52,7 @@ export function recordVisit(user: User, body: Record<string, unknown>, { fromDra
   }
   const clientRequestId = parseVisitRequestId(body.clientRequestId);
   const existing = findVisitRequest(user.team_id, user.id, clientRequestId);
-  if (existing) {
-    const progress = getLevelProgress(user.team_id, user.id);
-    return { ok: true, ...existing, progression: { progress, awardedXp: 0, previousLevel: progress.level, levelUp: false } };
-  }
+  if (existing) return { ok: true, ...existing };
 
   const outcome = optionalText(body.outcome, 20) as VisitOutcome;
   if (!OUTCOMES.includes(outcome)) throw new Error("Unbekanntes Ergebnis.");
@@ -154,21 +150,11 @@ export function recordVisit(user: User, body: Record<string, unknown>, { fromDra
   };
 
   const result = db.transaction(() => {
-    const before = getLevelProgress(user.team_id, user.id);
     const saved = createVisitOnce(user.team_id, user.id, clientRequestId, input);
     if (outcome === "APPOINTMENT" && !saved.replayed && saved.id !== null) {
       db.prepare("UPDATE visits SET follow_up_timezone = ?, follow_up_utc = ? WHERE id = ?").run(zone, utc, saved.id);
     }
-    const progress = getLevelProgress(user.team_id, user.id);
-    return {
-      ...saved,
-      progression: {
-        progress,
-        awardedXp: progress.totalXp - before.totalXp,
-        previousLevel: before.level,
-        levelUp: progress.level > before.level,
-      },
-    };
+    return saved;
   }).immediate();
 
   return result;

@@ -6,7 +6,7 @@ import path from "node:path";
 import { getDb } from "../../src/lib/db";
 import { changeSaleDraft, listSaleDrafts } from "../../src/lib/sale-drafts";
 import { recordVisit } from "../../src/lib/record-visit";
-import { getLevelProgress } from "../../src/lib/level-queries";
+import { getLevelDashboard } from "../../src/lib/level-queries";
 import { listAppointments, requireTeamVisit, setAppointmentDone, setAppointmentSlot } from "../../src/lib/queries";
 import { appointmentTimeZone, appointmentUtc } from "../../src/lib/appointment-time";
 import { sendAppointmentReminders } from "../../src/lib/appointment-reminders";
@@ -45,19 +45,19 @@ function fixture() {
 }
 const count = (table: string, user: User) => (db.prepare(`SELECT COUNT(*) AS total FROM ${table} WHERE user_id = ?`).get(user.id) as { total: number }).total;
 
-test("opening a calculator earns no visit, XP or sale post; confirmation earns exactly once", () => {
+test("opening a calculator earns no visit or sale post; confirmation earns exactly once", () => {
   const f = fixture(); const open = f.opening();
   changeSaleDraft(f.first, open);
   changeSaleDraft(f.first, open);
   assert.equal(listSaleDrafts(f.first).length, 1);
   assert.equal(count("visits", f.first), 0);
   assert.equal(count("posts", f.first), 0);
-  assert.equal(getLevelProgress(f.team, f.first.id).totalXp, 0);
+  assert.equal(getLevelDashboard(f.team, f.first.id).totals.sales, 0);
   const confirmed = changeSaleDraft(f.first, { draftKey: open.draftKey, action: "CONFIRM" });
   assert.equal(confirmed.status, "CONFIRMED");
   assert.equal(count("visits", f.first), 1);
   assert.equal(count("posts", f.first), 1);
-  assert.equal(getLevelProgress(f.team, f.first.id).totalXp, 100);
+  assert.equal(getLevelDashboard(f.team, f.first.id).totals.sales, 1);
   assert.equal(changeSaleDraft(f.first, { draftKey: open.draftKey, action: "CONFIRM" }).replayed, true);
   assert.equal(count("visits", f.first), 1);
   assert.equal(listSaleDrafts(f.first).length, 0);
@@ -150,9 +150,9 @@ test("failed reminders retry and concurrent workers respect DB leases", async ()
   assert.equal(await pending, 1);
 });
 
-test("territory handover requires explicit appointment ownership and preserves author XP", async () => {
+test("territory handover requires explicit appointment ownership and keeps the author's numbers", async () => {
   const f = fixture(); const visit = f.appointment("2026-10-14 18:00");
-  const xp = getLevelProgress(f.team, f.first.id).totalXp;
+  const numbers = getLevelDashboard(f.team, f.first.id).totals;
   assert.throws(() => recordTerritoryHandover(f.leader, f.territory, f.second.id, undefined, ""), /festlegen/);
   assert.throws(() => recordTerritoryHandover(f.leader, f.territory, null, "TRANSFER", ""), /Person/);
   assert.throws(() => recordTerritoryHandover(f.first, f.territory, f.second.id, "TRANSFER", ""));
@@ -162,8 +162,8 @@ test("territory handover requires explicit appointment ownership and preserves a
   assert.equal(listAppointments(f.team, { userId: f.first.id }).length, 0);
   assert.equal(listAppointments(f.team, { userId: f.second.id }).length, 1);
   assert.equal(requireTeamVisit(visit.id!, f.team).user_id, f.second.id);
-  assert.equal(getLevelProgress(f.team, f.first.id).totalXp, xp);
-  assert.equal(getLevelProgress(f.team, f.second.id).totalXp, 0);
+  assert.deepEqual(getLevelDashboard(f.team, f.first.id).totals, numbers);
+  assert.equal(getLevelDashboard(f.team, f.second.id).totals.doors, 0);
   subscribe(f.second);
   const recipients: number[][] = [];
   await sendAppointmentReminders(new Date("2026-10-14T15:45:00Z"), async (ids) => { recipients.push(ids); return 1; });

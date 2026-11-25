@@ -5,7 +5,6 @@ import { handle } from "@/lib/api";
 import { normalizeSlot } from "@/lib/appointments";
 import { appointmentTimeZone } from "@/lib/appointment-time";
 import { requireTeamVisit, setAppointmentDone, setAppointmentSlot } from "@/lib/queries";
-import { getLevelProgress } from "@/lib/level-queries";
 
 export const dynamic = "force-dynamic";
 
@@ -42,13 +41,8 @@ export async function DELETE(
       }
     }
 
-    const progression = db.transaction(() => {
-      const before = getLevelProgress(user.team_id, visit.user_id);
-      db.prepare("DELETE FROM visits WHERE id = ?").run(visit.id);
-      const progress = getLevelProgress(user.team_id, visit.user_id);
-      return { progress, awardedXp: progress.totalXp - before.totalXp, previousLevel: before.level, levelUp: false };
-    }).immediate();
-    return { ok: true, progression };
+    db.prepare("DELETE FROM visits WHERE id = ?").run(visit.id);
+    return { ok: true };
   });
 }
 

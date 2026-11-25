@@ -5,6 +5,7 @@ import { useRef, useState, type FormEvent } from "react";
 import {
   IconChat,
   IconCheck,
+  IconPyramid,
   IconChevronDown,
   IconComment,
   IconHeart,
@@ -16,6 +17,8 @@ import { useToast } from "@/components/Toast";
 import { Avatar, EmptyState, InlineError, Pill } from "@/components/ui";
 import { useConfirm } from "@/components/useConfirm";
 import { timeAgo } from "@/lib/format";
+import { positionLabel, rankLabel } from "@/lib/tiers";
+import { useRanks } from "@/components/ranks/RanksContext";
 import type { FeedComment, FeedPost } from "@/lib/community";
 
 export interface Viewer {
@@ -233,7 +236,8 @@ function PostCard({
   const [open, setOpen] = useState(defaultOpen);
   const [liking, setLiking] = useState(false);
   const { confirm, dialog } = useConfirm();
-  const canDelete = post.kind === "TEXT" && (post.user.id === viewer.id || viewer.isLeader);
+  const ranks = useRanks();
+  const canDelete = post.kind !== "SALE" && (post.user.id === viewer.id || viewer.isLeader);
   const isMine = post.user.id === viewer.id;
 
   async function toggleLike() {
@@ -282,7 +286,8 @@ function PostCard({
           <Link href={`/profil/${post.user.id}`} className="block truncate text-headline">
             {post.user.name}
           </Link>
-          <Link href={`/team/beitrag/${post.id}`} className="block text-footnote text-muted">
+          <Link href={`/team/beitrag/${post.id}`} className="block truncate text-footnote text-muted">
+            {post.user.tier && <>{positionLabel({ role: post.user.role, tier: post.user.tier }, ranks)} · </>}
             <time dateTime={post.created_at} suppressHydrationWarning>
               {timeAgo(post.created_at)}
             </time>
@@ -297,7 +302,11 @@ function PostCard({
         )}
       </header>
 
-      {post.body && <p className="mt-3 whitespace-pre-wrap break-words text-body">{post.body}</p>}
+      {post.rank ? (
+        <RankRow label={rankLabel(post.rank.tier, ranks)} by={post.rank.by} message={post.body} mine={isMine} />
+      ) : (
+        post.body && <p className="mt-3 whitespace-pre-wrap break-words text-body">{post.body}</p>
+      )}
 
       {post.sale && <SaleRow sale={post.sale} mine={isMine} />}
 
@@ -338,6 +347,32 @@ function PostCard({
       />
       {dialog}
     </article>
+  );
+}
+
+/**
+ * Eine Befoerderung: der neue Rang, darunter die Worte der Geschaeftsfuehrung.
+ * Kein gruener Haken - der bedeutet nur Abschluss.
+ */
+function RankRow({ label, by, message, mine }: { label: string; by: string | null; message: string; mine: boolean }) {
+  return (
+    <div className="mt-3 space-y-3">
+      <div className="flex items-center gap-3">
+        <span className="glyph glyph-lg glyph-round glyph-rank">
+          <IconPyramid className="h-5 w-5" />
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="block text-headline">{mine ? "Du bist jetzt" : "Ist jetzt"} {label}</span>
+          <span className="block text-footnote text-muted">Aufgestiegen auf der Karriereleiter</span>
+        </span>
+      </div>
+      {message && (
+        <blockquote className="rank-post-quote">
+          <p className="whitespace-pre-wrap break-words text-body">{message}</p>
+          {by && <footer className="mt-1 text-footnote text-muted">– {by}</footer>}
+        </blockquote>
+      )}
+    </div>
   );
 }
 
@@ -436,7 +471,7 @@ function Comments({
   }
 
   if (!open && post.comments.length === 0) return null;
-  const cheer = post.kind === "SALE" && post.user.id !== viewer.id;
+  const cheer = (post.kind === "SALE" || post.kind === "RANK") && post.user.id !== viewer.id;
 
   return (
     <div className="mb-2 mt-1 space-y-3 border-t border-separator pt-3">
