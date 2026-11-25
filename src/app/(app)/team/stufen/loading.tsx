@@ -1,40 +1,32 @@
-import type { CSSProperties } from "react";
 import { SegmentedLinks, SkeletonHeader, SkeletonText } from "@/components/ui";
-import { TIER_LABEL } from "@/lib/tiers";
+import { TIER_LABEL, TIERS } from "@/lib/tiers";
 import { TEAM_VIEWS } from "../views";
 
-/** So viele Bilder zeigt der Platzhalter je Stufe - nach unten mehr, wie in jedem Team. */
-const STEPS = [
-  { label: "Geschäftsführung", people: 1 },
-  { label: TIER_LABEL.TEAMLEITER, people: 2 },
-  { label: TIER_LABEL.SENIOR, people: 3 },
-  { label: TIER_LABEL.BERATER, people: 5 },
-];
-
-/** Platzhalter der Stufen - die Pyramide steht schon, grau sind nur die Leute. */
-export default function LoadingTiers() {
+/** Platzhalter der Karriereleiter - die Sprossen stehen schon, grau sind nur die Leute. */
+export default function LoadingCareer() {
   return (
-    <div className="page" aria-busy="true" aria-label="Stufen werden geladen">
-      <SkeletonHeader title="Stufen">
+    <div className="page" aria-busy="true" aria-label="Karriereleiter wird geladen">
+      <SkeletonHeader title="Karriere">
         <SegmentedLinks ariaLabel="Team" current="stufen" options={TEAM_VIEWS} className="max-w-md seg-tight" />
       </SkeletonHeader>
-      <div className="pyramid" aria-hidden="true">
-        {STEPS.map((step, index) => (
-          <div key={step.label} className="pyramid-step surface" style={{ "--step": index } as CSSProperties}>
-            <p className="text-headline">{step.label}</p>
-            <div className="pyramid-people">
-              {Array.from({ length: step.people }, (_, i) => (
-                <span key={i} className="pyramid-person">
-                  <span className="skeleton h-12 w-12 rounded-full" />
-                  <span className="block w-full text-footnote">
-                    <SkeletonText width="70%" />
-                  </span>
-                </span>
-              ))}
+      <ol className="ladder" aria-hidden="true">
+        {[...TIERS].reverse().map((tier) => (
+          <li key={tier} className="ladder-rung" data-state="open">
+            <span className="ladder-mark" />
+            <div className="ladder-body surface">
+              <p className="text-headline">{TIER_LABEL[tier]}</p>
+              <div className="mt-2 flex gap-2">
+                {[0, 1, 2].map((i) => (
+                  <span key={i} className="skeleton h-10 w-10 rounded-full" />
+                ))}
+              </div>
+              <span className="mt-2 block text-footnote">
+                <SkeletonText width="40%" />
+              </span>
             </div>
-          </div>
+          </li>
         ))}
-      </div>
+      </ol>
     </div>
   );
 }

@@ -1,7 +1,7 @@
 export type Role = "LEADER" | "MEMBER";
 
-/** Stufe im Vertrieb - bestimmt den Provisionssatz; ab Teamleiter darf man ein eigenes Team aufbauen. */
-export type Tier = "BERATER" | "SENIOR" | "TEAMLEITER";
+/** Rang im Vertrieb - bestimmt den Provisionssatz und ob man ein eigenes Team haben darf (src/lib/tiers.ts). */
+export type Tier = "BERATER" | "SENIOR" | "JUNIOR_LEAD" | "TEAMLEITER";
 
 export type VisitOutcome = "NOT_HOME" | "MET_NO_SALE" | "APPOINTMENT" | "SALE";
 

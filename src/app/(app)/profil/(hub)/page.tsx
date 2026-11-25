@@ -2,7 +2,9 @@ import type { Metadata } from "next";
 import { requireUser } from "@/lib/auth";
 import { permissionsFor } from "@/lib/permissions";
 import { navigation } from "@/lib/nav";
-import { getLevelProgress } from "@/lib/level-queries";
+import { careerFor, loadRanks } from "@/lib/ranks";
+import { positionLabel } from "@/lib/tiers";
+import { RankCard } from "@/components/ranks/RankCard";
 import { countAppointments } from "@/lib/queries";
 import { countCustomers } from "@/lib/customers";
 import { cardSettings } from "@/lib/card-queries";
@@ -40,7 +42,8 @@ export default async function ProfileHubPage() {
   const user = await requireUser();
   const rights = permissionsFor(user);
   const nav = navigation(user.role, rights, user.id);
-  const level = getLevelProgress(user.team_id, user.id);
+  const ranks = loadRanks(user.team_id);
+  const career = user.role === "MEMBER" ? careerFor(user, user, ranks) : null;
   const openAppointments = countAppointments(user.team_id, { userId: user.id }).open;
   const dueCustomers = rights["customers.manage"] ? countCustomers(user.team_id, berlinToday()).due : 0;
   const cardOn = cardSettings(user.id).token !== null;
@@ -56,11 +59,17 @@ export default async function ProfileHubPage() {
             href={`/profil/${user.id}`}
             icon={<Avatar name={user.name} src={user.avatar} size={56} />}
             title={<span className="text-title-3">{user.name}</span>}
-            subtitle={`Lv. ${level.level} · ${level.title}`}
+            subtitle={positionLabel(user, ranks)}
             className="min-h-20"
           />
         </li>
       </ul>
+
+      {career && (
+        <div className="mt-4">
+          <RankCard career={career} />
+        </div>
+      )}
 
       {/* Die eigenen Listen - ohne Ueberschrift, die Zeilen sagen es selbst. */}
       <ul className="list list-icons mt-6">

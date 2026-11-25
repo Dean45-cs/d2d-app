@@ -2,6 +2,8 @@ import crypto from "node:crypto";
 import { getDb, getSetting, setSetting } from "./db";
 import { followerIds, getPost, postForVisit } from "./community";
 import { isMilestone } from "./ranking";
+import { loadRanks, newlyReady } from "./ranks";
+import { rankLabel } from "./tiers";
 import { PUSH_KINDS, isPushKind, type PushKind } from "./push-kinds";
 
 export { PUSH_KINDS, isPushKind, type PushKind };
@@ -338,6 +340,25 @@ export async function notifyComment(
     url: `/team/beitrag/${postId}`,
     tag: `comment-${postId}`,
   }, "comment");
+}
+
+/**
+ * Nach einem Abschluss: hat die Person (oder wegen der Team-Ziele ihre
+ * Fuehrungskraft) alle Ziele fuer den naechsten Rang erreicht, erfaehrt es
+ * der direkte Chef - je Rang einmal.
+ */
+export async function notifyRankReady(visitId: number): Promise<void> {
+  const visit = getDb().prepare("SELECT team_id, user_id FROM visits WHERE id = ?").get(visitId) as { team_id: number; user_id: number } | undefined;
+  if (!visit) return;
+  const ranks = loadRanks(visit.team_id);
+  for (const entry of newlyReady(visit.team_id, visit.user_id)) {
+    await pushToUsers(entry.recipients, {
+      title: `${entry.name} ist bereit für ${rankLabel(entry.tier, ranks)}`,
+      body: "Alle Ziele für den nächsten Rang sind erreicht – jetzt befördern?",
+      url: "/team/stufen",
+      tag: `rank-${entry.userId}-${entry.tier}`,
+    }, "rank");
+  }
 }
 
 /** Neues Abo: die abonnierte Person erfaehrt, wer ihr jetzt folgt. */

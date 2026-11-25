@@ -21,7 +21,7 @@ export async function PATCH(
   });
 }
 
-/** Kundendaten entfernen - der Abschluss bleibt in Zahlen, Feed und XP erhalten. */
+/** Kundendaten entfernen - der Abschluss bleibt in Zahlen, Feed und Zielen erhalten. */
 export async function DELETE(
   _request: Request,
   { params }: { params: Promise<{ id: string }> },

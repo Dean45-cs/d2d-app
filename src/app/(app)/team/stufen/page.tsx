@@ -1,104 +1,76 @@
-import type { CSSProperties } from "react";
 import type { Metadata } from "next";
-import Link from "next/link";
 import { requireUser } from "@/lib/auth";
-import { hasPermission } from "@/lib/permissions";
+import { hasPermission, structureIds } from "@/lib/permissions";
 import { listMembers } from "@/lib/queries";
+import { careerFor, loadGoals, loadRanks, rankSince, readyIds } from "@/lib/ranks";
 import { firstName } from "@/lib/ranking";
-import { TIER_LABEL, buildPyramid, type PyramidLevel } from "@/lib/tiers";
-import { Avatar, Cell, PageHeader, SegmentedLinks, plural } from "@/components/ui";
+import { goalSummary } from "@/lib/ranks-model";
+import { TIERS, rankLabel } from "@/lib/tiers";
+import { PageHeader, SegmentedLinks, plural } from "@/components/ui";
 import { TEAM_VIEWS } from "../views";
+import { CareerLadder, type LadderRung } from "./CareerLadder";
 
 export const dynamic = "force-dynamic";
-export const metadata: Metadata = { title: "Stufen" };
+export const metadata: Metadata = { title: "Karriere" };
 
 /**
- * Wer steht auf welcher Stufe? Eine Pyramide mit Profilbildern: oben die
- * Geschaeftsfuehrung, darunter Teamleiter, Senior Berater und als Basis die
- * Berater. Jedes Bild fuehrt ins Profil; man selbst traegt einen Ring.
- * Saetze stehen hier bewusst nicht - der Vertrieb sieht nur Euro-Betraege.
+ * Die Karriereleiter: unten Berater, oben Teamleiter. Auf jeder Sprosse die
+ * Leute in diesem Rang; die eigene Sprosse ist markiert, die naechste zeigt
+ * die Ziele mit Balken. Hoehere Sprossen nennen "mehr Provision" ohne Betrag.
+ *
+ * Wer bereit fuer den Aufstieg ist, sehen nur die Fuehrungskraefte darueber
+ * und die Geschaeftsfuehrung - befoerdern kann nur die Geschaeftsfuehrung.
  */
-export default async function TiersPage() {
+export default async function CareerPage() {
   const user = await requireUser();
-  const levels = buildPyramid(listMembers(user.team_id));
-  const total = levels.reduce((sum, level) => sum + level.people.length, 0);
-  const canAssign = user.role === "LEADER" && hasPermission(user, "team.roles");
+  const ranks = loadRanks(user.team_id);
+  const goals = loadGoals(user.team_id);
+  const members = listMembers(user.team_id).filter((member) => member.active && member.role === "MEMBER");
+  const canPromote = user.role === "LEADER" && hasPermission(user, "team.roles");
+  // "Bereit" nur fuer die, deren Fortschritt man sehen darf.
+  const visible = user.role === "LEADER" ? null : new Set(structureIds(user));
+  const ready = readyIds(user.team_id, goals);
+  const career = user.role === "MEMBER" ? careerFor(user, user, ranks) : null;
+  const since = user.role === "MEMBER" ? rankSince(user.id) : null;
+  const reports = new Map<number, number>();
+  for (const member of members) if (member.manager_id !== null) reports.set(member.manager_id, (reports.get(member.manager_id) ?? 0) + 1);
+  const byId = new Map(listMembers(user.team_id).map((member) => [member.id, member]));
+
+  const rungs: LadderRung[] = [...TIERS].reverse().map((tier) => ({
+    tier,
+    label: rankLabel(tier, ranks),
+    team: ranks[tier].team,
+    goals: goals.filter((goal) => goal.tier === tier).map(goalSummary),
+    people: members
+      .filter((member) => member.tier === tier)
+      .sort((a, b) => a.name.localeCompare(b.name, "de"))
+      .map((member) => {
+        const seesProgress = visible === null || visible.has(member.id);
+        return {
+          id: member.id,
+          name: member.name,
+          first: firstName(member.name),
+          avatar: member.avatar,
+          me: member.id === user.id,
+          ready: seesProgress && ready.has(member.id),
+          reports: reports.get(member.id) ?? 0,
+          managerName: member.manager_id !== null ? byId.get(member.manager_id)?.name ?? null : null,
+        };
+      }),
+  }));
+  const readyPeople = rungs.flatMap((rung) => rung.people.filter((person) => person.ready).map((person) => ({ ...person, tier: rung.tier })));
+  const total = members.length;
 
   return (
     <div className="page">
       <PageHeader
-        title="Stufen"
-        subtitle={[plural(total, "Person", "Personen"), user.role === "MEMBER" ? `du bist ${TIER_LABEL[user.tier]}` : null]
-          .filter(Boolean)
-          .join(" · ")}
+        title="Karriere"
+        subtitle={[career ? `du bist ${career.label}` : null, plural(total, "Person", "Personen")].filter(Boolean).join(" · ")}
       >
         <SegmentedLinks ariaLabel="Team" current="stufen" options={TEAM_VIEWS} className="max-w-md seg-tight" />
       </PageHeader>
 
-      <ol className="pyramid" aria-label="Stufen im Team, von der Spitze zur Basis">
-        {levels.map((level, index) => (
-          <Step key={level.key} level={level} index={index} viewerId={user.id} />
-        ))}
-      </ol>
-      <p className="list-footer mx-auto max-w-[720px] text-center">
-        Wer mehr verkauft, steigt auf. Ab Teamleiter baust du dein eigenes Team auf.
-      </p>
-
-      {canAssign && (
-        <ul className="list mx-auto mt-6 max-w-[720px]">
-          <li>
-            <Cell href="/einstellungen/mitglieder" title="Stufen vergeben" subtitle="Unter Mitglieder im Blatt der Person" />
-          </li>
-        </ul>
-      )}
+      <CareerLadder rungs={rungs} career={career} since={since} ready={readyPeople} canPromote={canPromote} />
     </div>
-  );
-}
-
-/** Eine Stufe der Pyramide: Name, Anzahl und die Leute mit Bild. */
-function Step({ level, index, viewerId }: { level: PyramidLevel; index: number; viewerId: number }) {
-  return (
-    <li className="pyramid-step surface" style={{ "--step": index } as CSSProperties}>
-      <h2 className="text-headline">
-        {level.label}
-        {level.people.length > 0 && (
-          <>
-            {" "}
-            <span className="font-normal text-muted" aria-hidden="true">
-              {level.people.length}
-            </span>
-            <span className="sr-only">, {plural(level.people.length, "Person", "Personen")}</span>
-          </>
-        )}
-      </h2>
-      {level.people.length === 0 ? (
-        <p className="py-2 text-footnote text-muted">Noch frei</p>
-      ) : (
-        <ul className="pyramid-people">
-          {level.people.map((person) => {
-            const me = person.id === viewerId;
-            return (
-              <li key={person.id}>
-                <Link
-                  href={`/profil/${person.id}`}
-                  className="pyramid-person"
-                  title={person.name}
-                  aria-label={[me ? `${person.name} (du)` : person.name, level.label, person.team > 0 ? `${person.team} im Team` : null]
-                    .filter(Boolean)
-                    .join(", ")}
-                  aria-current={me ? "true" : undefined}
-                >
-                  <Avatar name={person.name} src={person.avatar} size={48} className={me ? "pyramid-me" : ""} />
-                  <span className={`block w-full truncate text-footnote ${me ? "font-semibold text-accent-ink" : ""}`}>
-                    {me ? "Du" : firstName(person.name)}
-                  </span>
-                  {person.team > 0 && <span className="-mt-1 block w-full truncate text-caption text-muted">{person.team} im Team</span>}
-                </Link>
-              </li>
-            );
-          })}
-        </ul>
-      )}
-    </li>
   );
 }

@@ -9,12 +9,13 @@ import { firstName, metricByKey, milestoneProgress, rank, saleStreak } from "@/l
 import { rangeToSince } from "@/lib/ranges";
 import { monthYear } from "@/lib/format";
 import { positionLabel } from "@/lib/tiers";
-import { getLevelProgress } from "@/lib/level-queries";
+import { careerFor, loadRanks, rankHistory } from "@/lib/ranks";
 import { DailyBars, fillDays } from "@/components/charts";
 import { Feed } from "@/components/community/Feed";
 import { FollowButton } from "@/components/community/FollowButton";
 import { ProfileEditor } from "@/components/community/ProfileEditor";
-import { LevelBadge, LevelSummary } from "@/components/levels/LevelCard";
+import { RankCard } from "@/components/ranks/RankCard";
+import { RankHistory } from "@/components/ranks/RankHistory";
 import { Avatar, PageHeader, Pill, ProgressBar, SectionHeader, StatGrid, percent } from "@/components/ui";
 import { IconCalendar, IconTrophy } from "@/components/icons";
 
@@ -36,7 +37,7 @@ type TabKey = (typeof TABS)[number]["key"];
 
 /**
  * Profil einer Person: wer sie ist (Bild, ein Satz, Abonnenten) und was sie
- * leistet - Zahlen, Level, Meilensteine, die letzten zwei Wochen. Daneben (auf
+ * leistet - Zahlen, Rang, Meilensteine, die letzten zwei Wochen. Daneben (auf
  * dem Handy darunter) ihre Beitraege. Wer ein Profil oeffnet, soll sehen,
  * was moeglich ist.
  */
@@ -56,7 +57,10 @@ export default async function ProfilePage({
   const isMe = profile.id === user.id;
   const first = firstName(profile.name);
   const teamId = user.team_id;
-  const level = getLevelProgress(teamId, profile.id);
+  const ranks = loadRanks(teamId);
+  // Fortschritt und Verlauf: nur die Person selbst, ihre Fuehrungskraefte und die Geschaeftsfuehrung.
+  const career = profile.role === "MEMBER" ? careerFor(user, { ...profile, team_id: teamId }, ranks) : null;
+  const history = career ? rankHistory(profile.id) : [];
 
   /* ------------------------------- Zahlen -------------------------------- */
   const all = totals(teamId, { userId: profile.id });
@@ -88,7 +92,7 @@ export default async function ProfilePage({
   const posts = listFeed(teamId, user.id, { scope, limit: 20 });
   const query = new URLSearchParams({ scope: scope.kind, user: String(profile.id) }).toString();
 
-  const roleLabel = positionLabel(profile);
+  const roleLabel = positionLabel(profile, ranks);
 
   return (
     <div className="page">
@@ -106,7 +110,6 @@ export default async function ProfilePage({
             <p className="mt-3 max-w-full break-words text-title-1">{profile.name}</p>
             <p className="mt-1 flex flex-wrap items-center justify-center gap-2 text-subhead text-muted">
               {roleLabel}
-              <LevelBadge progress={level} />
               {profile.follows_me && <Pill>Hat dich abonniert</Pill>}
               {!profile.active && <Pill tone="danger">Deaktiviert</Pill>}
             </p>
@@ -168,11 +171,8 @@ export default async function ProfilePage({
                 ]}
               />
 
-              <LevelSummary
-                progress={level}
-                href={isMe ? "/team/erfolge" : undefined}
-                label={isMe ? "Dein Level" : `Level von ${first}`}
-              />
+              {career && <RankCard career={career} label={isMe ? "Dein Rang" : `Rang von ${first}`} />}
+              {career && <RankHistory entries={history} ranks={ranks} />}
 
               <StatGrid
                 columns={3}

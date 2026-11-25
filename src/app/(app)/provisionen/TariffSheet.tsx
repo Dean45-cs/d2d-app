@@ -40,6 +40,7 @@ export function TariffSheet({
   const match = kwh !== null ? bandAt(tariff.bands, kwh) : undefined;
   const bonus = tariff.bonuses.reduce((sum, item) => sum + item.amount, 0);
   const name = view.subject?.name;
+  const team = teamShares(match ? [match] : tariff.bands);
   const heading = view.subject === null ? "Standardliste" : view.manager || (view.admin && name) ? `Provision von ${name}` : "Deine Provision";
 
   return (
@@ -84,6 +85,27 @@ export function TariffSheet({
           </section>
         )}
 
+        {team.length > 0 && (
+          <section>
+            <ListLabel>An Verträgen deines Teams</ListLabel>
+            <ul className="list">
+              {team.map((entry) => (
+                <li key={entry.label}>
+                  <Cell
+                    title={`Verkauft ein ${entry.label}`}
+                    subtitle={entry.follow > 0 ? `später +${money(entry.follow)} Folgeprovision` : undefined}
+                    trailing={<span className="text-headline tabular-nums text-accent-ink">+{entry.text}</span>}
+                  />
+                </li>
+              ))}
+            </ul>
+            <p className="list-footer">
+              {match || tariff.bands.length === 1 ? "Je Vertrag" : "Je Vertrag, je nach Staffel"} – direkt unter dir. Steht
+              dazwischen noch jemand mit Team, bekommst du den Rest bis zu deinem Betrag. Deinen Leuten wird nichts abgezogen.
+            </p>
+          </section>
+        )}
+
         <section>
           <ListLabel>Gut zu wissen</ListLabel>
           <ul className="list">
@@ -104,6 +126,26 @@ export function TariffSheet({
   );
 }
 
+/** Was man je Rang darunter bekommt - fuer eine Staffel genau, sonst von-bis. */
+function teamShares(bands: ViewBand[]): Array<{ label: string; text: string; follow: number }> {
+  const byLabel = new Map<string, { min: number; max: number; follow: number }>();
+  for (const band of bands) {
+    for (const entry of band.team ?? []) {
+      const seen = byLabel.get(entry.label);
+      byLabel.set(entry.label, {
+        min: Math.min(seen?.min ?? entry.now, entry.now),
+        max: Math.max(seen?.max ?? entry.now, entry.now),
+        follow: Math.max(seen?.follow ?? 0, entry.follow),
+      });
+    }
+  }
+  return [...byLabel.entries()].map(([label, value]) => ({
+    label,
+    text: Math.abs(value.max - value.min) < 0.005 ? money(value.max) : `${money(value.min).replace(/\s?€$/, "")}–${money(value.max)}`,
+    follow: value.follow,
+  }));
+}
+
 function BandRow({
   band,
   view,
@@ -121,7 +163,7 @@ function BandRow({
     band.promo > 0 ? `davon ${money(band.promo)} Aktion${promoUntil ? ` bis ${shortDay(promoUntil)}` : ""}` : null,
     band.follow > 0 ? `später +${money(band.follow)} Folgeprovision` : null,
     bonus > 0 && band.now !== null ? `mit Bonus ${money(band.now + bonus)}` : null,
-    view.manager && band.keep !== undefined ? `für dich als Teamleiter ${money(band.keep)}` : null,
+    view.manager && band.keep !== undefined ? `für dich ${money(band.keep)}` : null,
     view.admin && band.admin
       ? [
           `Admin ${money(band.admin.now)}${band.admin.follow > 0 ? ` + ${money(band.admin.follow)} später` : ""}`,

@@ -74,7 +74,6 @@ export interface Preferences {
   goalDoors: number;
   goalMet: number;
   goalSales: number;
-  levelUp: boolean;
   toastSpeed: ToastSpeed;
   vibrate: boolean;
 
@@ -107,7 +106,6 @@ const DEFAULTS: Preferences = {
   goalDoors: 20,
   goalMet: 5,
   goalSales: 1,
-  levelUp: true,
   toastSpeed: "normal",
   vibrate: false,
   offlineWarm: true,

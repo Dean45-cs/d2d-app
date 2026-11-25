@@ -1,5 +1,4 @@
 import { bellKey } from "./doorbells";
-import type { LevelFeedback } from "./level-feedback";
 
 /**
  * Warteschlange für Schreibvorgänge ohne Netz.
@@ -194,7 +193,6 @@ export interface FlushResult {
   /** Neu zurueckgehalten: der Server nimmt sie nicht an, sie bleiben zum Verwerfen liegen. */
   held: number;
   remaining: number;
-  progression?: LevelFeedback;
 }
 
 let flushing = false;
@@ -220,7 +218,6 @@ export async function flush(userId?: number): Promise<FlushResult> {
   let sent = 0;
   let rejected = 0;
   let held = 0;
-  let progression: LevelFeedback | undefined;
 
   /*
    * Auftraege, deren Eroeffnung (OPEN) noch nicht angekommen ist: die
@@ -259,17 +256,8 @@ export async function flush(userId?: number): Promise<FlushResult> {
         if (response.ok) {
           // Die Bestaetigung vor dem Entfernen lesen: bei Verbindungsabbruch
           // bleibt die Anfrage wiederholbar und erzeugt serverseitig keine Duplikate.
-          const data = await response.json();
+          await response.json();
           if (!remove(entry.localId)) break;
-          if (data.progression) {
-            const next = data.progression as LevelFeedback;
-            progression = {
-              ...next,
-              awardedXp: (progression?.awardedXp ?? 0) + next.awardedXp,
-              previousLevel: progression?.previousLevel ?? next.previousLevel,
-              levelUp: Boolean(progression?.levelUp || next.levelUp),
-            };
-          }
           sent += 1;
         } else if (response.status === 401 || response.status === 429) {
           break; // Neu anmelden bzw. spaeter versuchen; keine Besuche verlieren.
@@ -297,7 +285,7 @@ export async function flush(userId?: number): Promise<FlushResult> {
     flushing = false;
   }
 
-  return { sent, rejected, held, remaining: getQueue(userId).length, progression };
+  return { sent, rejected, held, remaining: getQueue(userId).length };
 }
 
 /**

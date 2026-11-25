@@ -2,8 +2,9 @@ import { assertPermission, hasPermission } from "./permissions";
 import crypto from "node:crypto";
 import { getDb } from "./db";
 import { AuthError, hashPassword } from "./auth";
-import { canLeadTeam, isTier } from "./tiers";
-import type { Tier, User } from "./types";
+import { canLeadTeam, TIERS } from "./tiers";
+import { loadRanks } from "./ranks";
+import type { User } from "./types";
 
 function activeUser(id: number) {
   const user = getDb().prepare("SELECT * FROM users WHERE id = ? AND active = 1").get(id) as User | undefined;
@@ -26,19 +27,20 @@ export function invitationApprover(inviter: User): User {
 
 /**
  * Unter wem landet, wen `inviter` mitbringt oder anlegt? Ein eigenes Team baut
- * man erst ab Teamleiter auf: Geschaeftsfuehrung und Teamleiter bekommen die
- * Person selbst, alle anderen bringen sie zu ihrer Fuehrungskraft - der
- * naechsten aktiven Person darueber, die ein Team haben darf.
+ * man erst ab einem Rang mit Team auf: die Geschaeftsfuehrung und diese Raenge
+ * bekommen die Person selbst, alle anderen bringen sie zu ihrer
+ * Fuehrungskraft - der naechsten aktiven Person darueber, die ein Team haben darf.
  */
 export function placementManager(inviter: User): User {
-  if (canLeadTeam(inviter)) return inviter;
+  const ranks = loadRanks(inviter.team_id);
+  if (canLeadTeam(inviter, ranks)) return inviter;
   const db = getDb();
   const seen = new Set([inviter.id]);
   let current = inviter;
   while (current.manager_id !== null && !seen.has(current.manager_id)) {
     const manager = db.prepare("SELECT * FROM users WHERE id = ? AND team_id = ?").get(current.manager_id, inviter.team_id) as User | undefined;
     if (!manager) break;
-    if (manager.active && canLeadTeam(manager)) return manager;
+    if (manager.active && canLeadTeam(manager, ranks)) return manager;
     seen.add(manager.id);
     current = manager;
   }
@@ -169,32 +171,14 @@ export function setManager(teamId: number, userId: number, managerId: number | n
       SELECT id FROM users WHERE id = ? UNION SELECT u.id FROM users u JOIN descendants d ON u.manager_id = d.id
     ) SELECT id FROM descendants WHERE id = ?`).get(userId, managerId);
     if (cycle) throw new Error("Diese Zuordnung würde einen Kreis in der Struktur erzeugen.");
-    if (!canLeadTeam(manager)) {
-      throw new Error(`Ein eigenes Team gibt es erst ab Teamleiter. Mach ${manager.name} zuerst zum Teamleiter.`);
+    const ranks = loadRanks(teamId);
+    if (!canLeadTeam(manager, ranks)) {
+      const first = TIERS.find((tier) => ranks[tier].team);
+      const label = first ? ranks[first].label : "Teamleiter";
+      throw new Error(`Ein eigenes Team gibt es erst ab ${label}. Mach ${manager.name} zuerst zum ${label}.`);
     }
   }
   db.prepare("UPDATE users SET manager_id = ? WHERE id = ?").run(managerId, userId);
-}
-
-/**
- * Stufe im Vertrieb setzen. Wer Leute unter sich hat, bleibt Teamleiter, bis
- * sie einer anderen Fuehrungskraft zugeordnet sind - sonst stuende ein Team
- * unter jemandem, der keines haben darf.
- */
-export function setTier(teamId: number, userId: number, value: unknown): Tier {
-  if (!isTier(value)) throw new Error("Unbekannte Stufe.");
-  const db = getDb();
-  const member = db.prepare("SELECT * FROM users WHERE id = ? AND team_id = ?").get(userId, teamId) as User | undefined;
-  if (!member) throw new Error("Mitglied nicht gefunden.");
-  if (member.role === "LEADER") throw new Error("Die Geschäftsführung hat keine Stufe im Vertrieb.");
-  if (value !== "TEAMLEITER") {
-    const { count } = db.prepare("SELECT COUNT(*) AS count FROM users WHERE manager_id = ? AND id <> ?").get(userId, userId) as { count: number };
-    if (count > 0) {
-      throw new Error(`${member.name} hat noch ${count === 1 ? "eine Person" : `${count} Personen`} unter sich. Ordne sie zuerst einer anderen Führungskraft zu – nur Teamleiter haben ein eigenes Team.`);
-    }
-  }
-  db.prepare("UPDATE users SET tier = ? WHERE id = ?").run(value, userId);
-  return value;
 }
 
 export interface InvitationRow {

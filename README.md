@@ -21,9 +21,9 @@ Eine Web-App für Door-to-Door-Teams im Energievertrieb:
   zum Anrufen, Besuchen und Umberaten
 - **Provisionen** – die Liste aus dem Portal, mit Regeln der Geschäftsführung: jede Person sieht,
   welcher Tarif ihr wie viel bringt (für den Verbrauch des Kunden auf den Euro genau),
-  nach ihrer Stufe (Berater, Senior Berater, Teamleiter); Teamleiter bekommen von den
-  Verträgen ihrer direkten Leute die Differenz, dazu Boni je Tarif, Person oder
-  für Strom + Gas – niemand sieht, was die Ebenen darüber bekommen
+  nach ihrem Rang (Berater, Senior Berater, Junior Teamleiter, Teamleiter); Ränge mit Team
+  bekommen an den Verträgen ihrer Leute die Differenz – über alle Ebenen –, dazu Boni je
+  Tarif, Person oder für Strom + Gas; niemand sieht, was die Ebenen darüber bekommen
 - **Preise auf der Karte** – zeigt, wo der Grundversorger besonders teuer ist; Preise in Sekunden
   vom Preisblatt eingetragen oder als Tabelle aus Excel übernommen
 - **Übersicht** – Antreff- und Abschlussquoten je Mitarbeiter, Gebiet und Zeitraum; dazu ein
@@ -31,8 +31,8 @@ Eine Web-App für Door-to-Door-Teams im Energievertrieb:
   Vergleich zum gleich langen Zeitraum davor – fürs Team und je Person
 - **Rangliste** – je Kennzahl, der eigene Platz samt Abstand zum nächsten,
   Team-Schnitt, Bestwert und Direktvergleich mit einem Kollegen
-- **Stufen** – wer Berater, Senior Berater oder Teamleiter ist, als Pyramide mit
-  Profilbildern: oben die Geschäftsführung, unten die breite Basis
+- **Karriereleiter** – vier Ränge von Berater bis Teamleiter mit Zielen für den Aufstieg;
+  jeder sieht, wo er steht und was zum nächsten Rang fehlt, befördert wird von Hand
 - **Team-Feed** – jeder Abschluss erscheint von selbst; dazu eigene Beiträge, Kommentare
   und „Gefällt mir“
 - **Abonnieren** – wer Kollegen abonniert, bekommt eine Push-Nachricht aufs Handy,
@@ -105,8 +105,8 @@ Geräte abgemeldet. Neu gesetzt von der Leitung wird es unter Profil › Verwalt
 | Kundenliste: Kunden zuordnen, Wiedervorlage, Export | ✅ | – |
 | Provisionsliste mit den eigenen Beträgen | ✅ (Admin-Provision) | ✅ |
 | Provisionen verwalten: Liste importieren, Regeln, Boni | ✅ | – |
-| Stufen vergeben (Berater, Senior Berater, Teamleiter) | ✅ | – |
-| Eigenes Team aufbauen, Differenz an dessen Verträgen | ✅ | ✅ (ab Teamleiter) |
+| Ränge vergeben und einstellen (Name, Satz, Team, Ziele) | ✅ | – |
+| Eigenes Team aufbauen, Differenz an dessen Verträgen | ✅ | ✅ (ab Junior Teamleiter, einstellbar) |
 | Energiekarte | ✅ | ✅ |
 
 Die Tabelle beschreibt die Rollenstandards. Unter **Profil › Verwaltung › Rechte** lassen
@@ -190,7 +190,7 @@ einklappbaren Seitenleiste; beim Klinken bleibt sie im Auto-Modus schmal. Alte A
    Popup-Blocker dazwischenkommt; blockiert der Browser es trotzdem, wechselt die App selbst
    auf die Seite.
    Bei der Rückkehr fragt die App nach **Abschluss bestätigen**, **Später fortsetzen** oder
-   **Abgebrochen**. Nur die Bestätigung erzeugt Besuch, Abschluss-XP und Feedmeldung.
+   **Abgebrochen**. Nur die Bestätigung erzeugt Besuch, Abschluss und Feedmeldung.
    Offene Aufträge stehen beim Klinken und auf der Leitungsübersicht; über „Tarifrechner
    öffnen“ lässt sich die Erfassung fortsetzen. Öffnen, Bestätigen und Abbrechen werden
    bei fehlender Verbindung kontogebunden lokal vorgemerkt und danach synchronisiert.
@@ -355,7 +355,7 @@ Bei offenen Terminen muss ausdrücklich gewählt werden: **bei bisherigen Verant
 belassen** oder **an die neu zugeteilte Person übergeben**. Letzteres benötigt zusätzlich
 „Teamtermine“; ohne neue Person ist nur das Belassen möglich. Die Übergabe ändert die
 Terminverantwortung, Terminliste und Push-Empfänger, bewahrt jedoch Besuchsautor,
-ursprüngliche Auswertung und XP. Zuteilung und Terminübergabe werden gemeinsam gespeichert;
+ursprüngliche Auswertung und Zahlen. Zuteilung und Terminübergabe werden gemeinsam gespeichert;
 eine inzwischen geänderte Zuteilung erfordert ein erneutes Laden der Seite. Die letzte
 Übergabe samt Notiz wird im Gebiet angezeigt.
 
@@ -507,57 +507,63 @@ Abschluss/Anschluss (wann ausgezahlt wird) und zeigt vor dem Speichern, was neu 
 
 | Regel | Wer | Wirkung |
 |---|---|---|
-| Standardsatz | Geschäftsführung | der Satz der Stufe **Berater**, z. B. 65 % der Admin-Provision – damit starten alle |
-| Stufen | Geschäftsführung | **Senior Berater** und **Teamleiter** bekommen einen höheren Satz, z. B. 70 % und 75 %: die ganze Liste verschiebt sich um dieselben Prozentpunkte, auch bei Ausnahmen |
+| Standardsatz | Geschäftsführung | der Satz des Rangs **Berater**, z. B. 60 % der Admin-Provision – damit starten alle |
+| Ränge | Geschäftsführung | **Senior Berater**, **Junior Teamleiter** und **Teamleiter** bekommen einen höheren Satz, z. B. 65, 70 und 75 %: die ganze Liste verschiebt sich um dieselben Prozentpunkte, auch bei Ausnahmen |
 | Ausnahme | Geschäftsführung | je Sparte, Anbieter oder Tarif ein anderer Satz oder ein fester Betrag – die genauere gilt: Tarif vor Anbieter vor Sparte vor Standard |
-| Individueller Satz | Geschäftsführung | für eine einzelne Person statt des Satzes ihrer Stufe, z. B. 68 % |
-| Differenz | automatisch | ein Teamleiter bekommt von jedem Vertrag seiner **direkten** Leute die Differenz zwischen seinem und ihrem Betrag |
+| Individueller Satz | Geschäftsführung | für eine einzelne Person statt des Satzes ihres Rangs, z. B. 68 % |
+| Differenz | automatisch | jede Führungskraft mit Team-Rang bekommt an jedem Vertrag ihrer Leute den Unterschied zum höchsten Betrag unter ihr – über alle Ebenen |
 
-### Stufen im Vertrieb
+### Ränge und Karriereleiter
 
-Jede Person im Vertrieb hat eine Stufe: **Berater**, **Senior Berater** oder **Teamleiter**.
-Die Geschäftsführung vergibt sie unter **Profil › Verwaltung › Mitglieder** im Blatt der
-Person (Recht „Rollen und Stufen ändern“); die Sätze stehen unter **Provisionsregeln ›
-Stufen**. Ohne eigenen Satz bekommt eine Stufe so viel wie die darunter, nie weniger.
+Jede Person im Vertrieb hat einen von vier Rängen: **Berater**, **Senior Berater**,
+**Junior Teamleiter** und **Teamleiter**. Unter **Profil › Verwaltung › Ränge**
+(`/einstellungen/raenge`, Recht „Rollen und Stufen ändern“) stellt die Geschäftsführung je
+Rang den **Namen**, den **Satz**, ob er ein **Team** haben darf und die **Ziele** für den
+Aufstieg ein. Ohne eigenen Satz bekommt ein Rang so viel wie der darunter, nie weniger. Darf
+ein Rang ein Team haben, dürfen es alle darüber auch (ab Werk: Junior Teamleiter und
+Teamleiter). Ausführlich festgehalten in [docs/RAENGE.md](docs/RAENGE.md).
 
-- **Wer mehr verkauft, steigt auf** – und bekommt bei gleich vielen Verträgen mehr. Jeder
-  behält den Satz seiner Stufe, egal unter wem er steht.
-- **Ein eigenes Team gibt es erst ab Teamleiter.** Nur der Geschäftsführung und Teamleitern
-  lassen sich Leute zuordnen. Wer Leute unter sich hat, bleibt Teamleiter, bis sie einer
-  anderen Führungskraft zugeordnet sind.
-- **Die Differenz zahlt die Firma.** Von jedem Vertrag seiner direkten Leute bekommt der
-  Teamleiter die Differenz zu seinem eigenen Betrag – dem Berater wird nichts abgezogen.
-  Ist die Person Senior Berater, ist die Differenz entsprechend kleiner.
-- **Keine weiteren Ebenen.** Wird jemand im Team selbst Teamleiter, fällt die Differenz weg
-  und er baut sein eigenes Team auf; an dessen Leuten verdient der frühere Teamleiter nichts.
-  Ein Vertrag kostet so nie mehr als den Satz eines Teamleiters.
+**Differenz über alle Ebenen.** Jede Führungskraft mit Team-Rang bekommt an einem Vertrag den
+Unterschied zwischen ihrem Betrag und dem höchsten Betrag unter ihr in der Kette. Die Firma
+zahlt dem Verkäufer nichts weniger und je Vertrag nie mehr als den Satz der obersten Person.
+Gleicher Rang darüber bekommt nichts; wer deaktiviert ist, wird übersprungen.
 
-**Die Pyramide** unter **Team › Stufen** (`/team/stufen`) zeigt allen, wer wo steht: oben
-die Geschäftsführung, darunter Teamleiter, Senior Berater und als breite Basis die Berater –
-jede Person mit Profilbild (ohne Bild das Kürzel) und Vornamen, innerhalb einer Stufe nach
-Namen. Ein Tipp führt ins Profil, man selbst trägt einen Ring und heißt „Du“; wer ein Team
-hat, darunter „6 im Team“. Leere Stufen bleiben als „Noch frei“ stehen, damit man sieht,
-wohin es geht. Deaktivierte fehlen, Provisionssätze stehen dort nicht. Aufbau in
-`buildPyramid` (`src/lib/tiers.ts`), Tests in `scripts/tests/tiers.test.ts`.
-
-Beispiel bei 184,62 € Admin-Provision und den Sätzen 65 / 70 / 75 %:
-
-| | |
+| 100 € Admin-Provision, Max (Berater 60 %) → Lisa (65 %, mit Team) → Tom (Teamleiter 75 %) | |
 |---|---:|
-| Tom (Berater) für seinen Vertrag | 120,00 € |
-| Lisa (Teamleiterin, Tom ist in ihrem Team) bekommt dazu | 18,47 € |
-| Lisa für einen eigenen Vertrag | 138,47 € |
-| Bleibt bei der Geschäftsführung an Toms Vertrag | 46,15 € |
+| Max für seinen Vertrag | 60 € |
+| Lisa dazu (65 − 60) | 5 € |
+| Tom dazu (75 − 65) | 10 € |
+| Die Firma zahlt | 75 € |
+
+**Ziele** hängen am Zielrang, alle müssen erfüllt sein: Abschlüsse (Strom + Gas beim selben
+Kunden zählt doppelt), Strom- bzw. Gas-Abschlüsse, Zeit im Rang, Teamgröße, Abschlüsse im
+Team als Summe oder Durchschnitt je Person (nur direkte Leute). Zeiträume: seit letztem
+Aufstieg, letzte X Monate, laufender Monat oder Quartal – in Berliner Zeit. Team-Ziele lassen
+sich nur wählen, wo der Rang darunter ein Team haben darf.
+
+**Befördert wird von Hand.** Sind alle Ziele erreicht, sieht die Person „Bereit“, ihr direkter
+Chef (sonst die Geschäftsführung) bekommt eine Push-Nachricht – je Rang einmal. Unter
+**Team › Karriere** (`/team/stufen`) steht die Leiter mit den Leuten auf ihren Sprossen,
+oben „Bereit für den Aufstieg“; die Geschäftsführung befördert dort oder unter Mitglieder,
+auf Wunsch mit Beitrag im Feed und ein paar Worten. Die Person sieht beim nächsten Öffnen
+einmal einen Vollbild-Moment. Wer auf einen Rang ohne Team zurückgestuft wird, gibt seine
+Leute an die eigene Führungskraft ab. Jeder Wechsel steht im Verlauf im Profil.
+
+Fortschritt und Verlauf sehen nur die Person, die Führungskräfte über ihr und die
+Geschäftsführung; alle anderen sehen nur den Rang (im Profil, in Rangliste, Feed und
+Mitgliederliste). Was höhere Ränge bekommen, sieht im Vertrieb niemand – die Leiter nennt
+nur „mehr Provision“. Rechenkern in `src/lib/commissions/model.ts`, Ränge in
+`src/lib/tiers.ts`, `src/lib/ranks-model.ts` und `src/lib/ranks.ts`, Tests in
+`scripts/tests/commissions.test.ts` und `scripts/tests/ranks.test.ts`.
 
 Die Geschäftsführung entscheidet außerdem, ob **Aktions-** und **Folgeprovision** anteilig
 weitergegeben werden. Ein fester Betrag gilt für die Abschlussprovision; die Folgeprovision
 wird immer prozentual geteilt. Ein individueller Satz gilt, solange die Person dieselbe
-Führungskraft hat – danach wieder ihre Stufe.
+Führungskraft hat – danach wieder sein Rang.
 
 **Beim Update** wird einmalig Teamleiter, wer schon Leute unter sich hat – niemand verliert
-sein Team. Die früheren Anteile („80 % von Lisa“) und die Untergrenze dafür gibt es nicht
-mehr; bis Sätze für Senior Berater und Teamleiter eingetragen sind, bekommen alle den
-Standardsatz.
+sein Team. Der Junior Teamleiter kommt ohne eigenen Satz dazu (bekommt so viel wie Senior
+Berater), als Aufstiegsdatum gilt bei allen der Tag, an dem sie in die App kamen.
 
 ### Boni
 
@@ -570,11 +576,11 @@ Marge, sie gehen an den, der verkauft, und stehen als Plakette am Tarif bzw. obe
 
 - **Vertrieb**: nur die eigenen Euro-Beträge – nie die Admin-Provision, keinen Prozentsatz
   und nichts von den Ebenen darüber.
-- **Teamleiter**: unter „Meine Leute“ ihre direkten Leute mit Stufe, die Liste jeder dieser
-  Personen und die Differenz, die sie selbst an deren Verträgen bekommen. Nicht die Leute
-  anderer Teamleiter, auch wenn die in der Struktur unter ihnen stehen.
+- **Ränge mit Team**: unter „Meine Leute“ ihre Struktur mit Rang, die Liste jeder dieser
+  Personen und die Differenz, die sie selbst an deren Verträgen bekommen. In der eigenen
+  Liste steht im Detailblatt eines Tarifs, was sie an einem Vertrag je Rang darunter bekommen.
 - **Provisionen verwalten** (Geschäftsführung): Standardliste mit Admin-Provision und dem, was
-  bleibt, „Ansicht als …“ für jede Person, Import, Regeln, Sätze der Stufen, individuelle
+  bleibt, „Ansicht als …“ für jede Person, Import, Regeln, Sätze der Ränge, individuelle
   Sätze und Boni.
 
 Zugeschnitten wird auf dem Server: was jemand nicht sehen darf, verlässt ihn nicht.
@@ -614,24 +620,11 @@ dem Gerät und steht deshalb auch im Treppenhaus ohne Netz. Regeln in
 
 Der Name des Teams auf der Karte kommt aus `SEED_TEAM` bei der Ersteinrichtung.
 
-## Level, XP und Abzeichen
+## Erfolge und Abzeichen
 
-Unter **Team › Erfolge** (`/team/erfolge`) stehen der eigene Fortschritt,
-Tagesziele, 50 Erfolge in fünf Schwierigkeitsstufen, sieben Rangtitel, die Teamrangliste und die letzten
-20 XP-Einträge. Das Level ist außerdem beim Klinken, im Profil, in der Übersicht
-und in der Rangliste sichtbar. Beim Speichern zeigt die App die gewonnenen XP und
-meldet einen Levelaufstieg.
-
-| Ergebnis eines Besuchs | XP insgesamt |
-| --- | ---: |
-| Nicht angetroffen | 5 |
-| Angetroffen, kein Abschluss | 15 |
-| Termin vereinbart | 40 |
-| Abschluss | 100 |
-
-Pro Besuch zählt genau ein Ergebnis. Level 1 beginnt bei 0 XP, Level 2 bei 100 XP,
-Level 3 bei 250 XP. Jeder weitere Aufstieg kostet 50 XP mehr als der vorherige;
-es gibt kein festes Maximallevel. Die Regeln stehen zentral in `src/lib/levels.ts`.
+Unter **Team › Erfolge** (`/team/erfolge`) stehen die Tagesziele, der eigene Rang und
+50 Erfolge in fünf Schwierigkeitsstufen. XP und Level gibt es nicht mehr – den Aufstieg zeigt
+die Karriereleiter, wer vorne liegt, die Rangliste. Die Regeln stehen in `src/lib/levels.ts`.
 Die Erfolgssammlung ist von **Bronze → Silber → Gold → Platin → Diamant** sortiert.
 Erreichte Abzeichen sind Medaillen im Metall ihrer Stufe (Bronze bis Diamant, ab Gold mit
 Perlkranz), offene ein leerer Rohling im Fortschrittsring. Kategorie-Symbole unterscheiden
@@ -641,7 +634,7 @@ hervorgehoben.
 
 Neu zählen Strom-, Gas- und Kombiabschlüsse, erledigte Termine, aktive Tage,
 Tage mit Abschluss und persönliche Tagesbestwerte. `BEIDES` zählt für beide
-Produktabzeichen, bleibt aber ein Besuch mit einmaligen XP. Ein Abschluss ohne
+Produktabzeichen, bleibt aber ein Besuch. Ein Abschluss ohne
 Produktangabe zählt nur zum allgemeinen Abschlussfortschritt. Aktive und erfolgreiche
 Tage müssen nicht aufeinanderfolgen; beim Wiederöffnen eines Termins sinkt dessen
 Erfolgsfortschritt. Tagesbestwerte und Aktivitätstage folgen Europe/Berlin.
@@ -651,15 +644,12 @@ Quellenvergleich und Grenzen: [Recherche zu Vertriebserfolgen](docs/VERTRIEBSERF
 Tagesziele (Standard: 20 Türen, 5 Gespräche, 1 Abschluss – jeder stellt sie unter
 **Einstellungen › Ziele & Erfolge** selbst ein) beginnen um Mitternacht in
 **Europe/Berlin** neu, einschließlich Sommerzeitwechsel. Abzeichen und Tagesziele
-vergeben keine zusätzlichen XP. XP-Hinweise und die Meldung zum Levelaufstieg lassen
-sich dort ebenfalls abschalten.
+zählen nur, was wirklich passiert ist.
 
-XP werden serverseitig aus den bestehenden Besuchen ermittelt: Altbestand zählt
-automatisch, gelöschte Besuche ziehen XP und Abzeichenfortschritt wieder ab.
-Die Rangliste berücksichtigt aktive Teammitglieder und die Geschäftsführung mit mindestens
-einem Besuch; gleiche Gesamt-XP teilen sich einen Platz. Gesamt-XP bleiben dauerhaft.
+Abzeichen werden serverseitig aus den bestehenden Besuchen ermittelt: Altbestand zählt
+automatisch, gelöschte Besuche ziehen den Fortschritt wieder ab.
 Offline-Einträge zählen nach erfolgreicher Synchronisierung, am Tag der Speicherung
-auf dem Server. Stabile Anfrage-IDs verhindern doppelte Besuche, XP und Feedbeiträge
+auf dem Server. Stabile Anfrage-IDs verhindern doppelte Besuche und Feedbeiträge
 bei wiederholtem Senden; auch nach einem Undo bleibt eine Anfrage als erledigt bekannt.
 Neue wartende Einträge sind an das erfassende Konto gebunden.
 
@@ -755,7 +745,7 @@ wieder her.
 | **Klinken** | Nur offene Türen beim Öffnen, Straßen nach Nähe oder wie im Gebiet, Tagesziel-Ring, Versorger und Preis, Visitenkarte im Kopf, fällige Termine, „Nächste offene Tür“, Entfernung zur Tür, Terminbestätigung anbieten, Standort automatisch oder nur auf Antippen, vorgewähltes Produkt |
 | **Karte** | Karte oder Satellit beim Öffnen, dunkle Karte im Dunkelmodus, Standort im Gebiet mitverfolgen |
 | **Bereiche** | Übersicht, Karte und Team in Reiter- und Seitenleiste, womit die App startet, jeder Abschnitt der Übersicht bzw. von „Meine Zahlen“ |
-| **Ziele & Erfolge** | Tagesziele für Türen, Gespräche und Abschlüsse, XP-Hinweise, Level-Aufstieg melden |
+| **Ziele & Erfolge** | Tagesziele für Türen, Gespräche und Abschlüsse |
 | **Mitteilungen** | Push auf diesem Gerät, Push je Anlass (Konto), Push-Hinweis im Feed, Vibration (Android), wie lange Meldungen stehen |
 | **Dieses Gerät** | Super-Energiesparmodus, Klinken und Termine für den Start ohne Netz speichern, als App installieren, alles zurücksetzen |
 | **Konto** | Passwort ändern |

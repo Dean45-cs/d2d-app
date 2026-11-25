@@ -21,7 +21,7 @@ export default async function PostPage({ params }: { params: Promise<{ id: strin
 
   return (
     <div className="page-narrow">
-      <PageHeader title={post?.kind === "SALE" ? "Abschluss" : "Beitrag"} back={{ href: "/team", label: "Team" }} />
+      <PageHeader title={post?.kind === "SALE" ? "Abschluss" : post?.kind === "RANK" ? "Beförderung" : "Beitrag"} back={{ href: "/team", label: "Team" }} />
       {post ? (
         <Feed
           initial={[post]}

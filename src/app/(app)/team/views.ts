@@ -3,5 +3,5 @@ export const TEAM_VIEWS = [
   { key: "feed", href: "/team", label: "Feed" },
   { key: "rangliste", href: "/team/rangliste", label: "Rangliste" },
   { key: "erfolge", href: "/team/erfolge", label: "Erfolge" },
-  { key: "stufen", href: "/team/stufen", label: "Stufen" },
+  { key: "stufen", href: "/team/stufen", label: "Karriere" },
 ];

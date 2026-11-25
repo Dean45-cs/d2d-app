@@ -1,7 +1,6 @@
 import { bellKey } from "@/lib/doorbells";
 import { dayLabel, doorStatus, whenLabel, type DoorFacts } from "@/lib/doors";
 import type { ProviderInfo } from "@/lib/energy/provider";
-import type { LevelFeedback } from "@/lib/level-feedback";
 import { firstName } from "@/lib/ranking";
 import type { LocalLast, LocalVisits } from "@/lib/tour-draft";
 import type { VisitOutcome } from "@/lib/types";
@@ -84,7 +83,6 @@ export type SaveResult =
       id: number;
       /** Die Tuer, an der gespeichert wurde - fuer "Rückgängig". */
       door: SavedDoor;
-      progression?: LevelFeedback;
     }
   | {
       status: "queued";

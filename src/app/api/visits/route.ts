@@ -3,7 +3,7 @@ import { after } from "next/server";
 import { requireUser } from "@/lib/auth";
 import { listVisits } from "@/lib/queries";
 import { handle, optionalNumber } from "@/lib/api";
-import { notifySale } from "@/lib/push";
+import { notifyRankReady, notifySale } from "@/lib/push";
 import { recordVisit } from "@/lib/record-visit";
 
 export const dynamic = "force-dynamic";
@@ -16,6 +16,7 @@ export async function POST(request: Request) {
     if (body.outcome === "SALE" && !result.replayed && result.id !== null) {
       const visitId = result.id;
       after(() => notifySale(visitId).catch((error) => console.warn("[push] Abschluss:", error)));
+      after(() => notifyRankReady(visitId).catch((error) => console.warn("[push] Rang:", error)));
     }
     return { ok: true, ...result };
   });

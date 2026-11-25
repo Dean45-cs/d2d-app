@@ -26,7 +26,7 @@ export function berlinParts(date: Date) {
 }
 
 /** Berliner Wanduhrzeit (als UTC-Zahl gelesen) in den echten Zeitpunkt umrechnen - als SQLite-Zeitstempel. */
-function berlinWallToSql(wall: number): string {
+export function berlinWallToSql(wall: number): string {
   let instant = wall;
   for (let iteration = 0; iteration < 3; iteration += 1) {
     const parts = berlinParts(new Date(instant));

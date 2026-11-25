@@ -2,7 +2,7 @@ import { after } from "next/server";
 import { requireUser } from "@/lib/auth";
 import { handle } from "@/lib/api";
 import { changeSaleDraft, listSaleDrafts } from "@/lib/sale-drafts";
-import { notifySale } from "@/lib/push";
+import { notifyRankReady, notifySale } from "@/lib/push";
 
 export const dynamic = "force-dynamic";
 
@@ -16,6 +16,7 @@ export async function POST(request: Request) {
     if (result.status === "CONFIRMED" && !result.replayed && "id" in result && result.id != null) {
       const id = result.id;
       after(() => notifySale(id).catch((error) => console.warn("[push] Abschluss:", error)));
+      after(() => notifyRankReady(id).catch((error) => console.warn("[push] Rang:", error)));
     }
     return result;
   });

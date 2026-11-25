@@ -1,53 +1,27 @@
 import { getDb } from "./db";
-import {
-  achievementsFor,
-  dailyGoalsFor,
-  levelProgress,
-  xpForOutcome,
-  XP_RULES,
-  type Achievement,
-  type AchievementStats,
-  type DailyGoal,
-  type LevelProgress,
-  type LevelTotals,
-} from "./levels";
-import { OUTCOME_LABEL, type VisitOutcome } from "./types";
+import { achievementsFor, dailyGoalsFor, type Achievement, type AchievementStats, type DailyGoal, type LevelTotals } from "./levels";
 import { berlinDayBounds, berlinParts } from "./format";
 
-/** Nur vertrauenswürdige Regel-Konstanten werden hier in SQL eingesetzt. */
-const XP_SQL = `CASE v.outcome ${XP_RULES.map((rule) => `WHEN '${rule.outcome}' THEN ${rule.xp}`).join(" ")} ELSE 0 END`;
+/*
+ * Erfolge aus der Datenbank: Abzeichen und Tagesziele. XP und Level gibt es
+ * nicht mehr - den Aufstieg zeigt die Karriereleiter.
+ */
+
 const TOTALS_SQL = `COUNT(v.id) AS doors,
   COALESCE(SUM(v.outcome IN ('MET_NO_SALE', 'APPOINTMENT', 'SALE')), 0) AS met,
   COALESCE(SUM(v.outcome = 'APPOINTMENT'), 0) AS appointments,
-  COALESCE(SUM(v.outcome = 'SALE'), 0) AS sales,
-  COALESCE(SUM(${XP_SQL}), 0) AS totalXp`;
-
-interface TotalsRow extends LevelTotals {
-  totalXp: number;
-}
-
-export interface LevelLeaderboardEntry {
-  userId: number;
-  name: string;
-  avatar: string;
-  rank: number;
-  progress: LevelProgress;
-}
+  COALESCE(SUM(v.outcome = 'SALE'), 0) AS sales`;
 
 export interface LevelDashboard {
-  progress: LevelProgress;
   totals: LevelTotals;
-  todayXp: number;
   goals: DailyGoal[];
   achievements: Achievement[];
-  history: Array<{ id: number; outcome: VisitOutcome; label: string; xp: number; createdAt: string }>;
-  leaderboard: LevelLeaderboardEntry[];
 }
 
 // Berliner Tagesgrenzen stehen in format.ts - die Rangliste rechnet mit denselben.
 export { berlinDayBounds };
 
-function userTotals(teamId: number, userId: number): TotalsRow {
+function userTotals(teamId: number, userId: number): LevelTotals {
   // Der JOIN prüft die Mitgliedschaft auch dann, wenn die Person noch keine Besuche hat.
   const row = getDb().prepare(`
     SELECT ${TOTALS_SQL}
@@ -55,34 +29,12 @@ function userTotals(teamId: number, userId: number): TotalsRow {
     LEFT JOIN visits v ON v.user_id = u.id AND v.team_id = u.team_id
     WHERE u.team_id = ? AND u.id = ?
     GROUP BY u.id
-  `).get(teamId, userId) as TotalsRow | undefined;
+  `).get(teamId, userId) as LevelTotals | undefined;
   if (!row) throw new Error("Die Person gehört nicht zu diesem Team.");
   return row;
 }
 
-/** Historische Besuche zählen sofort; Korrekturen und Löschungen korrigieren auch die XP. */
-export function getLevelProgress(teamId: number, userId: number): LevelProgress {
-  return levelProgress(userTotals(teamId, userId).totalXp);
-}
-
-export function getLevelLeaderboard(teamId: number): LevelLeaderboardEntry[] {
-  const rows = getDb().prepare(`
-    SELECT u.id AS userId, u.name, avatar_src(u.id, u.avatar) AS avatar, COALESCE(SUM(${XP_SQL}), 0) AS totalXp
-    FROM users u
-    LEFT JOIN visits v ON v.user_id = u.id AND v.team_id = u.team_id
-    WHERE u.team_id = ? AND u.active = 1
-    GROUP BY u.id
-    HAVING u.role = 'MEMBER' OR COUNT(v.id) > 0
-  `).all(teamId) as Array<{ userId: number; name: string; avatar: string; totalXp: number }>;
-  rows.sort((a, b) => b.totalXp - a.totalXp || a.name.localeCompare(b.name, "de") || a.userId - b.userId);
-  let rank = 0;
-  return rows.map((row, index) => {
-    if (index === 0 || row.totalXp !== rows[index - 1].totalXp) rank = index + 1;
-    return { userId: row.userId, name: row.name, avatar: row.avatar, rank, progress: levelProgress(row.totalXp) };
-  });
-}
-
-/** Produktfortschritt und Beständigkeit aus denselben gültigen Besuchen wie die XP. */
+/** Produktfortschritt und Beständigkeit aus denselben gültigen Besuchen wie die Zahlen. */
 function achievementStats(teamId: number, userId: number, totals: LevelTotals): AchievementStats {
   const db = getDb();
   const products = db.prepare(`SELECT
@@ -122,22 +74,15 @@ function achievementStats(teamId: number, userId: number, totals: LevelTotals): 
 export function getLevelDashboard(teamId: number, userId: number, now = new Date()): LevelDashboard {
   const db = getDb();
   return db.transaction(() => {
-    const { totalXp, ...totals } = userTotals(teamId, userId);
+    const totals = userTotals(teamId, userId);
     const { start, end } = berlinDayBounds(now);
     const today = db.prepare(`SELECT ${TOTALS_SQL} FROM visits v
       WHERE v.team_id = ? AND v.user_id = ? AND v.created_at >= ? AND v.created_at < ?`
-    ).get(teamId, userId, start, end) as TotalsRow;
-    const visits = db.prepare(`SELECT id, outcome, created_at AS createdAt FROM visits
-      WHERE team_id = ? AND user_id = ? ORDER BY created_at DESC, id DESC LIMIT 20`
-    ).all(teamId, userId) as Array<{ id: number; outcome: VisitOutcome; createdAt: string }>;
+    ).get(teamId, userId, start, end) as LevelTotals;
     return {
-      progress: levelProgress(totalXp),
       totals,
-      todayXp: today.totalXp,
       goals: dailyGoalsFor(today),
       achievements: achievementsFor(achievementStats(teamId, userId, totals)),
-      history: visits.map((visit) => ({ ...visit, label: OUTCOME_LABEL[visit.outcome], xp: xpForOutcome(visit.outcome) })),
-      leaderboard: getLevelLeaderboard(teamId),
     };
   })();
 }

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, type ReactNode } from "react";
-import { IconBell, IconCalendar, IconCheckCircle, IconComment, IconHistory, IconUserPlus, IconVibrate } from "@/components/icons";
+import { IconBell, IconCalendar, IconCheckCircle, IconComment, IconHistory, IconPyramid, IconUserPlus, IconVibrate } from "@/components/icons";
 import { PUSH_BANNER_KEY, PushRows } from "@/components/community/PushToggle";
 import { useToast } from "@/components/Toast";
 import { ListLabel, PageHeader } from "@/components/ui";
@@ -33,6 +33,12 @@ const KIND_ROWS: Array<{ kind: PushKind; title: string; subtitle: string; icon: 
     title: "Terminerinnerungen",
     subtitle: "15 Minuten vor einem Termin – ohne Namen und Adresse auf dem Sperrbildschirm",
     icon: <SettingIcon tone="indigo"><IconCalendar /></SettingIcon>,
+  },
+  {
+    kind: "rank",
+    title: "Bereit für den nächsten Rang",
+    subtitle: "Wenn jemand aus deinem Team alle Ziele für den Aufstieg erreicht",
+    icon: <SettingIcon tone="teal"><IconPyramid /></SettingIcon>,
   },
 ];
 

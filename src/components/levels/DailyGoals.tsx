@@ -3,7 +3,7 @@
 import type { DailyGoal } from "@/lib/levels";
 import { usePrefs } from "@/components/PrefsSync";
 import { dailyTargets } from "@/lib/preferences";
-import { ActivityRings } from "./LevelCard";
+import { ActivityRings } from "./ActivityRings";
 
 /**
  * Die Tagesziele unter "Erfolge" mit den eigenen Zielen aus den

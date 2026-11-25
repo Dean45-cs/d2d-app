@@ -10,7 +10,6 @@ import { Cell } from "@/components/ui";
 import { PrefSwitch, SettingIcon } from "@/components/settings/controls";
 import { ACCENT_LABEL } from "@/lib/accents";
 import { HOME_COOKIE } from "@/lib/home";
-import { setXpHints } from "@/lib/level-feedback";
 import { setPowerSaving } from "@/lib/power";
 import { resetPrefs } from "@/lib/preferences";
 import { PUSH_BANNER_KEY } from "@/components/community/PushToggle";
@@ -54,7 +53,8 @@ export function OfflineWarmCell() {
 }
 
 /** Merker, die Seiten selbst fuehren und die "Zuruecksetzen" mit leert. */
-const PAGE_MEMORY = ["d2d.mapType", "d2d_street_order", "d2d_product", PUSH_BANNER_KEY];
+// "d2d.xpHints" stammt aus der Zeit der XP-Level - weg damit.
+const PAGE_MEMORY = ["d2d.mapType", "d2d_street_order", "d2d_product", PUSH_BANNER_KEY, "d2d.xpHints"];
 
 /** Alles auf Anfang - Farbe, Schalter, Merker, Startseite. Mitteilungsarten bleiben (Konto). */
 export function ResetCell() {
@@ -71,7 +71,6 @@ export function ResetCell() {
     });
     if (!ok) return;
     resetPrefs();
-    setXpHints(true);
     setPowerSaving(false);
     try {
       for (const key of PAGE_MEMORY) window.localStorage.removeItem(key);

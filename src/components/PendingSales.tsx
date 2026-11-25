@@ -5,8 +5,6 @@ import { useRouter } from "next/navigation";
 import { enqueue, fetchWithTimeout, flush, getQueue } from "@/lib/offline-queue";
 import { localSaleDrafts, SALE_DRAFT_EVENT, storeSaleDrafts } from "@/lib/sale-drafts-client";
 import type { SaleDraft } from "@/lib/sale-drafts";
-import type { LevelFeedback } from "@/lib/level-feedback";
-import { levelFeedbackText } from "@/lib/level-feedback";
 import { Sheet } from "@/components/Sheet";
 import { useToast } from "@/components/Toast";
 import { IconCheckCircle, IconExternal } from "@/components/icons";
@@ -19,16 +17,10 @@ const POLL_MS = 60_000;
 
 /**
  * Offene Auftraege: im Tarifrechner begonnen, hier noch nicht bestaetigt.
- * Erst die Bestaetigung zaehlt als Abschluss (XP, Feed). Kommt man aus dem
+ * Erst die Bestaetigung zaehlt als Abschluss (Zahlen, Feed, Ziele). Kommt man aus dem
  * Tarifrechner zurueck, fragt die App von selbst nach.
  */
-export function PendingSales({
-  userId,
-  onProgress,
-}: {
-  userId: number;
-  onProgress?: (feedback?: LevelFeedback) => void;
-}) {
+export function PendingSales({ userId }: { userId: number }) {
   const router = useRouter();
   const toast = useToast();
   const [drafts, setDrafts] = useState<SaleDraft[]>([]);
@@ -36,8 +28,6 @@ export function PendingSales({
   const [busy, setBusy] = useState(false);
   const serverDrafts = useRef<SaleDraft[]>([]);
   const syncing = useRef(false);
-  const progressRef = useRef(onProgress);
-  progressRef.current = onProgress;
 
   const merge = useCallback(() => {
     const local = localSaleDrafts(userId);
@@ -55,18 +45,11 @@ export function PendingSales({
       syncing.current = true;
       try {
         const result = await flush(userId);
-        if (result.progression) progressRef.current?.(result.progression);
         if (result.rejected) toast("Ein Vorgang konnte nicht gespeichert werden");
         else if (result.sent && decided === "CONFIRM") {
-          toast(["Abschluss bestätigt", levelFeedbackText(result.progression)].filter(Boolean).join(" · "), {
-            tone: "result",
-          });
+          toast("Abschluss bestätigt", { tone: "result" });
         } else if (result.sent && !decided) {
-          toast(
-            [result.sent === 1 ? "1 Eintrag nachgesendet" : `${result.sent} Einträge nachgesendet`, levelFeedbackText(result.progression)]
-              .filter(Boolean)
-              .join(" · "),
-          );
+          toast(result.sent === 1 ? "1 Eintrag nachgesendet" : `${result.sent} Einträge nachgesendet`);
         }
         if (result.sent) router.refresh();
         const response = await fetchWithTimeout("/api/sale-drafts", { cache: "no-store" });

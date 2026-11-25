@@ -1,22 +1,19 @@
 import {
-  ListLabel,
   SegmentedLinks,
   SkeletonHeader,
   SkeletonLine,
-  SkeletonList,
   SkeletonText,
 } from "@/components/ui";
 import { TEAM_VIEWS } from "../views";
 
-/** Platzhalter der Erfolge - Ringe von heute, Level, Abzeichen, rechts das Team. */
+/** Platzhalter der Erfolge - Ringe von heute, Rang, Abzeichen. */
 export default function LoadingAchievements() {
   return (
     <div className="page" aria-busy="true" aria-label="Erfolge werden geladen">
       <SkeletonHeader title="Erfolge">
         <SegmentedLinks ariaLabel="Team" current="erfolge" options={TEAM_VIEWS} className="max-w-md seg-tight" />
       </SkeletonHeader>
-      <div className="grid grid-cols-1 gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,400px)] lg:items-start">
-        <div className="space-y-8">
+      <div className="space-y-8">
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2" aria-hidden="true">
             <div className="surface p-4">
               <div className="mb-4 flex items-baseline justify-between gap-2">
@@ -40,10 +37,9 @@ export default function LoadingAchievements() {
               </div>
             </div>
             <div className="flex items-center gap-4 surface p-4">
-              <span className="skeleton h-16 w-16 shrink-0 rounded-full" />
               <span className="min-w-0 flex-1">
                 <span className="block text-footnote">
-                  <SkeletonText width="36%" />
+                  <SkeletonText width="24%" />
                 </span>
                 <span className="block text-title-3">
                   <SkeletonText width="64%" />
@@ -73,17 +69,6 @@ export default function LoadingAchievements() {
               ))}
             </div>
           </section>
-        </div>
-        <div className="space-y-8">
-          <section>
-            <ListLabel>Team nach XP</ListLabel>
-            <SkeletonList rows={6} />
-          </section>
-          <section>
-            <ListLabel>Zuletzt gesammelt</ListLabel>
-            <SkeletonList rows={3} icon={false} />
-          </section>
-        </div>
       </div>
     </div>
   );

@@ -3,7 +3,9 @@ import { assertMemberScope, assertNoExtraRights, assertPermission, structureIds 
 import type { User } from "@/lib/types";
 import { getDb } from "@/lib/db";
 import { handle, optionalAvatar, optionalText, requireText } from "@/lib/api";
-import { rejectPendingJoins, setManager, setTier } from "@/lib/invitations";
+import { rejectPendingJoins, setManager } from "@/lib/invitations";
+import { changeRank, loadRanks } from "@/lib/ranks";
+import { canLeadTeam } from "@/lib/tiers";
 
 export const dynamic = "force-dynamic";
 
@@ -36,12 +38,10 @@ export async function PATCH(
       return { ok: true };
     }
     if (body.tier !== undefined) {
-      // Die Stufe bestimmt Provision und wer ein Team haben darf - wie die Rolle Sache der Geschaeftsfuehrung.
-      assertPermission(leader, "team.roles");
-      if (leader.role !== "LEADER") throw new AuthError("Nur die Geschäftsführung vergibt Stufen.", 403);
-      if (Object.keys(body).length !== 1) throw new Error("Bitte die Stufe separat ändern.");
-      setTier(leader.team_id, userId, body.tier);
-      return { ok: true };
+      // Der Rang bestimmt Provision und wer ein Team haben darf - wie die Rolle Sache der Geschaeftsfuehrung.
+      if (Object.keys(body).some((key) => !["tier", "share", "message"].includes(key))) throw new Error("Bitte den Rang separat ändern.");
+      const change = changeRank(leader, userId, body.tier, { share: body.share, message: body.message });
+      return { ok: true, moved: change.moved, postId: change.postId };
     }
     if (Object.keys(body).some((key) => key !== "role")) assertPermission(leader, "team.manage");
     if (body.role !== undefined) {
@@ -87,7 +87,9 @@ export async function PATCH(
       values.push(body.role === "LEADER" ? "LEADER" : "MEMBER");
       // Zurueck im Vertrieb mit Leuten darunter: als Teamleiter, sonst stuende ein Team unter jemandem, der keines haben darf.
       const reports = db.prepare("SELECT 1 FROM users WHERE manager_id = ? AND id <> ? LIMIT 1").get(userId, userId);
-      if (body.role === "MEMBER" && member.role === "LEADER" && reports) fields.push("tier = 'TEAMLEITER'");
+      if (body.role === "MEMBER" && member.role === "LEADER" && reports && !canLeadTeam({ role: "MEMBER", tier: member.tier }, loadRanks(leader.team_id))) {
+        fields.push("tier = 'TEAMLEITER'");
+      }
     }
     if (body.password) {
       const password = String(body.password);

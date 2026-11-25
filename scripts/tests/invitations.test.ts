@@ -5,7 +5,8 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { getDb } from "../../src/lib/db";
 import { authenticate, hashPassword } from "../../src/lib/auth";
-import { createInvitation, registerInvitation, decideInvitation, revokeInvitation, publicInvitation, setManager, setTier, placementManager, invitationDashboard } from "../../src/lib/invitations";
+import { createInvitation, registerInvitation, decideInvitation, revokeInvitation, publicInvitation, setManager, placementManager, invitationDashboard } from "../../src/lib/invitations";
+import { changeRank } from "../../src/lib/ranks";
 import type { User } from "../../src/lib/types";
 
 const dir = mkdtempSync(path.join(tmpdir(), "d2d-invitations-"));
@@ -113,7 +114,8 @@ test("approval rolls back when an email was taken after registration", () => {
   decideInvitation(manager, id, "REJECTED");
 });
 
-test("a team of one's own starts at Teamleiter: placement, reporting lines and demotion", () => {
+test("a team of one's own starts at Junior Teamleiter: placement, reporting lines and demotion", () => {
+  const setTier = (id: number, tier: string) => changeRank(person(root), id, tier);
   // Ein Teamleiter bekommt die Person selbst - freigegeben von seiner Fuehrungskraft.
   const lead = createInvitation(manager);
   registerInvitation(lead.token, input("lead-invite@test.de"));
@@ -125,24 +127,25 @@ test("a team of one's own starts at Teamleiter: placement, reporting lines and d
   const solo = user("solo", root);
   assert.equal(placementManager(person(solo)).id, root);
   // Niemand wird einem Berater oder Senior Berater unterstellt.
-  assert.throws(() => setManager(team, solo, inviter), /erst ab Teamleiter/);
-  setTier(team, inviter, "SENIOR");
-  assert.throws(() => setManager(team, solo, inviter), /erst ab Teamleiter/);
+  assert.throws(() => setManager(team, solo, inviter), /erst ab Junior Teamleiter/);
+  setTier(inviter, "SENIOR");
+  assert.throws(() => setManager(team, solo, inviter), /erst ab Junior Teamleiter/);
   assert.equal(placementManager(person(inviter)).id, manager);
-  // Mit der Stufe Teamleiter geht beides - und Einladungen landen bei ihm selbst.
-  setTier(team, inviter, "TEAMLEITER");
+  // Ab Junior Teamleiter geht beides - und Einladungen landen bei ihm selbst.
+  setTier(inviter, "JUNIOR_LEAD");
   setManager(team, solo, inviter);
   assert.equal(placementManager(person(inviter)).id, inviter);
-  // Solange jemand unter ihm steht, bleibt er Teamleiter.
-  assert.throws(() => setTier(team, inviter, "BERATER"), /eine Person unter sich/);
-  assert.throws(() => setTier(team, manager, "SENIOR"), /Personen unter sich/);
-  setManager(team, solo, root);
-  setTier(team, inviter, "BERATER");
-  assert.equal(person(inviter).tier, "BERATER");
-  // Ungueltiges: unbekannte Stufe, fremdes Team, Geschaeftsfuehrung.
-  assert.throws(() => setTier(team, inviter, "CHEF"), /Unbekannte Stufe/);
-  assert.throws(() => setTier(otherTeam, inviter, "SENIOR"), /nicht gefunden/);
-  assert.throws(() => setTier(team, root, "TEAMLEITER"), /keine Stufe/);
+  // Zurueck auf einen Rang ohne Team: seine Leute rutschen zu seiner Fuehrungskraft.
+  const change = setTier(inviter, "BERATER");
+  assert.deepEqual([change.moved, person(solo).manager_id, person(inviter).tier], [1, manager, "BERATER"]);
+  // Jeder Wechsel steht im Verlauf.
+  const history = db.prepare("SELECT from_tier, tier FROM rank_history WHERE user_id = ? ORDER BY id").all(inviter) as Array<{ from_tier: string; tier: string }>;
+  assert.deepEqual(history.map((row) => [row.from_tier, row.tier]), [["BERATER", "SENIOR"], ["SENIOR", "JUNIOR_LEAD"], ["JUNIOR_LEAD", "BERATER"]]);
+  // Ungueltiges: unbekannter Rang, fremdes Team, Geschaeftsfuehrung, kein Recht.
+  assert.throws(() => setTier(inviter, "CHEF"), /Unbekannter Rang/);
+  assert.throws(() => changeRank(person(outsider), inviter, "SENIOR"), /nicht gefunden/);
+  assert.throws(() => setTier(root, "TEAMLEITER"), /keinen Rang/);
+  assert.throws(() => changeRank(person(manager), inviter, "SENIOR"), /Berechtigung|Geschäftsführung/);
 });
 
 test("placement skips inactive or ineligible managers and never leaves the team", () => {
