@@ -200,6 +200,7 @@ export default async function ProfileHubPage() {
 const ADMIN_TONES: Partial<Record<string, SymbolTone>> = {
   users: "blue",
   invite: "indigo",
+  qr: "teal",
   shield: "slate",
   list: "purple",
   cog: "teal",

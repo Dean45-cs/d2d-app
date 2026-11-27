@@ -26,3 +26,12 @@ export function qrPath(text: string): { size: number; path: string } {
   }
   return { size: size + QR_QUIET_ZONE * 2, path: parts.join("") };
 }
+
+/** QR-Code als eigenstaendige SVG-Datei - schwarz auf weiss, zum Drucken auf Ausweise. */
+export function qrSvg(text: string): string {
+  const { size, path } = qrPath(text);
+  return (
+    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${size} ${size}" width="${size * 8}" height="${size * 8}" shape-rendering="crispEdges">` +
+    `<rect width="${size}" height="${size}" fill="#fff"/><path d="${path}" fill="#000"/></svg>`
+  );
+}

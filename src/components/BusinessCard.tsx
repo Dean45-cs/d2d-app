@@ -23,9 +23,15 @@ export interface Sender {
  * unter einem anderen Namen), darum erst nach dem ersten Bild, vorher "".
  */
 export function useCardUrl(token: string | null): string {
+  const origin = useCardOrigin();
+  return token && origin ? `${origin}${cardPath(token)}` : "";
+}
+
+/** Vorderer Teil jedes Kartenlinks - fuer Listen mit vielen Karten. */
+export function useCardOrigin(): string {
   const [origin, setOrigin] = useState("");
   useEffect(() => setOrigin(CARD_ORIGIN || window.location.origin), []);
-  return token && origin ? `${origin}${cardPath(token)}` : "";
+  return origin;
 }
 
 /**

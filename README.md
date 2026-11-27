@@ -618,6 +618,14 @@ dem Gerät und steht deshalb auch im Treppenhaus ohne Netz. Regeln in
 `src/lib/business-card.ts`, Abfragen in `src/lib/card-queries.ts`, Tests in
 `scripts/tests/business-card.test.ts`.
 
+**Alle Karten auf einen Blick:** Unter **Profil › Verwaltung › Visitenkarten**
+(`/einstellungen/visitenkarten`, mit dem Recht „Team verwalten“) stehen die Links aller
+Personen, die man auch unter Mitglieder verwalten darf – mit Ausweisnummer. Ein Tipp zeigt den
+QR-Code groß, **Link kopieren** und **QR-Code herunterladen** (SVG, scharf in jeder Größe –
+für gedruckte Ausweise). **Alle Links kopieren** legt Name, Ausweisnummer und Link je Zeile in
+die Zwischenablage. Wer die Karte aus hat, steht darunter ohne Link: einschalten kann sie nur
+die Person selbst.
+
 Der Name des Teams auf der Karte kommt aus `SEED_TEAM` bei der Ersteinrichtung.
 
 ## Erfolge und Abzeichen

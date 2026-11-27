@@ -20,10 +20,11 @@ import {
   foldLine,
   isCardToken,
   memberSince,
+  qrFilename,
   vcardFilename,
   type PublicCard,
 } from "../../src/lib/business-card";
-import { cardSettings, publicCard, updateCard } from "../../src/lib/card-queries";
+import { cardSettings, publicCard, teamCards, updateCard } from "../../src/lib/card-queries";
 import { activeHref, navigation } from "../../src/lib/nav";
 import { permissionsFor } from "../../src/lib/permissions";
 import type { User } from "../../src/lib/types";
@@ -230,4 +231,52 @@ test("the QR path draws exactly the dark modules, inside a quiet zone", async ()
   assert.equal(drawn, dark);
   const starts = [...qr.path.matchAll(/M(\d+) (\d+)/g)].map((match) => [Number(match[1]), Number(match[2])]);
   assert.ok(starts.every(([x, y]) => x >= QR_QUIET_ZONE && y >= QR_QUIET_ZONE && y < size + QR_QUIET_ZONE));
+});
+
+test("the team card overview lists active people's links, cards that are on first", () => {
+  const on = person();
+  const team = (db.prepare("SELECT team_id FROM users WHERE id = ?").get(on) as { team_id: number }).team_id;
+  const add = (name: string, active = 1) =>
+    Number(
+      db.prepare(`INSERT INTO users(team_id, name, email, password_hash, role, active, created_at)
+        VALUES (?, ?, ?, '', 'MEMBER', ?, '2026-03-14 09:00:00')`)
+        .run(team, name, `team-card-${++sequence}@example.test`, active).lastInsertRowid,
+    );
+  const off = add("Aaron Off");
+  const gone = add("Bea Weg", 0);
+  const outside = person();
+  updateCard(on, { enabled: true });
+  updateCard(gone, { enabled: true });
+  updateCard(outside, { enabled: true });
+  db.prepare("UPDATE users SET badge_number = 'A-17' WHERE id = ?").run(on);
+
+  const cards = teamCards(team, [on, off, gone, outside]);
+  // Deaktivierte haben keine gueltige Karte, andere Teams gehoeren nicht dazu.
+  assert.deepEqual(cards.map((card) => card.id), [on, off]);
+  assert.equal(cards[0].token, cardSettings(on).token);
+  assert.equal(cards[0].badgeNumber, "A-17");
+  assert.equal(cards[1].token, null);
+  // Nur wen die Leitung nennt.
+  assert.deepEqual(teamCards(team, [off]).map((card) => card.id), [off]);
+  assert.deepEqual(teamCards(team, []), []);
+});
+
+test("the card overview is in the admin menu only with the right to manage the team", () => {
+  const id = person();
+  const member = db.prepare("SELECT * FROM users WHERE id = ?").get(id) as User;
+  const leader = { ...member, role: "LEADER" } as User;
+  const has = (user: User) =>
+    navigation(user.role, permissionsFor(user), user.id).admin.some((item) => item.href === "/einstellungen/visitenkarten");
+  assert.equal(has(member), permissionsFor(member)["team.manage"]);
+  assert.equal(has(leader), true);
+});
+
+test("QR downloads are standalone SVG files with a printable name", async () => {
+  const { qrSvg, qrPath } = await import("../../src/lib/qr");
+  const text = "https://carlssonsales.de/k/AbCdEfGhIjKl";
+  const svg = qrSvg(text);
+  assert.ok(svg.startsWith('<svg xmlns="http://www.w3.org/2000/svg"'));
+  assert.ok(svg.includes(qrPath(text).path));
+  assert.equal(qrFilename("Anna Müller-Groß"), "Visitenkarte-Anna-Mueller-Gross.svg");
+  assert.equal(qrFilename("???"), "Visitenkarte.svg");
 });
