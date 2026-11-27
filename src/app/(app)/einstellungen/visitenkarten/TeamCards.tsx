@@ -1,17 +1,22 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { QrCode } from "@/components/QrCode";
 import { Sheet } from "@/components/Sheet";
 import { useCardOrigin } from "@/components/BusinessCard";
 import { useToast } from "@/components/Toast";
+import { useConfirm } from "@/components/useConfirm";
 import { Avatar, Cell, EmptyState, ListLabel, PageHeader, ToneTile, plural } from "@/components/ui";
 import { IconExternal, IconLink, IconQr } from "@/components/icons";
 import { cardPath, qrFilename } from "@/lib/business-card";
 import type { TeamCard } from "@/lib/card-queries";
+import { fetchWithTimeout } from "@/lib/offline-queue";
 import { qrSvg } from "@/lib/qr";
 
 const BACK = { href: "/profil", label: "Profil", mobileOnly: true };
+
+type Change = { enabled?: boolean; renew?: boolean };
 
 async function copyText(text: string, toast: (message: string) => void, done: string) {
   try {
@@ -37,16 +42,44 @@ function downloadQr(url: string, name: string) {
 
 /**
  * Kartenlinks des Teams fuer die Leitung: wer die Karte an hat, mit Link
- * und QR-Code; wer nicht, steht darunter. Einschalten kann jede Person nur
- * selbst - die Karte zeigt Bild und Namen oeffentlich.
+ * und QR-Code; wer nicht, steht darunter und laesst sich hier einschalten -
+ * einzeln oder alle auf einmal. Ausschalten kann die Person weiterhin selbst.
  */
 export function TeamCards({ cards }: { cards: TeamCard[] }) {
+  const router = useRouter();
   const toast = useToast();
+  const { confirm, dialog } = useConfirm();
   const origin = useCardOrigin();
-  const [open, setOpen] = useState<TeamCard | null>(null);
+  const [openId, setOpenId] = useState<number | null>(null);
+  const [busy, setBusy] = useState(false);
   const on = cards.filter((card) => card.token);
   const off = cards.filter((card) => !card.token);
+  const open = cards.find((card) => card.id === openId) ?? null;
   const urlOf = (card: TeamCard) => (card.token && origin ? `${origin}${cardPath(card.token)}` : "");
+
+  async function change(ids: number[], body: Change, done: string): Promise<boolean> {
+    setBusy(true);
+    try {
+      const response = await fetchWithTimeout("/api/team/cards", {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ ids, ...body }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        toast(data.error ?? "Nicht gespeichert");
+        return false;
+      }
+      toast(done);
+      router.refresh();
+      return true;
+    } catch {
+      toast("Ohne Verbindung nicht möglich");
+      return false;
+    } finally {
+      setBusy(false);
+    }
+  }
 
   function copyAll() {
     const lines = on.map((card) => {
@@ -54,6 +87,34 @@ export function TeamCards({ cards }: { cards: TeamCard[] }) {
       return `${card.name}${badge}: ${urlOf(card)}`;
     });
     void copyText(lines.join("\n"), toast, plural(lines.length, "Link kopiert", "Links kopiert"));
+  }
+
+  async function enableAll() {
+    const ok = await confirm({
+      title: plural(off.length, "Karte einschalten?", "Karten einschalten?"),
+      text: "Bild, Name und Team sind danach über den Link öffentlich zu sehen. Jede Person kann ihre Karte selbst wieder ausschalten.",
+      confirmLabel: "Einschalten",
+    });
+    if (ok) await change(off.map((card) => card.id), { enabled: true }, plural(off.length, "Karte ist an", "Karten sind an"));
+  }
+
+  async function renew(card: TeamCard) {
+    const ok = await confirm({
+      title: "Neuen Link erzeugen?",
+      text: `Der bisherige QR-Code von ${card.name} und Links in schon verschickten Bestätigungen gelten danach nicht mehr.`,
+      confirmLabel: "Neuer Link",
+    });
+    if (ok) await change([card.id], { renew: true }, "Neuer Link – der alte gilt nicht mehr");
+  }
+
+  async function disable(card: TeamCard) {
+    const ok = await confirm({
+      title: "Visitenkarte ausschalten?",
+      text: `Die Seite von ${card.name} ist danach nicht mehr erreichbar. Beim Einschalten gibt es einen neuen Link.`,
+      confirmLabel: "Ausschalten",
+      danger: true,
+    });
+    if (ok && (await change([card.id], { enabled: false }, "Visitenkarte ist aus"))) setOpenId(null);
   }
 
   return (
@@ -65,7 +126,7 @@ export function TeamCards({ cards }: { cards: TeamCard[] }) {
           boxed
           icon={<IconQr className="h-6 w-6" />}
           title="Noch keine Visitenkarte an"
-          text="Jede Person schaltet ihre Karte selbst ein: Profil › Visitenkarte. Danach steht ihr Link hier."
+          text="Schalte die Karten unten ein – oder jede Person selbst unter Profil › Visitenkarte."
         />
       ) : (
         <>
@@ -74,7 +135,7 @@ export function TeamCards({ cards }: { cards: TeamCard[] }) {
             {on.map((card) => (
               <li key={card.id}>
                 <Cell
-                  onClick={() => setOpen(card)}
+                  onClick={() => setOpenId(card.id)}
                   icon={<Avatar name={card.name} src={card.avatar || null} size={32} />}
                   title={card.name}
                   subtitle={urlOf(card).replace(/^https?:\/\//, "") || " "}
@@ -108,25 +169,70 @@ export function TeamCards({ cards }: { cards: TeamCard[] }) {
                 <Cell
                   icon={<Avatar name={card.name} src={card.avatar || null} size={32} />}
                   title={card.name}
-                  subtitle="Visitenkarte ausgeschaltet"
-                  detail={card.badgeNumber || undefined}
+                  subtitle={card.badgeNumber ? `Ausweis-Nr. ${card.badgeNumber}` : "Visitenkarte ausgeschaltet"}
+                  trailing={
+                    <button
+                      type="button"
+                      className="btn btn-secondary btn-sm shrink-0"
+                      disabled={busy}
+                      onClick={() => void change([card.id], { enabled: true }, `Karte von ${card.name} ist an`)}
+                    >
+                      Einschalten
+                    </button>
+                  }
                 />
               </li>
             ))}
+            {off.length > 1 && (
+              <li>
+                <Cell
+                  onClick={() => void enableAll()}
+                  disabled={busy}
+                  tone="accent"
+                  title={`Alle ${off.length} einschalten`}
+                  chevron={false}
+                />
+              </li>
+            )}
           </ul>
           <p className="list-footer">
-            Die Karte zeigt Bild und Namen öffentlich – deshalb schaltet sie jede Person selbst ein: Profil › Visitenkarte.
+            Eine eingeschaltete Karte zeigt Bild, Name und Team öffentlich über ihren Link. Jede Person kann sie unter
+            Profil › Visitenkarte selbst wieder ausschalten.
           </p>
         </>
       )}
 
-      {open && <CardSheet card={open} url={urlOf(open)} onClose={() => setOpen(null)} />}
+      {open && open.token && (
+        <CardSheet
+          card={open}
+          url={urlOf(open)}
+          busy={busy}
+          onRenew={() => void renew(open)}
+          onDisable={() => void disable(open)}
+          onClose={() => setOpenId(null)}
+        />
+      )}
+      {dialog}
     </div>
   );
 }
 
 /** Eine Karte zum Vorzeigen oder Weitergeben: QR-Code, Link, Datei zum Drucken. */
-function CardSheet({ card, url, onClose }: { card: TeamCard; url: string; onClose: () => void }) {
+function CardSheet({
+  card,
+  url,
+  busy,
+  onRenew,
+  onDisable,
+  onClose,
+}: {
+  card: TeamCard;
+  url: string;
+  busy: boolean;
+  onRenew: () => void;
+  onDisable: () => void;
+  onClose: () => void;
+}) {
   const toast = useToast();
   return (
     <Sheet title={card.name} subtitle={card.badgeNumber ? `Ausweis-Nr. ${card.badgeNumber}` : "Visitenkarte"} onClose={onClose}>
@@ -163,6 +269,20 @@ function CardSheet({ card, url, onClose }: { card: TeamCard; url: string; onClos
             icon={<ToneTile tone="teal"><IconExternal className="h-4 w-4" /></ToneTile>}
             title="Vorschau öffnen"
           />
+        </li>
+      </ul>
+      <ul className="list mt-4">
+        <li>
+          <Cell
+            onClick={onRenew}
+            disabled={busy}
+            title="Neuen Link erzeugen"
+            subtitle="Der bisherige QR-Code gilt dann nicht mehr"
+            chevron={false}
+          />
+        </li>
+        <li>
+          <Cell onClick={onDisable} disabled={busy} tone="danger" title="Visitenkarte ausschalten" chevron={false} />
         </li>
       </ul>
     </Sheet>

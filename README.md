@@ -623,8 +623,10 @@ dem Gerät und steht deshalb auch im Treppenhaus ohne Netz. Regeln in
 Personen, die man auch unter Mitglieder verwalten darf – mit Ausweisnummer. Ein Tipp zeigt den
 QR-Code groß, **Link kopieren** und **QR-Code herunterladen** (SVG, scharf in jeder Größe –
 für gedruckte Ausweise). **Alle Links kopieren** legt Name, Ausweisnummer und Link je Zeile in
-die Zwischenablage. Wer die Karte aus hat, steht darunter ohne Link: einschalten kann sie nur
-die Person selbst.
+die Zwischenablage. Wer die Karte aus hat, steht darunter – mit **Einschalten** je Person
+und **Alle einschalten**. Im Blatt einer Karte gibt es außerdem **Neuen Link erzeugen** und
+**Visitenkarte ausschalten**. Das geht für jede Person, die man auch unter Mitglieder verwalten
+darf, und nur für aktive Konten (`PATCH /api/team/cards`, Regeln in `updateTeamCards`).
 
 Der Name des Teams auf der Karte kommt aus `SEED_TEAM` bei der Ersteinrichtung.
 
@@ -1434,8 +1436,10 @@ bzw. den Beschäftigten abgestimmt. Wer das nicht möchte: in
 `src/app/(app)/tour/TourClient.tsx` die Konstante `position` auf `null` setzen. „In meiner
 Nähe“ bleibt dann erhalten – dafür verlässt der Standort das Gerät nicht.
 
-Die **Visitenkarte** veröffentlicht Bild und Namen der Person – deshalb schaltet sie jede
-Person selbst ein und aus; die Rufnummer erscheint nur auf ausdrücklichen Wunsch. Die
+Die **Visitenkarte** veröffentlicht Bild und Namen der Person. Einschalten kann sie die Person
+selbst oder die Leitung (Recht „Team verwalten“) – die Beschäftigten sollten darüber informiert
+sein; ausschalten kann jede Person ihre Karte jederzeit selbst. Die Rufnummer erscheint nur auf
+ausdrücklichen Wunsch der Person. Die
 **Terminbestätigung** geht vom eigenen Handy per WhatsApp oder SMS an eine Nummer, die der
 Kunde für genau diesen Termin genannt hat – eine Nachricht zum vereinbarten Termin, keine
 Werbung. Ob WhatsApp auf dem Diensthandy genutzt werden darf, regelt der Betrieb; die SMS

@@ -24,7 +24,7 @@ import {
   vcardFilename,
   type PublicCard,
 } from "../../src/lib/business-card";
-import { cardSettings, publicCard, teamCards, updateCard } from "../../src/lib/card-queries";
+import { cardSettings, publicCard, teamCards, updateCard, updateTeamCards } from "../../src/lib/card-queries";
 import { activeHref, navigation } from "../../src/lib/nav";
 import { permissionsFor } from "../../src/lib/permissions";
 import type { User } from "../../src/lib/types";
@@ -279,4 +279,43 @@ test("QR downloads are standalone SVG files with a printable name", async () => 
   assert.ok(svg.includes(qrPath(text).path));
   assert.equal(qrFilename("Anna Müller-Groß"), "Visitenkarte-Anna-Mueller-Gross.svg");
   assert.equal(qrFilename("???"), "Visitenkarte.svg");
+});
+
+test("leaders switch their people's cards on and off, only within their structure", () => {
+  const team = Number(db.prepare("INSERT INTO teams(name) VALUES ('Stadtwerke Vertrieb')").run().lastInsertRowid);
+  const add = (role: "LEADER" | "MEMBER", manager: number | null, active = 1) =>
+    Number(
+      db.prepare(`INSERT INTO users(team_id, manager_id, name, email, password_hash, role, active, created_at)
+        VALUES (?, ?, ?, ?, '', ?, ?, '2026-03-14 09:00:00')`)
+        .run(team, manager, `Person ${++sequence}`, `team-switch-${sequence}@example.test`, role, active).lastInsertRowid,
+    );
+  const load = (id: number) => db.prepare("SELECT * FROM users WHERE id = ?").get(id) as User;
+  const boss = add("LEADER", null);
+  const a = add("MEMBER", boss);
+  const b = add("MEMBER", boss);
+  const gone = add("MEMBER", boss, 0);
+  const outsider = person();
+
+  // Alle auf einmal einschalten.
+  assert.equal(updateTeamCards(load(boss), [a, b, a], { enabled: true }), 2);
+  assert.ok(isCardToken(cardSettings(a).token));
+  assert.ok(isCardToken(cardSettings(b).token));
+
+  // Neuer Link ersetzt den alten, Ausschalten nimmt ihn weg.
+  const before = cardSettings(a).token;
+  updateTeamCards(load(boss), [a], { renew: true });
+  assert.notEqual(cardSettings(a).token, before);
+  assert.equal(publicCard(before), null);
+  updateTeamCards(load(boss), [b], { enabled: false });
+  assert.equal(cardSettings(b).token, null);
+
+  // Deaktivierte nicht einschalten, fremde Teams und Leute ausserhalb der Struktur gar nicht - und dann nichts.
+  assert.throws(() => updateTeamCards(load(boss), [b, gone], { enabled: true }), /deaktiviert/);
+  assert.equal(cardSettings(b).token, null);
+  assert.throws(() => updateTeamCards(load(boss), [outsider], { enabled: true }), /nicht gefunden/);
+  assert.throws(() => updateTeamCards(load(a), [b], { enabled: true }), /Berechtigung|Struktur/);
+  assert.equal(cardSettings(b).token, null);
+  assert.throws(() => updateTeamCards(load(boss), [], { enabled: true }), /Auswahl/);
+  assert.throws(() => updateTeamCards(load(boss), ["1"], { enabled: true }), /Auswahl/);
+  assert.throws(() => updateTeamCards(load(boss), [a], {}), /Nichts/);
 });

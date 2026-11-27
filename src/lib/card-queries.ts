@@ -1,6 +1,9 @@
 import crypto from "node:crypto";
 import { getDb } from "./db";
+import { AuthError } from "./auth";
 import { CARD_TOKEN_LENGTH, isCardToken, type PublicCard } from "./business-card";
+import { assertPermission, canManageMember } from "./permissions";
+import type { User } from "./types";
 
 /** Was die eigene Einstellungsseite der Visitenkarte braucht. */
 export interface CardSettings {
@@ -129,4 +132,46 @@ export function teamCards(teamId: number, ids: number[]): TeamCard[] {
     badgeNumber: row.badge_number,
     token: row.card_token,
   }));
+}
+
+/** Hoechstens so viele Karten auf einmal - mehr hat kein Team. */
+const MAX_TEAM_CARDS = 500;
+
+/**
+ * Die Leitung schaltet Karten ihrer Leute ein oder aus oder erzeugt neue
+ * Links - einzeln oder alle auf einmal. Erlaubt mit "Team verwalten" fuer
+ * jede Person, die man auch unter Mitglieder verwalten darf, und fuer sich
+ * selbst. Einschalten geht nur fuer aktive Konten. Alles oder nichts.
+ */
+export function updateTeamCards(
+  actor: User,
+  ids: unknown,
+  change: { enabled?: boolean; renew?: boolean },
+): number {
+  assertPermission(actor, "team.manage");
+  if (
+    !Array.isArray(ids) ||
+    ids.length === 0 ||
+    ids.length > MAX_TEAM_CARDS ||
+    !ids.every((id) => Number.isSafeInteger(id) && id > 0)
+  ) {
+    throw new Error("Ungültige Auswahl.");
+  }
+  if (change.enabled === undefined && !change.renew) throw new Error("Nichts zu ändern.");
+  const db = getDb();
+  const find = db.prepare("SELECT * FROM users WHERE id = ? AND team_id = ?");
+  const unique = [...new Set(ids as number[])];
+  const targets = unique.map((id) => {
+    const target = find.get(id, actor.team_id) as User | undefined;
+    if (!target) throw new Error("Mitarbeiter nicht gefunden.");
+    if (target.id !== actor.id && !canManageMember(actor, target)) {
+      throw new AuthError("Diese Person gehört nicht zu deiner verwaltbaren Struktur.", 403);
+    }
+    if (change.enabled !== false && !target.active) throw new Error(`${target.name} ist deaktiviert.`);
+    return target;
+  });
+  db.transaction(() => {
+    for (const target of targets) updateCard(target.id, change);
+  })();
+  return targets.length;
 }
