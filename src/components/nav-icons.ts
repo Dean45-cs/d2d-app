@@ -16,6 +16,7 @@ import {
   IconMapFill,
   IconPersonCircle,
   IconPyramid,
+  IconQr,
   IconShield,
   IconSparkles,
   IconTrophy,
@@ -48,4 +49,5 @@ export const NAV_ICONS: Record<IconName, { line: IconComponent; fill: IconCompon
   cog: { line: IconCog, fill: IconCog },
   euro: { line: IconEuro, fill: IconEuro },
   calculator: { line: IconCalculator, fill: IconCalculator },
+  qr: { line: IconQr, fill: IconQr },
 };

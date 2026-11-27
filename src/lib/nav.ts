@@ -35,7 +35,8 @@ export type IconName =
   | "list"
   | "cog"
   | "euro"
-  | "calculator";
+  | "calculator"
+  | "qr";
 
 export interface NavItem {
   href: string;
@@ -108,6 +109,10 @@ export function navigation(role: Role, rights: PermissionSet, userId?: number): 
   const admin: NavItem[] = [
     ...(rights["team.manage"] || rights["structure.manage"] || rights["team.roles"]
       ? [{ href: "/einstellungen/mitglieder", label: "Mitglieder", icon: "users" as const }]
+      : []),
+    // Die Kartenlinks des Teams auf einen Blick - zum Drucken oder Verteilen.
+    ...(rights["team.manage"]
+      ? [{ href: "/einstellungen/visitenkarten", label: "Visitenkarten", icon: "qr" as const }]
       : []),
     ...(rights["invitations.create"] || rights["invitations.approve"]
       ? [{ href: "/einstellungen/einladungen", label: "Einladungen", icon: "invite" as const }]

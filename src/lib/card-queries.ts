@@ -89,3 +89,44 @@ export function publicCard(token: unknown): PublicCard | null {
     .get(token) as PublicCard | undefined;
   return row ? { ...row, phone: row.phone.trim() } : null;
 }
+
+/** Eine Zeile der Kartenuebersicht fuer die Leitung. */
+export interface TeamCard {
+  id: number;
+  name: string;
+  /** Adresse des Profilbilds, "" ohne Bild. */
+  avatar: string;
+  badgeNumber: string;
+  /** null: Karte ausgeschaltet. */
+  token: string | null;
+}
+
+/**
+ * Die Kartenlinks der aktiven Personen, die `ids` nennt - fuer die Uebersicht
+ * der Leitung (Ausweise drucken, Links verteilen). Einschalten bleibt Sache
+ * jeder Person: wer die Karte aus hat, erscheint ohne Link. Mit Karte zuerst.
+ */
+export function teamCards(teamId: number, ids: number[]): TeamCard[] {
+  if (ids.length === 0) return [];
+  const rows = getDb()
+    .prepare(
+      `SELECT id, name, avatar_src(id, avatar) AS avatar, COALESCE(badge_number, '') AS badge_number, card_token
+         FROM users
+        WHERE team_id = ? AND active = 1 AND id IN (SELECT value FROM json_each(?))
+        ORDER BY card_token IS NULL, name COLLATE NOCASE`,
+    )
+    .all(teamId, JSON.stringify(ids)) as Array<{
+    id: number;
+    name: string;
+    avatar: string | null;
+    badge_number: string;
+    card_token: string | null;
+  }>;
+  return rows.map((row) => ({
+    id: row.id,
+    name: row.name,
+    avatar: row.avatar ?? "",
+    badgeNumber: row.badge_number,
+    token: row.card_token,
+  }));
+}

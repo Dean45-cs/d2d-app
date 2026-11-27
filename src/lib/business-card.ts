@@ -141,12 +141,22 @@ export function cardVcard(card: PublicCard, url: string): string {
 
 /** Dateiname fuer den Kontakt: "Anna-Mueller.vcf" - ohne Zeichen, an denen ein Browser scheitert. */
 export function vcardFilename(name: string): string {
-  const plain = name
+  return `${fileSlug(name) || "Kontakt"}.vcf`;
+}
+
+/** Dateiname fuer den QR-Code zum Drucken: "Visitenkarte-Anna-Mueller.svg". */
+export function qrFilename(name: string): string {
+  const slug = fileSlug(name);
+  return `Visitenkarte${slug ? `-${slug}` : ""}.svg`;
+}
+
+/** Name als Dateiname: Umlaute ausgeschrieben, sonst nur Buchstaben, Ziffern und Bindestriche. */
+function fileSlug(name: string): string {
+  return name
     .replace(/ä/g, "ae").replace(/ö/g, "oe").replace(/ü/g, "ue")
     .replace(/Ä/g, "Ae").replace(/Ö/g, "Oe").replace(/Ü/g, "Ue").replace(/ß/g, "ss")
     .normalize("NFKD")
     .replace(/[̀-ͯ]/g, "")
     .replace(/[^A-Za-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "");
-  return `${plain || "Kontakt"}.vcf`;
 }
