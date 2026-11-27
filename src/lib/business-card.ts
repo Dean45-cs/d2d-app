@@ -9,8 +9,9 @@
  * Abrufs, damit ein Bildschirmfoto nicht als Beleg durchgeht. Wer nicht mehr
  * im Team ist, hat keine Karte mehr: die Seite meldet dann "nicht gueltig".
  *
- * Die Karte ist freiwillig: jede Person schaltet sie selbst ein (Profil ›
- * Visitenkarte). Ihre Adresse ist ein Zufallswert, keine laufende Nummer -
+ * Einschalten kann die Person selbst (Profil › Visitenkarte) oder die
+ * Leitung (Verwaltung › Visitenkarten). Ihre Adresse ist ein Zufallswert,
+ * keine laufende Nummer -
  * so laesst sich das Team nicht von aussen durchzaehlen. Ein neuer Link macht
  * den alten (und damit gedruckte oder weitergegebene QR-Codes) ungueltig.
  *

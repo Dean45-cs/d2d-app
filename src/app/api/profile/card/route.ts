@@ -6,7 +6,7 @@ export const dynamic = "force-dynamic";
 
 /**
  * Die eigene Visitenkarte: ein- und ausschalten, Rufnummer zeigen, neuer
- * Link. Jede Person entscheidet selbst - die Karte zeigt ihr Bild oeffentlich.
+ * Link. Karten anderer schaltet die Leitung ueber /api/team/cards.
  */
 export async function PATCH(request: Request) {
   return handle(async () => {
