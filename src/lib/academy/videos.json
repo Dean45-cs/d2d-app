@@ -1,0 +1,196 @@
+{
+  "rote-linien": {
+    "title": "Die roten Linien",
+    "src": "/akademie/rote-linien.mp4",
+    "poster": "/akademie/rote-linien.jpg",
+    "captions": "/akademie/rote-linien.vtt",
+    "duration": 76.1,
+    "chapters": [
+      {
+        "t": 0,
+        "title": "Einstieg"
+      },
+      {
+        "t": 10.2,
+        "title": "Die Linien"
+      }
+    ],
+    "script": "9de52c013edb743b"
+  },
+  "auftreten": {
+    "title": "Auftreten & erster Eindruck",
+    "src": "/akademie/auftreten.mp4",
+    "poster": "/akademie/auftreten.jpg",
+    "captions": "/akademie/auftreten.vtt",
+    "duration": 193.9,
+    "chapters": [
+      {
+        "t": 0,
+        "title": "Einstieg"
+      },
+      {
+        "t": 9.3,
+        "title": "Die ersten zehn Sekunden"
+      },
+      {
+        "t": 75.7,
+        "title": "Abstand und Wohnung"
+      },
+      {
+        "t": 114,
+        "title": "Wann und wo du klingelst"
+      },
+      {
+        "t": 163.6,
+        "title": "Das Wichtigste"
+      }
+    ],
+    "script": "6d0b7c7c341a9b9c"
+  },
+  "ehrlichkeit": {
+    "title": "Ehrlich verkaufen",
+    "src": "/akademie/ehrlichkeit.mp4",
+    "poster": "/akademie/ehrlichkeit.jpg",
+    "captions": "/akademie/ehrlichkeit.vtt",
+    "duration": 183.1,
+    "chapters": [
+      {
+        "t": 0,
+        "title": "Einstieg"
+      },
+      {
+        "t": 11.4,
+        "title": "Wer du bist"
+      },
+      {
+        "t": 80.1,
+        "title": "Was du versprichst"
+      },
+      {
+        "t": 121.6,
+        "title": "Fragen ehrlich beantworten"
+      },
+      {
+        "t": 155.4,
+        "title": "Das Wichtigste"
+      }
+    ],
+    "script": "437f67f744a3ef37"
+  },
+  "grenzen": {
+    "title": "Grenzen an der Tür",
+    "src": "/akademie/grenzen.mp4",
+    "poster": "/akademie/grenzen.jpg",
+    "captions": "/akademie/grenzen.vtt",
+    "duration": 187.4,
+    "chapters": [
+      {
+        "t": 0,
+        "title": "Einstieg"
+      },
+      {
+        "t": 9.2,
+        "title": "Nein heißt Nein"
+      },
+      {
+        "t": 54.4,
+        "title": "Wo du nicht klingelst"
+      },
+      {
+        "t": 90.8,
+        "title": "Mit wem du keinen Vertrag machst"
+      },
+      {
+        "t": 161.2,
+        "title": "Das Wichtigste"
+      }
+    ],
+    "script": "abde39b85deca5ee"
+  },
+  "vertrag": {
+    "title": "Vertrag & Widerruf",
+    "src": "/akademie/vertrag.mp4",
+    "poster": "/akademie/vertrag.jpg",
+    "captions": "/akademie/vertrag.vtt",
+    "duration": 203.3,
+    "chapters": [
+      {
+        "t": 0,
+        "title": "Einstieg"
+      },
+      {
+        "t": 10.6,
+        "title": "Den Tarif vollständig erklären"
+      },
+      {
+        "t": 51.8,
+        "title": "Das Widerrufsrecht"
+      },
+      {
+        "t": 116.6,
+        "title": "Unterlagen und Wechsel"
+      },
+      {
+        "t": 173.5,
+        "title": "Das Wichtigste"
+      }
+    ],
+    "script": "b3302a1f6ad8fb42"
+  },
+  "datenschutz": {
+    "title": "Datenschutz & Kontakt",
+    "src": "/akademie/datenschutz.mp4",
+    "poster": "/akademie/datenschutz.jpg",
+    "captions": "/akademie/datenschutz.vtt",
+    "duration": 144.5,
+    "chapters": [
+      {
+        "t": 0,
+        "title": "Einstieg"
+      },
+      {
+        "t": 10.4,
+        "title": "Nur was nötig ist"
+      },
+      {
+        "t": 53.4,
+        "title": "Kontakt nach dem Besuch"
+      },
+      {
+        "t": 119.7,
+        "title": "Das Wichtigste"
+      }
+    ],
+    "script": "2b92bf0c210e4110"
+  },
+  "sicherheit": {
+    "title": "Sicherheit & Konflikte",
+    "src": "/akademie/sicherheit.mp4",
+    "poster": "/akademie/sicherheit.jpg",
+    "captions": "/akademie/sicherheit.vtt",
+    "duration": 171,
+    "chapters": [
+      {
+        "t": 0,
+        "title": "Einstieg"
+      },
+      {
+        "t": 9.6,
+        "title": "Deine Sicherheit geht vor"
+      },
+      {
+        "t": 47.4,
+        "title": "Schwierige Gespräche"
+      },
+      {
+        "t": 105.9,
+        "title": "Beschwerden und Vorfälle"
+      },
+      {
+        "t": 146.7,
+        "title": "Das Wichtigste"
+      }
+    ],
+    "script": "cbd6056ad87e94d8"
+  }
+}

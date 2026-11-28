@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="de">
+  <head>
+    <meta charset="utf-8" />
+    <title>Carlsson Sales · Akademie-Video</title>
+    <link rel="stylesheet" href="stage.css" />
+  </head>
+  <body>
+    <div id="stage"></div>
+    <script src="stage.js"></script>
+    <script>
+      // Die Zeitleiste legt render.ts vor dem Laden ab (window.__TIMELINE__).
+      window.__ready = document.fonts.ready.then(function () {
+        if (window.__TIMELINE__) window.V.load(window.__TIMELINE__);
+        return true;
+      });
+    </script>
+  </body>
+</html>

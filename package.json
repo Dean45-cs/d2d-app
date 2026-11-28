@@ -14,7 +14,8 @@
     "energy:refresh": "tsx scripts/refresh-energy.ts",
     "energy:check": "tsx scripts/check-energy-feed.ts",
     "icons": "node scripts/build-icons.mjs",
-    "themes": "tsx scripts/build-themes.ts"
+    "themes": "tsx scripts/build-themes.ts",
+    "akademie:videos": "tsx video/akademie/render.ts"
   },
   "dependencies": {
     "@mapbox/vector-tile": "^2.0.5",

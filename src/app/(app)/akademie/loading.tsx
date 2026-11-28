@@ -1,6 +1,6 @@
 import { ListLabel, SkeletonHeader, SkeletonList, SkeletonText } from "@/components/ui";
 
-/** Platzhalter der Akademie - Fortschritt, Module, rote Linien. */
+/** Platzhalter der Akademie - Fortschritt, Video der roten Linien, Module. */
 export default function LoadingAcademy() {
   return (
     <div className="page-narrow" aria-busy="true" aria-label="Akademie wird geladen">
@@ -15,6 +15,10 @@ export default function LoadingAcademy() {
             <SkeletonText width="44%" />
           </span>
         </span>
+      </div>
+      <ListLabel>Zuerst: die roten Linien</ListLabel>
+      <div className="surface overflow-hidden" aria-hidden="true">
+        <span className="skeleton block aspect-video w-full" />
       </div>
       <ListLabel>Module</ListLabel>
       <SkeletonList rows={6} icon="glyph" />

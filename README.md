@@ -673,7 +673,7 @@ transaktionale Speicherung und Offline-Wiederholungen mit isolierten Testdatenba
 ## Akademie
 
 Unter **Profil › Akademie** (`/akademie`, ab dem iPad in der Seitenleiste) lernt das Team die
-Verhaltensstandards an der Haustür – sechs Module mit je einem Quiz:
+Verhaltensstandards an der Haustür – sechs Module mit je einem **Erklärvideo** und einem Quiz:
 
 | Modul | Worum es geht |
 |---|---|
@@ -688,6 +688,14 @@ Jede Regel ist markiert: **Gesetz** mit Fundstelle (etwa „§ 123 StGB“) oder
 eigener Standard. Beispiele zeigen „So nicht“ und „So geht’s“. Auf der Startseite der Akademie
 stehen zehn **rote Linien**, die immer gelten.
 
+**Videos statt Lesen:** Jedes Modul beginnt mit einem Erklärvideo von drei bis fünf Minuten,
+die roten Linien haben ein eigenes. Wer die Videos schaut, hat alles Wichtige: Jede Regel,
+jedes Beispiel und „Das Wichtigste“ kommen darin vor (ein Test prüft das). Eine Sprecherstimme
+erklärt, die Schrift im Bild fasst zusammen, Untertitel sind an (zum Schauen ohne Ton),
+Kapitelmarken springen zu den Lektionen. Darunter stehen das Wichtigste in drei Sätzen, alles
+zum Nachlesen (eingeklappt) und das Quiz. Die Videos entstehen aus denselben Inhalten wie der
+Text – wie, steht in [video/akademie/README.md](video/akademie/README.md).
+
 Das Quiz zeigt eine Frage nach der anderen, die Antworten jedes Mal in neuer Reihenfolge. Nach jedem
 Tipp kommt die Erklärung vom Server: Der Browser kennt die Lösungen vorher nicht, und gewertet wird
 der ganze Durchgang erst dort. Bestanden ist ein Modul ab **80 %** – bei sechs Fragen ist ein Fehler
@@ -701,7 +709,9 @@ alle aktiven Personen, alphabetisch.
 **Inhalte pflegen:** Die Texte stehen in `src/lib/academy/content.ts` – bewusst im Code, nicht in
 der Datenbank. Hausregeln wie die Klingelzeiten legt die Geschäftsführung fest. Ändert sich ein
 Modul wesentlich (neue Regel, andere Fragen), wird seine `version` hochgezählt: Dann muss es jeder
-neu bestehen und sieht „Neu ablegen“. Für Tippfehler braucht es keine neue Version.
+neu bestehen und sieht „Neu ablegen“. Für Tippfehler braucht es keine neue Version. Nach jeder
+Textänderung das Video neu rendern (`npm run akademie:videos -- <modul>`) – `npm test` meldet,
+welches veraltet ist.
 
 > **Entwurf, keine Rechtsberatung.** Die Inhalte vor dem Ausrollen rechtlich prüfen lassen
 > (Anwältin, Anwalt oder Branchenverband). Fundstellen, Hausregeln und eine Prüfliste:
@@ -1386,9 +1396,13 @@ src/
     academy/          Akademie: Regeln, Beispiele, Quiz
 public/
   manifest.webmanifest, sw.js, offline.html, App-Icons
+  akademie/           Erklärvideos der Akademie (mp4, Vorschaubild, Untertitel)
 docs/
   IPHONE-IPAD.md      Installation auf dem Handy und App-Store-Weg
   AKADEMIE.md         Akademie: Fundstellen, Hausregeln, Prüfliste vor dem Ausrollen
+video/
+  einfuehrung/        Einführungsvideo als Code (Chromium + ffmpeg)
+  akademie/           Erklärvideos der Akademie: Drehbuch aus den Inhalten, Sprecherstimme (Piper)
 scripts/
   seed.ts             Ersteinrichtung
   refresh-energy.ts   Abruf der (optionalen) Tagesquelle für Cron
@@ -1406,6 +1420,7 @@ npm run lint            # ESLint (Next.js- und React-Hooks-Regeln)
 npm test                # Tests
 npm run db:seed         # Datenbank einrichten
 npm run themes          # Akzentfarben neu erzeugen (src/app/themes.css)
+npm run akademie:videos # Erklärvideos der Akademie neu rendern (video/akademie/README.md)
 npm run energy:refresh  # Tagesquelle abrufen (falls eingerichtet)
 npm run energy:check    # Preistabelle der Tagesquelle prüfen
 ```
