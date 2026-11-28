@@ -79,6 +79,14 @@ Diese Punkte sind als Vorschlag eingetragen – bitte bestätigen oder ändern:
       schon in der Widerrufsfrist beginnt.
 - [ ] Sind die **Quizfragen** eindeutig – gibt es zu jeder genau eine richtige Antwort?
 
+## Videos
+
+Zu jedem Modul und zu den roten Linien gibt es ein Erklärvideo. Sie sagen **wörtlich dieselben
+Regeln** wie der Text, dazu kurze Überleitungen und bei gesetzlichen Regeln den Hinweis „Das ist
+Gesetz“. Die rechtliche Prüfung des Textes deckt die Videos darum mit ab. Ändert sich danach ein
+Text, das Video neu rendern (`npm run akademie:videos -- <modul>`, siehe
+[video/akademie/README.md](../video/akademie/README.md)); `npm test` meldet veraltete Videos.
+
 ## Inhalte ändern
 
 1. Text in `src/lib/academy/content.ts` anpassen. Fragen haben eine feste `id`; die Lösung ist der
@@ -87,5 +95,7 @@ Diese Punkte sind als Vorschlag eingetragen – bitte bestätigen oder ändern:
    um eins erhöhen. Dann zählt ein früheres Bestehen nicht mehr: Alle sehen „Neu ablegen“, und der
    Stand des Teams zeigt, wer das Modul in der neuen Fassung schon bestanden hat. Für Tippfehler
    braucht es keine neue Version.
-3. `npm test` prüft die Inhalte mit: eindeutige Adressen und Fragen, gültige Lösungen, eine
-   Fundstelle bei jeder gesetzlichen Regel, und dass ein Fehler je Quiz erlaubt bleibt.
+3. Das Video des Moduls neu rendern: `npm run akademie:videos -- <modul>`.
+4. `npm test` prüft die Inhalte mit: eindeutige Adressen und Fragen, gültige Lösungen, eine
+   Fundstelle bei jeder gesetzlichen Regel, dass ein Fehler je Quiz erlaubt bleibt – und dass
+   jedes Video aktuell ist und jede Regel enthält.

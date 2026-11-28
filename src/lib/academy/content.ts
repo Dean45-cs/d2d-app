@@ -79,6 +79,8 @@ export interface AcademyModule {
   minutes: number;
   icon: ModuleIcon;
   tone: ModuleTone;
+  /** Das Wichtigste in drei Saetzen - unter dem Video und am Ende des Videos. */
+  keyPoints: string[];
   lessons: Lesson[];
   quiz: Question[];
 }
@@ -113,6 +115,11 @@ export const ACADEMY_MODULES: AcademyModule[] = [
     minutes: 6,
     icon: "person",
     tone: "blue",
+    keyPoints: [
+      "Ausweis zeigen, Namen und Firma nennen, das Anliegen sagen.",
+      "Abstand halten: hinein nur auf Einladung, hinaus sofort, wenn du gehen sollst.",
+      "Geklingelt wird Mo–Sa von 10 bis 20 Uhr, nie an Sonn- und Feiertagen – und nur im eigenen Gebiet.",
+    ],
     lessons: [
       {
         title: "Die ersten zehn Sekunden",
@@ -263,6 +270,11 @@ export const ACADEMY_MODULES: AcademyModule[] = [
     minutes: 7,
     icon: "chat",
     tone: "teal",
+    keyPoints: [
+      "Sag immer klar, wer du bist – nie „von den Stadtwerken“.",
+      "Keine erfundenen Pflichten, Fristen oder Ersparnisse: Bonus und Bedingungen immer dazusagen.",
+      "Ein Auftrag heißt Auftrag – nie eine getarnte Unterschrift.",
+    ],
     lessons: [
       {
         title: "Wer du bist",
@@ -428,6 +440,11 @@ export const ACADEMY_MODULES: AcademyModule[] = [
     minutes: 7,
     icon: "ban",
     tone: "magenta",
+    keyPoints: [
+      "Ein klares Nein beendet das Gespräch.",
+      "Schilder wie „Keine Vertreter“ und gesperrte Türen gelten für alle.",
+      "Kein Vertrag mit Minderjährigen oder Überforderten – und nie eine Unterschrift für andere.",
+    ],
     lessons: [
       {
         title: "Nein heißt Nein",
@@ -604,6 +621,11 @@ export const ACADEMY_MODULES: AcademyModule[] = [
     minutes: 8,
     icon: "pencil",
     tone: "indigo",
+    keyPoints: [
+      "Arbeitspreis, Grundpreis, Laufzeit, Preisgarantie und Bonus vollständig erklären.",
+      "Vor der Unterschrift: Widerrufsbelehrung mit Formular. Der Kunde hat 14 Tage Widerrufsrecht.",
+      "Kein Bargeld, keine Bankkarten, keine PINs oder TANs.",
+    ],
     lessons: [
       {
         title: "Den Tarif vollständig erklären",
@@ -778,6 +800,11 @@ export const ACADEMY_MODULES: AcademyModule[] = [
     minutes: 6,
     icon: "key",
     tone: "purple",
+    keyPoints: [
+      "Nur die Daten aufnehmen, die der Vertrag braucht.",
+      "Kundendaten nie in private Chats oder Screenshots.",
+      "Anrufe und Werbung per Nachricht nur mit ausdrücklicher Einwilligung.",
+    ],
     lessons: [
       {
         title: "Nur was nötig ist",
@@ -922,6 +949,11 @@ export const ACADEMY_MODULES: AcademyModule[] = [
     minutes: 6,
     icon: "shield",
     tone: "brown",
+    keyPoints: [
+      "Deine Sicherheit geht vor jedem Abschluss.",
+      "Ruhig bleiben, nicht diskutieren, freundlich gehen.",
+      "Beschwerden und Vorfälle noch am selben Tag der Leitung melden.",
+    ],
     lessons: [
       {
         title: "Deine Sicherheit geht vor",
