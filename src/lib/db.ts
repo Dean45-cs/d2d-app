@@ -442,6 +442,7 @@ function migrate(db: Database.Database) {
 
   migrateCommissions(db);
   migrateTiers(db);
+  migrateAcademy(db);
 }
 
 /**
@@ -787,6 +788,27 @@ function migrateCommunity(db: Database.Database) {
      WHERE v.outcome = 'SALE'
        AND NOT EXISTS (SELECT 1 FROM posts p WHERE p.visit_id = v.id)
      ORDER BY v.id
+  `);
+}
+
+/**
+ * Akademie (src/lib/academy/): je Person und Modul der Stand - Durchgaenge,
+ * bestes Ergebnis, wann bestanden. Die Inhalte stehen im Code; version haelt
+ * fest, auf welche Fassung des Moduls sich die Zahlen beziehen.
+ */
+function migrateAcademy(db: Database.Database) {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS academy_progress (
+      user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      module_id  TEXT NOT NULL,
+      version    INTEGER NOT NULL,
+      attempts   INTEGER NOT NULL DEFAULT 0,
+      best_score INTEGER NOT NULL DEFAULT 0,
+      last_score INTEGER NOT NULL DEFAULT 0,
+      passed_at  TEXT,
+      updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+      PRIMARY KEY (user_id, module_id)
+    );
   `);
 }
 

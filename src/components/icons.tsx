@@ -641,6 +641,16 @@ export function IconTrophy(props: IconProps) {
     </Line>
   );
 }
+/** Doktorhut - die Akademie. */
+export function IconGraduation(props: IconProps) {
+  return (
+    <Line {...props}>
+      <path d="M12 4.75 2.75 9.25 12 13.75l9.25-4.5L12 4.75Z" />
+      <path d="M6.5 11.4v4.35c0 1.55 2.45 2.9 5.5 2.9s5.5-1.35 5.5-2.9V11.4" />
+      <path d="M21.25 9.25v5" />
+    </Line>
+  );
+}
 export function IconHeart({ className, filled = false }: IconProps & { filled?: boolean }) {
   const d =
     "M12 20s-7.5-4.6-7.5-10.2A4.3 4.3 0 0 1 12 7.2a4.3 4.3 0 0 1 7.5 2.6C19.5 15.4 12 20 12 20Z";

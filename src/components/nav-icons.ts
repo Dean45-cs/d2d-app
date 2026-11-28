@@ -11,6 +11,7 @@ import {
   IconDoor,
   IconDoorFill,
   IconEuro,
+  IconGraduation,
   IconList,
   IconMap,
   IconMapFill,
@@ -50,4 +51,5 @@ export const NAV_ICONS: Record<IconName, { line: IconComponent; fill: IconCompon
   euro: { line: IconEuro, fill: IconEuro },
   calculator: { line: IconCalculator, fill: IconCalculator },
   qr: { line: IconQr, fill: IconQr },
+  academy: { line: IconGraduation, fill: IconGraduation },
 };
