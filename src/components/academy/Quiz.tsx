@@ -8,6 +8,7 @@ import { ProgressBar } from "@/components/ui";
 import { IconCheck, IconCheckCircle, IconX } from "@/components/icons";
 import type { AnswerCheck, PublicQuestion } from "@/lib/academy/score";
 import { fetchWithTimeout } from "@/lib/offline-queue";
+import { powerSaving } from "@/lib/power";
 
 interface Result {
   correct: number;
@@ -17,6 +18,15 @@ interface Result {
   /** Bestandene Module danach - und wie viele es gibt. */
   modulesPassed: number;
   modulesTotal: number;
+}
+
+/** Sanft scrollen - ausser bei reduzierter Bewegung, im Energiesparmodus oder mit "Bewegung aus". */
+function scrollBehavior(): ScrollBehavior {
+  const still =
+    window.matchMedia("(prefers-reduced-motion: reduce)").matches ||
+    powerSaving() ||
+    document.documentElement.dataset.motion === "off";
+  return still ? "auto" : "smooth";
 }
 
 /** Antworten jeder Frage in neuer Reihenfolge - die Position verraet nichts. */
@@ -58,6 +68,7 @@ export function Quiz({
   const toast = useToast();
   const sectionRef = useRef<HTMLElement>(null);
   const headingRef = useRef<HTMLHeadingElement>(null);
+  const answerRef = useRef<HTMLDivElement>(null);
   // null: noch nicht gestartet. Sonst je Frage die Reihenfolge der Antworten.
   const [orders, setOrders] = useState<number[][] | null>(null);
   const [index, setIndex] = useState(0);
@@ -68,17 +79,18 @@ export function Quiz({
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<Result | null>(null);
 
-  // Neue Frage oder Ergebnis: Blick und Fokus dorthin - die Seite davor ist lang.
+  // Neue Frage oder Ergebnis: das Quiz oben ins Bild, der Fokus auf die Frage - die Seite davor ist lang.
   const step = orders === null ? -1 : result ? questions.length : index;
   useEffect(() => {
     if (step < 0) return;
-    const section = sectionRef.current;
-    if (section && section.getBoundingClientRect().top < 0) {
-      const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-      section.scrollIntoView({ block: "start", behavior: reduce ? "auto" : "smooth" });
-    }
+    sectionRef.current?.scrollIntoView({ block: "start", behavior: scrollBehavior() });
     headingRef.current?.focus({ preventScroll: true });
   }, [step]);
+
+  // Nach der Antwort: Erklaerung und "Weiter" ins Bild, frei von der Reiterleiste.
+  useEffect(() => {
+    if (feedback) answerRef.current?.scrollIntoView({ block: "nearest", behavior: scrollBehavior() });
+  }, [feedback]);
 
   function start() {
     setOrders(shuffledOrders(questions));
@@ -260,22 +272,24 @@ export function Quiz({
             })}
           </div>
 
-          <div aria-live="polite">
+          <div ref={answerRef} className="scroll-mb-28">
+            <div aria-live="polite">
+              {feedback && (
+                <div className={`mt-4 rounded-xl p-3 ${feedback.correct ? "bg-accent-tint" : "bg-danger-tint"}`}>
+                  <p className={`text-headline ${feedback.correct ? "text-accent-ink" : "text-danger"}`}>
+                    {feedback.correct ? "Richtig" : "Nicht ganz"}
+                  </p>
+                  <p className="mt-1 text-body text-ink">{feedback.explanation}</p>
+                </div>
+              )}
+            </div>
+
             {feedback && (
-              <div className={`mt-4 rounded-xl p-3 ${feedback.correct ? "bg-accent-tint" : "bg-danger-tint"}`}>
-                <p className={`text-headline ${feedback.correct ? "text-accent-ink" : "text-danger"}`}>
-                  {feedback.correct ? "Richtig" : "Nicht ganz"}
-                </p>
-                <p className="mt-1 text-body text-ink">{feedback.explanation}</p>
-              </div>
+              <button type="button" className="btn btn-primary btn-block mt-4" onClick={advance} disabled={busy}>
+                {index < questions.length - 1 ? "Weiter" : "Auswerten"}
+              </button>
             )}
           </div>
-
-          {feedback && (
-            <button type="button" className="btn btn-primary btn-block mt-4" onClick={advance} disabled={busy}>
-              {index < questions.length - 1 ? "Weiter" : "Auswerten"}
-            </button>
-          )}
         </div>
       )}
     </section>
