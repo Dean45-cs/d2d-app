@@ -9,6 +9,8 @@ import { countAppointments } from "@/lib/queries";
 import { countCustomers } from "@/lib/customers";
 import { cardSettings } from "@/lib/card-queries";
 import { commissionCounts } from "@/lib/commissions/store";
+import { ACADEMY_MODULES } from "@/lib/academy/content";
+import { passedCount, progressFor } from "@/lib/academy/store";
 import { berlinToday } from "@/lib/contracts";
 import { Avatar, Cell, ListLabel, PageHeader, ToneTile, type SymbolTone } from "@/components/ui";
 import { NAV_ICONS } from "@/components/nav-icons";
@@ -20,6 +22,7 @@ import {
   IconComment,
   IconContacts,
   IconEuro,
+  IconGraduation,
   IconMap,
   IconPlay,
   IconQr,
@@ -48,6 +51,7 @@ export default async function ProfileHubPage() {
   const dueCustomers = rights["customers.manage"] ? countCustomers(user.team_id, berlinToday()).due : 0;
   const cardOn = cardSettings(user.id).token !== null;
   const commissions = rights["commissions.manage"] ? commissionCounts(user.team_id) : null;
+  const academyPassed = passedCount(progressFor(user.id));
 
   return (
     <div className="page-narrow">
@@ -91,6 +95,14 @@ export default async function ProfileHubPage() {
             href="/tarifvergleich"
             icon={<ToneTile tone="magenta"><IconCalculator className="h-4 w-4" /></ToneTile>}
             title="Tarifvergleich"
+          />
+        </li>
+        <li>
+          <Cell
+            href="/akademie"
+            icon={<ToneTile tone="purple"><IconGraduation className="h-4 w-4" /></ToneTile>}
+            title="Akademie"
+            detail={`${academyPassed}/${ACADEMY_MODULES.length}`}
           />
         </li>
         {rights["customers.manage"] && (

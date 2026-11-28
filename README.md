@@ -108,6 +108,8 @@ Geräte abgemeldet. Neu gesetzt von der Leitung wird es unter Profil › Verwalt
 | Ränge vergeben und einstellen (Name, Satz, Team, Ziele) | ✅ | – |
 | Eigenes Team aufbauen, Differenz an dessen Verträgen | ✅ | ✅ (ab Junior Teamleiter, einstellbar) |
 | Energiekarte | ✅ | ✅ |
+| Akademie: Module lernen, Quiz ablegen | ✅ | ✅ |
+| Akademie: Stand des Teams | ✅ | – |
 
 Die Tabelle beschreibt die Rollenstandards. Unter **Profil › Verwaltung › Rechte** lassen
 sich 22 Rechte pro Person auf **Standard**, **Erlauben** oder **Entziehen** setzen:
@@ -667,6 +669,43 @@ Neue wartende Einträge sind an das erfassende Konto gebunden.
 transaktionale Speicherung und Offline-Wiederholungen mit isolierten Testdatenbanken.
 
 ---
+
+## Akademie
+
+Unter **Profil › Akademie** (`/akademie`, ab dem iPad in der Seitenleiste) lernt das Team die
+Verhaltensstandards an der Haustür – sechs Module mit je einem Quiz:
+
+| Modul | Worum es geht |
+|---|---|
+| Auftreten & erster Eindruck | Vorstellen mit Ausweis, Abstand, Wohnung nur auf Einladung, Klingelzeiten, eigenes Gebiet, Papiere |
+| Ehrlich verkaufen | Keine falsche Identität („von den Stadtwerken“), keine erfundenen Pflichten, ehrliche Zahlen, keine erschlichene Unterschrift |
+| Grenzen an der Tür | Nein heißt Nein, Schilder an Tür und Haus, Minderjährige, Überforderte, nur der Vertragspartner unterschreibt |
+| Vertrag & Widerruf | Tarif vollständig erklären, 14 Tage Widerrufsrecht mit Formular, Unterlagen, Wechsel, kein Bargeld |
+| Datenschutz & Kontakt | Nur nötige Daten, keine privaten Chats, Anrufe und Nachrichten nur mit Einwilligung |
+| Sicherheit & Konflikte | Eigene Sicherheit zuerst, ruhig bleiben, Beschwerden und Vorfälle am selben Tag melden |
+
+Jede Regel ist markiert: **Gesetz** mit Fundstelle (etwa „§ 123 StGB“) oder **Hausregel** – unser
+eigener Standard. Beispiele zeigen „So nicht“ und „So geht’s“. Auf der Startseite der Akademie
+stehen zehn **rote Linien**, die immer gelten.
+
+Das Quiz zeigt eine Frage nach der anderen, die Antworten jedes Mal in neuer Reihenfolge. Nach jedem
+Tipp kommt die Erklärung vom Server: Der Browser kennt die Lösungen vorher nicht, und gewertet wird
+der ganze Durchgang erst dort. Bestanden ist ein Modul ab **80 %** – bei sechs Fragen ist ein Fehler
+erlaubt. Wiederholen geht jederzeit; ein schlechterer Durchgang nimmt ein Bestehen nicht zurück.
+Das Profil zeigt den Stand („3/6“).
+
+Wer die **Teamauswertung** sehen darf, findet oben rechts den **Stand des Teams**
+(`/akademie/team`): je Modul, wie viele es bestanden haben, und je Person, was noch offen ist –
+alle aktiven Personen, alphabetisch.
+
+**Inhalte pflegen:** Die Texte stehen in `src/lib/academy/content.ts` – bewusst im Code, nicht in
+der Datenbank. Hausregeln wie die Klingelzeiten legt die Geschäftsführung fest. Ändert sich ein
+Modul wesentlich (neue Regel, andere Fragen), wird seine `version` hochgezählt: Dann muss es jeder
+neu bestehen und sieht „Neu ablegen“. Für Tippfehler braucht es keine neue Version.
+
+> **Entwurf, keine Rechtsberatung.** Die Inhalte vor dem Ausrollen rechtlich prüfen lassen
+> (Anwältin, Anwalt oder Branchenverband). Fundstellen, Hausregeln und eine Prüfliste:
+> [Akademie – Inhalte und Prüfung](docs/AKADEMIE.md).
 
 ## Vergleich, Feed und Profil
 
@@ -1302,6 +1341,7 @@ src/
       tour/           Türerfassung (das Herzstück)
       termine/        Vereinbarte Termine, Bestätigung per WhatsApp/SMS
       tarifvergleich/ Tarifvergleich als eigene Seite (beim Klinken als Blatt)
+      akademie/       Akademie: Module mit Quiz, Stand des Teams
       kunden/         Kundenliste: Kunde je Auftrag, Vertragsende, Wiedervorlage
       provisionen/    Provisionsliste je Person, Struktur (Anteile, persönliche Sätze)
       team/           Feed, Beitrag, Rangliste, Erfolge
@@ -1332,6 +1372,7 @@ src/
     tariff-memory.ts  Tarifvergleich: Preise je Tarif und PLZ und laufender Vergleich im Gerät
     tariff-options.ts Tarifvergleich: Tarife (ohne Beträge) und Grundversorger vom Server
     commissions/      Provisionen: Rechenkern, Excel- und Tabellen-Import, Sichtbarkeit je Rolle
+    academy/          Akademie: Inhalte (content.ts), Auswertung des Quiz, Fortschritt je Person
     contracts.ts      Vertragsende, Fälligkeit, Datumsformate
     confirmation.ts   Terminbestätigung: Text, WhatsApp- und SMS-Links
     business-card.ts  Visitenkarte: Link, vCard; Abfragen in card-queries.ts
@@ -1342,10 +1383,12 @@ src/
     offline-pages.ts  Gespeicherte Seiten für den Start ohne Netz (löschen, auffrischen)
   components/         UI-Bausteine, Diagramme, Navigation
     map/              Kartenschicht: OpenFreeMap (MapLibre), Apple Karten, OSM-Rückfall
+    academy/          Akademie: Regeln, Beispiele, Quiz
 public/
   manifest.webmanifest, sw.js, offline.html, App-Icons
 docs/
   IPHONE-IPAD.md      Installation auf dem Handy und App-Store-Weg
+  AKADEMIE.md         Akademie: Fundstellen, Hausregeln, Prüfliste vor dem Ausrollen
 scripts/
   seed.ts             Ersteinrichtung
   refresh-energy.ts   Abruf der (optionalen) Tagesquelle für Cron

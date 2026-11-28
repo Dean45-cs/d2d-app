@@ -36,7 +36,8 @@ export type IconName =
   | "cog"
   | "euro"
   | "calculator"
-  | "qr";
+  | "qr"
+  | "academy";
 
 export interface NavItem {
   href: string;
@@ -94,6 +95,8 @@ export function navigation(role: Role, rights: PermissionSet, userId?: number): 
     role !== "LEADER" || rights["commissions.manage"] ? [{ href: "/provisionen", label: "Provisionen", icon: "euro" }] : [];
   // Tarifvergleich ueber die Laufzeit - beim Klinken als Blatt, hier als eigene Seite.
   const vergleich: NavItem = { href: "/tarifvergleich", label: "Tarifvergleich", icon: "calculator" };
+  // Akademie: Verhaltensstandards lernen, mit Quiz je Modul - fuer alle.
+  const akademie: NavItem = { href: "/akademie", label: "Akademie", icon: "academy" };
   const gebiete: NavItem = {
     href: "/gebiete",
     label: rights["territories.view_all"] ? "Gebiete" : "Meine Gebiete",
@@ -144,12 +147,12 @@ export function navigation(role: Role, rights: PermissionSet, userId?: number): 
       href: "/profil",
       label: "Profil",
       icon: "profile",
-      match: ["/einstellungen", "/kunden", "/provisionen", "/tarifvergleich", ...me, ...(reports ? [] : ["/start"])],
+      match: ["/einstellungen", "/kunden", "/provisionen", "/tarifvergleich", "/akademie", ...me, ...(reports ? [] : ["/start"])],
     },
   ];
 
   const sidebar: NavSection[] = [
-    { items: [start, tour, termine, vergleich, ...kunden, ...provisionen] },
+    { items: [start, tour, termine, vergleich, ...kunden, ...provisionen, akademie] },
     { title: "Karte", items: [gebiete, preise], area: "map" },
     { title: "Team", items: [feed, rangliste, erfolge, stufen], area: "team" },
     ...(admin.length > 0 ? [{ title: "Verwaltung", items: admin }] : []),
@@ -159,7 +162,7 @@ export function navigation(role: Role, rights: PermissionSet, userId?: number): 
     tabs,
     sidebar,
     admin,
-    items: [start, tour, termine, vergleich, ...kunden, ...provisionen, gebiete, preise, feed, rangliste, erfolge, stufen, ...admin],
+    items: [start, tour, termine, vergleich, ...kunden, ...provisionen, akademie, gebiete, preise, feed, rangliste, erfolge, stufen, ...admin],
   };
 }
 
